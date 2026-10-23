@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Build a signed, notarized CleanMate .dmg for GitHub Releases.
-# Steps: release notes from CHANGELOG.md -> archive -> export (Developer ID) -> notarize app -> staple -> dmg -> notarize dmg -> staple -> sha256.
-# No secrets here: notarytool reads credentials from a keychain profile (see --help).
+# Build a signed, notarized CleanMate .dmg for GitHub Releases, and its Sparkle update feed.
+# Steps: release notes from CHANGELOG.md -> archive -> check the EdDSA key -> export (Developer ID) -> notarize app
+# -> staple -> dmg -> notarize dmg -> staple -> sha256 -> EdDSA signature -> appcast.xml.
+# No secrets here: notarytool and Sparkle's sign_update read their keys from the login keychain (see --help).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,19 +12,26 @@ APP_NAME="CleanMate"
 OUT="$ROOT/build/release"
 PROFILE="${NOTARY_PROFILE:-cleanmate-notary}"
 SKIP_NOTARIZE=0
+DERIVED="$ROOT/build/DerivedData"
+# Sparkle's command line tools come with its Swift package, resolved into DERIVED by the archive step.
+SPARKLE_BIN="${SPARKLE_BIN:-$DERIVED/SourcePackages/artifacts/sparkle/Sparkle/bin}"
+REPO_URL="https://github.com/homielab/cleanmate"
 
 usage() {
   cat <<EOF
 Usage: scripts/release.sh [--skip-notarize] [--profile NAME] [--help]
 
-Builds build/release/CleanMate-<version>.dmg (+ .sha256) from the current checkout, and
-build/release/CleanMate-<version>-notes.md with the "## [<version>]" section of CHANGELOG.md.
+Builds build/release/CleanMate-<version>.dmg (+ .sha256) from the current checkout,
+build/release/CleanMate-<version>-notes.md with the "## [<version>]" section of CHANGELOG.md, and
+build/release/appcast.xml: the Sparkle update feed with one item for this version, its download
+signed with the EdDSA key, and the same release notes.
 The version is MARKETING_VERSION in the Xcode project. Before running: bump it, rename
 "## [Unreleased]" in CHANGELOG.md to "## [<version>] - YYYY-MM-DD", and commit. Without that
 section the script stops before building anything.
 
   --skip-notarize  Local dry run: archive, export with Developer ID, make the dmg,
                    but do not contact Apple (the dmg will not pass Gatekeeper on other Macs).
+                   Without the EdDSA key, appcast.xml is written unsigned: never publish it.
   --profile NAME   notarytool keychain profile (default: \$NOTARY_PROFILE or cleanmate-notary).
   --help           Show this help.
 
@@ -31,11 +39,16 @@ One-time setup:
   - "Developer ID Application" certificate for team 79LQ4MHVMG in the login keychain.
   - xcrun notarytool store-credentials cleanmate-notary \\
         --apple-id <apple id> --team-id 79LQ4MHVMG --password <app-specific password>
+  - Sparkle's EdDSA private key in the login keychain, matching SUPublicEDKey in CleanMate/Info.plist.
+    Check: build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -p
+    On another Mac, import a backup with generate_keys -f <file>. SPARKLE_BIN overrides the tools folder.
 
 This script does not tag, push or upload. Publish afterwards, e.g.:
   git tag v<version> && git push origin main v<version>
   gh release create v<version> build/release/CleanMate-<version>.dmg build/release/CleanMate-<version>.dmg.sha256 \\
-      --title "CleanMate <version>" --notes-file build/release/CleanMate-<version>-notes.md
+      build/release/appcast.xml --title "CleanMate <version>" --notes-file build/release/CleanMate-<version>-notes.md
+The app reads its feed from $REPO_URL/releases/latest/download/appcast.xml,
+so the new release must be the latest one (gh's default) and carry appcast.xml.
 EOF
 }
 
@@ -49,10 +62,15 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-VERSION="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null \
-  | awk -F' = ' '/ MARKETING_VERSION = /{print $2; exit}')"
-[[ -n "$VERSION" ]] || { echo "Cannot read MARKETING_VERSION" >&2; exit 1; }
-echo "==> CleanMate $VERSION"
+SETTINGS="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null)"
+setting() { awk -F' = ' -v key=" $1 = " 'index($0, key) { print $2; exit }' <<<"$SETTINGS"; }
+VERSION="$(setting MARKETING_VERSION)"
+BUILD="$(setting CURRENT_PROJECT_VERSION)"
+MIN_SYSTEM="$(setting MACOSX_DEPLOYMENT_TARGET)"
+[[ -n "$VERSION" && -n "$BUILD" && -n "$MIN_SYSTEM" ]] || {
+  echo "Cannot read MARKETING_VERSION, CURRENT_PROJECT_VERSION or MACOSX_DEPLOYMENT_TARGET" >&2; exit 1
+}
+echo "==> CleanMate $VERSION (build $BUILD)"
 
 # Body of the "## [<version>]" section of CHANGELOG.md (heading, link definitions and
 # surrounding blank lines dropped), up to the next "## " heading.
@@ -90,7 +108,20 @@ notarize() { # $1 = file to submit (zip or dmg)
 
 echo "==> Archive"
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
-  -destination 'generic/platform=macOS' -archivePath "$ARCHIVE" archive -quiet
+  -destination 'generic/platform=macOS' -derivedDataPath "$DERIVED" -archivePath "$ARCHIVE" archive -quiet
+
+# Before notarizing: Sparkle refuses an update signed with another key than the installed app's SUPublicEDKey.
+echo "==> Sparkle key"
+[[ -x "$SPARKLE_BIN/sign_update" && -x "$SPARKLE_BIN/generate_keys" ]] || { echo "Sparkle tools not found in $SPARKLE_BIN" >&2; exit 1; }
+APP_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ARCHIVE/Products/Applications/$APP_NAME.app/Contents/Info.plist")"
+SIGN_KEY="$("$SPARKLE_BIN/generate_keys" -p 2>/dev/null || true)"
+if [[ "$SIGN_KEY" != "$APP_KEY" ]]; then
+  if [[ -z "$SIGN_KEY" ]]; then echo "No Sparkle EdDSA key in the login keychain." >&2
+  else echo "The keychain's Sparkle key ($SIGN_KEY) is not the app's SUPublicEDKey ($APP_KEY)." >&2; fi
+  [[ $SKIP_NOTARIZE -eq 1 ]] || exit 1
+  echo "warning: --skip-notarize: appcast.xml gets no EdDSA signature." >&2
+  SIGN_KEY=""
+fi
 
 echo "==> Export (Developer ID)"
 # Manual style: non-sandboxed app with no capabilities needs no provisioning profile, so no Apple account is needed here.
@@ -142,8 +173,44 @@ if [[ $SKIP_NOTARIZE -eq 0 ]]; then
 fi
 
 (cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
+
+echo "==> Appcast"
+# Signed last: stapling changes the dmg. sign_update prints: sparkle:edSignature="..." length="..."
+if [[ -n "$SIGN_KEY" ]]; then
+  ENCLOSURE_ATTRS="$("$SPARKLE_BIN/sign_update" "$DMG")"
+  [[ "$ENCLOSURE_ATTRS" == *'sparkle:edSignature="'* ]] || { echo "sign_update failed: $ENCLOSURE_ATTRS" >&2; exit 1; }
+else
+  ENCLOSURE_ATTRS="length=\"$(stat -f %z "$DMG")\""
+fi
+APPCAST="$OUT/appcast.xml"
+CDATA_NOTES="${NOTES//]]>/]]]]><![CDATA[>}"  # "]]>" would end the CDATA section
+cat > "$APPCAST" <<APPCAST_XML
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>$APP_NAME</title>
+    <link>$REPO_URL</link>
+    <language>en</language>
+    <item>
+      <title>$APP_NAME $VERSION</title>
+      <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
+      <sparkle:version>$BUILD</sparkle:version>
+      <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>$MIN_SYSTEM</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[
+$CDATA_NOTES
+]]></description>
+      <enclosure url="$REPO_URL/releases/download/v$VERSION/$(basename "$DMG")" type="application/octet-stream" $ENCLOSURE_ATTRS/>
+    </item>
+  </channel>
+</rss>
+APPCAST_XML
+xmllint --noout "$APPCAST"
+
 echo "==> Done: $DMG"
 cat "$DMG.sha256"
 echo "Release notes: $NOTES_FILE"
+echo "Appcast: $APPCAST"
+[[ -n "$SIGN_KEY" ]] || echo "(appcast.xml has no EdDSA signature: do not publish it)"
 [[ $SKIP_NOTARIZE -eq 1 ]] && echo "(not notarized: --skip-notarize)"
 exit 0

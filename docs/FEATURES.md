@@ -24,7 +24,7 @@ For a short overview, see the [README](../README.md).
 ## Settings, shortcuts and Undo
 
 **Settings** (⌘,): optional menu bar item showing free space and the space freed in the last 30 days (off by default), Full Disk Access status, age thresholds (old logs, temporary files, AI sessions), remembered
-choices, excluded folders, and the activity log. **View** › ⌘1–⌘6 switch modules; **Scan › Scan Again** (⌘R) rescans the visible module and **Scan › Stop** (⌘.) stops a running scan. With VoiceOver, the warning shown when you exclude a broad folder and the confirmation that remembered choices were reset are read aloud, and keyboard focus moves to **Cancel** when a confirmation row appears in Settings. Clean/Trash have no shortcut on purpose, and while a delete or Trash confirmation is open ⌘R, ⌘., ⌘⌫ and ⌘1–⌘6 do nothing.
+choices, updates (see [Privacy](#privacy)), excluded folders, and the activity log. **View** › ⌘1–⌘6 switch modules; **Scan › Scan Again** (⌘R) rescans the visible module and **Scan › Stop** (⌘.) stops a running scan. With VoiceOver, the warning shown when you exclude a broad folder and the confirmation that remembered choices were reset are read aloud, and keyboard focus moves to **Cancel** when a confirmation row appears in Settings. Clean/Trash have no shortcut on purpose, and while a delete or Trash confirmation is open ⌘R, ⌘., ⌘⌫ and ⌘1–⌘6 do nothing.
 Before the first scan, Smart Scan shows the free space on your disk and how much CleanMate freed in the last 30 days.
 In Smart Scan and Privacy each group header shows its total and a **Select All / Deselect All** button (items that are locked or empty stay unticked) and can be collapsed; arrow keys move between rows and Space ticks or unticks the selected ones. The Uninstaller's file list (leftovers and Reset too) and Extensions work the same way (rows that can't be ticked stay as they are); in Unknown Hidden Config, Space opens Quick Look. After a scan, items in each group are sorted largest first (during the scan they keep a fixed order so rows don't jump). Rows show the app's icon when there is one and a small bar comparing each size with the largest in the group (Large & Old Files, Uninstaller and Space Lens have the same bars); after cleaning, the result lists what each group freed.
 After a scan the sidebar shows a badge next to Smart Scan and Privacy (size selected) and Large & Old Files (files found). After moving items to the Trash, an **Open Trash** button opens it in Finder. In Large & Old Files, Space Lens and Uninstaller (also a Reset) an **Undo** button puts the items of that module's last move to the Trash back where they were — only while they are still in the Trash, never over something now in their place, and only if their folder still exists (not replaced by a link, nor by another disk mounted there); anything it can't put back is counted and left in the Trash. Undo lasts until CleanMate quits (nothing is saved). Launch agents an uninstall booted out stay unloaded until the next login. The same undo is also on **Edit › Undo Move to Trash / Undo Uninstall / Undo Reset (⌘Z)**; using either one removes the other, and there is no redo. It is dropped by a new scan, a new move to the Trash, another Space Lens folder, or switching to another module. While typing in a search field, ⌘Z first undoes the typing. Smart Scan has no Undo (most of what it cleans is deleted outright) and no ⌘Z.
@@ -100,7 +100,18 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 
 ## Privacy
 
-CleanMate collects no data and makes no network connections: no analytics, no telemetry, no update checks.
+CleanMate collects no data: no analytics, no telemetry. Its only network connection is the update check, done with
+[Sparkle](https://sparkle-project.org):
+
+- **CleanMate › Check for Updates…** checks now. Automatic checks are off on the first launch; on the second launch
+  CleanMate asks whether to check automatically (and whether to download and install updates by itself).
+- **Settings › General › Updates**: **Automatically check for updates** and **Automatically download and install
+  updates** (only with automatic checks on) change that answer at any time.
+- A check downloads the update feed (`appcast.xml`) from this project's latest GitHub Release; the update itself is
+  downloaded only when you install it or allow automatic downloads. No system profile or other data is sent.
+- Every update is signed with the project's EdDSA key and checked before it is unpacked; macOS checks its Developer ID
+  signature and notarization as for the first install.
+
 Settings are stored in the app's own preferences on your Mac.
 
 ## Languages

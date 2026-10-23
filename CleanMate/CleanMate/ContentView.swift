@@ -105,6 +105,7 @@ struct ContentView: View {
             // Once, and only when missing; remembered even if the user picks Not Now.
             if !fullDiskAccessPrompted && !FullDiskAccess.isGranted { showsFullDiskAccess = true }
             fullDiskAccessPrompted = true
+            AppUpdater.shared.start()  // after the window: see `start`
         }
         .sheet(isPresented: $showsFullDiskAccess) { FullDiskAccessSheet() }
     }
@@ -248,7 +249,7 @@ private struct FullDiskAccessSheet: View {
             Text("CleanMate works without it, but some items can't be read: the Trash, Safari data and app containers. Turn on CleanMate in System Settings > Privacy & Security > Full Disk Access, then scan again.")
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("CleanMate only cleans inside your user account and never sends anything over the network.")
+            Text("CleanMate only cleans inside your user account and collects no data.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

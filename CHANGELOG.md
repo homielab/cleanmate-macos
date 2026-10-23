@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Updates**: CleanMate › Check for Updates… installs new versions from GitHub Releases (signed, verified with
+  Sparkle). On the second launch you are asked whether to check automatically; Settings › General › Updates changes
+  it. This update check is CleanMate's only network connection and sends no data about you or your Mac.
 - **Uninstaller**: an app's config outside ~/Library (`~/.config/zed`, `~/.cursor`…) and folders that only start like
   its name (`BraveSoftware` for Brave Browser, marked "Possibly related") are listed with its data, not ticked.
 

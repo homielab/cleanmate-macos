@@ -27,7 +27,7 @@ struct SettingsView: View {
             Tab("Exclusions", systemImage: "nosign", value: Self.exclusionsTab) { ExclusionSettings() }
             Tab("Activity", systemImage: "list.bullet.rectangle", value: "activity") { ActivitySettings() }
         }
-        .frame(width: 520, height: 590)  // tallest tab (General) fits without scrolling in EN/VI
+        .frame(width: 520, height: 780)  // tallest tab (General) fits without scrolling in EN/VI
     }
 }
 
@@ -86,6 +86,7 @@ struct GeneralSettings: View {
                     }
                 }
             }
+            UpdateSettings(updater: .shared)
             Section {
                 LabeledContent("Language") { Text("Same as your Mac") }
             } footer: {

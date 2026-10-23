@@ -61,6 +61,26 @@
         }
       }
     },
+    "Automatically check for updates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tự động kiểm tra cập nhật"
+          }
+        }
+      }
+    },
+    "Automatically download and install updates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tự động tải về và cài đặt bản cập nhật"
+          }
+        }
+      }
+    },
     "Blocked by a folder in Exclusions" : {
       "localizations" : {
         "vi" : {
@@ -71,12 +91,52 @@
         }
       }
     },
+    "Check for Updates…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra cập nhật…"
+          }
+        }
+      }
+    },
+    "Checking for updates is CleanMate’s only network connection: it asks GitHub whether a new version is out. Nothing about you or your Mac is sent." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra cập nhật là kết nối mạng duy nhất của CleanMate: hỏi GitHub xem đã có phiên bản mới chưa. Không gửi gì về bạn hay máy Mac của bạn."
+          }
+        }
+      }
+    },
     "Chrome downloads it again when an AI feature is used" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chrome tải lại khi dùng tính năng AI"
+          }
+        }
+      }
+    },
+    "CleanMate collects no data. Its only network connection is the update check." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate không thu thập dữ liệu. Kết nối mạng duy nhất là kiểm tra cập nhật."
+          }
+        }
+      }
+    },
+    "CleanMate only cleans inside your user account and collects no data." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate chỉ dọn trong tài khoản người dùng của bạn và không thu thập dữ liệu."
           }
         }
       }
@@ -701,6 +761,16 @@
         }
       }
     },
+    "Updates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cập nhật"
+          }
+        }
+      }
+    },
     "Yarn Berry cache" : {
       "localizations" : {
         "vi" : {
@@ -1249,16 +1319,6 @@
         }
       }
     },
-    "CleanMate collects no data and never sends anything over the network." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CleanMate không thu thập dữ liệu và không bao giờ gửi gì ra mạng."
-          }
-        }
-      }
-    },
     "CleanMate doesn’t remove these items. Check them and deal with them yourself if needed." : {
       "localizations" : {
         "vi" : {
@@ -1275,16 +1335,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate vẫn chạy trên thanh menu sau khi đóng cửa sổ. Ứng dụng không tự mở khi đăng nhập."
-          }
-        }
-      }
-    },
-    "CleanMate only cleans inside your user account and never sends anything over the network." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CleanMate chỉ dọn trong tài khoản người dùng của bạn và không bao giờ gửi gì ra mạng."
           }
         }
       }

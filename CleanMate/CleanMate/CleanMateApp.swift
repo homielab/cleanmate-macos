@@ -82,7 +82,7 @@ private struct AppCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
             Button("About CleanMate") {
-                let credits = String(localized: "CleanMate collects no data and never sends anything over the network.")
+                let credits = String(localized: "CleanMate collects no data. Its only network connection is the update check.")
                 NSApplication.shared.orderFrontStandardAboutPanel(options: [
                     .credits: NSAttributedString(string: credits, attributes: [
                         .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
@@ -90,6 +90,7 @@ private struct AppCommands: Commands {
                     ]),
                 ])
             }
+            CheckForUpdatesButton(updater: .shared)
         }
         // View menu: ⌘1…⌘6 pick a sidebar module.
         CommandGroup(before: .sidebar) {

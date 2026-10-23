@@ -8,7 +8,7 @@ A native macOS app that frees disk space and clears privacy traces — fast, sim
 </picture>
 
 Everything is previewed first and only removed after you confirm. CleanMate runs entirely on your Mac:
-no account, no network, no telemetry.
+no account, no telemetry; its only network connection is the update check, which you can turn off.
 
 > CleanMate is an independent open-source project, not affiliated with MacPaw or CleanMyMac.
 
@@ -33,6 +33,8 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
    [GitHub Releases](https://github.com/homielab/cleanmate/releases/latest).
    It is signed with a Developer ID and notarized by Apple; a `.sha256` checksum is published next to it.
 2. Open the disk image and drag **CleanMate** to **Applications**.
+3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks
+   whether to check automatically; change it any time in Settings › General › Updates.
 
 Requires **macOS 27** or later.
 
@@ -52,7 +54,11 @@ The full rules are in [docs/FEATURES.md › Safety](docs/FEATURES.md#safety).
 
 ## Privacy
 
-CleanMate collects no data and makes no network connections: no analytics, no telemetry, no update checks.
+CleanMate collects no data: no analytics, no telemetry. Its only network connection is the update check
+([Sparkle](https://sparkle-project.org)): it downloads the update feed from this repository's GitHub Releases, and a
+new version only when you install it or turn on automatic downloads. Nothing about you or your Mac is sent (system
+profiling is off). Automatic checks are off until you answer the question on the second launch, and can be turned
+off in Settings › General › Updates. Updates are signed (EdDSA) and verified before they are installed.
 Settings stay in the app's own preferences on your Mac.
 
 ## Permissions
@@ -71,7 +77,8 @@ System Settings › General › Language & Region › Applications.
 
 ## Build from source
 
-Requires Xcode 27 on macOS 27. There are no third-party dependencies.
+Requires Xcode 27 on macOS 27. The only third-party dependency is [Sparkle](https://sparkle-project.org) for
+updates, fetched by Swift Package Manager on the first build. Tests and the smoke test never check for updates.
 
 ```sh
 # Build
@@ -88,8 +95,8 @@ scripts/check-warnings.sh
 ```
 
 Or open `CleanMate/CleanMate.xcodeproj` in Xcode and press Run.
-`scripts/release.sh --help` explains how to build a signed, notarized DMG; its release notes come from the
-version's section in [CHANGELOG.md](CHANGELOG.md).
+`scripts/release.sh --help` explains how to build a signed, notarized DMG and the `appcast.xml` update feed; their
+release notes come from the version's section in [CHANGELOG.md](CHANGELOG.md).
 
 ## Project layout
 
@@ -97,6 +104,7 @@ version's section in [CHANGELOG.md](CHANGELOG.md).
   (`SmartScanCatalog`, `DeveloperCatalog`, `AppCatalog`, `PrivacyCatalog`), `ActivityLog`, `Preferences`.
 - `CleanMate/CleanMate/Views/` — one view and model per module, plus Settings.
 - `CleanMate/CleanMate/AppIcon.icon` — the app icon (open it in Icon Composer).
+- `CleanMate/Info.plist` — Sparkle settings merged into the generated Info.plist: update feed URL and public EdDSA key.
 - `CleanMate/CleanMateTests/` — unit and end-to-end tests.
 - `scripts/` — smoke test, warning check, snapshot diff and release script.
 - `docs/` — detailed features and the README screenshots.

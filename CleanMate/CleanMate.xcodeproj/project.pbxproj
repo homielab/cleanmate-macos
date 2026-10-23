@@ -6,6 +6,10 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		C0FFEE00000000000000000E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C0FFEE00000000000000000D /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		C0FFEE000000000000000008 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -38,6 +42,7 @@
 		B4E7D5D03087BCB600917B8E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				C0FFEE00000000000000000E /* Sparkle in Frameworks */,
 			);
 		};
 		C0FFEE000000000000000005 /* Frameworks */ = {
@@ -83,6 +88,9 @@
 				B4E7D5D53087BCB600917B8E /* CleanMate */,
 			);
 			name = CleanMate;
+			packageProductDependencies = (
+				C0FFEE00000000000000000D /* Sparkle */,
+			);
 			productName = CleanMate;
 			productReference = B4E7D5D33087BCB600917B8E /* CleanMate.app */;
 			productType = "com.apple.product-type.application";
@@ -137,6 +145,9 @@
 			);
 			mainGroup = B4E7D5CA3087BCB600917B8E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C0FFEE00000000000000000C /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B4E7D5D43087BCB600917B8E /* Products */;
 			projectDirPath = "";
@@ -317,6 +328,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 HomieLab.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -349,6 +361,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 HomieLab.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -435,6 +448,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C0FFEE00000000000000000C /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = exactVersion;
+				version = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C0FFEE00000000000000000D /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0FFEE00000000000000000C /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B4E7D5CB3087BCB600917B8E /* Project object */;
 	validationLevel = 1;

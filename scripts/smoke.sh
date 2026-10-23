@@ -3,7 +3,8 @@
 # not start a second process. Runs three launch configurations on one build:
 # default, Vietnamese UI (-AppleLanguages (vi)) and menu bar icon on (-showMenuBarExtra YES;
 # the status item itself is not checked: with the screen locked no app's status item appears in
-# CGWindowList at any layer, so it cannot be measured). No GUI interaction, no scan, no clean.
+# CGWindowList at any layer, so it cannot be measured). No GUI interaction, no scan, no clean,
+# no network.
 # Works with the screen locked: CGWindowList owner/layer/bounds need no Screen Recording permission.
 # Usage: scripts/smoke.sh [path/to/CleanMate.app]   (default: Debug build into build/smoke)
 set -euo pipefail
@@ -70,10 +71,11 @@ FAIL=0
 fail() { echo "FAIL: $*"; FAIL=1; }
 
 # One launch configuration: $1 = label, rest = extra launch arguments.
-# Launch arguments only shadow defaults for this run: no Full Disk Access sheet, no restored windows.
+# Launch arguments only shadow defaults for this run: no Full Disk Access sheet, no restored windows,
+# and no update checks (Sparkle neither asks for permission on a later launch nor goes online).
 run_config() {
   local label="$1"; shift
-  local args=(--args -fullDiskAccessPrompted YES -ApplePersistenceIgnoreState YES "$@")
+  local args=(--args -fullDiskAccessPrompted YES -ApplePersistenceIgnoreState YES -SUEnableAutomaticChecks NO "$@")
   local before n extra
   echo "== $label"
   before="$(pids)"
