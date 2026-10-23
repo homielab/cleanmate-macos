@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0] - 2026-10-24
+
 First public release: a native macOS cleaner that frees disk space and removes privacy traces,
 showing everything first and removing only what you confirm.
 
