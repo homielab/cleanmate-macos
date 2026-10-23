@@ -1,0 +1,144 @@
+import Foundation
+
+/// UserDefaults keys for the Settings window, readable from engine code (UserDefaults is thread-safe).
+nonisolated enum Preferences {
+    /// [String]: folders and files never listed nor removed by any module (`SafetyPolicy.excluded`).
+    static let excludedFolders = "excludedFolders"
+    /// [String: Bool]: item id → selected, only for items whose choice differs from `selectedByDefault`.
+    static let selectionOverrides = "selectionOverrides"
+    static let oldLogsDays = "oldLogsDays"
+    static let tempFilesDays = "tempFilesDays"
+    static let sessionDays = "sessionDays"
+    /// The one-time Full Disk Access sheet was shown.
+    static let fullDiskAccessPrompted = "fullDiskAccessPrompted"
+    /// Bool, off by default: free-space item in the menu bar.
+    static let showMenuBarExtra = "showMenuBarExtra"
+    /// [String: Int]: scan scope → entries checked by the last finished Large & Old Files scan (progress estimate).
+    static let largeFilesLastCount = "largeFilesLastCount"
+    /// String: folders last chosen as the Large & Old Files scope, newest first, one path per line.
+    static let largeFilesRecentFolders = "largeFilesRecentFolders"
+    /// String: path of the Large & Old Files scope, empty for the whole home folder.
+    static let largeFilesScope = "largeFilesScope"
+    /// String: folders last chosen in Space Lens › Location, same format as `largeFilesRecentFolders`.
+    static let spaceLensRecentFolders = "spaceLensRecentFolders"
+    /// [String: Double]: Smart Scan/Privacy item id → seconds its scan took in the last finished scan (progress weights).
+    static let smartScanLastDurations = "smartScanLastDurations"
+    /// String (`UninstallerModel.AppSort` raw value): order of the Uninstaller's app list, Name by default.
+    static let uninstallerSort = "uninstallerSort"
+    /// String (`UninstallerModel.UnusedFilter` raw value): "not used for" filter of the Uninstaller's app list, All by default.
+    static let uninstallerUnused = "uninstallerUnused"
+
+    /// String: ids of Smart Scan groups turned off in Settings › Smart Scan, one per line; never scanned nor shown.
+    static let disabledScanGroups = "disabledScanGroups"
+    /// Settings tab shown when the window opens.
+    static let settingsTab = "settingsTab"
+
+    /// [String: [String: Any]]: probe command → last output with its fingerprint and date (`SizeProbe.output`).
+    static let probeOutputs = "probeOutputs"
+
+    static let recentLimit = 5
+
+    /// Smart Scan group ids turned off in Settings. `defaults` is injected by tests.
+    static func disabledGroups(defaults: UserDefaults = .standard) -> Set<String> {
+        disabledGroups(text: defaults.string(forKey: disabledScanGroups) ?? "")
+    }
+
+    static func disabledGroups(text: String) -> Set<String> { Set(text.split(separator: "\n").map(String.init)) }
+
+    /// Paths of a recent-folders value (one per line, newest first), folders that no longer exist dropped.
+    static func recentFolders(_ stored: String) -> [String] {
+        stored.split(separator: "\n").map(String.init).filter {
+            var isFolder: ObjCBool = false
+            return FileManager.default.fileExists(atPath: $0, isDirectory: &isFolder) && isFolder.boolValue
+        }
+    }
+
+    /// `stored` with `path` moved to the front, missing folders dropped, at most `recentLimit` entries.
+    static func addingRecentFolder(_ path: String, to stored: String) -> String {
+        ([path] + recentFolders(stored).filter { $0 != path }).prefix(recentLimit).joined(separator: "\n")
+    }
+
+    static var excluded: [String] { UserDefaults.standard.stringArray(forKey: excludedFolders) ?? [] }
+
+    /// A folder (not a package such as .app) or a regular file, never a symlink nor a missing path: what
+    /// Settings › Exclusions and "Never Clean This" accept. `SafetyPolicy` refuses an excluded file, and its
+    /// parent folders, the same way as an excluded folder.
+    /// Never a "broad" path: the context menu must not exclude home, "/" or a parent of home.
+    static func canExclude(_ url: URL) -> Bool { isExcludableItem(url) && !isBroad(url) }
+
+    /// "/", `home` or a folder containing `home`: excluding it leaves every module with nothing to clean, so
+    /// Settings › Exclusions asks first.
+    static func isBroad(_ url: URL, home: URL = URL(fileURLWithPath: NSHomeDirectory())) -> Bool {
+        let path = url.standardizedFileURL.path, homePath = home.standardizedFileURL.path
+        return path == "/" || path == homePath || homePath.hasPrefix(path + "/")
+    }
+
+    private static func isExcludableItem(_ url: URL) -> Bool {
+        guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey, .isRegularFileKey, .isSymbolicLinkKey]),
+              values.isSymbolicLink != true else { return false }
+        return values.isDirectory == true ? values.isPackage != true : values.isRegularFile == true
+    }
+
+    /// `paths` plus the excludable ones among `urls` (Settings › Exclusions add button and drag & drop),
+    /// nothing added twice. Broad paths are accepted: Settings confirms them first.
+    static func addingExcluded(_ urls: [URL], to paths: [String]) -> [String] {
+        var result = paths
+        for url in urls where isExcludableItem(url) {
+            let path = url.standardizedFileURL.path
+            if !result.contains(path) { result.append(path) }
+        }
+        return result
+    }
+
+    /// "Never Clean This": saves `urls` to the exclusion list; returns those now excluded. `defaults` is
+    /// injected by tests so they never touch the real list.
+    static func exclude(_ urls: [URL], defaults: UserDefaults = .standard) -> [URL] {
+        let paths = addingExcluded(urls.filter(canExclude), to: defaults.stringArray(forKey: excludedFolders) ?? [])
+        defaults.set(paths, forKey: excludedFolders)
+        return urls.filter { paths.contains($0.standardizedFileURL.path) }
+    }
+
+    static var overrides: [String: Bool] { dictionary(selectionOverrides) }
+
+    /// Remembers the user's choice for `item`; a choice equal to the default is forgotten so new defaults still apply.
+    static func remember(_ item: CleanerItem, selected: Bool) {
+        update(selectionOverrides) { (all: inout [String: Bool]) in all[item.id] = selected == item.selectedByDefault ? nil : selected }
+    }
+
+    /// The `[String: V]` stored under `key`; empty when missing or of another type.
+    static func dictionary<V>(_ key: String) -> [String: V] {
+        UserDefaults.standard.dictionary(forKey: key) as? [String: V] ?? [:]
+    }
+
+    /// Re-reads the dictionary under `key`, applies `change` and stores it (other entries kept).
+    static func update<V>(_ key: String, _ change: (inout [String: V]) -> Void) {
+        var all: [String: V] = dictionary(key)
+        change(&all)
+        UserDefaults.standard.set(all, forKey: key)
+    }
+}
+
+/// Age thresholds (in days) the user can change in Settings; the catalogs take them as parameters.
+nonisolated struct CleanupAges: Sendable, Equatable {
+    var logs = 7
+    var temp = 3
+    var sessions = 30
+
+    static let `default` = CleanupAges()
+
+    /// Values the AI-sessions stepper steps through; contains the default (30).
+    static let sessionSteps = [7, 14, 30, 60, 90, 180, 365]
+
+    /// Next step above/below `days`; an old saved value off the list (e.g. 37) snaps to its neighbour.
+    static func sessionStep(from days: Int, up: Bool) -> Int {
+        up ? sessionSteps.first { $0 > days } ?? sessionSteps.last!
+           : sessionSteps.last { $0 < days } ?? sessionSteps.first!
+    }
+
+    static var current: CleanupAges {
+        let defaults = UserDefaults.standard
+        return CleanupAges(logs: defaults.object(forKey: Preferences.oldLogsDays) as? Int ?? Self.default.logs,
+                           temp: defaults.object(forKey: Preferences.tempFilesDays) as? Int ?? Self.default.temp,
+                           sessions: defaults.object(forKey: Preferences.sessionDays) as? Int ?? Self.default.sessions)
+    }
+}
