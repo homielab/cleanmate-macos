@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its name (`BraveSoftware` for Brave Browser, marked "Possibly related") are listed with its data, not ticked.
 - **Smart Scan**: Orca and OrbStack caches and logs, and downloaded Ollama models — unticked, each model chosen on
   its own and removed with only the files no other model uses.
+- **Smart Scan**: Windsurf code search indexes, browser caches and downloaded browsers (unticked), opencode and
+  Cline caches and logs, and old Cursor agent chats stored outside ~/Library.
 
 ### Fixed
 - **Uninstaller**: finds data in folders named after the app's bundle name or executable or spelled without spaces

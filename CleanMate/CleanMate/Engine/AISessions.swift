@@ -52,12 +52,28 @@ nonisolated enum AISessions {
         guard folder.deletingLastPathComponent().lastPathComponent == "projects",
               folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == ".claude"
         else { return nil }
-        let encoded = folder.lastPathComponent
+        return projectLabel(encoded: folder.lastPathComponent, shown: folder.lastPathComponent, of: url, now: now)
+    }
+
+    /// Entries in `~/.cursor/projects/<folder>/{agent-transcripts,agent-tools}/`: like Claude Code's, Cursor names
+    /// `<folder>` after the project path, but without the leading "-" (`/Users/me/my_app` → `Users-me-my-app`).
+    static func cursorLabel(of url: URL) -> (title: String, date: Date?)? { cursorLabel(of: url, now: Date()) }
+
+    static func cursorLabel(of url: URL, now: Date) -> (title: String, date: Date?)? {
+        let project = url.deletingLastPathComponent().deletingLastPathComponent()
+        guard project.deletingLastPathComponent().lastPathComponent == "projects",
+              project.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == ".cursor"
+        else { return nil }
+        return projectLabel(encoded: "-" + project.lastPathComponent, shown: project.lastPathComponent, of: url, now: now)
+    }
+
+    /// The project path of `encoded` with ~ (`shown` when the project no longer exists) and the entry's last change.
+    private static func projectLabel(encoded: String, shown: String, of url: URL, now: Date) -> (title: String, date: Date?) {
         // One lookup per project, not per session file.
         let title = resolved.withLock { $0[encoded].flatMap { now.timeIntervalSince($0.at) < labelLifetime ? $0.title : nil } } ?? {
             let found = claudeProjectPath(encoded: encoded) { path in
                 (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
-            }.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? encoded
+            }.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? shown
             resolved.withLock { $0[encoded] = (found, now) }
             return found
         }()

@@ -1478,6 +1478,16 @@ struct AppCatalogTests {
             ".config/github-copilot/apps.json", ".copilot/config.json", ".continue/config.yaml",
             ".ollama/models/blobs/sha256-1", ".ollama/id_ed25519", ".lmstudio/models/m.gguf", ".cache/lm-studio/models/m.gguf",
             ".cursor/mcp.json", ".codeium/windsurf/memories/m.pb",
+            ".cursor/extensions/ext/package.json", ".cursor/ai-tracking/ai-code-tracking.db", ".cursor/hooks.json",
+            ".cursor/projects/Users-me-app/terminals/1.txt", ".cursor/skills-cursor/s/SKILL.md",
+            ".codeium/windsurf/cascade/c.pb", ".codeium/windsurf/user_settings.pb", ".codeium/windsurf/skills/s/SKILL.md",
+            ".codeium/windsurf/ws-browser-profile/Default/Cookies", ".codeium/windsurf/ws-browser-profile/Default/History",
+            ".codeium/windsurf/ws-browser-profile/Default/Login Data", ".codeium/installation_id",
+            ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db", ".local/share/opencode/snapshot/a/HEAD",
+            ".local/share/opencode/tool-output/t.txt", ".cline/data/secrets.json", ".cline/data/globalState.json",
+            ".cline/data/cache/user_input_history.jsonl", ".cline/data/db/sessions.db",
+            ".cline/data/sessions/session_1/s.messages.json", ".cline/data/settings/providers.json",
+            ".cline/data/workspaces/1/state.json", ".factory/settings.json",
             "Library/Application Support/Claude/claude_desktop_config.json", "Library/Application Support/Claude/Cookies",
             "Library/Application Support/Claude/Local Storage/leveldb/1.ldb",
             "Library/Application Support/Code/User/settings.json", "Library/Application Support/Cursor/User/settings.json",
@@ -1502,10 +1512,17 @@ struct AppCatalogTests {
             "Library/Application Support/Microsoft Edge Canary/Default/Cache/Cache_Data/f",
             "Library/Caches/BraveSoftware/Brave-Browser-Beta/Default/Cache/f",
             "Library/Caches/Google/Chrome/Default/Cache/f", "Library/Application Support/Telegram Desktop/tdata/user_data/cache/f",
+            ".cursor/projects/Users-me-app/agent-transcripts/1/t.jsonl", ".cursor/projects/Users-me-app/agent-tools/1.txt",
+            ".codeium/windsurf/database/abc/3/MODEL_EMBED_1/x", ".codeium/database/abc/3/x",
+            ".codeium/windsurf/ws-browser/chromium-1169/c", ".codeium/windsurf/ws-browser-profile/Default/Cache/f",
+            ".codeium/windsurf/ws-browser-profile/GrShaderCache/f", ".cache/opencode/models.json",
+            ".cache/opencode/bin/rg", ".local/share/opencode/log/opencode.log", ".cline/data/logs/cline.log",
         ]
         for path in protected + junk { try box.file(path, age: old) }
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
                                               ofItemAtPath: box.home.appending(path: ".codex/sessions/2025/01/01").path)
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
+                                              ofItemAtPath: box.home.appending(path: ".cursor/projects/Users-me-app/agent-transcripts/1").path)
         var listed: [URL] = []
         for item in [CleanerGroup.aiTools(), .applications].flatMap(\.items) {
             listed += await Scanner.scan(item, policy: box.policy).entries.map { $0.url.resolvingSymlinksInPath() }
@@ -1924,6 +1941,16 @@ struct AppCatalogTests {
         #expect(label?.title == (root.path as NSString).abbreviatingWithTildeInPath)
         #expect(AISessions.claudeLabel(of: projects.appending(path: "-nope-gone/s.jsonl"))?.title == "-nope-gone")
         #expect(AISessions.claudeLabel(of: URL(fileURLWithPath: "/x/.claude/file-history/abc")) == nil)
+
+        // Cursor: the same encoding without the leading "-", one level deeper (agent-transcripts/<id>).
+        let cursor = URL(fileURLWithPath: "/x/.cursor/projects")
+        let encoded = String(AISessions.claudeFolderName(root.path).dropFirst())
+        #expect(AISessions.cursorLabel(of: cursor.appending(path: encoded + "/agent-transcripts/1"))?.title
+                == (root.path as NSString).abbreviatingWithTildeInPath)
+        #expect(AISessions.cursorLabel(of: cursor.appending(path: "Users-nope-gone/agent-tools/1.txt"))?.title == "Users-nope-gone")
+        #expect(AISessions.cursorLabel(of: URL(fileURLWithPath: "/x/.cursor/extensions/a/b")) == nil)
+        let cursorSessions = try #require(sessions.first { $0.id == "cursor-sessions" })
+        #expect(cursorSessions.runningAppBundleIDs == ["com.todesktop.230313mzl4w4u92"] && cursorSessions.entryLabel != nil)
     }
 
     /// A cached label lasts one scan; a later scan sees the project moved away.

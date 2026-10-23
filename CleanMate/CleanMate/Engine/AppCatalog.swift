@@ -45,10 +45,34 @@ extension CleanerGroup {
             "~/.gemini/tmp", "~/.gemini/antigravity*/conversations", "~/.gemini/antigravity*/brain",
         ], processes: ["gemini"]),
         app("antigravity", "Antigravity", bundle: ["com.google.antigravity"], vscode("Antigravity")),
-        app("cursor", "Cursor", bundle: ["com.todesktop.230313mzl4w4u92"],
+        app("cursor", "Cursor", bundle: [cursorBundle],
             vscode("Cursor") + ["~/Library/Caches/com.todesktop.230313mzl4w4u92"]),
-        app("windsurf", "Windsurf", bundle: ["com.exafunction.windsurf"],
+        // Cursor agent chats outside ~/Library: transcripts and saved tool output per project. Never
+        // ~/.cursor/{extensions,mcp.json,hooks.json,skills-cursor,plugins,plans,ai-tracking}.
+        sessions("cursor-sessions", "Cursor", ["~/.cursor/projects/*/agent-transcripts", "~/.cursor/projects/*/agent-tools"],
+                 apps: [cursorBundle], processes: ["cursor-agent"], label: AISessions.cursorLabel(of:)),
+        app("windsurf", "Windsurf", bundle: [windsurfBundle],
             vscode("Windsurf") + ["~/Library/Caches/com.exafunction.windsurf"]),
+        // Windsurf and the Codeium extensions (same ~/.codeium, run by a language server): code search indexes
+        // (embeddings, built again when a project is indexed) and Chromium caches of the browser profile. Never
+        // cascade, memories, brain, implicit, code_tracker, skills, workflows, user_settings.pb, nor the profile's
+        // cookies, logins or history.
+        cache("windsurf-cache", "Windsurf", ["~/.codeium/database", "~/.codeium/windsurf/database"]
+                + ["~/.codeium/ws-browser-profile", "~/.codeium/windsurf/ws-browser-profile"].flatMap(chromium),
+              apps: [windsurfBundle], processes: codeiumServers),
+        // Unticked like Playwright browsers: Chromium builds (Playwright layout, `chromium-1169`) Windsurf downloads
+        // for its browser; it downloads one again when the browser is used.
+        CleanerItem(id: "windsurf-browsers", title: "Windsurf: downloaded browsers",
+                    note: "Chromium builds for Windsurf's browser, downloaded again when it is opened",
+                    paths: ["~/.codeium/ws-browser", "~/.codeium/windsurf/ws-browser"], selectedByDefault: false,
+                    showsWhenEmpty: false, runningAppBundleIDs: [windsurfBundle], runningProcessNames: codeiumServers),
+        // opencode: models list, downloaded tools (rg) and plugin packages in its cache, and its logs. Never
+        // auth.json, opencode.db (sessions), snapshot (undo history), tool-output, shell, repos.
+        cache("opencode-cache", "opencode", ["~/.cache/opencode", "~/.local/share/opencode/log"],
+              processes: ["opencode"], openFiles: true),
+        // Cline: logs only. Never secrets.json, settings, db (sessions.db indexes its sessions), sessions,
+        // workspaces, data/cache (holds user_input_history.jsonl), cron, apps.
+        cache("cline-cache", "Cline", ["~/.cline/data/logs"], processes: ["cline"], openFiles: true),
         // Orca: Electron caches, crash reports and logs only; never its accounts, keys, profiles, terminal history,
         // session index (ai-vault) nor the terminal host it unpacks (daemon-host). Skipped while Orca, a helper or
         // its terminal host (which keeps terminals alive after Orca quits, and writes the daemon log) runs.
@@ -199,6 +223,10 @@ extension CleanerGroup {
     }
 
     nonisolated private static let orca = "~/Library/Application Support/orca"
+    nonisolated private static let cursorBundle = "com.todesktop.230313mzl4w4u92"
+    nonisolated private static let windsurfBundle = "com.exafunction.windsurf"
+    /// Codeium's language server, started by Windsurf and by the Codeium extensions of other editors.
+    nonisolated private static let codeiumServers = ["language_server_macos_arm", "language_server_macos_x64"]
 
     /// `item`, also skipped while a command-line process with one of these names runs (a background helper).
     nonisolated private static func running(_ item: CleanerItem, processes: [String]) -> CleanerItem {
@@ -214,11 +242,15 @@ extension CleanerGroup {
                     showsWhenEmpty: false, runningAppBundleIDs: bundle)
     }
 
+    /// `openFiles`: keep an entry holding a file a process has open; only for items with a few roots (the
+    /// open-file table is read once per root).
     nonisolated private static func cache(_ id: String, _ name: String, _ paths: [String],
-                                          excluded: Set<String> = []) -> CleanerItem {
+                                          excluded: Set<String> = [], apps: [String] = [], processes: [String] = [],
+                                          openFiles: Bool = false) -> CleanerItem {
         CleanerItem(id: id, title: "\(name): cache & logs",
                     note: "Recreated as needed; sign-ins, settings and memory are kept", paths: paths,
-                    excluded: excluded, showsWhenEmpty: false)
+                    excluded: excluded, showsWhenEmpty: false, runningAppBundleIDs: apps, runningProcessNames: processes,
+                    skipsOpenFiles: openFiles)
     }
 
     nonisolated private static func sessionItem(_ id: String, _ name: String, _ paths: [String], days: Int,

@@ -121,6 +121,16 @@
         }
       }
     },
+    "Chromium builds for Windsurf's browser, downloaded again when it is opened" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản Chromium cho trình duyệt của Windsurf, sẽ được tải lại khi mở trình duyệt"
+          }
+        }
+      }
+    },
     "CleanMate collects no data. Its only network connection is the update check." : {
       "localizations" : {
         "vi" : {
@@ -797,6 +807,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cập nhật"
+          }
+        }
+      }
+    },
+    "Windsurf: downloaded browsers" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Windsurf: trình duyệt đã tải"
           }
         }
       }
