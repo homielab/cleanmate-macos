@@ -49,6 +49,12 @@ extension CleanerGroup {
             vscode("Cursor") + ["~/Library/Caches/com.todesktop.230313mzl4w4u92"]),
         app("windsurf", "Windsurf", bundle: ["com.exafunction.windsurf"],
             vscode("Windsurf") + ["~/Library/Caches/com.exafunction.windsurf"]),
+        // Orca: Electron caches, crash reports and logs only; never its accounts, keys, profiles, terminal history,
+        // session index (ai-vault) nor the terminal host it unpacks (daemon-host). Skipped while Orca, a helper or
+        // its terminal host (which keeps terminals alive after Orca quits, and writes the daemon log) runs.
+        // Not `skipsOpenFiles`: the open-file table is read once per root, and `chromium` globs ~500 roots here (~60 s).
+        running(app("orca", "Orca", bundle: ["com.stablyai.orca*"],
+                    chromium(orca) + [orca + "/Crashpad/completed", orca + "/logs"]), processes: ["orca-terminal-host"]),
         app("zed", "Zed", bundle: ["dev.zed.Zed"],
             ["~/Library/Caches/Zed", "~/Library/Application Support/Zed/hang_traces"]),
         // GitHub Copilot: ~/.config/github-copilot holds the login, never listed.
@@ -57,8 +63,17 @@ extension CleanerGroup {
         // globalContext.json: the selected profile and models (settings, not index).
         cache("continue-cache", "Continue", ["~/.continue/index"], excluded: ["globalContext.json"]),
         sessions("continue-sessions", "Continue", ["~/.continue/sessions"], excluded: ["sessions.json"]),
-        // Ollama: logs only, never ~/.ollama/models or its id_ed25519 key.
+        // Ollama: logs, never its id_ed25519 key.
         app("ollama", "Ollama", bundle: ["com.electron.ollama"], ["~/.ollama/logs"]),
+        // Ollama models: GBs each, unticked, each one ticked on its own: one entry per tag (its manifest) plus the
+        // blobs no other model uses (`OllamaModels`). Deleted like the Chrome model (the Trash would free nothing).
+        // Skipped while Ollama runs: its server reads them, and an app quit leaves `ollama serve` running.
+        CleanerItem(id: "ollama-models", title: "Ollama: downloaded models",
+                    note: "Downloaded again with ollama pull; a model made with ollama create must be made again",
+                    paths: [OllamaModels.manifestFolders], selectedByDefault: false, shellFolders: OllamaModels.shellFolders,
+                    showsWhenEmpty: false, runningAppBundleIDs: ["com.electron.ollama"], runningProcessNames: ["ollama"],
+                    skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } }, entryLabel: OllamaModels.label(of:),
+                    selectableEntries: true, entryFiles: OllamaModels.ownBlobs(of:)),
         // LM Studio: app caches only; models live in ~/.lmstudio (older versions: ~/.cache/lm-studio).
         app("lm-studio", "LM Studio", bundle: ["ai.elementlabs.lmstudio"],
             chromium("~/Library/Application Support/LM Studio")),
@@ -181,6 +196,15 @@ extension CleanerGroup {
         CleanerItem(id: id + "-ai-model", title: "\(name): on-device AI model", note: note,
                     paths: ["~/Library/Application Support/\(support)/\(folder)"], selectedByDefault: false,
                     showsWhenEmpty: false, runningAppBundleIDs: [bundle])
+    }
+
+    nonisolated private static let orca = "~/Library/Application Support/orca"
+
+    /// `item`, also skipped while a command-line process with one of these names runs (a background helper).
+    nonisolated private static func running(_ item: CleanerItem, processes: [String]) -> CleanerItem {
+        var item = item
+        item.runningProcessNames = processes
+        return item
     }
 
     /// App names are not translated.

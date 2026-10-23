@@ -27,6 +27,18 @@ struct EndToEndCleanTests {
         ".claude/projects/Default/memory/MEMORY.md",
         ".codex/auth.json", ".codex/config.toml", ".gemini/oauth_creds.json", ".gemini/settings.json",
         ".config/github-copilot/hosts.json", ".ollama/id_ed25519", ".ollama/models/blob",
+        ".ollama/models/blobs/sha256-" + String(repeating: "a", count: 64),
+        // Orca's accounts, keys, profiles, history and session index next to its caches and logs
+        "Library/Application Support/orca/agent-session-authority.key",
+        "Library/Application Support/orca/orca-e2ee-keypair.json", "Library/Application Support/orca/Cookies",
+        "Library/Application Support/orca/claude-accounts/a/auth.json",
+        "Library/Application Support/orca/profiles/default/settings.json",
+        "Library/Application Support/orca/terminal-history/1.log",
+        "Library/Application Support/orca/ai-vault/session-search.sqlite",
+        "Library/Application Support/orca/Partitions/orca-browser/Local Storage/leveldb/000003.log",
+        // OrbStack's keys, settings and machines next to its caches and logs
+        ".orbstack/ssh/id_ed25519", ".orbstack/vmconfig.json", ".orbstack/config/docker.json",
+        "Library/Group Containers/HUJDZ9NVLN.dev.orbstack/data/data.img",
         // Kept on purpose by catalog items
         "Library/Caches/com.apple.bird/state", "Library/Logs/CleanMate/activity.log",
         "Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.FavoriteItems.sfl3",
@@ -68,6 +80,7 @@ struct EndToEndCleanTests {
         "Developer/tools/HF_HUB_CACHE/version.txt", "Developer/tools/ANDROID_AVD_HOME/Pixel.avd/config.ini",
         "Developer/tools/ANDROID_AVD_HOME/Pixel.avd/userdata-qemu.img",
         "Developer/tools/ANDROID_EMULATOR_HOME/avd/Pixel.avd/config.ini",
+        "Developer/tools/OLLAMA_MODELS/blobs/sha256-" + String(repeating: "b", count: 64),
     ]
     /// Every shell folder variable is set in the fake `.zprofile` to `~/Developer/tools/<NAME>`.
     static let shellTools = "~/Developer/tools/"

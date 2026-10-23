@@ -201,6 +201,16 @@
         }
       }
     },
+    "Downloaded again with ollama pull; a model made with ollama create must be made again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sẽ được tải lại bằng ollama pull; mô hình tạo bằng ollama create phải tạo lại"
+          }
+        }
+      }
+    },
     "Downloaded Node.js archives, downloaded again by nvm install" : {
       "localizations" : {
         "vi" : {
@@ -217,6 +227,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mô hình và bộ dữ liệu đã tải, sẽ được tải lại khi chương trình dùng đến"
+          }
+        }
+      }
+    },
+    "Downloaded updates, caches and logs; machines, containers and settings are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản cập nhật đã tải, bộ nhớ đệm và nhật ký; máy ảo, container và cài đặt được giữ nguyên"
           }
         }
       }
@@ -487,6 +507,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không có gì được chuyển vào Thùng rác."
+          }
+        }
+      }
+    },
+    "Ollama: downloaded models" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ollama: mô hình đã tải"
           }
         }
       }

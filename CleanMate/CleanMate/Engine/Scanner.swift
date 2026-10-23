@@ -4,7 +4,7 @@ import Foundation
 
 nonisolated struct ScanEntry: Identifiable, Hashable, Sendable {
     let url: URL
-    let size: Int64
+    var size: Int64
     /// The entry is a database whose records are erased (`CleanerItem.database`); `size` is then 0.
     var isDatabase = false
     /// Records to erase in that database; nil when they could not be counted.
@@ -167,7 +167,11 @@ nonisolated enum Scanner {
                 group.addTask {
                     if Task.isCancelled { return nil } // no walk or sqlite3 run for what the caller discards
                     guard let database = item.database, database.applies(to: url) else {
-                        return await entry(at: url, olderThan: cutoff, splitDepth: split)
+                        guard var found = await entry(at: url, olderThan: cutoff, splitDepth: split) else { return nil }
+                        if let files = item.entryFiles?(url) {
+                            found.size += files.filter(policy.allows).reduce(0) { $0 + fileSize($1) }
+                        }
+                        return found
                     }
                     return await records(in: url, database)
                 }
@@ -185,6 +189,13 @@ nonisolated enum Scanner {
         }
         result.entries.sort { $0.size > $1.size }
         return result
+    }
+
+    /// Allocated bytes of a regular file (not through a symlink); 0 for anything else or a missing file.
+    static func fileSize(_ url: URL) -> Int64 {
+        var info = stat()
+        guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return 0 }
+        return Int64(info.st_blocks) * 512
     }
 
     /// Locked (Finder "Locked", `uchg`) or SIP-protected (`sunlnk`/restricted, e.g. the daemons' `$TMPDIR/com.apple.*`

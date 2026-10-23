@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it. This update check is CleanMate's only network connection and sends no data about you or your Mac.
 - **Uninstaller**: an app's config outside ~/Library (`~/.config/zed`, `~/.cursor`…) and folders that only start like
   its name (`BraveSoftware` for Brave Browser, marked "Possibly related") are listed with its data, not ticked.
+- **Smart Scan**: Orca and OrbStack caches and logs, and downloaded Ollama models — unticked, each model chosen on
+  its own and removed with only the files no other model uses.
 
 ### Fixed
 - **Uninstaller**: finds data in folders named after the app's bundle name or executable or spelled without spaces

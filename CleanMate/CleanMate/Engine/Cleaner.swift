@@ -203,14 +203,31 @@ nonisolated enum Cleaner {
                 report += await erase(database, in: entry.url)
                 continue
             }
-            do {
+            // Read before the entry goes (an Ollama manifest names its blobs), removed after it: a failure in
+            // between leaves unused files, never an entry missing its files.
+            let files = item.entryFiles?(entry.url) ?? []
+            func remove(_ url: URL) throws {
                 switch item.mode {
-                case .delete: try FileManager.default.removeItem(at: entry.url)
-                case .trash: try trash(entry.url)
+                case .delete: try FileManager.default.removeItem(at: url)
+                case .trash: try trash(url)
                 }
+            }
+            do {
+                try remove(entry.url)
                 report.freed += entry.size
             } catch {
                 report.skipped += 1 // permission / SIP / in use: leave it
+                continue
+            }
+            for file in files {
+                var info = stat()
+                guard lstat(file.path, &info) == 0 else { continue } // already gone
+                guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file), !Scanner.isLocked(file),
+                      (try? remove(file)) != nil else {
+                    report.skipped += 1 // kept: counted in the entry's size, so not freed
+                    report.freed = max(0, report.freed - Int64(info.st_blocks) * 512)
+                    continue
+                }
             }
         }
         return report

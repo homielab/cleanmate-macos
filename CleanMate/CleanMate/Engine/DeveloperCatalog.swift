@@ -185,6 +185,12 @@ extension CleanerGroup {
                note: "Volumes no container uses; they may hold databases or other data",
                type: "Local Volumes", ["volume", "prune", "--all", "--force"], selected: false,
                details: DeveloperTools.dockerUnusedVolumes),
+        // OrbStack: the app's caches (its downloaded updates too) and logs; never ~/.orbstack's ssh keys, config,
+        // shell setup or run folder, nor the machines and containers (in its group container). Skipped while the app
+        // or its VM manager (`dev.kdrag0n.MacVirt.vmgr`) runs; a log a process still writes is kept.
+        dev("orbstack", "\("OrbStack"): cache & logs",
+            note: "Downloaded updates, caches and logs; machines, containers and settings are kept",
+            ["~/Library/Caches/dev.kdrag0n.MacVirt", "~/.orbstack/log"], apps: ["dev.kdrag0n.MacVirt*"], openFiles: true),
     ])
 
     nonisolated static let oldIDEVersions = "old-ide-versions"
@@ -211,14 +217,15 @@ extension CleanerGroup {
         _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource? = nil, _ paths: [String],
         minAge: TimeInterval? = nil, included: [String]? = nil, mode: RemovalMode = .delete, command: ShellCommand? = nil,
         probe: SizeProbe? = nil, locate: PathLookup? = nil, shell: [String: [String]] = [:], selected: Bool = true, apps: [String] = [],
-        processes: [String] = [], upperBound: Bool = false,
+        processes: [String] = [], upperBound: Bool = false, openFiles: Bool = false,
         entryLabel: CleanerItem.EntryLabel? = nil, selectableEntries: Bool = false
     ) -> CleanerItem {
         CleanerItem(id: id, title: title, note: note, paths: paths, minAge: minAge, included: included, mode: mode,
                     selectedByDefault: selected, command: command, probe: probe, locate: locate, shellFolders: shell,
                     sizeIsUpperBound: upperBound,
                     showsWhenEmpty: false,
-                    runningAppBundleIDs: apps, runningProcessNames: processes, entryLabel: entryLabel, selectableEntries: selectableEntries)
+                    runningAppBundleIDs: apps, runningProcessNames: processes, skipsOpenFiles: openFiles,
+                    entryLabel: entryLabel, selectableEntries: selectableEntries)
     }
 
     nonisolated private static func docker(
