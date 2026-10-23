@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Uninstaller**: an app's config outside ~/Library (`~/.config/zed`, `~/.cursor`…) and folders that only start like
+  its name (`BraveSoftware` for Brave Browser, marked "Possibly related") are listed with its data, not ticked.
+
+### Fixed
+- **Uninstaller**: finds data in folders named after the app's bundle name or executable or spelled without spaces
+  (`Code` for Visual Studio Code, `DiskDrill`, `beekeeper-studio`), and of apps with a three-letter name such as Arc.
+
 ## [1.0] - 2026-10-24
 
 First public release: a native macOS cleaner that frees disk space and removes privacy traces,

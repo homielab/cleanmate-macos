@@ -18,7 +18,8 @@ final class UninstallerModel {
     var loadingApps = false
     /// Filled in the background after the list appears.
     var appSizes: [URL: Int64] = [:]
-    /// Total size of each app's ~/Library data (same rule as its detail), measured in the background after `appSizes`.
+    /// Total size of each app's data in ~/Library and config in ~ and ~/.config (same rule as its detail, suggestions
+    /// included), measured in the background after `appSizes`.
     var appDataSizes: [URL: Int64] = [:]
     /// Bumped when `appDataSizes` must be (re)measured: the view's `.task(id:)` runs `measureAppData`, cancelled on leaving.
     var dataGeneration = 0
@@ -50,7 +51,7 @@ final class UninstallerModel {
     var highlighted: Set<URL> = []
     /// The selected app's own row is ticked. Unticked: `remove()` resets the app (moves only its ticked data).
     var trashApp = true
-    /// Data of the selected app, or leftovers of removed apps.
+    /// Data and config of the selected app, or leftovers of removed apps.
     var entries: [AppDataEntry] = []
     var loadingEntries = false
     var checked: Set<URL> = []
@@ -330,7 +331,8 @@ final class UninstallerModel {
         }
     }
 
-    /// Loads what the current selection would remove: the app's data (ticked) or leftovers (never ticked).
+    /// Loads what the current selection would remove: the app's data (ticked; suggestions and config not) or leftovers
+    /// (never ticked).
     func loadEntries() async {
         entriesGeneration += 1
         let current = entriesGeneration
@@ -347,11 +349,11 @@ final class UninstallerModel {
             // All installed apps (incl. Apple's, nested and unlisted ones) and running ones, not just the listed apps.
             let others = apps.filter { $0.url != app.url }
             let ids = Uninstaller.allBundleIDs().union(runningApps).union(others.map(\.bundleID))
-            let names = Set(others.map(\.name)).union(Uninstaller.otherAppNames(than: app.url, in: Uninstaller.allAppURLs()))
+            let names = Set(others.flatMap(\.names)).union(Uninstaller.otherAppNames(than: app.url, in: Uninstaller.allAppURLs()))
             let found = await appData(app, ids, names)
             guard !Task.isCancelled, current == entriesGeneration else { return }
             entries = found
-            checked = Set(found.map(\.url))
+            checked = Set(found.filter { $0.kind == .data }.map(\.url)) // suggestions and config: never ticked for the user
         case .leftovers:
             let installed = Uninstaller.allBundleIDs().union(runningApps)
             let found = await leftovers(installed)

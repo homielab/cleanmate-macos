@@ -238,6 +238,34 @@ nonisolated struct SafetyPolicy: Sendable {
         return allows(URL(fileURLWithPath: path))
     }
 
+    /// Hidden items of the home folder that are never one app's config, whatever app is named like them: shell and login
+    /// files, keys, stores shared by developer tools, and the folders `allows` already refuses. Lowercased.
+    static let sharedHomeItems: Set = [
+        ".config", ".cache", ".local", ".trash", ".ssh", ".gnupg", ".aws", ".kube", ".cfusertextencoding", ".ds_store",
+        ".zshrc", ".zshenv", ".zprofile", ".zlogin", ".zlogout", ".zsh_history", ".zsh_sessions", ".oh-my-zsh",
+        ".bashrc", ".bash_profile", ".bash_history", ".bash_sessions", ".profile", ".inputrc", ".hushlogin",
+        ".gitconfig", ".git-credentials", ".netrc", ".npmrc", ".npm", ".yarnrc", ".cargo", ".rustup", ".gradle", ".m2",
+        ".nvm", ".pyenv", ".rbenv", ".gem", ".bun", ".deno", ".android", ".swiftpm", ".cocoapods", ".password-store",
+        ".vim", ".vimrc", ".viminfo", ".lesshst", ".python_history", ".node_repl_history",
+    ]
+
+    /// Uninstaller rule for an app's config outside ~/Library, only ever moved to the Trash: a hidden item directly in
+    /// the home folder (`~/.cursor`, never a `sharedHomeItems` one) or a non-hidden item directly in ~/.config
+    /// (`~/.config/zed`; a symlinked ~/.config is never followed), not a symlink itself, not Apple's, and allowed by
+    /// `allows` (never ~/.config, ~/.cache, ~/.local, ~/.Trash themselves nor anything in .ssh, .gnupg, .aws, .kube).
+    func allowsAppConfig(_ url: URL) -> Bool {
+        let path = Self.normalize(url)
+        let parent = (path as NSString).deletingLastPathComponent
+        let name = (path as NSString).lastPathComponent
+        let home = allowedRoots[0]
+        let inHome = parent == home && name.hasPrefix(".") && name.count > 1 && !Self.sharedHomeItems.contains(name.lowercased())
+        let inConfig = parent == home + "/.config" && !name.hasPrefix(".")
+        guard inHome || inConfig, !Self.isApple(name) else { return false }
+        let real = URL(fileURLWithPath: path)
+        guard (try? real.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == false else { return false }
+        return allows(real)
+    }
+
     /// Uninstaller rule for a user extension, only ever moved to the Trash: one entry directly inside one of the
     /// `ExtensionItem.Kind` folders of ~/Library, with that kind's name extension, not hidden, not a symlink, not Apple's
     /// (name or `CFBundleIdentifier`), and allowed by `allows`.

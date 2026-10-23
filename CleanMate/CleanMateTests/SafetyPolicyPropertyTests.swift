@@ -170,6 +170,12 @@ struct SafetyPolicyPropertyTests {
                 #expect(generalOK(t) && SafetyPolicy.appDataFolders.map { key(realHome + "/Library/" + $0) }.contains(parentKey)
                         && !name.hasPrefix("."), "allowsAppData \(path) → \(t)")
             }
+            if policy.allowsAppConfig(url) {
+                let inHome = parentKey == key(realHome) && name.hasPrefix(".")
+                let inConfig = parentKey == key(realHome + "/.config") && !name.hasPrefix(".")
+                #expect(generalOK(t) && (inHome || inConfig) && !isLink(t)
+                        && !SafetyPolicy.sharedHomeItems.contains(name.lowercased()), "allowsAppConfig \(path) → \(t)")
+            }
             for label in ["com.x.agent", "com.apple.x", "a/b", ""] where policy.allowsLaunchAgent(url, label: label) {
                 #expect(generalOK(t) && parentKey == key(realHome + "/Library/LaunchAgents") && !isLink(t)
                         && label == "com.x.agent", "allowsLaunchAgent \(path) → \(t)")

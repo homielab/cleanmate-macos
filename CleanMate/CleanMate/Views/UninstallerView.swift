@@ -221,6 +221,10 @@ struct UninstallerView: View {
                             }
                             .font(.callout)
                         }
+                        if model.entries.contains(where: { $0.kind != .data }) {
+                            Text("Items marked “Possibly related” and config in your home folder or ~/.config aren’t selected for you: check them before removing.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                     }
                     entryList(app: app, empty: Text("No Related Files Found"))
                     footer(button: model.trashApp ? Text("Uninstall…") : Text("Reset…"), app: app)
@@ -375,7 +379,7 @@ struct UninstallerView: View {
                 .tag(app.url)
             }
             ForEach(model.entries) { entry in
-                row(url: entry.url, folder: Text(verbatim: entry.folder), size: entry.size,
+                row(url: entry.url, folder: location(entry), size: entry.size,
                     checked: model.checked.contains(entry.url), largest: largest) { label in
                     Toggle(isOn: checked(entry.url)) { label }.labelsHidden()
                 }
@@ -390,6 +394,11 @@ struct UninstallerView: View {
                 ContentUnavailableView { Label { empty } icon: { Image(systemName: "checkmark.circle") } }
             }
         }
+    }
+
+    /// The entry's folder (`~/.config`, `~` for config), and whether it is only a suggestion.
+    private func location(_ entry: AppDataEntry) -> Text {
+        entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
     }
 
     /// `check` gets the checkbox's (hidden) label: item name + size, so VoiceOver reads both on the checkbox.

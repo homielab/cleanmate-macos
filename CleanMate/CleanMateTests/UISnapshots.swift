@@ -355,6 +355,9 @@ struct UISnapshots {
         let data = [("Application Support/com.example.calculator", 820_000_000), ("Caches/com.example.calculator", 96_000_000),
                     ("Preferences/com.example.calculator.plist", 4_096), ("Logs/Calculator", 1_200_000)]
             .map { AppDataEntry(url: library.appending(path: $0.0), size: Int64($0.1)) }
+            // Listed but never ticked: a folder only starting like the app's name, and config outside ~/Library.
+            + [AppDataEntry(url: library.appending(path: "Application Support/CalculatorSoftware"), size: 2_400_000, kind: .suggested),
+               AppDataEntry(url: Self.sample.appending(path: ".config/calculator"), size: 48_000, kind: .config)]
         try await snapshot("uninstaller-results") {
             let model = UninstallerModel()
             model.appData = { _, _, _ in data }

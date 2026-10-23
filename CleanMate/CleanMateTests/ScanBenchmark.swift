@@ -218,35 +218,35 @@ struct ScanBenchmark {
         print("BENCH space-lens exact bytes=\(total.0) folders=\(total.1.count) folderBytes=\(total.1.values.reduce(0, +))")
     }
 
-    /// Uninstaller review: for EVERY app in the Uninstaller list, the ~/Library entries `AppMatcher` would tick,
-    /// written to `$TMPDIR/cleanmate-uninstall-matches.tsv` (never in the repo): app, bundle id, folder, entry, reason.
-    /// Same inputs as `UninstallerModel` (other bundle ids incl. Apple's and nested apps; other app names) but without
-    /// running apps. Only lists folders — never sizes, trash or remove.
+    /// Uninstaller review: for EVERY app in the Uninstaller list, the ~/Library entries and config items in ~ and ~/.config
+    /// it would list, written to `$TMPDIR/cleanmate-uninstall-matches.tsv` (never in the repo): app, bundle id, folder,
+    /// entry, kind (data = ticked, suggested / config = listed unticked), reason. Same inputs as `UninstallerModel` (other
+    /// bundle ids incl. Apple's and nested apps; other app names) but without running apps. Only lists folders — never
+    /// sizes, trash or remove.
     @Test func uninstallerMatches() async {
         let apps = await Uninstaller.installedApps(policy: policy)
-        let entries = SafetyPolicy.appDataFolders.flatMap { folder in
-            let dir = policy.homeURL.appending(path: "Library/\(folder)")
-            guard mayRead("uninstall Library/\(folder)", dir) else { return [(String, String)]() }
-            return ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
-                .filter { policy.allowsAppData(dir.appending(path: $0)) }.map { (folder, $0) }
+        for folder in SafetyPolicy.appDataFolders {
+            _ = mayRead("uninstall Library/\(folder)", policy.homeURL.appending(path: "Library/\(folder)"))
         }
+        let skipped = ProtectedFolders.skipped(home: policy.homeURL, hasFullDiskAccess: FullDiskAccess.isGranted)
         let all = Uninstaller.allBundleIDs(policy: policy).union(apps.map(\.bundleID))
-        var tsv = "app\tbundle_id\tfolder\tentry\treason\n", count = 0
+        let matches = await Uninstaller.classifiedMatches(of: apps, otherBundleIDs: all, skipped: skipped,
+                                                          allApps: Uninstaller.allAppURLs(policy: policy), policy: policy)
+        var tsv = "app\tbundle_id\tfolder\tentry\tkind\treason\n", count = 0
         for app in apps {
-            let others = apps.filter { $0.url != app.url }
-            for (folder, name) in entries where AppMatcher.matches(
-                name: name, folder: folder, bundleID: app.bundleID, appName: app.name, otherBundleIDs: all,
-                otherAppNames: Set(others.map(\.name))) {
+            for (url, kind) in matches[app.url] ?? [] {
+                let name = url.lastPathComponent, folder = url.deletingLastPathComponent().lastPathComponent
                 let id = AppMatcher.identifier(name, in: folder)
-                let reason = id == app.bundleID.lowercased() ? "bundle id" : AppMatcher.belongs(id, to: app.bundleID) ? "prefix" : "name"
-                tsv += "\(app.name)\t\(app.bundleID)\t\(folder)\t\(name)\t\(reason)\n"
+                let reason = kind == .config ? "config" : kind == .suggested ? "prefix of name"
+                    : id == app.bundleID.lowercased() ? "bundle id" : AppMatcher.belongs(id, to: app.bundleID) ? "prefix" : "name"
+                tsv += "\(app.name)\t\(app.bundleID)\t\(folder)\t\(name)\t\(kind)\t\(reason)\n"
                 count += 1
             }
         }
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("cleanmate-uninstall-matches.tsv")
         do { try tsv.write(to: file, atomically: true, encoding: .utf8); print("BENCH uninstall matches -> \(file.path)") }
         catch { print("BENCH uninstall matches NOT written: \(error)") }
-        print("BENCH uninstall apps=\(apps.count) entries=\(entries.count) matches=\(count)")
+        print("BENCH uninstall apps=\(apps.count) matches=\(count)")
     }
 
     /// Uninstaller list sizes, exactly as the app does it: app bundles, then every app's ~/Library data (one

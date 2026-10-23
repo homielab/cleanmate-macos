@@ -1,7 +1,8 @@
 import AppKit
 
-// Uninstaller: apps in /Applications and ~/Applications (and up to two subfolders down) plus their data in ~/Library, and data left behind
-// by apps already removed. Everything goes to the Trash; Apple's apps and data are never listed.
+// Uninstaller: apps in /Applications and ~/Applications (and up to three subfolders down) plus their data in ~/Library and
+// their config in ~ and ~/.config, and data left behind by apps already removed. Everything goes to the Trash; Apple's apps
+// and data are never listed.
 
 nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     let url: URL
@@ -10,17 +11,33 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     let version: String?
     /// Spotlight's last-used date, when known.
     let lastUsed: Date?
+    /// `CFBundleName` and `CFBundleExecutable`: folders are often named after these (`Code` for Visual Studio Code).
+    var bundleName: String? = nil
+    var executableName: String? = nil
 
     var id: URL { url }
+    /// Every name the app goes by, for `otherAppNames` of the other apps.
+    var names: [String] { [name] + [bundleName, executableName].compactMap { $0 } }
 }
 
-/// One item directly inside a ~/Library data folder (`SafetyPolicy.appDataFolders`).
+/// One item directly inside a ~/Library data folder (`SafetyPolicy.appDataFolders`), or an app's config item directly in
+/// ~ or ~/.config (`SafetyPolicy.allowsAppConfig`).
 nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
+    /// `data`: surely the app's (ticked when listed). `suggested`: a folder that only starts like the app's name.
+    /// `config`: outside ~/Library. Only `data` is ticked for the user.
+    enum Kind: Sendable { case data, suggested, config }
+
     let url: URL
     let size: Int64
+    var kind: Kind = .data
 
     var id: URL { url }
     var folder: String { url.deletingLastPathComponent().lastPathComponent }
+    /// Where the item is, as shown: its ~/Library folder, `~/.config` or `~`.
+    var location: String {
+        guard kind == .config else { return folder }
+        return folder == ".config" ? "~/.config" : "~"
+    }
 }
 
 nonisolated enum AppMatcher {
@@ -30,7 +47,8 @@ nonisolated enum AppMatcher {
     static let genericNames: Set = [
         "google", "microsoft", "apple", "adobe", "mozilla", "jetbrains", "electron", "java", "oracle", "common", "shared",
         "default", "helper", "update", "updater", "crashpad", "crashreporter", "cache", "caches", "logs", "data", "temp",
-        "plugins", "support", "settings", "config",
+        "plugins", "support", "settings", "config", "app", "main", "launcher", "runner", "client", "agent", "service",
+        "desktop", "studio", "browser", "editor", "player",
         "homebrew",  // the `brew` CLI's own Logs/Caches folders, not a Homebrew GUI app's
     ]
     /// `bundleID.<channel>` is a sibling app of another release channel (`com.google.Chrome.canary`,
@@ -64,31 +82,108 @@ nonisolated enum AppMatcher {
         appName.count >= 4 && !genericNames.contains(appName.lowercased())
     }
 
-    /// Whether the entry `name` in Library `folder` belongs to the app: by bundle id (unless a longer installed bundle
-    /// id claims it, e.g. `com.foo.App.Pro`), or — only in `nameFolders` — a folder named exactly like a distinctive app
-    /// that no other installed app shares (same name, or a family name such as `Barista` for `Barista Pro`).
-    static func matches(name: String, folder: String, bundleID: String, appName: String, otherBundleIDs: Set<String>,
-                        otherAppNames: Set<String> = []) -> Bool {
-        guard !SafetyPolicy.isApple(name) else { return false }
-        return matches(id: identifier(name, in: folder), name: name, folder: folder, bundleID: bundleID, appName: appName,
-                       otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames)
+    /// Folders where a folder that only starts with the app's first word (`BraveSoftware` for Brave Browser) is offered,
+    /// never ticked.
+    static let suggestionFolders: Set = ["Application Support"]
+
+    /// `name` lowercased as folders spell it: as is, without spaces (`diskdrill`), spaces as `-` or `_` (`beekeeper-studio`).
+    static func variants(_ name: String) -> Set<String> {
+        let lower = name.lowercased().trimmingCharacters(in: .whitespaces)
+        guard lower.contains(" ") else { return [lower] }
+        return [lower, lower.replacing(" ", with: ""), lower.replacing(" ", with: "-"), lower.replacing(" ", with: "_")]
     }
 
-    /// `matches` for a non-Apple `name` whose `identifier` is `id`, computed once per entry by the scan of every app.
-    static func matches(id: String, name: String, folder: String, bundleID: String, appName: String,
-                        otherBundleIDs: Set<String>, otherAppNames: Set<String>) -> Bool {
-        if belongs(id, to: bundleID) {
-            let rest = id.dropFirst(bundleID.count + 1)
-            if releaseChannels.contains(where: { rest == $0 || rest.hasPrefix($0 + ".") }) { return false }
-            return !otherBundleIDs.contains { other in
-                other.count > bundleID.count && belongs(other.lowercased(), to: bundleID) && belongs(id, to: other)
+    /// What one app's folders may be named, worked out once per app.
+    struct Names: Sendable {
+        let bundleID: String
+        /// Lowercased folder names that surely stand for the app: `variants` of its name and `CFBundleName` (3+ characters)
+        /// and of its `CFBundleExecutable` (4+ characters), never `genericNames`.
+        let exact: Set<String>
+        /// The first word of the app's name, lowercased, when `isDistinctive`: suggested folders start with it.
+        let prefix: String?
+
+        init(bundleID: String, name: String, bundleName: String? = nil, executableName: String? = nil) {
+            self.bundleID = bundleID
+            var exact = Set<String>()
+            for name in [name, bundleName].compactMap({ $0 }) { exact.formUnion(variants(name).filter { $0.count >= 3 }) }
+            if let executableName { exact.formUnion(variants(executableName).filter { $0.count >= 4 }) }
+            self.exact = exact.subtracting(genericNames)
+            let word = name.split(separator: " ").first.map { $0.lowercased() }
+            prefix = word.flatMap { isDistinctive($0) ? $0 : nil }
+        }
+
+        init(_ app: InstalledApp) {
+            self.init(bundleID: app.bundleID, name: app.name, bundleName: app.bundleName, executableName: app.executableName)
+        }
+    }
+
+    /// Another app goes by `name` (lowercased) too, in any `variants` spelling, or by a longer name of its family whose
+    /// first words spell it: `Barista Pro` for `barista`, `Disk Drill Pro` for `diskdrill`.
+    static func isClaimed(_ name: String, byOther otherAppNames: Set<String>) -> Bool {
+        otherAppNames.contains { other in
+            let words = other.lowercased().split(separator: " ").map(String.init)
+            guard words.count > 1 else { return words.first == name }
+            if variants(other).contains(name) { return true }
+            return (1..<words.count).contains { count in
+                ["", " ", "-", "_"].contains { words.prefix(count).joined(separator: $0) == name }
             }
         }
-        guard nameFolders.contains(folder), isDistinctive(appName), name.caseInsensitiveCompare(appName) == .orderedSame
-        else { return false }
-        // Checked last: the scan of every app's data calls this for each app × entry.
-        let lowerName = appName.lowercased()
-        return !otherAppNames.contains { $0.lowercased() == lowerName || $0.lowercased().hasPrefix(lowerName + " ") }
+    }
+
+    /// Whether the entry `name` in Library `folder` belongs to the app: by bundle id (unless a longer installed bundle
+    /// id claims it, e.g. `com.foo.App.Pro`), or — only in `nameFolders` — a folder named like the app (`Names.exact`)
+    /// that no other installed app shares (same name, or a family name such as `Barista` for `Barista Pro`).
+    static func matches(name: String, folder: String, bundleID: String, appName: String, bundleName: String? = nil,
+                        executableName: String? = nil, otherBundleIDs: Set<String>, otherAppNames: Set<String> = []) -> Bool {
+        kind(name: name, folder: folder, app: Names(bundleID: bundleID, name: appName, bundleName: bundleName,
+                                                    executableName: executableName),
+             otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames) == .data
+    }
+
+    /// How the Library entry `name` belongs to the app: `.data` (`matches`), `.suggested` (in `suggestionFolders`, not
+    /// reverse-DNS, starts with `Names.prefix`, and no other app has a name starting with it), or nil.
+    static func kind(name: String, folder: String, app: Names, otherBundleIDs: Set<String>,
+                     otherAppNames: Set<String>) -> AppDataEntry.Kind? {
+        guard !SafetyPolicy.isApple(name) else { return nil }
+        return kind(id: identifier(name, in: folder), lowerName: name.lowercased(), folder: folder, app: app,
+                    otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames)
+    }
+
+    /// `kind` for a non-Apple entry whose `identifier` is `id`, computed once per entry by the scan of every app.
+    static func kind(id: String, lowerName: String, folder: String, app: Names, otherBundleIDs: Set<String>,
+                     otherAppNames: Set<String>) -> AppDataEntry.Kind? {
+        let bundleID = app.bundleID
+        if belongs(id, to: bundleID) {
+            let rest = id.dropFirst(bundleID.count + 1)
+            if releaseChannels.contains(where: { rest == $0 || rest.hasPrefix($0 + ".") }) { return nil }
+            let claimed = otherBundleIDs.contains { other in
+                other.count > bundleID.count && belongs(other.lowercased(), to: bundleID) && belongs(id, to: other)
+            }
+            return claimed ? nil : .data
+        }
+        guard nameFolders.contains(folder) else { return nil }
+        // Other app names are checked last: the scan of every app's data calls this for each app × entry.
+        if app.exact.contains(lowerName) { return isClaimed(lowerName, byOther: otherAppNames) ? nil : .data }
+        guard suggestionFolders.contains(folder), let prefix = app.prefix, lowerName.hasPrefix(prefix),
+              lowerName.count > prefix.count, !isBundleIDShaped(lowerName) else { return nil }
+        return otherAppNames.contains { variants($0).contains { $0.hasPrefix(prefix) } } ? nil : .suggested
+    }
+
+    /// Config of command-line tools that a desktop app of the same name doesn't own (Claude Code's `~/.claude`, Gemini
+    /// CLI's `~/.gemini`, Copilot's editor sign-in in `~/.config/github-copilot`…), even when the CLI isn't found.
+    static let toolConfigNames: Set = ["claude", "codex", "gemini", "copilot", "github-copilot", "continue", "aider", "goose"]
+
+    /// The `Names.exact` name the config item `name` stands for: `~/.config/<name>`, `~/.<name>` or `~/.<name>-…`
+    /// (`inConfigFolder` false: `name` has its dot), unless another app goes by that name; nil when it isn't the app's.
+    static func configName(_ name: String, inConfigFolder: Bool, app: Names, otherAppNames: Set<String>) -> String? {
+        let lower = name.lowercased()
+        let stem = inConfigFolder ? lower : String(lower.dropFirst())
+        guard inConfigFolder || lower.hasPrefix("."), !SafetyPolicy.isApple(lower), !genericNames.contains(stem),
+              !toolConfigNames.contains(stem) else { return nil }
+        let matched = app.exact.contains(stem) ? stem
+            : inConfigFolder ? nil : app.exact.first { stem.hasPrefix($0 + "-") }
+        guard let matched, !toolConfigNames.contains(matched), !isClaimed(matched, byOther: otherAppNames) else { return nil }
+        return matched
     }
 
     /// Vendors of system parts, CLI tools and SDKs shared by many apps (Shortcuts is `is.workflow`, Sparkle, analytics
@@ -129,10 +224,12 @@ nonisolated enum Uninstaller {
         for folder in policy.applicationFolders {
             for url in appURLs(in: folder) where policy.allowsApp(url) {
                 guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { continue }
+                let info = bundle.infoDictionary
                 apps.append(InstalledApp(
                     url: url, name: url.deletingPathExtension().lastPathComponent, bundleID: id,
-                    version: bundle.infoDictionary?["CFBundleShortVersionString"] as? String,
-                    lastUsed: NSMetadataItem(url: url)?.value(forAttribute: "kMDItemLastUsedDate") as? Date))
+                    version: info?["CFBundleShortVersionString"] as? String,
+                    lastUsed: NSMetadataItem(url: url)?.value(forAttribute: "kMDItemLastUsedDate") as? Date,
+                    bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String))
             }
         }
         return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -194,34 +291,110 @@ nonisolated enum Uninstaller {
         return entries.sorted { $0.size > $1.size }
     }
 
-    /// The app's data in ~/Library, largest first. `otherBundleIDs`/`otherAppNames`: every other installed or running app,
-    /// whose data must never be picked.
-    @concurrent static func data(of app: InstalledApp, otherBundleIDs: Set<String>, otherAppNames: Set<String> = [],
-                                 policy: SafetyPolicy = .current) async -> [AppDataEntry] {
-        await dataEntries(policy: policy) {
-            AppMatcher.matches(name: $0, folder: $1, bundleID: app.bundleID, appName: app.name, otherBundleIDs: otherBundleIDs,
-                               otherAppNames: otherAppNames)
+    /// Hidden items directly in the home folder and items directly in ~/.config that `allowsAppConfig`: (name, whether
+    /// in ~/.config, url).
+    static func configItems(policy: SafetyPolicy) -> [(name: String, inConfig: Bool, url: URL)] {
+        let home = policy.homeURL, config = home.appending(path: ".config")
+        let names = { (dir: URL) in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [] }
+        return (names(home).filter { $0.hasPrefix(".") }.map { (name: $0, inConfig: false, url: home.appending(path: $0)) }
+                + names(config).map { (name: $0, inConfig: true, url: config.appending(path: $0)) })
+            .filter { policy.allowsAppConfig($0.url) }
+    }
+
+    /// Every command folder the config rule checks: `toolFolders`, the process `PATH` and macOS's own bin folders.
+    static var configToolFolders: [String] {
+        toolFolders + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+            + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+    }
+
+    /// Command-line tools in `folders` (`~` is the policy's home): lowercased name → paths. A config item named like
+    /// one belongs to that tool, not to an app, unless every one of them is (a link into) the app's own bundle.
+    static func toolPaths(home: URL, folders: [String] = configToolFolders) -> [String: [String]] {
+        var tools: [String: [String]] = [:]
+        for folder in Set(folders) where !folder.isEmpty {
+            let path = folder.hasPrefix("~/") ? home.appending(path: String(folder.dropFirst(2))).path : folder
+            for name in (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? [] {
+                tools[name.lowercased(), default: []].append((path as NSString).appendingPathComponent(name))
+            }
+        }
+        return tools
+    }
+
+    /// A tool named `name` is installed and not all of its copies lie inside `app`'s bundle.
+    static func isForeignTool(_ name: String, app: URL, tools: [String: [String]]) -> Bool {
+        guard let paths = tools[name] else { return false }
+        let bundle = app.resolvingSymlinksInPath().path + "/"
+        return !paths.allSatisfy { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path.hasPrefix(bundle) }
+    }
+
+    /// The Library entries and config items one app would list, with how each belongs to it.
+    private static func classify(_ app: InstalledApp, library: [LibraryItem], config: [(name: String, inConfig: Bool, url: URL)],
+                                 otherBundleIDs: Set<String>, otherAppNames: Set<String>,
+                                 tools: [String: [String]]) -> [(url: URL, kind: AppDataEntry.Kind)] {
+        let names = AppMatcher.Names(app)
+        let data = library.compactMap { item in
+            AppMatcher.kind(id: item.id, lowerName: item.lowerName, folder: item.folder, app: names,
+                            otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames).map { (url: item.url, kind: $0) }
+        }
+        let configs = config.compactMap { item -> (url: URL, kind: AppDataEntry.Kind)? in
+            guard let matched = AppMatcher.configName(item.name, inConfigFolder: item.inConfig, app: names,
+                                                      otherAppNames: otherAppNames) else { return nil }
+            let stem = item.inConfig ? item.name.lowercased() : String(item.name.lowercased().dropFirst())
+            guard !isForeignTool(matched, app: app.url, tools: tools), !isForeignTool(stem, app: app.url, tools: tools)
+            else { return nil }
+            return (url: item.url, kind: .config)
+        }
+        return data + configs
+    }
+
+    /// A non-Apple Library entry with the per-entry work of `AppMatcher.kind` done once.
+    private struct LibraryItem { let id: String; let lowerName: String; let folder: String; let url: URL }
+
+    private static func libraryItems(policy: SafetyPolicy, skipped: Set<String> = []) -> [LibraryItem] {
+        dataFolderItems(policy: policy, skipped: skipped).filter { !SafetyPolicy.isApple($0.name) }.map {
+            LibraryItem(id: AppMatcher.identifier($0.name, in: $0.folder), lowerName: $0.name.lowercased(), folder: $0.folder,
+                        url: $0.url)
         }
     }
 
-    /// For every app, the ~/Library entries `data(of:)` would list for it (same `AppMatcher` rule; other app names are
-    /// the other apps in `apps`), from ONE listing of `appDataFolders` for all apps. Never measures sizes.
+    /// The app's data in ~/Library and its config in ~ and ~/.config, largest first. `otherBundleIDs`/`otherAppNames`:
+    /// every other installed or running app (all names it goes by), whose data must never be picked. `tools` defaults
+    /// to `toolPaths`.
+    @concurrent static func data(of app: InstalledApp, otherBundleIDs: Set<String>, otherAppNames: Set<String> = [],
+                                 tools: [String: [String]]? = nil, policy: SafetyPolicy = .current) async -> [AppDataEntry] {
+        let found = classify(app, library: libraryItems(policy: policy), config: configItems(policy: policy),
+                             otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames,
+                             tools: tools ?? toolPaths(home: policy.homeURL))
+        var entries: [AppDataEntry] = []
+        for item in found { entries.append(AppDataEntry(url: item.url, size: await size(of: item.url), kind: item.kind)) }
+        return entries.sorted { $0.size > $1.size }
+    }
+
+    /// For every app, the entries `data(of:)` would list for it with their kind (same rules; other app names are all
+    /// names of the other apps in `apps` plus the names of `allApps`), from ONE listing for all apps. Never measures sizes.
     /// `skipped`: folders not to list (`ProtectedFolders` without Full Disk Access: listing them would prompt).
     /// `allApps`: app bundles not in `apps` whose names count too (`allAppURLs`).
-    @concurrent static func dataMatches(of apps: [InstalledApp], otherBundleIDs: Set<String>, skipped: Set<String> = [],
-                                        allApps: [URL] = [], policy: SafetyPolicy = .current) async -> [URL: [URL]] {
-        // Per-entry work done once, not once per app.
-        let items = dataFolderItems(policy: policy, skipped: skipped).filter { !SafetyPolicy.isApple($0.name) }
-            .map { (id: AppMatcher.identifier($0.name, in: $0.folder), name: $0.name, folder: $0.folder, url: $0.url) }
-        var result: [URL: [URL]] = [:]
+    @concurrent static func classifiedMatches(of apps: [InstalledApp], otherBundleIDs: Set<String>, skipped: Set<String> = [],
+                                              allApps: [URL] = [], tools: [String: [String]]? = nil,
+                                              policy: SafetyPolicy = .current) async -> [URL: [(url: URL, kind: AppDataEntry.Kind)]] {
+        let library = libraryItems(policy: policy, skipped: skipped)
+        let config = configItems(policy: policy)
+        let tools = tools ?? toolPaths(home: policy.homeURL)
+        var result: [URL: [(url: URL, kind: AppDataEntry.Kind)]] = [:]
         for app in apps {
-            let names = Set(apps.lazy.filter { $0.url != app.url }.map(\.name)).union(otherAppNames(than: app.url, in: allApps))
-            result[app.url] = items.filter {
-                AppMatcher.matches(id: $0.id, name: $0.name, folder: $0.folder, bundleID: app.bundleID, appName: app.name,
-                                   otherBundleIDs: otherBundleIDs, otherAppNames: names)
-            }.map(\.url)
+            let names = Set(apps.lazy.filter { $0.url != app.url }.flatMap(\.names)).union(otherAppNames(than: app.url, in: allApps))
+            result[app.url] = classify(app, library: library, config: config, otherBundleIDs: otherBundleIDs,
+                                       otherAppNames: names, tools: tools)
         }
         return result
+    }
+
+    /// `classifiedMatches` without the kinds: what each app row's data size adds up.
+    @concurrent static func dataMatches(of apps: [InstalledApp], otherBundleIDs: Set<String>, skipped: Set<String> = [],
+                                        allApps: [URL] = [], tools: [String: [String]]? = nil,
+                                        policy: SafetyPolicy = .current) async -> [URL: [URL]] {
+        await classifiedMatches(of: apps, otherBundleIDs: otherBundleIDs, skipped: skipped, allApps: allApps, tools: tools,
+                                policy: policy).mapValues { $0.map(\.url) }
     }
 
     /// Bin folders of package managers and language toolchains; `~` is the policy's home. The process `PATH` is added
@@ -309,7 +482,8 @@ nonisolated enum Uninstaller {
         }
     }
 
-    /// Moves the app (if any) and then its data to the Trash, re-checking the policy right before each item, and that
+    /// Moves the app (if any) and then its data and config to the Trash, re-checking the policy (`allowsAppData` or
+    /// `allowsAppConfig`) right before each item, and that
     /// the app is not open (`isRunning`) right before it goes (its size walk may take seconds).
     /// If `FileManager.trashItem` is refused for lack of permission (owned by root or another user, App Store), the
     /// app goes through `recycle` instead. If the app still isn't trashed, nothing else is touched and it throws.
@@ -339,7 +513,7 @@ nonisolated enum Uninstaller {
         }
         await bootOutAgents(in: data, policy: policy, run: launchctl)
         report += CleanReport.trashing(data.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
-                                       allows: policy.allowsAppData, trash: moveToTrash)
+                                       allows: { policy.allowsAppData($0) || policy.allowsAppConfig($0) }, trash: moveToTrash)
         return report
     }
 

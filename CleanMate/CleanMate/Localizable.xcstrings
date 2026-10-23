@@ -721,6 +721,16 @@
         }
       }
     },
+    "%@ · Possibly related" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Có thể liên quan"
+          }
+        }
+      }
+    },
     "%@ · data %@" : {
       "localizations" : {
         "vi" : {
@@ -1985,6 +1995,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản sao lưu iPhone & iPad"
+          }
+        }
+      }
+    },
+    "Items marked “Possibly related” and config in your home folder or ~/.config aren’t selected for you: check them before removing." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mục ghi “Có thể liên quan” và cấu hình trong thư mục người dùng hoặc ~/.config không được chọn sẵn: hãy kiểm tra trước khi gỡ."
           }
         }
       }

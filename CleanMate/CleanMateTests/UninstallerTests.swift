@@ -50,10 +50,131 @@ struct UninstallerTests {
     }
 
     @Test func shortOrGenericAppNamesNeverMatchFolders() {
-        for name in ["Zed", "Arc", "Google", "Microsoft", "Electron", "JetBrains", "Homebrew"] {
+        for name in ["Go", "Google", "Microsoft", "Electron", "JetBrains", "Homebrew", "Studio"] {
             #expect(!AppMatcher.matches(name: name, folder: "Application Support", bundleID: "x.y.z", appName: name, otherBundleIDs: []),
                     "\(name)")
         }
+        // A 3-character name counts as the app's name or CFBundleName, never as its executable.
+        #expect(AppMatcher.matches(name: "Zed", folder: "Application Support", bundleID: "x.y.z", appName: "Zed", otherBundleIDs: []))
+        #expect(AppMatcher.matches(name: "arc", folder: "Caches", bundleID: "x.y.z", appName: "Arc Browser", bundleName: "Arc",
+                                   otherBundleIDs: []))
+        #expect(!AppMatcher.matches(name: "Fox", folder: "Caches", bundleID: "x.y.z", appName: "Firefox Tools",
+                                    executableName: "Fox", otherBundleIDs: []))
+    }
+
+    /// Folders named after the app's name, CFBundleName, CFBundleExecutable or a spelling of them are surely its data;
+    /// a folder only starting with its first word is a suggestion; nothing another app goes by is ever picked.
+    @Test func matchesNameVariantsAndSuggestsPrefixFolders() {
+        let vscode = AppMatcher.Names(bundleID: "com.microsoft.VSCode", name: "Visual Studio Code", bundleName: "Code",
+                                      executableName: "Electron")
+        let brave = AppMatcher.Names(bundleID: "com.brave.Browser", name: "Brave Browser", bundleName: "Brave Browser")
+        let kind = { (name: String, folder: String, app: AppMatcher.Names, others: Set<String>) in
+            AppMatcher.kind(name: name, folder: folder, app: app, otherBundleIDs: [], otherAppNames: others)
+        }
+        let others: Set = ["Cursor", "Arc", "Disk Utility", "Studio One"]
+        #expect(kind("Code", "Application Support", vscode, others) == .data)
+        #expect(kind("Visual Studio Code", "Logs", vscode, others) == .data)
+        #expect(kind("Electron", "Application Support", vscode, others) == nil) // generic executable
+        #expect(kind("Arc", "Application Support", AppMatcher.Names(bundleID: "company.thebrowser.Browser", name: "Arc"), []) == .data)
+        let beekeeper = AppMatcher.Names(bundleID: "io.beekeeperstudio.desktop", name: "Beekeeper Studio")
+        #expect(kind("beekeeper-studio", "Application Support", beekeeper, others) == .data)
+        #expect(kind("Beekeeper_Studio", "Caches", beekeeper, others) == .data)
+        let diskDrill = AppMatcher.Names(bundleID: "com.cleverfiles.Disk-Drill", name: "Disk Drill")
+        #expect(kind("DiskDrill", "Application Support", diskDrill, others) == .data)
+        #expect(kind("DiskDrill", "Preferences", diskDrill, others) == nil) // name folders only
+        // Suggestion: only in Application Support, never reverse-DNS, never when another app starts the same way.
+        #expect(kind("BraveSoftware", "Application Support", brave, others) == .suggested)
+        #expect(kind("BraveSoftware", "Caches", brave, others) == nil)
+        #expect(kind("brave.foo.bar", "Application Support", brave, others) == nil)
+        #expect(kind("BraveSoftware", "Application Support", brave, others.union(["Brave Origin"])) == nil)
+        #expect(kind("BraveSoftware", "Application Support", brave, others.union(["BraveVPN"])) == nil)
+        #expect(kind("DiskUtilityPro", "Application Support", diskDrill, ["Disk Expert"]) == nil)
+        let chrome = AppMatcher.Names(bundleID: "com.google.Chrome", name: "Google Chrome")
+        #expect(kind("GoogleUpdater", "Application Support", chrome, []) == nil) // generic first word
+        // Another app with the same name or a longer family name: ambiguous, only bundle ids count.
+        #expect(kind("DiskDrill", "Application Support", diskDrill, ["Disk Drill Pro"]) == nil)
+        #expect(kind("Code", "Application Support", vscode, ["Code"]) == nil)
+        #expect(kind("beekeeper-studio", "Application Support", beekeeper, ["beekeeper-studio"]) == nil)
+        #expect(kind("Code", "Application Support", vscode, ["Codebase Pro", "Codex"]) == .data)
+        #expect(kind("com.microsoft.VSCode", "Caches", vscode, ["Code"]) == .data)
+    }
+
+    @Test func appConfigPolicyAllowsOnlyTopLevelConfigItems() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for path in [".cursor", ".antigravity-ide", ".config/zed", ".config/opencode", ".zed.json"] {
+            #expect(policy.allowsAppConfig(try make(path)), "\(path)")
+        }
+        try make(".ssh/config")
+        for path in [".config", ".cache", ".local", ".Trash", ".ssh", ".SSH", ".ssh/config", ".gnupg", ".aws", ".kube", ".zshrc",
+                     ".android", ".cargo", ".config/.DS_Store", ".config/zed/settings.json", ".local/share/zed", "visible",
+                     "Documents", "Library/Application Support/Zed", ".com.apple.foo", ".cursor/extensions"] {
+            #expect(!policy.allowsAppConfig(home.appending(path: path)), "\(path)")
+        }
+        #expect(!policy.allowsAppConfig(URL(fileURLWithPath: "/tmp/.cursor")))
+        let link = home.appending(path: ".linked")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: home.appending(path: ".cursor"))
+        #expect(!policy.allowsAppConfig(link))
+        // A symlinked ~/.config (dotfile managers) is never followed.
+        let other = root.appending(path: "dotfiles")
+        try FileManager.default.createDirectory(at: other.appending(path: "zed"), withIntermediateDirectories: true)
+        try FileManager.default.removeItem(at: home.appending(path: ".config"))
+        try FileManager.default.createSymbolicLink(at: home.appending(path: ".config"), withDestinationURL: other)
+        #expect(!policy.allowsAppConfig(home.appending(path: ".config/zed")))
+    }
+
+    /// Config outside ~/Library: `~/.config/<name>` and `~/.<name>`/`~/.<name>-…` are listed, never ticked; never a
+    /// protected or shared folder, a generic name, or a name a command-line tool outside the app uses.
+    @MainActor @Test func listsAppConfigUntickedAndNeverToolOrProtectedFolders() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cursorApp = try app("Applications/Cursor.app", bundleID: "com.todesktop.cursor")
+        try make("Applications/Cursor.app/Contents/Resources/bin/code")
+        for path in [".cursor/argv.json", ".cursor-tutor/x", ".config/cursor/x", ".config/zed/settings.json",
+                     ".antigravity-ide/x", ".ssh/config", ".cache/zed/x", ".config/settings/x", ".mytool/x",
+                     ".config/mytool/x", ".zedx/x", ".gemini/x", ".config/github-copilot/x", "Library/Application Support/Cursor/x"] {
+            try make(path)
+        }
+        let bin = try make("bin", folder: true)
+        try FileManager.default.createSymbolicLink(at: bin.appending(path: "cursor"),
+                                                   withDestinationURL: cursorApp.appending(path: "Contents/Resources/bin/code"))
+        try make("bin/mytool")
+        let tools = Uninstaller.toolPaths(home: home, folders: [bin.path])
+        let config = { (app: InstalledApp, others: Set<String>) async in
+            await Uninstaller.data(of: app, otherBundleIDs: [], otherAppNames: others, tools: tools, policy: policy)
+                .filter { $0.kind == .config }.map { ($0.url.path as NSString).replacingOccurrences(of: home.path, with: "~") }
+        }
+        let cursor = InstalledApp(url: cursorApp, name: "Cursor", bundleID: "com.todesktop.cursor", version: nil, lastUsed: nil)
+        #expect(Set(await config(cursor, [])) == ["~/.cursor", "~/.cursor-tutor", "~/.config/cursor"])
+        #expect(await config(cursor, ["Cursor"]).isEmpty) // another app goes by that name
+        let zed = InstalledApp(url: URL(filePath: "/nonexistent/Zed.app"), name: "Zed", bundleID: "dev.zed.Zed", version: nil, lastUsed: nil)
+        #expect(await config(zed, []) == ["~/.config/zed"]) // never ~/.cache/zed, nor ~/.zedx
+        let ide = InstalledApp(url: URL(filePath: "/nonexistent/Antigravity IDE.app"), name: "Antigravity IDE",
+                               bundleID: "com.google.antigravity", version: nil, lastUsed: nil)
+        #expect(await config(ide, []) == ["~/.antigravity-ide"])
+        for (name, bundleName) in [("SSH", "ssh"), ("Settings", "settings"), ("My Tool", "mytool"), ("Gemini", "Gemini"),
+                                   ("GitHub Copilot", "GitHub Copilot")] {
+            let app = InstalledApp(url: URL(filePath: "/nonexistent/\(name).app"), name: name, bundleID: "com.test.\(bundleName)",
+                                   version: nil, lastUsed: nil, bundleName: bundleName)
+            #expect(await config(app, []).isEmpty, "\(name)") // protected, generic, a tool outside the bundle, or a CLI's
+        }
+        // In the detail: listed with the ~/Library data, only the data ticked; data sizes count it all.
+        let model = UninstallerModel()
+        let policy = policy
+        model.apps = [cursor]
+        model.appData = { app, _, _ in // not the real Mac's other apps (it may have a real Cursor.app)
+            await Uninstaller.data(of: app, otherBundleIDs: [], tools: tools, policy: policy)
+        }
+        model.selection = .app(cursor.url)
+        await model.loadEntries()
+        #expect(model.entries.count == 4)
+        #expect(model.checked.map(\.lastPathComponent) == ["Cursor"])
+        let matches = await Uninstaller.dataMatches(of: [cursor], otherBundleIDs: [], tools: tools, policy: policy)
+        #expect(Set(matches[cursor.url] ?? []) == Set(model.entries.map(\.url)))
+        // Moved to the (fake) Trash like other data, re-checked right before; a protected folder never is.
+        let moved = Moved()
+        let ssh = AppDataEntry(url: home.appending(path: ".ssh"), size: 1, kind: .config)
+        let report = try await Uninstaller.trash(app: nil, data: model.entries + [ssh], policy: policy, launchctl: { _ in true },
+                                                 moveToTrash: { moved.add($0); return $0 }, isRunning: { _ in false })
+        #expect(Set(moved.all) == Set(model.entries.map(\.url)) && report.skipped == 1)
     }
 
     @Test func twoInstalledAppsWithSharedPrefixKeepTheirOwnData() {
