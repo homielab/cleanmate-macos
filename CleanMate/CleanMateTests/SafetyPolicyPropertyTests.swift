@@ -172,7 +172,7 @@ struct SafetyPolicyPropertyTests {
             }
             if policy.allowsAppConfig(url) {
                 let inHome = parentKey == key(realHome) && name.hasPrefix(".")
-                let inConfig = parentKey == key(realHome + "/.config") && !name.hasPrefix(".")
+                let inConfig = [".config", ".local/share"].contains { parentKey == key(realHome + "/" + $0) } && !name.hasPrefix(".")
                 #expect(generalOK(t) && (inHome || inConfig) && !isLink(t)
                         && !SafetyPolicy.sharedHomeItems.contains(name.lowercased()), "allowsAppConfig \(path) → \(t)")
             }

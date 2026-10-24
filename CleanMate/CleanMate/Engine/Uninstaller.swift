@@ -1,7 +1,7 @@
 import AppKit
 
 // Uninstaller: apps in /Applications and ~/Applications (and up to three subfolders down) plus their data in ~/Library and
-// their config in ~ and ~/.config, and data left behind by apps already removed. Everything goes to the Trash; Apple's apps
+// their config in ~, ~/.config and ~/.local/share, and data left behind by apps already removed. Everything goes to the Trash; Apple's apps
 // and data are never listed.
 
 nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
@@ -21,7 +21,7 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
 }
 
 /// One item directly inside a ~/Library data folder (`SafetyPolicy.appDataFolders`), or an app's config item directly in
-/// ~ or ~/.config (`SafetyPolicy.allowsAppConfig`).
+/// ~, ~/.config or ~/.local/share (`SafetyPolicy.allowsAppConfig`).
 nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
     /// `data`: surely the app's (ticked when listed). `suggested`: a folder that only starts like the app's name.
     /// `config`: outside ~/Library. Only `data` is ticked for the user.
@@ -33,10 +33,11 @@ nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
 
     var id: URL { url }
     var folder: String { url.deletingLastPathComponent().lastPathComponent }
-    /// Where the item is, as shown: its ~/Library folder, `~/.config` or `~`.
+    /// Where the item is, as shown: its ~/Library folder, `~/.config`, `~/.local/share` or `~`.
     var location: String {
         guard kind == .config else { return folder }
-        return folder == ".config" ? "~/.config" : "~"
+        let parent = url.deletingLastPathComponent()
+        return SafetyPolicy.appConfigFolders.first { parent.path.hasSuffix("/" + $0) }.map { "~/" + $0 } ?? "~"
     }
 }
 
@@ -173,8 +174,8 @@ nonisolated enum AppMatcher {
     /// CLI's `~/.gemini`, Copilot's editor sign-in in `~/.config/github-copilot`…), even when the CLI isn't found.
     static let toolConfigNames: Set = ["claude", "codex", "gemini", "copilot", "github-copilot", "continue", "aider", "goose"]
 
-    /// The `Names.exact` name the config item `name` stands for: `~/.config/<name>`, `~/.<name>` or `~/.<name>-…`
-    /// (`inConfigFolder` false: `name` has its dot), unless another app goes by that name; nil when it isn't the app's.
+    /// The `Names.exact` name the config item `name` stands for: `~/.config/<name>`, `~/.local/share/<name>`, `~/.<name>`
+    /// or `~/.<name>-…` (`inConfigFolder` false: `name` has its dot), unless another app goes by that name; nil when it isn't the app's.
     static func configName(_ name: String, inConfigFolder: Bool, app: Names, otherAppNames: Set<String>) -> String? {
         let lower = name.lowercased()
         let stem = inConfigFolder ? lower : String(lower.dropFirst())
@@ -291,13 +292,14 @@ nonisolated enum Uninstaller {
         return entries.sorted { $0.size > $1.size }
     }
 
-    /// Hidden items directly in the home folder and items directly in ~/.config that `allowsAppConfig`: (name, whether
-    /// in ~/.config, url).
+    /// Hidden items directly in the home folder and items directly in ~/.config or ~/.local/share that
+    /// `allowsAppConfig`: (name, whether in ~/.config or ~/.local/share, url).
     static func configItems(policy: SafetyPolicy) -> [(name: String, inConfig: Bool, url: URL)] {
-        let home = policy.homeURL, config = home.appending(path: ".config")
+        let home = policy.homeURL
         let names = { (dir: URL) in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [] }
+        let folders = SafetyPolicy.appConfigFolders.map { home.appending(path: $0) }
         return (names(home).filter { $0.hasPrefix(".") }.map { (name: $0, inConfig: false, url: home.appending(path: $0)) }
-                + names(config).map { (name: $0, inConfig: true, url: config.appending(path: $0)) })
+                + folders.flatMap { folder in names(folder).map { (name: $0, inConfig: true, url: folder.appending(path: $0)) } })
             .filter { policy.allowsAppConfig($0.url) }
     }
 
@@ -357,7 +359,7 @@ nonisolated enum Uninstaller {
         }
     }
 
-    /// The app's data in ~/Library and its config in ~ and ~/.config, largest first. `otherBundleIDs`/`otherAppNames`:
+    /// The app's data in ~/Library and its config in ~, ~/.config and ~/.local/share, largest first. `otherBundleIDs`/`otherAppNames`:
     /// every other installed or running app (all names it goes by), whose data must never be picked. `tools` defaults
     /// to `toolPaths`.
     @concurrent static func data(of app: InstalledApp, otherBundleIDs: Set<String>, otherAppNames: Set<String> = [],

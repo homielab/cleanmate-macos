@@ -101,12 +101,13 @@ struct UninstallerTests {
 
     @Test func appConfigPolicyAllowsOnlyTopLevelConfigItems() throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        for path in [".cursor", ".antigravity-ide", ".config/zed", ".config/opencode", ".zed.json"] {
+        for path in [".cursor", ".antigravity-ide", ".config/zed", ".config/opencode", ".zed.json", ".local/share/zed"] {
             #expect(policy.allowsAppConfig(try make(path)), "\(path)")
         }
         try make(".ssh/config")
         for path in [".config", ".cache", ".local", ".Trash", ".ssh", ".SSH", ".ssh/config", ".gnupg", ".aws", ".kube", ".zshrc",
-                     ".android", ".cargo", ".config/.DS_Store", ".config/zed/settings.json", ".local/share/zed", "visible",
+                     ".android", ".cargo", ".config/.DS_Store", ".config/zed/settings.json", ".local/share", ".local/share/.zed",
+                     ".local/share/zed/db.sqlite", ".local/zed", ".local/state/zed", "visible",
                      "Documents", "Library/Application Support/Zed", ".com.apple.foo", ".cursor/extensions"] {
             #expect(!policy.allowsAppConfig(home.appending(path: path)), "\(path)")
         }
@@ -120,6 +121,16 @@ struct UninstallerTests {
         try FileManager.default.removeItem(at: home.appending(path: ".config"))
         try FileManager.default.createSymbolicLink(at: home.appending(path: ".config"), withDestinationURL: other)
         #expect(!policy.allowsAppConfig(home.appending(path: ".config/zed")))
+        // Nor a symlinked ~/.local/share or ~/.local, nor a symlink inside it.
+        try FileManager.default.createSymbolicLink(at: home.appending(path: ".local/share/linked"), withDestinationURL: other)
+        #expect(!policy.allowsAppConfig(home.appending(path: ".local/share/linked")))
+        try FileManager.default.removeItem(at: home.appending(path: ".local/share"))
+        try FileManager.default.createSymbolicLink(at: home.appending(path: ".local/share"), withDestinationURL: other)
+        #expect(!policy.allowsAppConfig(home.appending(path: ".local/share/zed")))
+        try FileManager.default.removeItem(at: home.appending(path: ".local"))
+        try FileManager.default.createSymbolicLink(at: home.appending(path: ".local"), withDestinationURL: root)
+        try FileManager.default.createDirectory(at: root.appending(path: "share/zed"), withIntermediateDirectories: true)
+        #expect(!policy.allowsAppConfig(home.appending(path: ".local/share/zed")))
     }
 
     /// Config outside ~/Library: `~/.config/<name>` and `~/.<name>`/`~/.<name>-…` are listed, never ticked; never a
@@ -130,7 +141,10 @@ struct UninstallerTests {
         try make("Applications/Cursor.app/Contents/Resources/bin/code")
         for path in [".cursor/argv.json", ".cursor-tutor/x", ".config/cursor/x", ".config/zed/settings.json",
                      ".antigravity-ide/x", ".ssh/config", ".cache/zed/x", ".config/settings/x", ".mytool/x",
-                     ".config/mytool/x", ".zedx/x", ".gemini/x", ".config/github-copilot/x", "Library/Application Support/Cursor/x"] {
+                     ".config/mytool/x", ".zedx/x", ".gemini/x", ".config/github-copilot/x", "Library/Application Support/Cursor/x",
+                     ".local/share/zed/db/0/db.sqlite", ".local/share/cursor/x", ".local/share/mytool/x",
+                     ".local/share/settings/x", ".local/share/gemini/x", ".local/share/.zed/x",
+                     ".local/state/zed/x"] {
             try make(path)
         }
         let bin = try make("bin", folder: true)
@@ -143,10 +157,13 @@ struct UninstallerTests {
                 .filter { $0.kind == .config }.map { ($0.url.path as NSString).replacingOccurrences(of: home.path, with: "~") }
         }
         let cursor = InstalledApp(url: cursorApp, name: "Cursor", bundleID: "com.todesktop.cursor", version: nil, lastUsed: nil)
-        #expect(Set(await config(cursor, [])) == ["~/.cursor", "~/.cursor-tutor", "~/.config/cursor"])
+        #expect(Set(await config(cursor, [])) == ["~/.cursor", "~/.cursor-tutor", "~/.config/cursor", "~/.local/share/cursor"])
         #expect(await config(cursor, ["Cursor"]).isEmpty) // another app goes by that name
         let zed = InstalledApp(url: URL(filePath: "/nonexistent/Zed.app"), name: "Zed", bundleID: "dev.zed.Zed", version: nil, lastUsed: nil)
-        #expect(await config(zed, []) == ["~/.config/zed"]) // never ~/.cache/zed, nor ~/.zedx
+        // Never ~/.cache/zed, ~/.local/state/zed, ~/.local/share/.zed nor ~/.zedx.
+        #expect(Set(await config(zed, [])) == ["~/.config/zed", "~/.local/share/zed"])
+        let zedEntries = await Uninstaller.data(of: zed, otherBundleIDs: [], tools: tools, policy: policy)
+        #expect(Set(zedEntries.filter { $0.kind == .config }.map(\.location)) == ["~/.config", "~/.local/share"])
         let ide = InstalledApp(url: URL(filePath: "/nonexistent/Antigravity IDE.app"), name: "Antigravity IDE",
                                bundleID: "com.google.antigravity", version: nil, lastUsed: nil)
         #expect(await config(ide, []) == ["~/.antigravity-ide"])
@@ -165,7 +182,7 @@ struct UninstallerTests {
         }
         model.selection = .app(cursor.url)
         await model.loadEntries()
-        #expect(model.entries.count == 4)
+        #expect(model.entries.count == 5)
         #expect(model.checked.map(\.lastPathComponent) == ["Cursor"])
         let matches = await Uninstaller.dataMatches(of: [cursor], otherBundleIDs: [], tools: tools, policy: policy)
         #expect(Set(matches[cursor.url] ?? []) == Set(model.entries.map(\.url)))

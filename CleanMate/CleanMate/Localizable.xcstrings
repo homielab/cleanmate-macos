@@ -2119,12 +2119,12 @@
         }
       }
     },
-    "Items marked “Possibly related” and config in your home folder or ~/.config aren’t selected for you: check them before removing." : {
+    "Items marked “Possibly related” and config in your home folder, ~/.config or ~/.local/share aren’t selected for you: check them before removing." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mục ghi “Có thể liên quan” và cấu hình trong thư mục người dùng hoặc ~/.config không được chọn sẵn: hãy kiểm tra trước khi gỡ."
+            "value" : "Mục ghi “Có thể liên quan” và cấu hình trong thư mục người dùng, ~/.config hoặc ~/.local/share không được chọn sẵn: hãy kiểm tra trước khi gỡ."
           }
         }
       }

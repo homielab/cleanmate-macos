@@ -18,7 +18,7 @@ final class UninstallerModel {
     var loadingApps = false
     /// Filled in the background after the list appears.
     var appSizes: [URL: Int64] = [:]
-    /// Total size of each app's data in ~/Library and config in ~ and ~/.config (same rule as its detail, suggestions
+    /// Total size of each app's data in ~/Library and config in ~, ~/.config and ~/.local/share (same rule as its detail, suggestions
     /// included), measured in the background after `appSizes`.
     var appDataSizes: [URL: Int64] = [:]
     /// Bumped when `appDataSizes` must be (re)measured: the view's `.task(id:)` runs `measureAppData`, cancelled on leaving.

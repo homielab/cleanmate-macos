@@ -222,7 +222,7 @@ struct UninstallerView: View {
                             .font(.callout)
                         }
                         if model.entries.contains(where: { $0.kind != .data }) {
-                            Text("Items marked “Possibly related” and config in your home folder or ~/.config aren’t selected for you: check them before removing.")
+                            Text("Items marked “Possibly related” and config in your home folder, ~/.config or ~/.local/share aren’t selected for you: check them before removing.")
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                     }
@@ -396,7 +396,7 @@ struct UninstallerView: View {
         }
     }
 
-    /// The entry's folder (`~/.config`, `~` for config), and whether it is only a suggestion.
+    /// The entry's folder (`~/.config`, `~/.local/share`, `~` for config), and whether it is only a suggestion.
     private func location(_ entry: AppDataEntry) -> Text {
         entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
     }

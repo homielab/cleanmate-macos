@@ -249,17 +249,21 @@ nonisolated struct SafetyPolicy: Sendable {
         ".vim", ".vimrc", ".viminfo", ".lesshst", ".python_history", ".node_repl_history",
     ]
 
+    /// Folders of the home folder whose non-hidden items can be an app's config or data (XDG config and data homes).
+    static let appConfigFolders = [".config", ".local/share"]
+
     /// Uninstaller rule for an app's config outside ~/Library, only ever moved to the Trash: a hidden item directly in
-    /// the home folder (`~/.cursor`, never a `sharedHomeItems` one) or a non-hidden item directly in ~/.config
-    /// (`~/.config/zed`; a symlinked ~/.config is never followed), not a symlink itself, not Apple's, and allowed by
-    /// `allows` (never ~/.config, ~/.cache, ~/.local, ~/.Trash themselves nor anything in .ssh, .gnupg, .aws, .kube).
+    /// the home folder (`~/.cursor`, never a `sharedHomeItems` one) or a non-hidden item directly in ~/.config or
+    /// ~/.local/share (`~/.config/zed`, `~/.local/share/zed`; a symlinked ~/.config, ~/.local or ~/.local/share is never
+    /// followed), not a symlink itself, not Apple's, and allowed by `allows` (never ~/.config, ~/.cache, ~/.local,
+    /// ~/.local/share, ~/.Trash themselves nor anything in .ssh, .gnupg, .aws, .kube).
     func allowsAppConfig(_ url: URL) -> Bool {
         let path = Self.normalize(url)
         let parent = (path as NSString).deletingLastPathComponent
         let name = (path as NSString).lastPathComponent
         let home = allowedRoots[0]
         let inHome = parent == home && name.hasPrefix(".") && name.count > 1 && !Self.sharedHomeItems.contains(name.lowercased())
-        let inConfig = parent == home + "/.config" && !name.hasPrefix(".")
+        let inConfig = Self.appConfigFolders.contains { parent == home + "/" + $0 } && !name.hasPrefix(".")
         guard inHome || inConfig, !Self.isApple(name) else { return false }
         let real = URL(fileURLWithPath: path)
         guard (try? real.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == false else { return false }
