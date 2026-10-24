@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1] - 2026-10-24
+
 ### Added
 - **Updates**: CleanMate › Check for Updates… installs new versions from GitHub Releases (signed, verified with
   Sparkle). On the second launch you are asked whether to check automatically; Settings › General › Updates changes
