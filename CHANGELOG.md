@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan**: incomplete Ollama downloads (`-partial` files an interrupted `ollama pull` leaves in the models
   folder) — one unticked row, skipped while Ollama runs.
 
+### Fixed
+- **Large & Old Files**: the progress estimate kept a count for every folder ever scanned, without limit; it now
+  keeps at most 20 folders inside your home folder and drops older entries from elsewhere on the next scan.
+
 ## [1.1] - 2026-10-24
 
 ### Added

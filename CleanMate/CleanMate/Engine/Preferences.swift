@@ -13,7 +13,8 @@ nonisolated enum Preferences {
     static let fullDiskAccessPrompted = "fullDiskAccessPrompted"
     /// Bool, off by default: free-space item in the menu bar.
     static let showMenuBarExtra = "showMenuBarExtra"
-    /// [String: Int]: scan scope → entries checked by the last finished Large & Old Files scan (progress estimate).
+    /// [String: Int]: scan scope → entries checked by the last finished Large & Old Files scan (progress estimate),
+    /// at most `LargeFilesModel.lastCountLimit` scopes, all inside the home folder.
     static let largeFilesLastCount = "largeFilesLastCount"
     /// String: folders last chosen as the Large & Old Files scope, newest first, one path per line.
     static let largeFilesRecentFolders = "largeFilesRecentFolders"
@@ -106,15 +107,15 @@ nonisolated enum Preferences {
     }
 
     /// The `[String: V]` stored under `key`; empty when missing or of another type.
-    static func dictionary<V>(_ key: String) -> [String: V] {
-        UserDefaults.standard.dictionary(forKey: key) as? [String: V] ?? [:]
+    static func dictionary<V>(_ key: String, defaults: UserDefaults = .standard) -> [String: V] {
+        defaults.dictionary(forKey: key) as? [String: V] ?? [:]
     }
 
     /// Re-reads the dictionary under `key`, applies `change` and stores it (other entries kept).
-    static func update<V>(_ key: String, _ change: (inout [String: V]) -> Void) {
-        var all: [String: V] = dictionary(key)
+    static func update<V>(_ key: String, defaults: UserDefaults = .standard, _ change: (inout [String: V]) -> Void) {
+        var all: [String: V] = dictionary(key, defaults: defaults)
         change(&all)
-        UserDefaults.standard.set(all, forKey: key)
+        defaults.set(all, forKey: key)
     }
 }
 

@@ -64,6 +64,13 @@ final class LargeFilesModel {
     var scannedCount = 0
     /// Entries the last finished scan of the same scope checked; 0 = unknown (first scan).
     var estimatedCount = 0
+    /// Where the entry count of each scope persists (`Preferences.largeFilesLastCount`); nil = memory only.
+    /// Never the real preferences under a test host.
+    @ObservationIgnored var lastCountDefaults: UserDefaults? =
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil
+    @ObservationIgnored private var memoryLastCounts: [String: Int] = [:]
+    /// Most scopes whose entry count is kept: home, the presets and the recent folders, with and without Full Disk Access.
+    static let lastCountLimit = 20
     /// Determinate progress of the running scan, or nil when there is no estimate.
     var scanFraction: Double? { Self.fraction(checked: scannedCount, estimate: estimatedCount) }
     /// The last scan left out folders macOS protects (no Full Disk Access): the view shows a note.
@@ -341,7 +348,7 @@ final class LargeFilesModel {
         }
         // Same folder and same Full Disk Access state → roughly the same number of entries as last time.
         let scopeKey = "\(root.path)|\(skipping.isEmpty ? "full" : "limited")"
-        estimatedCount = (Preferences.dictionary(Preferences.largeFilesLastCount) as [String: Int])[scopeKey] ?? 0
+        estimatedCount = lastCounts[scopeKey] ?? 0
         let scanFiles = scanFiles
         scanTask = Task {
             do {
@@ -360,7 +367,7 @@ final class LargeFilesModel {
                 duplicateGroups = nil
                 if duplicatesOnly { findDuplicates() }
                 // shortcut: progress arrives every 500 entries, so this undercounts by < 500; fine for an estimate.
-                Preferences.update(Preferences.largeFilesLastCount) { (counts: inout [String: Int]) in counts[scopeKey] = scannedCount }
+                storeLastCount(scannedCount, for: scopeKey)
                 phase = .results
                 Attention.finished()
             } catch {
@@ -377,6 +384,39 @@ final class LargeFilesModel {
     }
 
     func cancel() { scanTask?.cancel() }
+
+    /// Entry count of each scan scope (`"<path>|full"` or `"<path>|limited"`) from the last finished scans.
+    var lastCounts: [String: Int] {
+        guard let defaults = lastCountDefaults else { return memoryLastCounts }
+        return Preferences.dictionary(Preferences.largeFilesLastCount, defaults: defaults)
+    }
+
+    private func storeLastCount(_ count: Int, for key: String) {
+        guard let defaults = lastCountDefaults else {
+            memoryLastCounts = Self.recordingLastCount(count, for: key, in: memoryLastCounts, home: home)
+            return
+        }
+        Preferences.update(Preferences.largeFilesLastCount, defaults: defaults) { (counts: inout [String: Int]) in
+            counts = Self.recordingLastCount(count, for: key, in: counts, home: home)
+        }
+    }
+
+    /// `counts` with `count` stored under `key`, scopes outside `home` dropped (only home and folders inside it can
+    /// be scanned; older versions also kept other paths) and at most `limit` scopes: `key` plus the others in path
+    /// order. Pure string work: never touches a folder macOS may guard.
+    static func recordingLastCount(_ count: Int, for key: String, in counts: [String: Int], home: URL,
+                                   limit: Int = lastCountLimit) -> [String: Int] {
+        let homePath = home.standardizedFileURL.path
+        func insideHome(_ scopeKey: String) -> Bool {
+            guard let bar = scopeKey.lastIndex(of: "|") else { return false }
+            let path = URL(fileURLWithPath: String(scopeKey[..<bar])).standardizedFileURL.path
+            return path == homePath || path.hasPrefix(homePath + "/")
+        }
+        let others = counts.keys.filter { $0 != key && insideHome($0) }.sorted().prefix(max(limit - 1, 0))
+        var result = Dictionary(uniqueKeysWithValues: others.map { ($0, counts[$0]!) })
+        result[key] = count
+        return result
+    }
 
     /// Only from results: not twice, nor after a new scan started behind the dialog (⌘R).
     func trash() async {

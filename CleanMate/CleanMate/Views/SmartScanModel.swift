@@ -335,7 +335,7 @@ final class SmartScanModel {
         let overrides = Preferences.overrides
         let scanItem = scanItem
         let blockedByExclusion = blockedByExclusion
-        estimates = durationsKey.map(Preferences.dictionary) ?? [:]
+        estimates = durationsKey.map { Preferences.dictionary($0) } ?? [:]
         var durations: [String: Double] = [:]
         await withTaskGroup(of: (CleanerItem, ItemScan, Duration, Bool).self) { group in
             for item in newItems {

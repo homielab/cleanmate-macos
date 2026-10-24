@@ -108,44 +108,33 @@ struct RaceTests {
         return model
     }
 
-    /// The finished scan stores its entry count; put the real value back afterwards.
-    func keepingLastCount(_ body: () async throws -> Void) async rethrows {
-        let saved = UserDefaults.standard.object(forKey: Preferences.largeFilesLastCount)
-        defer { UserDefaults.standard.set(saved, forKey: Preferences.largeFilesLastCount) }
-        try await body()
-    }
-
     @Test func olderLargeFilesScanNeverOverwritesANewerOne() async throws {
-        try await keepingLastCount {
-            let gates = Gates()
-            let model = largeFiles(gates) { $0 == 1 }
-            model.scan()
-            try await until { gates.calls == 1 }
-            model.scan()
-            try await until { if case .results = model.phase { true } else { false } }
-            gates.open(1) // the first scan finishes after the second
-            try await until { gates.left == 2 }
-            try await Task.sleep(for: .milliseconds(200))
-            guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
-            #expect(model.files.map(\.size) == [200_000_000] && model.scannedCount == 2000)
-        }
+        let gates = Gates()
+        let model = largeFiles(gates) { $0 == 1 }
+        model.scan()
+        try await until { gates.calls == 1 }
+        model.scan()
+        try await until { if case .results = model.phase { true } else { false } }
+        gates.open(1) // the first scan finishes after the second
+        try await until { gates.left == 2 }
+        try await Task.sleep(for: .milliseconds(200))
+        guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(model.files.map(\.size) == [200_000_000] && model.scannedCount == 2000)
     }
 
     @Test func cancellingBackToBackLargeFilesScansRestoresWhatWasShownBefore() async throws {
-        try await keepingLastCount {
-            let gates = Gates()
-            let model = largeFiles(gates) { _ in true }
-            model.scan()
-            try await until { gates.calls == 1 }
-            model.scan()
-            try await until { gates.calls == 2 }
-            model.cancel()
-            gates.open(2)
-            gates.open(1)
-            try await until { if case .idle = model.phase { true } else { false } }
-            guard case .idle = model.phase else { Issue.record("phase \(model.phase)"); return }
-            #expect(model.files.isEmpty)
-        }
+        let gates = Gates()
+        let model = largeFiles(gates) { _ in true }
+        model.scan()
+        try await until { gates.calls == 1 }
+        model.scan()
+        try await until { gates.calls == 2 }
+        model.cancel()
+        gates.open(2)
+        gates.open(1)
+        try await until { if case .idle = model.phase { true } else { false } }
+        guard case .idle = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(model.files.isEmpty)
     }
 
     @Test func olderLoginItemsListingNeverReplacesANewerOne() async throws {

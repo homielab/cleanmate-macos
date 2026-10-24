@@ -240,9 +240,12 @@ struct LargeFilesTests {
 
     /// Each scope keeps its own entry count for the progress estimate; a protected scope without access is not scanned.
     @MainActor @Test func scopeChangesRescanWithItsOwnEstimateAndProtectedScopesNeedAccess() async throws {
-        let saved = UserDefaults.standard.object(forKey: Preferences.largeFilesLastCount)
-        defer { UserDefaults.standard.set(saved, forKey: Preferences.largeFilesLastCount) }
+        let suite = "CleanMateTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
         let model = LargeFilesModel()
+        #expect(model.lastCountDefaults == nil) // test host: never the real preferences
+        model.lastCountDefaults = defaults
         model.home = home
         var access = true
         model.hasFullDiskAccess = { access }
@@ -253,15 +256,14 @@ struct LargeFilesTests {
         }
         let projects = home.appending(path: "Projects")
         #expect(!model.setScope(root)) // outside home: refused, nothing scanned
-        // Set and read with no suspension in between: other suites share these defaults (RaceTests).
-        Preferences.update(Preferences.largeFilesLastCount) { (counts: inout [String: Int]) in
+        Preferences.update(Preferences.largeFilesLastCount, defaults: defaults) { (counts: inout [String: Int]) in
             counts["\(projects.path)|full"] = 1500
             counts["\(home.path)|full"] = 3000
         }
         #expect(model.setScope(projects))
         #expect(model.estimatedCount == 1500 && model.scopeName == "~/Projects")
         try await scanned()
-        Preferences.update(Preferences.largeFilesLastCount) { (counts: inout [String: Int]) in counts["\(home.path)|full"] = 3000 }
+        #expect(model.lastCounts == ["\(projects.path)|full": 0, "\(home.path)|full": 3000]) // the finished scan's count
         model.setScope(home)
         #expect(model.scope == nil && model.estimatedCount == 3000)
         try await scanned()
@@ -271,6 +273,38 @@ struct LargeFilesTests {
         #expect(model.needsAccess && model.files.isEmpty)
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(await roots.all.count == 2)
+    }
+
+    /// The entry counts keep only scopes inside home (older versions also stored others), at most `lastCountLimit`.
+    @Test func lastCountsKeepScopesInsideHomeUpToTheLimit() {
+        let home = URL(fileURLWithPath: "/Users/me")
+        let stale = ["/var/folders/x/T/CleanMateLargeFiles-1|full": 5, "/Users/meow|full": 6, "/Users/me/../other|full": 7,
+                     "no-bar": 8, "/Users/me|limited": 9, "/Users/me/Downloads|full": 10]
+        #expect(LargeFilesModel.recordingLastCount(1, for: "/Users/me|full", in: stale, home: home)
+                == ["/Users/me|full": 1, "/Users/me|limited": 9, "/Users/me/Downloads|full": 10])
+        let many = Dictionary(uniqueKeysWithValues: (10..<40).map { ("/Users/me/F\($0)|full", $0) })
+        let kept = LargeFilesModel.recordingLastCount(2, for: "/Users/me/New|full", in: many, home: home, limit: 5)
+        #expect(kept == ["/Users/me/New|full": 2, "/Users/me/F10|full": 10, "/Users/me/F11|full": 11,
+                         "/Users/me/F12|full": 12, "/Users/me/F13|full": 13])
+        #expect(LargeFilesModel.recordingLastCount(3, for: "/Users/me/F39|full", in: many, home: home, limit: 2)
+                == ["/Users/me/F39|full": 3, "/Users/me/F10|full": 10])
+    }
+
+    /// Under a test host a finished scan keeps its count in memory only: the real preferences stay untouched.
+    @MainActor @Test func finishedScanNeverWritesTheRealPreferencesInTests() async throws {
+        let before = UserDefaults.standard.dictionary(forKey: Preferences.largeFilesLastCount) as? [String: Int]
+        let model = LargeFilesModel()
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        model.scanFiles = { _, _, _, progress in
+            progress(700)
+            try await Task.sleep(for: .milliseconds(100)) // the count reaches the model on the main actor
+            return []
+        }
+        model.scan()
+        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(10)) }
+        #expect(model.lastCounts == ["\(home.path)|full": 700])
+        #expect(UserDefaults.standard.dictionary(forKey: Preferences.largeFilesLastCount) as? [String: Int] == before)
     }
 
     /// A folder scope can go down to 1 MB (smaller → scans again, larger → filters only); the home stays ≥ 50 MB.
