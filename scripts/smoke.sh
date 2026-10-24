@@ -10,7 +10,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DOMAIN="com.homielab.CleanMate"
+# The app's real preferences, by path: `defaults <domain>` can resolve to a leftover sandbox container
+# (~/Library/Containers/com.homielab.CleanMate) instead of the file the unsandboxed app writes.
+PREFS="$HOME/Library/Preferences/com.homielab.CleanMate.plist"
 TIMEOUT="${SMOKE_TIMEOUT:-20}"
 TMP="$(mktemp -d)"
 APP="${1:-}"
@@ -34,9 +36,14 @@ print(list.filter { $0[kCGWindowOwnerPID as String] as? Int32 == pid && $0[kCGWi
 SWIFT
 xcrun swiftc -O -o "$TMP/count" "$TMP/count.swift"
 
-# The app writes real defaults (e.g. window frame); restore them afterwards.
+# The app writes real defaults (window frames, Sparkle's first-launch flag); restore them afterwards.
+# Everything goes through `defaults` with the plist path, so cfprefsd's cached copy stays in step with
+# the file (copying the file behind its back would be undone by cfprefsd, and no cfprefsd is killed).
 HAD_DEFAULTS=0
-defaults export "$DOMAIN" "$TMP/defaults.plist" 2>/dev/null && HAD_DEFAULTS=1
+if [[ -f "$PREFS" ]]; then
+  defaults export "$PREFS" "$TMP/defaults.plist"
+  HAD_DEFAULTS=1
+fi
 
 PID=""
 # Only ever stop the process this script launched, never another CleanMate the user has open.
@@ -50,7 +57,13 @@ stop_app() {
 }
 cleanup() {
   stop_app
-  if [[ $HAD_DEFAULTS == 1 ]]; then defaults import "$DOMAIN" "$TMP/defaults.plist"; else defaults delete "$DOMAIN" 2>/dev/null || true; fi
+  # `defaults import` merges into what is there, so clear the keys added by the run first.
+  defaults delete "$PREFS" 2>/dev/null || true
+  if [[ $HAD_DEFAULTS == 1 ]]; then
+    defaults import "$PREFS" "$TMP/defaults.plist"
+  else
+    rm -f "$PREFS"  # `defaults delete` leaves an empty plist behind
+  fi
   rm -rf "$TMP"
 }
 trap cleanup EXIT
