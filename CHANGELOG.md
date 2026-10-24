@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Smart Scan**: Firebase CLI debug logs (`~/.cache/firebase/firebase-debug.log`, which `firebase mcp` lets grow
   without limit; kept while still open) and its downloaded emulators (unticked).
+- **Smart Scan**: ZCode caches and logs (daily app logs in `~/.zcode/v2/logs` can reach several GB), skipped
+  while ZCode runs.
 
 ## [1.2] - 2026-10-24
 

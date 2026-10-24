@@ -79,6 +79,14 @@ extension CleanerGroup {
         // Not `skipsOpenFiles`: the open-file table is read once per root, and `chromium` globs ~500 roots here (~60 s).
         running(app("orca", "Orca", bundle: ["com.stablyai.orca*"],
                     chromium(orca) + [orca + "/Crashpad/completed", orca + "/logs"]), processes: ["orca-terminal-host"]),
+        // ZCode: Electron caches of its session folder (and partitions), daily app logs and the CLI's event logs.
+        // Never v2/{credentials.json,provider_config.json,certs,runtime,tasks-index.sqlite*,visualizations},
+        // cli/{config.json,db,memories,agents,plugins,rollout,artifacts,exec} (rollout holds model input and output
+        // of sessions), skills, workspace, plugin-workspace, backup, computer-use, nor the session's cookies, Local
+        // Storage or IndexedDB. Skipped while the app or its agent processes (`zcode-cli`) run, so today's log, still
+        // being written, stays. Not `skipsOpenFiles`: `chromium` globs the partitions, one open-file read per root.
+        cache("zcode-cache", "ZCode", chromium(zcode) + ["~/.zcode/v2/logs", "~/.zcode/cli/log"],
+              apps: ["dev.zcode.app"], processes: ["zcode-cli"]),
         app("zed", "Zed", bundle: ["dev.zed.Zed"],
             ["~/Library/Caches/Zed", "~/Library/Application Support/Zed/hang_traces"]),
         // GitHub Copilot: ~/.config/github-copilot holds the login, never listed.
@@ -230,6 +238,7 @@ extension CleanerGroup {
     }
 
     nonisolated private static let orca = "~/Library/Application Support/orca"
+    nonisolated private static let zcode = "~/Library/Application Support/ZCode/session"
     nonisolated private static let cursorBundle = "com.todesktop.230313mzl4w4u92"
     nonisolated private static let windsurfBundle = "com.exafunction.windsurf"
     /// Codeium's language server, started by Windsurf and by the Codeium extensions of other editors.

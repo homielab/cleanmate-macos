@@ -1507,6 +1507,17 @@ struct AppCatalogTests {
     }
 
     /// Logins, settings, memory, models and profiles of AI tools and apps, even very old, are never listed.
+    /// ZCode: ticked caches and logs, skipped while the app or one of its `zcode-cli` agents runs (today's log is
+    /// still being written then); no session history (`cli/rollout`) in this item.
+    @Test func zcodeCachesAndLogsSkippedWhileRunning() throws {
+        let item = try #require(CleanerGroup.aiTools().items.first { $0.id == "zcode-cache" })
+        #expect(item.selectedByDefault && item.mode == .delete && item.minAge == nil && item.command == nil)
+        #expect(item.runningAppBundleIDs == ["dev.zcode.app"] && item.runningProcessNames == ["zcode-cli"])
+        #expect(item.paths.contains("~/.zcode/v2/logs") && item.paths.contains("~/.zcode/cli/log"))
+        #expect(item.paths.contains("~/Library/Application Support/ZCode/session/Partitions/*/Cache"))
+        #expect(!item.paths.contains { $0.contains("rollout") || $0.hasSuffix("/ZCode") || $0.contains("remote-assets") })
+    }
+
     @Test func credentialsSettingsAndMemoryAreNeverListed() async throws {
         let box = try Sandbox()
         defer { box.remove() }
@@ -1545,6 +1556,18 @@ struct AppCatalogTests {
             "Library/Application Support/BraveSoftware/Brave-Browser-Nightly/Default/Preferences",
             "Library/Application Support/Firefox/Profiles/x.default/cookies.sqlite",
             "Library/Application Support/Telegram Desktop/tdata/key_datas",
+            ".zcode/v2/credentials.json", ".zcode/v2/provider_config.json", ".zcode/v2/setting.json",
+            ".zcode/v2/certs/ca.pem", ".zcode/v2/runtime/r/bin", ".zcode/v2/tasks-index.sqlite",
+            ".zcode/v2/tasks-index.sqlite-wal", ".zcode/v2/visualizations/v.html", ".zcode/cli/config.json",
+            ".zcode/cli/db/state.db", ".zcode/cli/memories/m.md", ".zcode/cli/agents/a/agent.json",
+            ".zcode/cli/plugins/p/plugin.json", ".zcode/cli/rollout/model-io-session_1.jsonl",
+            ".zcode/cli/artifacts/a.txt", ".zcode/cli/exec/e.log", ".zcode/skills/s/SKILL.md",
+            ".zcode/workspace/w/file.txt", ".zcode/plugin-workspace/p.txt", ".zcode/backup/b.json",
+            ".zcode/computer-use/c.json", "Library/Application Support/ZCode/session/Cookies",
+            "Library/Application Support/ZCode/session/Local Storage/leveldb/1.ldb",
+            "Library/Application Support/ZCode/session/IndexedDB/x/1.ldb",
+            "Library/Application Support/ZCode/session/Partitions/p/Cookies",
+            "Library/Application Support/ZCode/remote-assets-cache/releases/r.zip",
         ]
         let junk = [
             ".claude/debug/log.txt", ".claude/projects/-Users-me-app/old.jsonl", ".codex/log/codex.log",
@@ -1560,6 +1583,9 @@ struct AppCatalogTests {
             ".codeium/windsurf/ws-browser/chromium-1169/c", ".codeium/windsurf/ws-browser-profile/Default/Cache/f",
             ".codeium/windsurf/ws-browser-profile/GrShaderCache/f", ".cache/opencode/models.json",
             ".cache/opencode/bin/rg", ".local/share/opencode/log/opencode.log", ".cline/data/logs/cline.log",
+            ".zcode/v2/logs/2026-10-20.log", ".zcode/cli/log/zcode-2026-10-20.jsonl",
+            "Library/Application Support/ZCode/session/Cache/Cache_Data/f",
+            "Library/Application Support/ZCode/session/Partitions/p/Code Cache/js/f",
         ]
         for path in protected + junk { try box.file(path, age: old) }
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
