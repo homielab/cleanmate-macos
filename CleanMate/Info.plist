@@ -5,7 +5,7 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/homielab/cleanmate/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>UN9VpzA76tcbRJA1pvVliMnMPcYyEiUGRugKM7ISucY=</string>
+	<string>aCtRQ2Pnm0Hy3YKZ3GFtYGnX3sZjxN4wRGq59jFcbJc=</string>
 	<key>SUEnableSystemProfiling</key>
 	<false/>
 	<key>SUVerifyUpdateBeforeExtraction</key>

@@ -15,6 +15,8 @@ SKIP_NOTARIZE=0
 DERIVED="$ROOT/build/DerivedData"
 # Sparkle's command line tools come with its Swift package, resolved into DERIVED by the archive step.
 SPARKLE_BIN="${SPARKLE_BIN:-$DERIVED/SourcePackages/artifacts/sparkle/Sparkle/bin}"
+# Keychain account of CleanMate's own EdDSA key (Sparkle's default account, ed25519, is not used).
+SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-cleanmate}"
 REPO_URL="https://github.com/homielab/cleanmate"
 
 usage() {
@@ -39,9 +41,12 @@ One-time setup:
   - "Developer ID Application" certificate for team 79LQ4MHVMG in the login keychain.
   - xcrun notarytool store-credentials cleanmate-notary \\
         --apple-id <apple id> --team-id 79LQ4MHVMG --password <app-specific password>
-  - Sparkle's EdDSA private key in the login keychain, matching SUPublicEDKey in CleanMate/Info.plist.
-    Check: build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -p
-    On another Mac, import a backup with generate_keys -f <file>. SPARKLE_BIN overrides the tools folder.
+  - Sparkle's EdDSA private key in the login keychain under the account "cleanmate", matching
+    SUPublicEDKey in CleanMate/Info.plist. With bin=build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin:
+      Check:   \$bin/generate_keys --account cleanmate -p
+      Back up: \$bin/generate_keys --account cleanmate -x <file>  (keep the file outside the repo, somewhere safe)
+      Restore: \$bin/generate_keys --account cleanmate -f <file>  (on another Mac)
+    SPARKLE_ACCOUNT overrides the account, SPARKLE_BIN the tools folder.
 
 This script does not tag, push or upload. Publish afterwards, e.g.:
   git tag v<version> && git push origin main v<version>
@@ -114,10 +119,10 @@ xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
 echo "==> Sparkle key"
 [[ -x "$SPARKLE_BIN/sign_update" && -x "$SPARKLE_BIN/generate_keys" ]] || { echo "Sparkle tools not found in $SPARKLE_BIN" >&2; exit 1; }
 APP_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$ARCHIVE/Products/Applications/$APP_NAME.app/Contents/Info.plist")"
-SIGN_KEY="$("$SPARKLE_BIN/generate_keys" -p 2>/dev/null || true)"
+SIGN_KEY="$("$SPARKLE_BIN/generate_keys" --account "$SPARKLE_ACCOUNT" -p 2>/dev/null || true)"
 if [[ "$SIGN_KEY" != "$APP_KEY" ]]; then
-  if [[ -z "$SIGN_KEY" ]]; then echo "No Sparkle EdDSA key in the login keychain." >&2
-  else echo "The keychain's Sparkle key ($SIGN_KEY) is not the app's SUPublicEDKey ($APP_KEY)." >&2; fi
+  if [[ -z "$SIGN_KEY" ]]; then echo "No Sparkle EdDSA key for account $SPARKLE_ACCOUNT in the login keychain." >&2
+  else echo "The keychain's Sparkle key for $SPARKLE_ACCOUNT ($SIGN_KEY) is not the app's SUPublicEDKey ($APP_KEY)." >&2; fi
   [[ $SKIP_NOTARIZE -eq 1 ]] || exit 1
   echo "warning: --skip-notarize: appcast.xml gets no EdDSA signature." >&2
   SIGN_KEY=""
@@ -177,7 +182,7 @@ fi
 echo "==> Appcast"
 # Signed last: stapling changes the dmg. sign_update prints: sparkle:edSignature="..." length="..."
 if [[ -n "$SIGN_KEY" ]]; then
-  ENCLOSURE_ATTRS="$("$SPARKLE_BIN/sign_update" "$DMG")"
+  ENCLOSURE_ATTRS="$("$SPARKLE_BIN/sign_update" --account "$SPARKLE_ACCOUNT" "$DMG")"
   [[ "$ENCLOSURE_ATTRS" == *'sparkle:edSignature="'* ]] || { echo "sign_update failed: $ENCLOSURE_ATTRS" >&2; exit 1; }
 else
   ENCLOSURE_ATTRS="length=\"$(stat -f %z "$DMG")\""
