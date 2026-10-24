@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while ZCode runs.
 - **Smart Scan**: Kilo Code CLI and MiMoCode caches and logs (models list, downloaded tools), skipped while
   the CLI runs; their sessions and settings are kept.
+- **Smart Scan**: ZCode's remote server files (Linux server, Node.js and tools it installs on SSH machines,
+  downloaded again on the next connection), unticked and skipped while ZCode runs.
 
 ## [1.2] - 2026-10-24
 

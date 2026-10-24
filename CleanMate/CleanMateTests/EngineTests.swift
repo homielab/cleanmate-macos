@@ -1518,6 +1518,28 @@ struct AppCatalogTests {
         #expect(!item.paths.contains { $0.contains("rollout") || $0.hasSuffix("/ZCode") || $0.contains("remote-assets") })
     }
 
+    /// ZCode's remote server files: unticked, skipped while ZCode runs, and listed as one entry (the cache folder)
+    /// so the files `releases` hard-links from `components` count once; nothing else of ZCode is listed.
+    @Test func zcodeRemoteServerFilesAreOneUntickedEntry() async throws {
+        let item = try #require(CleanerGroup.aiTools().items.first { $0.id == "zcode-remote-assets" })
+        #expect(!item.selectedByDefault && item.mode == .delete && !item.showsWhenEmpty && item.note != nil)
+        #expect(item.runningAppBundleIDs == ["dev.zcode.app"] && item.runningProcessNames == ["zcode-cli"])
+        #expect(item.included == ["remote-assets-cache"] && item.command == nil && item.probe == nil)
+        let box = try Sandbox()
+        defer { box.remove() }
+        let cache = "Library/Application Support/ZCode/remote-assets-cache"
+        let node = try box.file(cache + "/components/node-runtime/linux-x64/v22.0.0/bin/node", bytes: 200_000)
+        let linked = box.home.appending(path: cache + "/releases/3.15.3/linux-x64/node/linux-x64/bin/node")
+        try FileManager.default.createDirectory(at: linked.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.linkItem(at: node, to: linked)
+        try box.file(cache + "/staging/remote-component-glm-1/component.tar.gz")
+        try box.file("Library/Application Support/ZCode/session/Cookies")
+        try box.file("Library/Application Support/ZCode/Preferences")
+        let entries = await Scanner.scan(item, policy: box.policy).entries
+        #expect(entries.map { $0.url.resolvingSymlinksInPath().lastPathComponent } == ["remote-assets-cache"])
+        #expect((entries.first?.size ?? 0) >= 200_000 && (entries.first?.size ?? 0) < 400_000)
+    }
+
     @Test func credentialsSettingsAndMemoryAreNeverListed() async throws {
         let box = try Sandbox()
         defer { box.remove() }
@@ -1574,7 +1596,7 @@ struct AppCatalogTests {
             "Library/Application Support/ZCode/session/Local Storage/leveldb/1.ldb",
             "Library/Application Support/ZCode/session/IndexedDB/x/1.ldb",
             "Library/Application Support/ZCode/session/Partitions/p/Cookies",
-            "Library/Application Support/ZCode/remote-assets-cache/releases/r.zip",
+            "Library/Application Support/ZCode/Preferences", "Library/Application Support/ZCode/Local Storage/leveldb/1.ldb",
         ]
         let junk = [
             ".claude/debug/log.txt", ".claude/projects/-Users-me-app/old.jsonl", ".codex/log/codex.log",
@@ -1595,6 +1617,8 @@ struct AppCatalogTests {
             ".zcode/v2/logs/2026-10-20.log", ".zcode/cli/log/zcode-2026-10-20.jsonl",
             "Library/Application Support/ZCode/session/Cache/Cache_Data/f",
             "Library/Application Support/ZCode/session/Partitions/p/Code Cache/js/f",
+            "Library/Application Support/ZCode/remote-assets-cache/components/ripgrep/linux-x64/v14.1.1-1/rg",
+            "Library/Application Support/ZCode/remote-assets-cache/releases/3.15.3/linux-x64/manifest-linux-x64.json",
         ]
         for path in protected + junk { try box.file(path, age: old) }
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],

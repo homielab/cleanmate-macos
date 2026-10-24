@@ -56,7 +56,7 @@ struct EndToEndCleanTests {
         // ZCode's login, settings, task index, agent data and session history next to its caches and logs
         ".zcode/v2/credentials.json", ".zcode/v2/tasks-index.sqlite", ".zcode/cli/config.json", ".zcode/cli/db/state.db",
         ".zcode/cli/rollout/model-io-session_1.jsonl", ".zcode/cli/memories/m.md",
-        "Library/Application Support/ZCode/session/Cookies",
+        "Library/Application Support/ZCode/session/Cookies", "Library/Application Support/ZCode/Preferences",
         // Firebase CLI login, other downloaded tools and a project's own log next to its debug logs
         ".config/configstore/firebase-tools.json", ".cache/firebase/crashlytics/buildtools/b.jar",
         ".cache/firebase/universal-maker/universal-maker", ".cache/firebase/extensions/a/1.0.0/extension.yaml",

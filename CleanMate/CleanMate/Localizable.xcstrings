@@ -4617,6 +4617,26 @@
           }
         }
       }
+    },
+    "ZCode: remote server files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ZCode: tệp máy chủ từ xa"
+          }
+        }
+      }
+    },
+    "Server and tools ZCode installs on remote machines, downloaded again when it connects to one" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy chủ và công cụ ZCode cài lên máy từ xa, sẽ được tải lại khi kết nối tới máy đó"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

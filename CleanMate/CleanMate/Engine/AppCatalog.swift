@@ -95,6 +95,16 @@ extension CleanerGroup {
         // being written, stays. Not `skipsOpenFiles`: `chromium` globs the partitions, one open-file read per root.
         cache("zcode-cache", "ZCode", chromium(zcode) + ["~/.zcode/v2/logs", "~/.zcode/cli/log"],
               apps: ["dev.zcode.app"], processes: ["zcode-cli"]),
+        // Unticked like Windsurf's browsers: the Linux server, Node.js, node-pty and tools ZCode copies to remote
+        // machines (SSH). It downloads them from its CDN (sha256-checked) into `components`, links them into
+        // `releases/<version>/<platform>`, and downloads them again when the cache is missing; `staging` only holds
+        // its temporary downloads. One entry (the folder itself): `releases` hard-links `components`, so measuring
+        // them apart would count the files twice. ZCode creates the folder again when needed.
+        CleanerItem(id: "zcode-remote-assets", title: "ZCode: remote server files",
+                    note: "Server and tools ZCode installs on remote machines, downloaded again when it connects to one",
+                    paths: ["~/Library/Application Support/ZCode"], included: ["remote-assets-cache"],
+                    selectedByDefault: false, showsWhenEmpty: false, runningAppBundleIDs: ["dev.zcode.app"],
+                    runningProcessNames: ["zcode-cli"]),
         app("zed", "Zed", bundle: ["dev.zed.Zed"],
             ["~/Library/Caches/Zed", "~/Library/Application Support/Zed/hang_traces"]),
         // GitHub Copilot: ~/.config/github-copilot holds the login, never listed.
