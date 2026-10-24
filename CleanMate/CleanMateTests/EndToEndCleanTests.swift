@@ -49,6 +49,10 @@ struct EndToEndCleanTests {
         // OrbStack's keys, settings and machines next to its caches and logs
         ".orbstack/ssh/id_ed25519", ".orbstack/vmconfig.json", ".orbstack/config/docker.json",
         "Library/Group Containers/HUJDZ9NVLN.dev.orbstack/data/data.img",
+        // Firebase CLI login, other downloaded tools and a project's own log next to its debug logs
+        ".config/configstore/firebase-tools.json", ".cache/firebase/crashlytics/buildtools/b.jar",
+        ".cache/firebase/universal-maker/universal-maker", ".cache/firebase/extensions/a/1.0.0/extension.yaml",
+        ".cache/firebase/other.log", "Developer/app/firebase-debug.log", "Developer/app/firebase.json",
         // Kept on purpose by catalog items
         "Library/Caches/com.apple.bird/state", "Library/Logs/CleanMate/activity.log",
         "Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.FavoriteItems.sfl3",

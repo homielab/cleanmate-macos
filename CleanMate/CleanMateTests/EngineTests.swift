@@ -1212,6 +1212,49 @@ struct DeveloperToolsTests {
         #expect(!listed.contains { path in data.contains { $0.path == path } })
     }
 
+    /// Firebase CLI: only its debug logs in ~/.cache/firebase go (ticked); the emulators are their own unticked row.
+    /// The login token, the other downloaded tools and a project's own firebase-debug.log are never listed;
+    /// a log a process still has open (a running `firebase mcp`) is kept at scan and clean.
+    @Test func firebaseOnlyDebugLogsAndEmulators() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let items = CleanerGroup.developer.items
+        let logs = try #require(items.first { $0.id == "firebase-logs" })
+        let emulators = try #require(items.first { $0.id == "firebase-emulators" })
+        #expect(logs.paths == ["~/.cache/firebase"] && logs.included == ["firebase-debug.log", "firebase-debug.*.log"])
+        #expect(logs.selectedByDefault && logs.mode == .delete && logs.skipsOpenFiles && logs.runningProcessNames.isEmpty)
+        #expect(emulators.paths == ["~/.cache/firebase/emulators"] && !emulators.selectedByDefault)
+        #expect(emulators.mode == .delete && emulators.skipsOpenFiles && emulators.runningProcessNames.isEmpty)
+        for item in [logs, emulators] { #expect(item.command == nil && item.probe == nil && item.shellFolders.isEmpty) }
+
+        let held = try box.file(".cache/firebase/firebase-debug.log")
+        let rotated = try box.file(".cache/firebase/firebase-debug.1.log")
+        let jar = try box.file(".cache/firebase/emulators/cloud-firestore-emulator-v1.19.8.jar")
+        let ui = try box.file(".cache/firebase/emulators/ui-v1.14.0/index.html")
+        let kept = try [".config/configstore/firebase-tools.json", ".cache/firebase/crashlytics/buildtools/b.jar",
+                        ".cache/firebase/universal-maker/universal-maker", ".cache/firebase/extensions/a/1.0.0/extension.yaml",
+                        ".cache/firebase/other.log", "Developer/app/firebase-debug.log", "Developer/app/firebase.json"]
+            .map { try box.file($0) }
+        let handle = try FileHandle(forWritingTo: held)
+        defer { try? handle.close() }
+        let own: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0, only: [getpid()]) }
+
+        let logScan = await Scanner.scan(logs, policy: box.policy, openPaths: own)
+        #expect(logScan.entries.map(\.url.lastPathComponent) == ["firebase-debug.1.log"])
+        let emulatorScan = await Scanner.scan(emulators, policy: box.policy, openPaths: own)
+        #expect(Set(emulatorScan.entries.map(\.url.lastPathComponent)) == ["cloud-firestore-emulator-v1.19.8.jar", "ui-v1.14.0"])
+        // Opened between scan and clean: kept too.
+        var forged = logScan
+        forged.entries.append(ScanEntry(url: held, size: 1))
+        #expect(await Cleaner.clean(logs, scan: forged, policy: box.policy, openPaths: own).skipped == 1)
+        #expect(await Cleaner.clean(emulators, scan: emulatorScan, policy: box.policy, openPaths: own).skipped == 0)
+        let exists = { (url: URL) in FileManager.default.fileExists(atPath: url.path) }
+        #expect(exists(held) && !exists(rotated) && !exists(jar) && !exists(ui.deletingLastPathComponent()))
+        #expect(kept.allSatisfy(exists))
+        try handle.close()
+        #expect(await Scanner.scan(logs, policy: box.policy, openPaths: own).entries.map(\.url.lastPathComponent) == ["firebase-debug.log"])
+    }
+
     /// pnpm prune may remove far less than the store; bun and uv caches share APFS clones with projects:
     /// never counted as sure bytes.
     @Test func upperBoundDeveloperItems() {

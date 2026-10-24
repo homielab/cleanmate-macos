@@ -191,7 +191,22 @@ extension CleanerGroup {
         dev("orbstack", "\("OrbStack"): cache & logs",
             note: "Downloaded updates, caches and logs; machines, containers and settings are kept",
             ["~/Library/Caches/dev.kdrag0n.MacVirt", "~/.orbstack/log"], apps: ["dev.kdrag0n.MacVirt*"], openFiles: true),
+        // Firebase CLI: `firebase mcp` logs to ~/.cache/firebase/firebase-debug.log without limit, falling back to
+        // firebase-debug.<1-9>.log when that one cannot be opened (firebase-tools `bin/mcp.js`, `logger.js`). Only
+        // those names (`included`): the same folder holds downloaded tools (crashlytics, universal-maker, extensions).
+        // The CLI runs as `node`, so there is no process name to wait for; a log a CLI process still has open is kept.
+        // Never ~/.config/configstore/firebase-tools.json (the login) nor a project's own firebase-debug.log.
+        dev("firebase-logs", "\("Firebase CLI"): debug logs",
+            note: "Written by the Firebase CLI and its MCP server; a log still open is kept",
+            [firebaseCache], included: ["firebase-debug.log", "firebase-debug.*.log"], openFiles: true),
+        // Unticked: emulator JARs, zips and binaries (`downloadableEmulators.js`); the next `firebase emulators:start`
+        // downloads them again (needs network). Exported emulator data lives in the user's project, never here.
+        dev("firebase-emulators", "\("Firebase CLI"): emulators",
+            note: "Downloaded emulators, downloaded again by the next firebase emulators:start",
+            [firebaseCache + "/emulators"], selected: false, openFiles: true),
     ])
+
+    nonisolated private static let firebaseCache = "~/.cache/firebase"
 
     nonisolated static let oldIDEVersions = "old-ide-versions"
     nonisolated private static let clonedNote: LocalizedStringResource =

@@ -251,6 +251,16 @@
         }
       }
     },
+    "Downloaded emulators, downloaded again by the next firebase emulators:start" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trình giả lập đã tải, được tải lại ở lần firebase emulators:start kế tiếp"
+          }
+        }
+      }
+    },
     "Duplicates" : {
       "localizations" : {
         "vi" : {
@@ -841,6 +851,16 @@
         }
       }
     },
+    "Written by the Firebase CLI and its MCP server; a log still open is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do Firebase CLI và máy chủ MCP của nó ghi; nhật ký còn đang mở được giữ lại"
+          }
+        }
+      }
+    },
     "Yarn Berry cache" : {
       "localizations" : {
         "vi" : {
@@ -960,6 +980,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@: bộ nhớ đệm & nhật ký"
+          }
+        }
+      }
+    },
+    "%@: debug logs" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: nhật ký gỡ lỗi"
+          }
+        }
+      }
+    },
+    "%@: emulators" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: trình giả lập"
           }
         }
       }
