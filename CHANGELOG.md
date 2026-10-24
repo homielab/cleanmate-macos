@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without limit; kept while still open) and its downloaded emulators (unticked).
 - **Smart Scan**: ZCode caches and logs (daily app logs in `~/.zcode/v2/logs` can reach several GB), skipped
   while ZCode runs.
+- **Smart Scan**: Kilo Code CLI and MiMoCode caches and logs (models list, downloaded tools), skipped while
+  the CLI runs; their sessions and settings are kept.
 
 ## [1.2] - 2026-10-24
 

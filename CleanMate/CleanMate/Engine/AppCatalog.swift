@@ -70,6 +70,14 @@ extension CleanerGroup {
         // auth.json, opencode.db (sessions), snapshot (undo history), tool-output, shell, repos.
         cache("opencode-cache", "opencode", ["~/.cache/opencode", "~/.local/share/opencode/log"],
               processes: ["opencode"], openFiles: true),
+        // Kilo Code's CLI (`kilo`, formerly `kilocode`, also run as `kilo serve` by its editor extensions) and
+        // MiMoCode (`mimo`) are opencode forks with the same layout: models list and downloaded tools in the cache,
+        // logs next to their data. Never kilo.db / mimocode.db (sessions), auth.json, snapshot, storage,
+        // tool-output, repos, builtin_skills, compose, ~/.config or ~/.local/state.
+        cache("kilo-cache", "Kilo Code", ["~/.cache/kilo", "~/.local/share/kilo/log"],
+              processes: ["kilo", "kilocode"], openFiles: true),
+        cache("mimocode-cache", "MiMoCode", ["~/.cache/mimocode", "~/.local/share/mimocode/log"],
+              processes: ["mimo"], openFiles: true),
         // Cline: logs only. Never secrets.json, settings, db (sessions.db indexes its sessions), sessions,
         // workspaces, data/cache (holds user_input_history.jsonl), cron, apps.
         cache("cline-cache", "Cline", ["~/.cline/data/logs"], processes: ["cline"], openFiles: true),

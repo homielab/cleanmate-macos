@@ -36,12 +36,16 @@ struct EndToEndCleanTests {
         "Library/Application Support/orca/terminal-history/1.log",
         "Library/Application Support/orca/ai-vault/session-search.sqlite",
         "Library/Application Support/orca/Partitions/orca-browser/Local Storage/leveldb/000003.log",
-        // Windsurf, opencode, Cline and Cursor: logins, settings, chats, memories and histories next to their junk
+        // Windsurf, opencode and its forks (Kilo, MiMoCode), Cline and Cursor: logins, settings, chats, memories and
+        // histories next to their junk
         ".codeium/windsurf/cascade/chat.pb", ".codeium/windsurf/memories/global.md", ".codeium/windsurf/user_settings.pb",
         ".codeium/windsurf/ws-browser-profile/Default/Cookies", ".codeium/windsurf/ws-browser-profile/Default/Login Data",
         ".codeium/windsurf/ws-browser-profile/Default/History", ".codeium/windsurf/skills/a/SKILL.md",
         ".local/share/opencode/auth.json", ".local/share/opencode/opencode.db", ".local/share/opencode/snapshot/a/HEAD",
         ".local/share/opencode/tool-output/a.txt",
+        ".local/share/kilo/kilo.db", ".local/share/kilo/repos/r/HEAD", ".config/kilo/kilo.jsonc",
+        ".local/share/mimocode/mimocode.db", ".local/share/mimocode/auth.json", ".local/share/mimocode/snapshot/a/HEAD",
+        ".local/share/mimocode/builtin_skills/b/s/SKILL.md", ".local/state/mimocode/model.json",
         ".cline/data/secrets.json", ".cline/data/cache/user_input_history.jsonl", ".cline/data/db/sessions.db",
         ".cline/data/sessions/session_1/messages.json", ".cline/data/settings/providers.json",
         ".cursor/mcp.json", ".cursor/extensions/ext/package.json", ".cursor/ai-tracking/ai-code-tracking.db",
