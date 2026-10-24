@@ -98,6 +98,13 @@ extension CleanerGroup {
                     showsWhenEmpty: false, runningAppBundleIDs: ["com.electron.ollama"], runningProcessNames: ["ollama"],
                     skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } }, entryLabel: OllamaModels.label(of:),
                     selectableEntries: true, entryFiles: OllamaModels.ownBlobs(of:)),
+        // Interrupted `ollama pull`s: one unticked row, deleted (regenerable); never a finished blob or a manifest.
+        // Skipped while Ollama runs: a pull in progress writes to them.
+        CleanerItem(id: "ollama-partial", title: "Ollama: incomplete downloads",
+                    note: "Left by an interrupted ollama pull; pulling the model again starts over",
+                    paths: [OllamaModels.partialFolder], included: OllamaModels.partialNames, selectedByDefault: false,
+                    shellFolders: OllamaModels.partialShellFolders, showsWhenEmpty: false,
+                    runningAppBundleIDs: ["com.electron.ollama"], runningProcessNames: ["ollama"]),
         // LM Studio: app caches only; models live in ~/.lmstudio (older versions: ~/.cache/lm-studio).
         app("lm-studio", "LM Studio", bundle: ["ai.elementlabs.lmstudio"],
             chromium("~/Library/Application Support/LM Studio")),

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Smart Scan**: incomplete Ollama downloads (`-partial` files an interrupted `ollama pull` leaves in the models
+  folder) — one unticked row, skipped while Ollama runs.
+
 ## [1.1] - 2026-10-24
 
 ### Added

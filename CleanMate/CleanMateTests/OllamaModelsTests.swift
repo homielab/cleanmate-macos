@@ -134,6 +134,75 @@ struct OllamaModelsTests {
         #expect(box.exists(target) && (try? FileManager.default.destinationOfSymbolicLink(atPath: box.blob(2).path)) != nil)
     }
 
+    private var partialItem: CleanerItem {
+        get throws { try #require(CleanerGroup.aiTools().items.first { $0.id == "ollama-partial" }) }
+    }
+
+    @Test func partialCatalogItem() throws {
+        let item = try partialItem
+        #expect(!item.selectedByDefault && !item.selectableEntries && item.mode == .delete && !item.showsWhenEmpty)
+        #expect(item.command == nil && item.probe == nil && item.database == nil && item.entryFiles == nil && item.minAge == nil)
+        #expect(item.runningAppBundleIDs == ["com.electron.ollama"] && item.runningProcessNames == ["ollama"])
+        #expect(item.paths == ["~/.ollama/models/blobs"] && item.shellFolders == ["OLLAMA_MODELS": ["blobs"]])
+        #expect(item.included == ["sha256-*-partial", "sha256-*-partial-*"])
+    }
+
+    /// Unfinished pulls (`-partial` data, `-partial-<n>` part state) form one row with their total size and go;
+    /// finished blobs, manifests, the key and other files in `blobs` stay.
+    @Test func removesOnlyPartialDownloads() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let item = try partialItem
+        let manifest = try box.model("registry.ollama.ai/library/a/latest", config: 1, layers: [2])
+        let orphan = try box.file(box.blob(3))
+        let key = try box.file(box.home.appending(path: ".ollama/id_ed25519"), Data("key".utf8))
+        let other = try box.file(box.models.appending(path: "blobs/notes-partial"))
+        let data = try box.file(box.models.appending(path: "blobs/sha256-\(box.digest(4))-partial"), Data(repeating: 1, count: 300_000))
+        let parts = try (0..<2).map { try box.file(box.models.appending(path: "blobs/sha256-\(box.digest(4))-partial-\($0)"),
+                                                   Data(#"{"N":\#($0)}"#.utf8)) }
+        let second = try box.file(box.models.appending(path: "blobs/sha256-\(box.digest(5))-partial"))
+        let junk = [data, second] + parts
+
+        let scan = await Scanner.scan(item, policy: box.policy)
+        #expect(Set(scan.entries.map(\.url.lastPathComponent)) == Set(junk.map(\.lastPathComponent)))
+        #expect(scan.size == junk.reduce(0) { $0 + Scanner.fileSize($1) } && scan.size > 300_000)
+        // The models row never counts or removes them.
+        let models = await Scanner.scan(try self.item, policy: box.policy)
+        #expect(models.entries.map(\.url.lastPathComponent) == ["latest"])
+        #expect(models.size == Scanner.fileSize(manifest) + Scanner.fileSize(box.blob(1)) + Scanner.fileSize(box.blob(2)))
+
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.skipped == 0 && report.freed == scan.size)
+        #expect(!junk.contains(where: box.exists))
+        #expect([manifest, box.blob(1), box.blob(2), orphan, key, other].allSatisfy(box.exists))
+        #expect(await Scanner.scan(item, policy: box.policy).entries.isEmpty)
+    }
+
+    /// While `ollama` runs (a pull may be writing them), the row is locked: not ticked, not cleaned.
+    @MainActor @Test func partialDownloadsKeptWhileOllamaRuns() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let item = try partialItem
+        let data = try box.file(box.models.appending(path: "blobs/sha256-\(box.digest(4))-partial"))
+        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        model.appBundleIDs = { [] }
+        model.runningApps = []
+        model.processNames = { ["ollama", "zsh"] }
+        let policy = box.policy // not this Mac's Exclusions, Trash or activity log
+        model.logHome = box.home
+        model.scanItem = { await Scanner.scan($0, policy: policy) }
+        model.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy) }
+        await model.scan()
+        #expect(model.isRunning(item) && model.selected.isEmpty)
+        model.selected = [item.id]
+        await model.clean()
+        guard case .done(let report) = model.phase else { Issue.record("not done"); return }
+        #expect(report.skipped == 1 && box.exists(data))
+        model.processNames = { ["zsh"] }
+        await model.scan()
+        #expect(!model.isRunning(item) && model.selected.isEmpty) // unticked by default
+    }
+
     /// Orca and OrbStack: caches and logs only, skipped while the app (or a helper of OrbStack) runs.
     @Test func orcaAndOrbStackOnlyCachesAndLogs() throws {
         let orca = try #require(CleanerGroup.aiTools().items.first { $0.id == "orca" })

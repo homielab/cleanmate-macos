@@ -421,6 +421,16 @@
         }
       }
     },
+    "Left by an interrupted ollama pull; pulling the model again starts over" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do ollama pull bị ngắt để lại; tải lại mô hình sẽ bắt đầu từ đầu"
+          }
+        }
+      }
+    },
     "Module" : {
       "localizations" : {
         "vi" : {
@@ -527,6 +537,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ollama: mô hình đã tải"
+          }
+        }
+      }
+    },
+    "Ollama: incomplete downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ollama: bản tải dở"
           }
         }
       }

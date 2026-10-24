@@ -11,6 +11,13 @@ nonisolated enum OllamaModels {
     /// The same below `OLLAMA_MODELS` (the models folder itself).
     static let shellFolders = ["OLLAMA_MODELS": ["manifests/*/*/*"]]
 
+    /// Downloads `ollama pull` left unfinished: the data written so far, `blobs/sha256-<hex>-partial` (renamed to the
+    /// blob when done), and the state of each download part, `…-partial-<n>` (removed when done). No manifest names
+    /// them; a pull started again downloads them anew.
+    static let partialFolder = "~/.ollama/models/blobs"
+    static let partialShellFolders = ["OLLAMA_MODELS": ["blobs"]]
+    static let partialNames = ["sha256-*-partial", "sha256-*-partial-*"]
+
     /// Largest manifest read: real ones are about 1 KB; anything bigger is not one.
     static let manifestLimit = 1 << 20
 
