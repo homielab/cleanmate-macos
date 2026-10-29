@@ -391,6 +391,16 @@
         }
       }
     },
+    "Intermediate images left by docker build; the next build makes them again. Sizes may count layers shared with other images" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image trung gian do docker build để lại; lần build sau tạo lại. Kích thước có thể tính cả lớp dùng chung với image khác"
+          }
+        }
+      }
+    },
     "Item" : {
       "localizations" : {
         "vi" : {
@@ -1685,6 +1695,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Docker: container đã dừng"
+          }
+        }
+      }
+    },
+    "Docker: untagged build images" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Docker: image trung gian không tag"
           }
         }
       }

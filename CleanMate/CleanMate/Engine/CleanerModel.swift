@@ -199,6 +199,9 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Each entry gets its own checkbox in the expanded row and can be left out of the clean. The choice is
     /// per session only (never remembered), and every entry is listed (no 200-entry cap), so none is cleaned unseen.
     var selectableEntries = false
+    /// Removes one entry with a command instead of deleting a path (Docker's untagged images: `docker rmi <id>`);
+    /// nil for an entry it does not recognise, which is then skipped. The item's own `command` is not run.
+    var entryCommand: (@Sendable (URL) -> ShellCommand?)? = nil
     /// Files outside `paths` that belong to one entry alone and go with it (an Ollama model's blobs that no other
     /// model uses). Asked at scan, where they count in the entry's size, and again right before removal; each one
     /// is removed after its entry, through `SafetyPolicy.allows`, and only when it is a regular file.

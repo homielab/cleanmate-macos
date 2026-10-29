@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Developer Junk**: Docker untagged build images are listed one by one and can be cleaned individually.
+
 ### Changed
 - Now runs on macOS 13 or later (was macOS 27). On macOS 13, **Space Lens** shows its contents as a stacked bar
   instead of a donut chart.

@@ -350,6 +350,52 @@ struct ScannerCleanerTests {
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
+    @Test func dockerDanglingImages() throws {
+        let output = """
+        {"CreatedAt":"2026-09-18 05:11:30 +0000 UTC","ID":"6fecacab9f88","Repository":"<none>","Size":"97.9MB","Tag":"<none>"}
+        not json
+        {"CreatedAt":"2026-10-22 03:48:02 +0700 +07","ID":"8b1bc650def0","Repository":"<none>","Size":"1.82GB","Tag":"<none>"}
+        {"CreatedAt":"2026-10-22 03:48:02 +0700 +07","ID":"../../etc","Repository":"<none>","Size":"1GB","Tag":"<none>"}
+        """
+        let entries = DeveloperTools.dockerDanglingImages(in: output)
+        #expect(entries.map(\.title) == ["6fecacab9f88", "8b1bc650def0"])
+        #expect(entries.map(\.size) == [97_900_000, 1_820_000_000] && entries.allSatisfy { $0.date != nil })
+        #expect(DeveloperTools.dockerDanglingImages(in: "").isEmpty)
+        #expect(DeveloperTools.dockerImageID(of: entries[0].url) == "6fecacab9f88")
+        #expect(DeveloperTools.dockerImageID(of: URL(string: "docker-dangling:--force")!) == nil)
+        #expect(DeveloperTools.dockerImageID(of: URL(string: "docker-image:6fecacab9f88")!) == nil)
+        let item = try #require(CleanerGroup.developer.items.first { $0.id == "docker-dangling" })
+        #expect(item.selectedByDefault && item.selectableEntries && item.paths.isEmpty)
+        guard case .bytes(let total)? = item.probe?.parse(output) else { Issue.record("no size"); return }
+        #expect(total == 1_917_900_000)
+        #expect(item.probe?.parse("") == nil) // none: hidden
+    }
+
+    /// Only the ticked entries reach `docker rmi`, each by its own ID; an unrecognised one is skipped.
+    @Test func danglingImagesAreRemovedPerEntry() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let log = box.root.appending(path: "calls.txt")
+        let script = try box.file("fake-docker.sh")
+        try "#!/bin/sh\necho \"$@\" >> '\(log.path)'\n[ \"$2\" != 6fecacab9f88 ]\n".write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        var item = try #require(CleanerGroup.developer.items.first { $0.id == "docker-dangling" })
+        item.command = ShellCommand(executable: script.path)
+        item.entryCommand = { url in
+            DeveloperTools.dockerImageID(of: url).map { ShellCommand(executable: script.path, arguments: ["rmi", $0]) }
+        }
+        item.probe?.precondition = { true }
+        let scan = ItemScan(entries: [
+            ScanEntry(url: URL(string: "docker-dangling:8b1bc650def0")!, size: 10),
+            ScanEntry(url: URL(string: "docker-dangling:6fecacab9f88")!, size: 5),
+            ScanEntry(url: URL(string: "docker-dangling:nope")!, size: 1),
+        ], measuredSize: 16)
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.freed == 10 && report.skipped == 2)
+        #expect(SmartScanModel.removedCount(item, scan, report) == 1)
+        #expect(try String(contentsOf: log, encoding: .utf8) == "rmi 8b1bc650def0\nrmi 6fecacab9f88\n")
+    }
+
     @Test func commandTimeout() async {
         #expect(await ShellCommand(executable: "/usr/bin/true").run())
         #expect(await !ShellCommand(executable: "/bin/sleep", arguments: ["30"], timeout: .milliseconds(300)).run()) // 30 s: a starved poll can't see it exit 0 first
@@ -1342,7 +1388,7 @@ struct DeveloperToolsTests {
 
     @Test func dockerCommandsAlwaysTargetLocalSocket() async throws {
         let items = CleanerGroup.smartScan(ages: .default).flatMap(\.items).filter { $0.id.hasPrefix("docker-") }
-        try #require(items.count == 4)
+        try #require(items.count == 5)
         let expected = DeveloperTools.localDockerHostArguments()
         for item in items {
             #expect(item.command?.leadingArguments() == expected)
@@ -1948,12 +1994,12 @@ struct AppCatalogTests {
     }
 
     /// Entry ticks only work when cleaning removes the scanned entries: a command, a database erase or a probe
-    /// acts on the whole item, so an unticked entry would be cleaned anyway.
+    /// acts on the whole item, so an unticked entry would be cleaned anyway (unless `entryCommand` removes each).
     @Test func selectableEntriesOnlyOnPlainFileItems() {
         let items = (CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) + CleanerGroup.privacy).flatMap(\.items).filter(\.selectableEntries)
         #expect(!items.isEmpty)
         for item in items {
-            #expect(item.command == nil && item.database == nil && item.probe == nil, "\(item.id)")
+            #expect(item.entryCommand != nil || item.command == nil && item.database == nil && item.probe == nil, "\(item.id)")
         }
     }
 

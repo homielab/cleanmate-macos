@@ -172,6 +172,9 @@ extension CleanerGroup {
         docker("docker-images", "Docker: unused images", note: "Images no container uses. Images built on this Mac must be built again; others are pulled again when needed",
                type: "Images", ["image", "prune", "--all", "--force"], selected: false,
                details: DeveloperTools.dockerUnusedImages),
+        // Ticked: leftovers of `docker build` (a rebuilt image replaced them), which a build makes again. Each one is
+        // removed by its own ID, so an unticked one stays.
+        dockerDangling,
         docker("docker-build-cache", "Docker: build cache", note: "The next build is slower once",
                type: "Build Cache", ["builder", "prune", "--all", "--force"],
                details: DeveloperTools.dockerPrunableBuildCache),
@@ -241,6 +244,30 @@ extension CleanerGroup {
                     runningAppBundleIDs: apps, runningProcessNames: processes, skipsOpenFiles: openFiles,
                     entryLabel: entryLabel, selectableEntries: selectableEntries)
     }
+
+    /// Untagged images (`dangling=true`), listed one by one and removed with `docker rmi <id>` for the ticked ones.
+    /// `Size` counts layers shared with other images, so the entries can add up to more than the real gain.
+    nonisolated private static let dockerDangling: CleanerItem = {
+        let host: @Sendable () -> [String]? = { DeveloperTools.localDockerHostArguments() }
+        let list = ShellCommand(executable: "docker", arguments: ["images", "--filter", "dangling=true", "--format", "{{json .}}"],
+                                timeout: .seconds(20), leadingArguments: host)
+        var item = dev("docker-dangling", "Docker: untagged build images",
+            note: "Intermediate images left by docker build; the next build makes them again. Sizes may count layers shared with other images",
+            [], command: ShellCommand(executable: "docker", arguments: ["image", "prune", "--force"], timeout: .seconds(300),
+                                      leadingArguments: host),
+            probe: SizeProbe(command: list, precondition: DeveloperTools.dockerDaemonIsRunning,
+                             parse: { output in
+                                 let entries = DeveloperTools.dockerDanglingImages(in: output)
+                                 return entries.isEmpty ? nil : .bytes(entries.reduce(0) { $0 + $1.size })
+                             },
+                             details: (list, DeveloperTools.dockerDanglingImages)),
+            selectableEntries: true)
+        item.entryCommand = { url in
+            guard let id = DeveloperTools.dockerImageID(of: url) else { return nil }
+            return ShellCommand(executable: "docker", arguments: ["rmi", id], timeout: .seconds(60), leadingArguments: host)
+        }
+        return item
+    }()
 
     nonisolated private static func docker(
         _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource, type: String,
@@ -353,6 +380,30 @@ nonisolated enum DeveloperTools {
             return ScanEntry(url: url, size: bytes(fromDockerSize: image.Size) ?? 0, title: title,
                              date: dockerDate(image.CreatedAt))
         }
+    }
+
+    /// Untagged images from `docker images --filter dangling=true --format '{{json .}}'` (one JSON object per
+    /// line). An unreadable line is left out, never removed.
+    static func dockerDanglingImages(in output: String) -> [ScanEntry] {
+        struct Image: Decodable { let ID: String, CreatedAt: String, Size: String }
+        return output.split(whereSeparator: \.isNewline).compactMap { line in
+            guard let image = try? JSONDecoder().decode(Image.self, from: Data(line.utf8)),
+                  let id = shortImageID(image.ID), let url = URL(string: "docker-dangling:\(id)") else { return nil }
+            return ScanEntry(url: url, size: bytes(fromDockerSize: image.Size) ?? 0, title: id, date: dockerDate(image.CreatedAt))
+        }
+    }
+
+    /// 12 to 64 hex digits, without a "sha256:" prefix; anything else is not an image ID.
+    static func shortImageID(_ text: String) -> String? {
+        let id = text.replacingOccurrences(of: "sha256:", with: "")
+        return (12...64).contains(id.count) && id.allSatisfy(\.isHexDigit) && id == id.lowercased() ? id : nil
+    }
+
+    /// The image ID in a `docker-dangling:<id>` entry URL; nil for any other URL.
+    static func dockerImageID(of url: URL) -> String? {
+        let text = url.absoluteString
+        guard text.hasPrefix("docker-dangling:") else { return nil }
+        return shortImageID(String(text.dropFirst("docker-dangling:".count)))
     }
 
     /// Containers `docker container prune` removes, from `docker system df -v --format '{{json .}}'`: every one

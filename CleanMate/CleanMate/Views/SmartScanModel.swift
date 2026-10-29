@@ -193,7 +193,10 @@ final class SmartScanModel: ObservableObject {
     /// The item's scan as it will be cleaned: without the entries left out.
     func selectedScan(_ item: CleanerItem) -> ItemScan? {
         guard var scan = scans[item.id] else { return nil }
-        if let out = excludedEntries[item.id] { scan.entries.removeAll { out.contains($0.url) } }
+        if let out = excludedEntries[item.id] {
+            scan.entries.removeAll { out.contains($0.url) }
+            if item.entryCommand != nil { scan.measuredSize = nil } // its entries are what is removed: their sum counts
+        }
         return scan
     }
 
@@ -379,6 +382,7 @@ final class SmartScanModel: ObservableObject {
     /// Entries removed, for the activity log. A run command (e.g. `docker image prune`) succeeds or fails as a
     /// whole: its `skipped` is 0 or 1 for the item, not per entry, and its entries may be display-only.
     nonisolated static func removedCount(_ item: CleanerItem, _ scan: ItemScan, _ result: CleanReport) -> Int {
+        if item.entryCommand != nil { return max(0, scan.entries.count - result.skipped) } // one command per entry
         guard let command = item.command, item.paths.isEmpty || command.resolvedPath != nil else {
             return max(0, scan.entries.count - result.skipped)
         }
