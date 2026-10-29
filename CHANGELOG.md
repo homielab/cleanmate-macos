@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Developer Junk**: Docker build cache records not in use are listed one by one; tick the ones to clean (none are ticked by default).
 
 ### Changed
+- **Developer Junk**: rustup downloads are no longer hidden while `cargo` or `rustc` builds; only a running `rustup` skips them.
 - Now runs on macOS 13 or later (was macOS 27). On macOS 13, **Space Lens** shows its contents as a stacked bar
   instead of a donut chart.
 - **Smart Scan** and **Privacy**: larger checkboxes; a click anywhere on a row ticks it, and ticked rows are tinted.
@@ -26,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   10 times a second.
 
 ### Fixed
+- **Uninstaller**: Leftovers of Removed Apps no longer lists a config folder of an installed Homebrew formula or cask as orphaned.
 - **Smart Scan** and **Privacy**: "Freed" is now the size of what was removed or moved to the Trash, never the noisy
   change in free disk space (it could show less than was removed). The part moved to the Trash is shown apart, and the
   free space before and after is shown for reference.

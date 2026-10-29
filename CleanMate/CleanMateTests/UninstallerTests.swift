@@ -155,6 +155,21 @@ struct UninstallerTests {
         #expect(leftovers.allSatisfy { policy.allowsAppConfig($0.url) })
     }
 
+    /// A config folder named after a command in a PATH folder or an installed Homebrew package is that tool's, not an orphan.
+    @Test func orphanConfigSkipsToolsOnPathAndBrewPackages() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for path in [".config/mycli/x", ".config/helix/x", ".local/share/fishcask/x", ".config/gone/x", "bin/mycli",
+                     "brew/Cellar/helix/1.0/x", "brew/Caskroom/fishcask/1.0/x"] {
+            try make(path)
+        }
+        let leftovers = await Uninstaller.leftovers(installedBundleIDs: [], tools: [], appNames: [],
+                                                    toolFolders: [root.appending(path: "home/bin").path],
+                                                    brewPrefixes: [root.appending(path: "home/brew").path],
+                                                    isRegistered: { _ in false }, policy: policy)
+        #expect(leftovers.map(\.url.lastPathComponent) == ["gone"])
+        #expect(Uninstaller.brewPackageNames(prefixes: [root.appending(path: "home/brew").path]) == ["helix", "fishcask"])
+    }
+
     @MainActor @Test func listsAppConfigUntickedAndNeverToolOrProtectedFolders() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let cursorApp = try app("Applications/Cursor.app", bundleID: "com.todesktop.cursor")

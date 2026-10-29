@@ -433,6 +433,21 @@ nonisolated enum Uninstaller {
             .filter { !isSystemToolFolder($0) }
     }
 
+    /// Homebrew installs (Apple silicon, Intel).
+    static let brewPrefixes = ["/opt/homebrew", "/usr/local"]
+
+    /// Lowercased names of installed Homebrew formulae and casks: the folders in `<prefix>/Cellar` and `Caskroom`, the
+    /// same list `brew list` prints, read without running brew. A package's config folder is often named after the
+    /// package rather than its command (`helix` installs `hx`).
+    static func brewPackageNames(prefixes: [String] = brewPrefixes) -> Set<String> {
+        Set(prefixes.flatMap { prefix in
+            ["Cellar", "Caskroom"].flatMap { folder in
+                ((try? FileManager.default.contentsOfDirectory(atPath: prefix + "/" + folder)) ?? [])
+                    .filter { !$0.hasPrefix(".") }.map { $0.lowercased() }
+            }
+        })
+    }
+
     static func isSystemToolFolder(_ path: String) -> Bool {
         let path = path.hasSuffix("/") ? String(path.dropLast()) : path
         return systemToolFolders.contains { path == $0 || path.hasPrefix($0 + "/") }
@@ -452,10 +467,12 @@ nonisolated enum Uninstaller {
     }
 
     /// Data in ~/Library of apps that are no longer installed, largest first, then config and state folders (`~/.config`,
-    /// `~/.local/share`, `~/.local/state`) that no installed app or command-line tool is named after (`orphanConfig`).
+    /// `~/.local/share`, `~/.local/state`) that no installed app, command-line tool or Homebrew package is named after
+    /// (`orphanConfig`).
     /// `tools` defaults to `commandLineTools`; `appNames` to the apps found in the application folders; `toolFolders`: where tool names are looked up.
     @concurrent static func leftovers(installedBundleIDs: Set<String>, tools: Set<String>? = nil,
                                       appNames: [AppMatcher.Names]? = nil, toolFolders: [String] = configToolFolders,
+                                      brewPrefixes: [String] = brewPrefixes,
                                       isRegistered: @Sendable (String) -> Bool,
                                       policy: SafetyPolicy = .current) async -> [AppDataEntry] {
         let agents = policy.homeURL.appending(path: "Library/LaunchAgents")
@@ -472,6 +489,7 @@ nonisolated enum Uninstaller {
                                     bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String)
         }
         let foreign = Set(toolPaths(home: policy.homeURL, folders: toolFolders).keys).union(tools)
+            .union(brewPackageNames(prefixes: brewPrefixes))
         var orphans: [AppDataEntry] = []
         for item in configItems(policy: policy) where item.inConfig
             && AppMatcher.isOrphanConfig(item.name, appNames: names, installedBundleIDs: installedBundleIDs, tools: foreign) {

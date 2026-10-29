@@ -1157,11 +1157,21 @@ struct DeveloperToolsTests {
         #expect(npx?.paths == ["~/.npm/_npx"] && npx?.locate?.subpath == "_npx" && npx?.runningProcessNames == ["npx"])
         #expect(nvm?.paths == ["~/.nvm/.cache"] && nvm?.runningProcessNames == [])
         #expect(rustup?.paths == ["~/.rustup/downloads", "~/.rustup/tmp"])
-        #expect(rustup?.runningProcessNames == ["rustup", "cargo", "rustc"])
+        #expect(rustup?.runningProcessNames == ["rustup"] && rustup?.skipsOpenFiles == true)
         #expect([npx, nvm, rustup].allSatisfy { $0?.selectedByDefault == true && $0?.showsWhenEmpty == false })
         let mine = Set([npx, nvm, rustup].flatMap { $0?.paths ?? [] })
         let others = CleanerGroup.developer.items.filter { !["npx-cache", "nvm-cache", "rustup-downloads"].contains($0.id) }
         #expect(!others.flatMap(\.paths).contains { path in mine.contains { $0.hasPrefix(path + "/") || path.hasPrefix($0) } })
+    }
+
+    /// rustup downloads stay while `cargo`/`rustc` build, and are locked only while `rustup` itself runs.
+    @MainActor @Test func rustupDownloadsLockedOnlyByRustup() throws {
+        let rustup = try #require(CleanerGroup.developer.items.first { $0.id == "rustup-downloads" })
+        let model = SmartScanModel(module: .smartScan) { [] }
+        model.runningProcesses = ["cargo", "rustc"]
+        #expect(!model.isRunning(rustup))
+        model.runningProcesses = ["rustup"]
+        #expect(model.isRunning(rustup))
     }
 
     /// DerivedData skipped while Xcode builds; Yarn Berry and Cypress unticked; package caches skipped while their tool runs.

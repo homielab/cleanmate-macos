@@ -101,10 +101,11 @@ extension CleanerGroup {
             locate: lookup("go", ["env", "GOMODCACHE"])),
         dev("cargo-registry", "Cargo registry cache", note: "Downloaded crates, downloaded again on the next build",
             ["~/.cargo/registry", "~/.cargo/git"], shell: ["CARGO_HOME": ["registry", "git"]], processes: ["cargo"]),
-        // Partial and finished downloads of rustup; ~/.rustup/toolchains is never touched. A `cargo`/`rustc` proxy
-        // may install a pinned toolchain (rust-toolchain.toml) into these folders, so those count as running too.
+        // Partial and finished downloads of rustup; ~/.rustup/toolchains is never touched. Only `rustup` itself
+        // writes them (a `cargo`/`rustc` proxy installing a pinned toolchain runs as `rustup`), so a plain build does
+        // not hide the item; a download still open is kept.
         dev("rustup-downloads", "rustup downloads", note: "Toolchain downloads, downloaded again by rustup when needed",
-            ["~/.rustup/downloads", "~/.rustup/tmp"], shell: ["RUSTUP_HOME": ["downloads", "tmp"]], processes: ["rustup", "cargo", "rustc"]),
+            ["~/.rustup/downloads", "~/.rustup/tmp"], shell: ["RUSTUP_HOME": ["downloads", "tmp"]], processes: ["rustup"], openFiles: true),
         // Unticked: models can be many GB to download again. One entry per `models--org--name` folder (blobs plus
         // snapshot symlinks into them): always removed whole, never inside. ~/.cache/huggingface/token and
         // stored_tokens sit next to these folders and are never listed. Only hub repo folders (`included`, checked at
