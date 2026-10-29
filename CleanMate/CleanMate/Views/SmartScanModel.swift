@@ -1,76 +1,75 @@
 import AppKit
-import Observation
+import Combine
 
 /// Scan → select → clean state for a list of cleaner groups (Smart Scan, Privacy).
-@Observable
-final class SmartScanModel {
+final class SmartScanModel: ObservableObject {
     enum Phase { case idle, scanning, results, cleaning, done(CleanReport) }
 
     let module: Module
     /// Rebuilt from the catalog at every scan, so Settings changes (age thresholds) apply.
-    private(set) var groups: [CleanerGroup]
+    @Published private(set) var groups: [CleanerGroup]
     /// Entering results sorts each group's items once; while scanning they keep catalog order so rows don't jump.
-    var phase = Phase.idle {
+    @Published var phase = Phase.idle {
         didSet { if case .results = phase { groups = groups.map { Self.sortedBySize($0, scans: scans) } } }
     }
-    var scans: [String: ItemScan] = [:]
-    var selected: Set<String> = []
+    @Published var scans: [String: ItemScan] = [:]
+    @Published var selected: Set<String> = []
     /// Entries left out of a ticked item with `selectableEntries`: item id → entry URLs. Per session, never remembered.
-    var excludedEntries: [String: Set<URL>] = [:]
+    @Published var excludedEntries: [String: Set<URL>] = [:]
     /// Ids of result groups the user folded away; per session, kept across rescans since group ids are stable.
-    var collapsedGroups: Set<String> = []
+    @Published var collapsedGroups: Set<String> = []
     /// Item ids of the result rows highlighted with the keyboard/mouse (List selection), not the ticks.
-    var highlighted: Set<String> = []
+    @Published var highlighted: Set<String> = []
     /// Bundle ids of running apps, kept current through NSWorkspace launch/terminate notifications.
-    var runningApps = SmartScanModel.currentRunningApps()
+    @Published var runningApps = SmartScanModel.currentRunningApps()
     /// Names of running command-line tools; no notification exists, so refreshed at each scan and before cleaning.
-    var runningProcesses: Set<String> = []
+    @Published var runningProcesses: Set<String> = []
     /// Source of `runningApps` when an app launches or quits and before cleaning. Injected by tests, so an app
     /// opening or quitting on the Mac mid-test can't swap their fake list for the real one.
-    @ObservationIgnored var appBundleIDs: () -> Set<String> = SmartScanModel.currentRunningApps
+    var appBundleIDs: () -> Set<String> = SmartScanModel.currentRunningApps
     /// Injected by tests.
-    @ObservationIgnored var processNames: () -> Set<String> = RunningProcesses.names
+    var processNames: () -> Set<String> = RunningProcesses.names
     /// Item ids whose tool folder overlaps Settings › Exclusions at the last scan: locked, unticked, not counted.
-    var blocked: Set<String> = []
+    @Published var blocked: Set<String> = []
     /// The check `Cleaner` makes before running the item's command; tests pass a sandbox policy.
-    @ObservationIgnored var blockedByExclusion: @Sendable (CleanerItem) async -> Bool = { await Cleaner.blockedByExclusion($0) }
+    var blockedByExclusion: @Sendable (CleanerItem) async -> Bool = { await Cleaner.blockedByExclusion($0) }
     /// Injected by tests (e.g. a slow scan).
-    @ObservationIgnored var scanItem: @Sendable (CleanerItem) async -> ItemScan = { await Scanner.scan($0) }
+    var scanItem: @Sendable (CleanerItem) async -> ItemScan = { await Scanner.scan($0) }
     /// Injected by tests (a sandbox policy and a fake Trash).
     /// Saves exclusions ("Never Clean This"); tests inject a throwaway defaults domain.
-    @ObservationIgnored var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
+    var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
     /// Home whose activity log records each clean; tests pass a throwaway folder.
-    @ObservationIgnored var logHome = SafetyPolicy.current.homeURL
-    @ObservationIgnored var cleanItem: @Sendable (CleanerItem, ItemScan) async -> CleanReport = { await Cleaner.clean($0, scan: $1) }
+    var logHome = SafetyPolicy.current.homeURL
+    var cleanItem: @Sendable (CleanerItem, ItemScan) async -> CleanReport = { await Cleaner.clean($0, scan: $1) }
     /// Free bytes on the home volume, read before and after a clean; tests inject fixed values.
-    @ObservationIgnored var freeSpace: () -> Int64? = { Cleaner.freeSpace(SafetyPolicy.current.homeURL.path) }
+    var freeSpace: () -> Int64? = { Cleaner.freeSpace(SafetyPolicy.current.homeURL.path) }
     /// The volume's free space before and after the last clean, shown for reference next to what was freed.
     struct FreeSpaceChange: Equatable { var before: Int64; var after: Int64 }
-    var freeSpaceChange: FreeSpaceChange?
+    @Published var freeSpaceChange: FreeSpaceChange?
     /// Items scanned so far / items to scan, for the progress bar.
-    var scannedItems = 0
-    var totalItems = 0
+    @Published var scannedItems = 0
+    @Published var totalItems = 0
     /// Title of the item being cleaned; progress while cleaning reuses scannedItems/totalItems.
-    var cleaningItem: LocalizedStringResource?  // optional, not "": an empty literal adds a "" key to the catalog
-    @ObservationIgnored private var scanTask: Task<Void, Never>?
+    @Published var cleaningItem: LocalizedStringResource?  // optional, not "": an empty literal adds a "" key to the catalog
+    private var scanTask: Task<Void, Never>?
     /// Bumped by every scan: an older scan that is still finishing never writes over a newer one.
-    @ObservationIgnored private var generation = 0
+    private var generation = 0
     /// What a cancelled scan restores; kept from before the first of back-to-back scans, never a `.scanning` state.
-    @ObservationIgnored private var beforeScan: (Phase, [CleanerGroup], [String: ItemScan], Set<String>, [String: Set<URL>], Set<String>)?
-    @ObservationIgnored private var observers: [NSObjectProtocol] = []
-    @ObservationIgnored private let catalog: () -> [CleanerGroup]
+    private var beforeScan: (Phase, [CleanerGroup], [String: ItemScan], Set<String>, [String: Set<URL>], Set<String>)?
+    private var observers: [NSObjectProtocol] = []
+    private let catalog: () -> [CleanerGroup]
     /// Where each item's scan time from the last finished scan is kept; nil (custom catalogs, tests) = not kept.
-    @ObservationIgnored var durationsKey: String?
+    var durationsKey: String?
     /// Group ids turned off in Settings › Scan Groups; only the real Smart Scan catalog reads them, so Privacy and
     /// tests' custom catalogs are never filtered unless a test injects a throwaway defaults domain.
-    @ObservationIgnored var disabledGroups: () -> Set<String> = { [] }
+    var disabledGroups: () -> Set<String> = { [] }
     /// Ids of every catalog group, enabled or not, refreshed with each catalog read: the view counts the ones off.
-    @ObservationIgnored private(set) var catalogGroupIDs: [String] = []
+    private(set) var catalogGroupIDs: [String] = []
     /// Groups off right now: a group turned off after its scan is hidden, left out of the totals and not cleaned;
     /// turned back on, its already scanned results come back (no rescan needed: they are still in `scans`).
-    private(set) var offGroups: Set<String> = []
+    @Published private(set) var offGroups: Set<String> = []
     /// Item id → seconds from the last finished scan, read when a scan starts.
-    @ObservationIgnored private var estimates: [String: Double] = [:]
+    private var estimates: [String: Double] = [:]
 
     /// `catalog` defaults to the module's own (Privacy or Smart Scan).
     init(module: Module, catalog: (() -> [CleanerGroup])? = nil) {
@@ -249,7 +248,7 @@ final class SmartScanModel {
     /// What each group freed in the last clean, for the done screen; groups that freed nothing are left out.
     struct CleanedGroup: Identifiable { let id: String; let title: LocalizedStringResource; let systemImage: String
         var freed: Int64 = 0; var trashed: Int64 = 0 }
-    var cleanedGroups: [CleanedGroup] = []
+    @Published var cleanedGroups: [CleanedGroup] = []
 
     private var items: [CleanerItem] { activeGroups.flatMap(\.items) }
 

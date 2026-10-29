@@ -14,7 +14,7 @@ extension LaunchAgent.State {
 
 /// Login Items: the user's launch agents (disable, enable, remove) plus read-only agents and daemons in /Library.
 struct LaunchAgentsView: View {
-    @Bindable var model: LaunchAgentsModel
+    @ObservedObject var model: LaunchAgentsModel
     @State private var selection: URL?
     @State private var removing: LaunchAgent?
 

@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Uninstaller: apps on the left, the selected app's files (or leftovers of removed apps) on the right.
 struct UninstallerView: View {
-    @Bindable var model: UninstallerModel
+    @ObservedObject var model: UninstallerModel
     @Environment(\.locale) private var locale
     @State private var confirming = false
     @State private var previewURL: URL?

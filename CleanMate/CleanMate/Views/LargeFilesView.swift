@@ -27,7 +27,7 @@ extension FileKind {
 
 /// Large & Old Files: sortable table of big files in the home folder; ticked files go to the Trash.
 struct LargeFilesView: View {
-    @Bindable var model: LargeFilesModel
+    @ObservedObject var model: LargeFilesModel
     @State private var sortOrder = [KeyPathComparator(\LargeFile.size, order: .reverse)]
     @State private var selection: Set<URL> = []
     @State private var previewURL: URL?

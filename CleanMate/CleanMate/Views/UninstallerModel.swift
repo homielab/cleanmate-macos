@@ -1,9 +1,8 @@
 import AppKit
-import Observation
+import Combine
 
 /// Uninstaller: list of apps, the selected app's data (or leftovers of removed apps), ticked items go to the Trash.
-@Observable
-final class UninstallerModel {
+final class UninstallerModel: ObservableObject {
     /// `hiddenConfig` is read-only: `remove()` ignores it. `extensions` items are never ticked for the user.
     enum Selection: Hashable { case app(URL), leftovers, hiddenConfig, extensions }
     enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), restored(TrashUndo.Result) }
@@ -14,30 +13,30 @@ final class UninstallerModel {
     /// "Not used for" filter of the app list, remembered in `Preferences.uninstallerUnused`.
     enum UnusedFilter: String, CaseIterable { case all, months3, months6, year1 }
 
-    var apps: [InstalledApp] = []
-    var loadingApps = false
+    @Published var apps: [InstalledApp] = []
+    @Published var loadingApps = false
     /// Filled in the background after the list appears.
-    var appSizes: [URL: Int64] = [:]
+    @Published var appSizes: [URL: Int64] = [:]
     /// Total size of each app's data in ~/Library and config in ~, ~/.config and ~/.local/share (same rule as its detail, suggestions
     /// included), measured in the background after `appSizes`.
-    var appDataSizes: [URL: Int64] = [:]
+    @Published var appDataSizes: [URL: Int64] = [:]
     /// Bumped when `appDataSizes` must be (re)measured: the view's `.task(id:)` runs `measureAppData`, cancelled on leaving.
-    var dataGeneration = 0
+    @Published var dataGeneration = 0
     /// Size of each matched data entry, measured once per session; cleared with `appDataSizes` (`invalidateAppData`).
-    @ObservationIgnored private var dataEntrySizes: [URL: Int64] = [:]
+    private var dataEntrySizes: [URL: Int64] = [:]
     /// Injected by tests. For each app, the data entries it would list. Arguments: all listed apps, every bundle id
     /// installed or running. Without Full Disk Access the protected folders (Containers…) are not listed: they would prompt.
-    @ObservationIgnored var appDataMatches: ([InstalledApp], Set<String>) async -> [URL: [URL]] = { apps, ids in
+    var appDataMatches: ([InstalledApp], Set<String>) async -> [URL: [URL]] = { apps, ids in
         let skipped = ProtectedFolders.skipped(home: SafetyPolicy.current.homeURL, hasFullDiskAccess: FullDiskAccess.isGranted)
         return await Uninstaller.dataMatches(of: apps, otherBundleIDs: ids, skipped: skipped, allApps: Uninstaller.allAppURLs())
     }
     /// An app hidden by the search is deselected, so the detail, Uninstall and Return never act on an app not in the list.
-    var search = "" { didSet { deselectUnlistedApp() } }
+    @Published var search = "" { didSet { deselectUnlistedApp() } }
     /// Set by the view from `@AppStorage`; an app it hides is deselected like the search does.
-    var unused = UnusedFilter.all { didSet { if unused != oldValue { deselectUnlistedApp() } } }
+    @Published var unused = UnusedFilter.all { didSet { if unused != oldValue { deselectUnlistedApp() } } }
     /// A new selection drops the old one's rows at once (and any load still finishing for it): Uninstall must never
     /// send one app with another's ticked data before `loadEntries` runs.
-    var selection: Selection? {
+    @Published var selection: Selection? {
         didSet {
             guard selection != oldValue else { return }
             trashApp = true
@@ -48,58 +47,58 @@ final class UninstallerModel {
         }
     }
     /// Rows highlighted in the detail list (arrow keys); Space ticks them via `toggle(urls:)`.
-    var highlighted: Set<URL> = []
+    @Published var highlighted: Set<URL> = []
     /// The selected app's own row is ticked. Unticked: `remove()` resets the app (moves only its ticked data).
-    var trashApp = true
+    @Published var trashApp = true
     /// Data and config of the selected app, or leftovers of removed apps.
-    var entries: [AppDataEntry] = []
-    var loadingEntries = false
-    var checked: Set<URL> = []
-    var working = false
-    var outcome: Outcome?
-    var dropRejection: DropRejection?
+    @Published var entries: [AppDataEntry] = []
+    @Published var loadingEntries = false
+    @Published var checked: Set<URL> = []
+    @Published var working = false
+    @Published var outcome: Outcome?
+    @Published var dropRejection: DropRejection?
     /// Unknown hidden items of ~ and ~/.config (warning only, never removed); nil until first loaded.
-    var hiddenItems: [HiddenConfigItem]?
+    @Published var hiddenItems: [HiddenConfigItem]?
     /// Filled in the background after `hiddenItems`.
-    var hiddenSizes: [URL: Int64] = [:]
+    @Published var hiddenSizes: [URL: Int64] = [:]
     /// Extensions in ~/Library; nil until first loaded.
-    var extensionItems: [ExtensionItem]?
+    @Published var extensionItems: [ExtensionItem]?
     /// Filled in the background after `extensionItems`.
-    var extensionSizes: [URL: Int64] = [:]
+    @Published var extensionSizes: [URL: Int64] = [:]
     /// Bundle ids of running apps, kept current through NSWorkspace launch/terminate notifications.
-    var runningApps = SmartScanModel.currentRunningApps()
+    @Published var runningApps = SmartScanModel.currentRunningApps()
     /// Source of `runningApps` on launch/quit and right before extensions go; injected by tests.
-    @ObservationIgnored var appBundleIDs: @Sendable () -> Set<String> = SmartScanModel.currentRunningApps
-    @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    var appBundleIDs: @Sendable () -> Set<String> = SmartScanModel.currentRunningApps
+    private var observers: [NSObjectProtocol] = []
     /// Bumped by every loadEntries: an older load still finishing (cancellation is not honoured
     /// by the file walk) never clears `loadingEntries` or writes entries of a previous selection.
-    @ObservationIgnored private var entriesGeneration = 0
+    private var entriesGeneration = 0
     /// Injected by tests (sample data instead of the real ~/Library).
     /// Arguments: the app, bundle ids and names of every other installed/running app.
-    @ObservationIgnored var appData: (InstalledApp, Set<String>, Set<String>) async -> [AppDataEntry] = {
+    var appData: (InstalledApp, Set<String>, Set<String>) async -> [AppDataEntry] = {
         await Uninstaller.data(of: $0, otherBundleIDs: $1, otherAppNames: $2)
     }
     /// Injected by tests (sample leftovers instead of the real ~/Library). Argument: bundle ids of installed/running apps.
-    @ObservationIgnored var leftovers: (Set<String>) async -> [AppDataEntry] = { installed in
+    var leftovers: (Set<String>) async -> [AppDataEntry] = { installed in
         await Uninstaller.leftovers(installedBundleIDs: installed) { id in
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil
         }
     }
     /// The window's, set by the view: ⌘Z after Uninstall or Reset.
-    @ObservationIgnored weak var undoManager: UndoManager?
+    weak var undoManager: UndoManager?
     /// "Undo"; tests pass their own so the real Trash is never touched.
-    @ObservationIgnored var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Uninstaller") }
+    var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Uninstaller") }
     /// Injected by tests so nothing real goes to the Trash. Arguments: the app (if any), the ticked data.
-    @ObservationIgnored var trash: (URL?, [AppDataEntry]) async throws(Uninstaller.AppTrashError) -> CleanReport = {
+    var trash: (URL?, [AppDataEntry]) async throws(Uninstaller.AppTrashError) -> CleanReport = {
         try await Uninstaller.trash(app: $0, data: $1)
     }
 
     /// Injected by tests (a fake home instead of the real one).
-    @ObservationIgnored var hiddenConfig: () async -> [HiddenConfigItem] = {
+    var hiddenConfig: () async -> [HiddenConfigItem] = {
         await HiddenConfig.strange(running: SmartScanModel.currentRunningApps())
     }
     /// Injected by tests (sample data instead of the real ~/Library).
-    @ObservationIgnored var extensions: () async -> [ExtensionItem] = {
+    var extensions: () async -> [ExtensionItem] = {
         let running = NSWorkspace.shared.runningApplications.compactMap { app in
             app.bundleIdentifier.map { ($0, app.localizedName ?? $0) }
         }
@@ -107,14 +106,14 @@ final class UninstallerModel {
     }
     /// Injected by tests so nothing real goes to the Trash. Arguments: the ticked extensions, and whether one is
     /// in use right now (checked again just before each).
-    @ObservationIgnored var trashExtensions: ([AppDataEntry], @escaping @Sendable (URL) -> Bool) async -> CleanReport = {
+    var trashExtensions: ([AppDataEntry], @escaping @Sendable (URL) -> Bool) async -> CleanReport = {
         await Extensions.trash($0, inUse: $1)
     }
 
     /// Injected by tests. Lists the installed apps.
-    @ObservationIgnored var installedApps: () async -> [InstalledApp] = { await Uninstaller.installedApps() }
+    var installedApps: () async -> [InstalledApp] = { await Uninstaller.installedApps() }
     /// Injected by tests. Size of an app bundle; returns 0 when its task is cancelled (the file walk stops).
-    @ObservationIgnored var appSize: @Sendable (URL) async -> Int64 = { await Uninstaller.size(of: $0) }
+    var appSize: @Sendable (URL) async -> Int64 = { await Uninstaller.size(of: $0) }
 
     init() {
         let center = NSWorkspace.shared.notificationCenter

@@ -1,9 +1,8 @@
 import Foundation
-import Observation
+import Combine
 
 /// Space Lens: children of the current folder with their sizes, measured in parallel and remembered for the session.
-@Observable
-final class SpaceLensModel {
+final class SpaceLensModel: ObservableObject {
     struct Volume {
         var name = ""
         var total: Int64 = 0
@@ -26,53 +25,53 @@ final class SpaceLensModel {
     }
 
     /// Injectable for tests: folders inside it open with the full breadcrumb from it.
-    @ObservationIgnored var home = SafetyPolicy.current.homeURL
+    var home = SafetyPolicy.current.homeURL
     /// Where browsing started (home, a volume or a chosen folder); `path` holds the folders opened below it.
-    private(set) var root = SafetyPolicy.current.homeURL
-    private(set) var path: [URL] = []
-    private(set) var items: [SpaceItem] = []
-    private(set) var measuring = false
-    private(set) var trashing = false
+    @Published private(set) var root = SafetyPolicy.current.homeURL
+    @Published private(set) var path: [URL] = []
+    @Published private(set) var items: [SpaceItem] = []
+    @Published private(set) var measuring = false
+    @Published private(set) var trashing = false
     /// `trashing` is an undo: the bottom bar says "Putting back…".
-    private(set) var undoing = false
+    @Published private(set) var undoing = false
     /// Toolbar search over the current folder's names; "" = all. Cleared when the folder changes.
-    var search = ""
+    @Published var search = ""
     /// Item to select in the table once listed, set by `reveal`; the view clears it.
-    var revealed: URL?
-    var volume = Volume() // settable so UISnapshots can pin it (the real disk's free space changes between runs)
+    @Published var revealed: URL?
+    @Published var volume = Volume() // settable so UISnapshots can pin it (the real disk's free space changes between runs)
     /// Cleared (another folder or root) also drops its ⌘Z.
-    var report: CleanReport? { didSet { if report == nil { undoManager?.removeAllActions(withTarget: self) } } }
+    @Published var report: CleanReport? { didSet { if report == nil { undoManager?.removeAllActions(withTarget: self) } } }
     /// The window's, set by the view: ⌘Z after a move to the Trash.
-    @ObservationIgnored weak var undoManager: UndoManager?
+    weak var undoManager: UndoManager?
     /// The current listing left out folders macOS protects (no Full Disk Access): the view shows a note.
-    private(set) var skippedProtected = false
+    @Published private(set) var skippedProtected = false
     /// Injectable for tests.
-    @ObservationIgnored var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
+    var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
     /// "Undo"; tests pass their own so the real Trash is never touched.
-    @ObservationIgnored var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Space Lens") }
+    var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Space Lens") }
     /// Saves exclusions ("Never Clean This"); tests inject a throwaway defaults domain.
-    @ObservationIgnored var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
+    var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
     /// Injectable for tests, so they never move real files to the Trash.
-    @ObservationIgnored var trashItems: ([SpaceItem]) async -> CleanReport = { await SpaceLens.trash($0) }
+    var trashItems: ([SpaceItem]) async -> CleanReport = { await SpaceLens.trash($0) }
     /// Injectable for tests, to count how often folders are measured.
-    @ObservationIgnored var measure: @Sendable (URL, SpaceLens.HardLinks, Set<String>) async throws -> (size: Int64, folders: [String: Int64]) = {
+    var measure: @Sendable (URL, SpaceLens.HardLinks, Set<String>) async throws -> (size: Int64, folders: [String: Int64]) = {
         try await SpaceLens.measure($0, links: $1, skipping: $2)
     }
     /// Folders not entered by the last listing; when it changes (access granted) remembered sizes are dropped.
-    @ObservationIgnored private var skipping: Set<String> = []
+    private var skipping: Set<String> = []
 
     /// Session cache: folder path → allocated size.
-    @ObservationIgnored private var sizes: [String: Int64] = [:]
+    private var sizes: [String: Int64] = [:]
     /// Session cache per finished listing: folder path → its child folders' sizes, hard-linked ones included.
     /// Only valid as a whole: those sizes depend on which sibling counted a shared hard link first.
-    @ObservationIgnored private var listings: [String: [String: Int64]] = [:]
-    @ObservationIgnored private var task: Task<Void, Never>?
-    @ObservationIgnored private var started = false
+    private var listings: [String: [String: Int64]] = [:]
+    private var task: Task<Void, Never>?
+    private var started = false
     /// Another module removed files: remembered sizes may be wrong, measure again next time Space Lens is shown.
-    @ObservationIgnored private var stale = false
+    private var stale = false
     /// Bumped by `invalidate`: a listing measured before another module's clean never refills the caches.
-    @ObservationIgnored private var cacheEpoch = 0
-    @ObservationIgnored private var observer: (any NSObjectProtocol)?
+    private var cacheEpoch = 0
+    private var observer: (any NSObjectProtocol)?
 
     /// `center`: tests pass their own, so cleans recorded by tests running in parallel don't invalidate the cache.
     init(center: NotificationCenter = .default) {

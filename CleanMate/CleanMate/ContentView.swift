@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Sidebar modules.
 enum Module: String, CaseIterable, Identifiable {
@@ -48,25 +49,33 @@ enum Module: String, CaseIterable, Identifiable {
 }
 
 /// Module requested from outside the window (menu bar item); ContentView consumes it, also on first appearance.
-@Observable
-final class ModuleRouter {
+final class ModuleRouter: ObservableObject {
     static let shared = ModuleRouter()
-    var requested: Module?
+    @Published var requested: Module?
     /// "Show in Space Lens": Space Lens opens this item's folder with the item selected.
-    var spaceLensItem: URL?
+    @Published var spaceLensItem: URL?
 }
 
 struct ContentView: View {
-    @State private var router = ModuleRouter.shared
+    @ObservedObject private var router = ModuleRouter.shared
     @State private var selection: Module? = .smartScan
-    @State private var smartScan = SmartScanModel(module: .smartScan)
-    @State private var privacy = SmartScanModel(module: .privacy)
-    @State private var largeFiles = LargeFilesModel()
-    @State private var uninstaller = UninstallerModel()
-    @State private var spaceLens = SpaceLensModel()
-    @State private var loginItems = LaunchAgentsModel()
+    @StateObject private var smartScan = SmartScanModel(module: .smartScan)
+    @StateObject private var privacy = SmartScanModel(module: .privacy)
+    @StateObject private var largeFiles = LargeFilesModel()
+    @StateObject private var uninstaller = UninstallerModel()
+    @StateObject private var spaceLens = SpaceLensModel()
+    @StateObject private var loginItems = LaunchAgentsModel()
     @AppStorage(Preferences.fullDiskAccessPrompted) private var fullDiskAccessPrompted = false
     @State private var showsFullDiskAccess = false
+
+    init() {}
+
+    /// The scan benchmark's window: its own Smart Scan / Large & Old Files models, opened on `selection`.
+    init(smartScan: SmartScanModel? = nil, largeFiles: LargeFilesModel? = nil, selection: Module) {
+        if let smartScan { _smartScan = StateObject(wrappedValue: smartScan) }
+        if let largeFiles { _largeFiles = StateObject(wrappedValue: largeFiles) }
+        _selection = State(initialValue: selection)
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -112,12 +121,11 @@ struct ContentView: View {
 
     private func badgeText(_ module: Module) -> Text? {
         let badge: Module.Badge? = switch module {
-        case .smartScan, .privacy:
-            module.badge(hasResults: hasResults(module == .smartScan ? smartScan : privacy),
-                         size: (module == .smartScan ? smartScan : privacy).selectedSize)
+        // Totals only with results: this view redraws on every change of any model, also mid-scan.
+        case .smartScan: hasResults(smartScan) ? module.badge(hasResults: true, size: smartScan.selectedSize) : nil
+        case .privacy: hasResults(privacy) ? module.badge(hasResults: true, size: privacy.selectedSize) : nil
         case .largeFiles:
-            module.badge(hasResults: { if case .results = largeFiles.phase { true } else { false } }(),
-                         files: largeFiles.visibleFiles.count)
+            if case .results = largeFiles.phase { module.badge(hasResults: true, files: largeFiles.visibleFiles.count) } else { nil }
         case .uninstaller, .spaceLens, .loginItems: nil
         }
         return switch badge {

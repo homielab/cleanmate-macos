@@ -1,3 +1,4 @@
+import Combine
 import CryptoKit
 import Foundation
 import Testing
@@ -304,6 +305,27 @@ struct LargeFilesTests {
         for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(10)) }
         #expect(model.lastCounts == ["\(home.path)|full": 700])
         #expect(UserDefaults.standard.dictionary(forKey: Preferences.largeFilesLastCount) as? [String: Int] == before)
+    }
+
+    /// A burst of progress reports reaches the view as one update per `progressInterval`; the stored count is the highest.
+    @MainActor @Test func scanProgressIsThrottledAndTheHighestCountIsStored() async throws {
+        let model = LargeFilesModel()
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        model.scanFiles = { _, _, _, progress in
+            for count in stride(from: 500, through: 500_000, by: 500) { progress(count) } // well under 100 ms
+            try await Task.sleep(for: LargeFilesModel.progressInterval * 2)
+            progress(500_500) // the next interval: shown again
+            try await Task.sleep(for: .milliseconds(100)) // the count reaches the model on the main actor
+            return []
+        }
+        var shown: [Int] = []
+        let subscription = model.$scannedCount.dropFirst().sink { shown.append($0) }
+        defer { subscription.cancel() }
+        model.scan()
+        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(10)) }
+        #expect(shown.filter { $0 > 0 } == [500, 500_500]) // `scan()` resets it to 0 first
+        #expect(model.lastCounts == ["\(home.path)|full": 500_500])
     }
 
     /// A folder scope can go down to 1 MB (smaller → scans again, larger → filters only); the home stays ≥ 50 MB.

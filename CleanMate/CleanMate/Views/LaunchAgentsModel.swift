@@ -1,24 +1,23 @@
 import AppKit
-import Observation
+import Combine
 
 /// Login Items: launch agents with their state; the user's own can be disabled, enabled or removed.
-@Observable
-final class LaunchAgentsModel {
-    private(set) var agents: [LaunchAgent] = []
-    private(set) var loading = false
-    private(set) var working = false
+final class LaunchAgentsModel: ObservableObject {
+    @Published private(set) var agents: [LaunchAgent] = []
+    @Published private(set) var loading = false
+    @Published private(set) var working = false
     /// Set when an action failed, shown as an alert.
-    var failed: LaunchAgent?
-    @ObservationIgnored private var started = false
+    @Published var failed: LaunchAgent?
+    private var started = false
     /// Bumped by every load: a slower, older listing never replaces a newer one.
-    @ObservationIgnored private var generation = 0
+    private var generation = 0
     /// Injected by tests (sample agents instead of the real ones).
-    @ObservationIgnored var scan: () async -> [LaunchAgent] = {
+    var scan: () async -> [LaunchAgent] = {
         await LaunchAgents.scan { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }
     }
 
     /// Runs a launchctl action; injected by tests so no real launchctl runs.
-    @ObservationIgnored var run: (_ action: (LaunchAgent, SafetyPolicy) async -> Bool, _ agent: LaunchAgent) async -> Bool = {
+    var run: (_ action: (LaunchAgent, SafetyPolicy) async -> Bool, _ agent: LaunchAgent) async -> Bool = {
         await $0($1, .current)
     }
 

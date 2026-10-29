@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Scan → results → clean screen shared by Smart Scan and Privacy.
 struct SmartScanView: View {
-    @Bindable var model: SmartScanModel
+    @ObservedObject var model: SmartScanModel
     let module: Module
     @State private var confirming = false
     @State private var excludedCount = 0

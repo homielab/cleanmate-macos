@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// Space Lens: browse a folder's children by size, drill into folders, move picked items to the Trash.
 struct SpaceLensView: View {
-    @Bindable var model: SpaceLensModel
+    @ObservedObject var model: SpaceLensModel
     @State private var sortOrder = [KeyPathComparator(\SpaceItem.sortSize, order: .reverse)]
     @State private var selection: Set<URL> = []
     /// Selected URLs the policy allows, checked once per selection change, not per render; `model.trash` re-checks each item.

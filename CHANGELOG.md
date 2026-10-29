@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Large Files** and **Uninstaller**: the same larger checkboxes and tinted ticked rows; in Uninstaller a click anywhere on a row ticks it.
   Each group header has a checkbox (all, none or some ticked) instead of Select All / Deselect All, and locked rows
   show a lock with a larger reason text.
+- **Smart Scan** finishes sooner and uses less CPU while it scans; **Large Files** redraws its scan progress at most
+  10 times a second.
 
 ### Fixed
 - **Smart Scan** and **Privacy**: "Freed" is now the size of what was removed or moved to the Trash, never the noisy

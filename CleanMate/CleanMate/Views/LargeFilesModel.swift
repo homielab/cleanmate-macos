@@ -1,9 +1,8 @@
 import Foundation
-import Observation
+import Combine
 
 /// Large & Old Files: scan the home folder (or the chosen scope inside it) once (≥ the smallest size option), then filter in memory.
-@Observable
-final class LargeFilesModel {
+final class LargeFilesModel: ObservableObject {
     enum Phase { case idle, scanning, results, trashing, done(CleanReport) }
 
     static let sizeOptions: [Int64] = [50, 100, 500, 1_000, 5_000].map { $0 * 1_000_000 }
@@ -12,77 +11,79 @@ final class LargeFilesModel {
     /// Months without use; 0 = any age.
     static let ageOptions = [0, 3, 6, 12, 24]
 
-    var phase = Phase.idle
-    var files: [LargeFile] = [] {
+    @Published var phase = Phase.idle
+    @Published var files: [LargeFile] = [] {
         didSet { (nameRanks, locationRanks) = (nil, nil) }
     }
     /// Name / location → position in `localizedStandardCompare` order, built on the first sort by that column after a
     /// scan; later sorts compare Ints instead of strings.
-    @ObservationIgnored private var nameRanks: [String: Int]?
-    @ObservationIgnored private var locationRanks: [String: Int]?
+    private var nameRanks: [String: Int]?
+    private var locationRanks: [String: Int]?
     /// Ticked for the Trash. Never pre-filled.
-    var checked: Set<URL> = []
+    @Published var checked: Set<URL> = []
     /// A size below what the files were scanned at scans again; a larger one only filters.
-    var minSize = sizeOptions[0] {
+    @Published var minSize = sizeOptions[0] {
         didSet { if minSize < scannedMinSize { scan() } }
     }
     /// Smallest size the current files were scanned at.
-    private(set) var scannedMinSize = sizeOptions[0]
+    @Published private(set) var scannedMinSize = sizeOptions[0]
     /// Sizes the Size menu offers for the current scope.
     var sizeChoices: [Int64] { scope == nil ? Self.sizeOptions : Self.folderSizeOptions }
-    var minAgeMonths = 0
+    @Published var minAgeMonths = 0
     /// nil = all kinds.
-    var kind: FileKind?
+    @Published var kind: FileKind?
     /// Toolbar search: file name or location; "" = no search.
-    var search = ""
+    @Published var search = ""
     /// Only files with an identical copy among the scanned files; turning it on finds them once per scan.
-    var duplicatesOnly = false {
+    @Published var duplicatesOnly = false {
         didSet { if duplicatesOnly != oldValue { duplicatesOnly ? findDuplicates() : stopFindingDuplicates() } }
     }
     /// Same-content groups of the current scan, nil until found (the filter has not been on since the scan).
-    var duplicateGroups: [[URL]]? {
+    @Published var duplicateGroups: [[URL]]? {
         didSet { duplicateIndex = Dictionary((duplicateGroups ?? []).enumerated().flatMap { i, g in g.map { ($0, i) } }) { a, _ in a } }
     }
     /// File → its index in `duplicateGroups`; kept so the filter does no work per file.
-    private(set) var duplicateIndex: [URL: Int] = [:]
+    @Published private(set) var duplicateIndex: [URL: Int] = [:]
     /// Fraction of bytes read while finding duplicates; nil when not running.
-    var duplicateProgress: Double?
+    @Published var duplicateProgress: Double?
     /// Hashes by (path, size, inode, modification date): a new scan only reads files that are new or changed.
-    @ObservationIgnored private var duplicateHashes: [DuplicateFinder.Key: Data] = [:]
+    private var duplicateHashes: [DuplicateFinder.Key: Data] = [:]
     /// Where hashes persist across launches; nil = memory only. Never the real cache under a test host.
-    @ObservationIgnored var hashCacheURL: URL? =
+    var hashCacheURL: URL? =
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? DuplicateFinder.HashCache.defaultURL : nil
-    @ObservationIgnored private var hashCacheLoaded = false
-    @ObservationIgnored private var duplicateTask: Task<Void, Never>?
+    private var hashCacheLoaded = false
+    private var duplicateTask: Task<Void, Never>?
     /// Bumped by every start/stop: a stopped search that is still finishing never writes its result.
-    @ObservationIgnored private var duplicateRun = 0
+    private var duplicateRun = 0
     /// Injected by tests.
-    @ObservationIgnored var findDuplicateFiles: @Sendable ([URL], [DuplicateFinder.Key: Data], @escaping @Sendable (Double) -> Void) async throws -> DuplicateFinder.Result = {
+    var findDuplicateFiles: @Sendable ([URL], [DuplicateFinder.Key: Data], @escaping @Sendable (Double) -> Void) async throws -> DuplicateFinder.Result = {
         try await DuplicateFinder.find($0, cache: $1, progress: $2)
     }
     /// Files and folders checked so far by the running scan (the total is unknown up front).
-    var scannedCount = 0
+    @Published var scannedCount = 0
     /// Entries the last finished scan of the same scope checked; 0 = unknown (first scan).
-    var estimatedCount = 0
+    @Published var estimatedCount = 0
     /// Where the entry count of each scope persists (`Preferences.largeFilesLastCount`); nil = memory only.
     /// Never the real preferences under a test host.
-    @ObservationIgnored var lastCountDefaults: UserDefaults? =
+    var lastCountDefaults: UserDefaults? =
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? .standard : nil
-    @ObservationIgnored private var memoryLastCounts: [String: Int] = [:]
+    private var memoryLastCounts: [String: Int] = [:]
     /// Most scopes whose entry count is kept: home, the presets and the recent folders, with and without Full Disk Access.
     static let lastCountLimit = 20
+    /// Shortest time between two `scannedCount` updates while scanning.
+    nonisolated static let progressInterval = Duration.milliseconds(100)
     /// Determinate progress of the running scan, or nil when there is no estimate.
     var scanFraction: Double? { Self.fraction(checked: scannedCount, estimate: estimatedCount) }
     /// The last scan left out folders macOS protects (no Full Disk Access): the view shows a note.
-    var skippedProtected = false
+    @Published var skippedProtected = false
     /// The home folder; tests and snapshots set a fake one.
-    @ObservationIgnored var home = SafetyPolicy.current.homeURL
+    var home = SafetyPolicy.current.homeURL
     /// Folder scanned; nil = the whole home folder.
-    private(set) var scope: URL?
+    @Published private(set) var scope: URL?
     /// Scope of the files shown: a cancelled scan puts `scope` back to it, so a label never names other files.
-    @ObservationIgnored private var scannedScope: URL?
+    private var scannedScope: URL?
     /// The scope is a folder macOS protects and there is no Full Disk Access: nothing was scanned.
-    var needsAccess = false
+    @Published var needsAccess = false
     /// Presets of the Scope menu, relative to home.
     static let scopePresets = ["Downloads", "Desktop", "Documents"]
 
@@ -126,26 +127,26 @@ final class LargeFilesModel {
         scope = url
     }
     /// "Undo"; tests pass their own so the real Trash is never touched.
-    @ObservationIgnored var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Large & Old Files") }
+    var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Large & Old Files") }
     /// Injectable for tests.
     /// Saves exclusions ("Never Clean This"); tests inject a throwaway defaults domain.
-    @ObservationIgnored var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
-    @ObservationIgnored var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
+    var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
+    var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
     /// Injected by tests (e.g. a slow scan); args: root, minimum size, skipped folders, progress.
-    @ObservationIgnored var scanFiles: @Sendable (URL, Int64, Set<String>, @escaping @Sendable (Int) -> Void) async throws -> [LargeFile] = {
+    var scanFiles: @Sendable (URL, Int64, Set<String>, @escaping @Sendable (Int) -> Void) async throws -> [LargeFile] = {
         try await LargeFileScanner.scan(root: $0, minSize: $1, skipping: $2, progress: $3)
     }
     /// Injected by tests so the real Trash is never touched.
-    @ObservationIgnored var trashFiles: ([LargeFile]) async -> CleanReport = { await LargeFileScanner.trash($0) }
+    var trashFiles: ([LargeFile]) async -> CleanReport = { await LargeFileScanner.trash($0) }
     /// The window's, set by the view: ⌘Z after a move to the Trash.
-    @ObservationIgnored weak var undoManager: UndoManager?
+    weak var undoManager: UndoManager?
     /// "Undo" is putting files back: a scan now could miss them.
-    private(set) var undoing = false
-    @ObservationIgnored private var scanTask: Task<Void, Never>?
+    @Published private(set) var undoing = false
+    private var scanTask: Task<Void, Never>?
     /// Bumped by every scan: an older scan that is still finishing never writes over a newer one.
-    @ObservationIgnored private var generation = 0
+    private var generation = 0
     /// What a cancelled scan restores; kept from before the first of back-to-back scans, never `.scanning`.
-    @ObservationIgnored private var beforeScan = Phase.idle
+    private var beforeScan = Phase.idle
 
     var visibleFiles: [LargeFile] { files(of: kind) }
 
@@ -350,11 +351,21 @@ final class LargeFilesModel {
         let scopeKey = "\(root.path)|\(skipping.isEmpty ? "full" : "limited")"
         estimatedCount = lastCounts[scopeKey] ?? 0
         let scanFiles = scanFiles
+        // Highest count reported, and when the view last got one: at most ~10 redraws a second, since every
+        // change of a published property redraws the window (reports come every 500 entries).
+        let progress = Locked((count: 0, shown: ContinuousClock.now - .seconds(1)))
         scanTask = Task {
             do {
                 let found = try await scanFiles(root, threshold, skipping) { count in
                     // Parallel walk: reports may land out of order.
-                    Task { @MainActor in if current == self.generation { self.scannedCount = max(self.scannedCount, count) } }
+                    let show: Int? = progress.withLock { state in
+                        state.count = max(state.count, count)
+                        guard ContinuousClock.now - state.shown >= Self.progressInterval else { return nil }
+                        state.shown = .now
+                        return state.count
+                    }
+                    guard let show else { return }
+                    Task { @MainActor in if current == self.generation { self.scannedCount = max(self.scannedCount, show) } }
                 }
                 guard current == generation else { return } // a newer scan owns the state now
                 try Task.checkCancellation()
@@ -367,7 +378,7 @@ final class LargeFilesModel {
                 duplicateGroups = nil
                 if duplicatesOnly { findDuplicates() }
                 // shortcut: progress arrives every 500 entries, so this undercounts by < 500; fine for an estimate.
-                storeLastCount(scannedCount, for: scopeKey)
+                storeLastCount(progress.withLock { $0.count }, for: scopeKey)
                 phase = .results
                 Attention.finished()
             } catch {
