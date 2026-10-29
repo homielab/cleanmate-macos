@@ -175,9 +175,8 @@ extension CleanerGroup {
         // Ticked: leftovers of `docker build` (a rebuilt image replaced them), which a build makes again. Each one is
         // removed by its own ID, so an unticked one stays.
         dockerDangling,
-        docker("docker-build-cache", "Docker: build cache", note: "The next build is slower once",
-               type: "Build Cache", ["builder", "prune", "--all", "--force"],
-               details: DeveloperTools.dockerPrunableBuildCache),
+        // Unticked: a record is reused by the next build; each one is removed by its own ID.
+        dockerBuildCache,
         // Unticked: a stopped container's own filesystem (outside volumes) is lost with it.
         docker("docker-containers", "Docker: stopped containers",
                note: "Files written inside these containers (outside volumes) are lost",
@@ -265,6 +264,31 @@ extension CleanerGroup {
         item.entryCommand = { url in
             guard let id = DeveloperTools.dockerImageID(of: url) else { return nil }
             return ShellCommand(executable: "docker", arguments: ["rmi", id], timeout: .seconds(60), leadingArguments: host)
+        }
+        return item
+    }()
+
+    /// BuildKit cache records not in use, listed one by one (from `docker system df -v`) and removed with
+    /// `docker builder prune --all --filter id=<id>` for the ticked ones
+    /// (`--all`: without it internal/frontend records are kept even when their ID matches).
+    nonisolated private static let dockerBuildCache: CleanerItem = {
+        let host: @Sendable () -> [String]? = { DeveloperTools.localDockerHostArguments() }
+        let list = ShellCommand(executable: "docker", arguments: ["system", "df", "-v", "--format", "{{json .}}"],
+                                timeout: .seconds(20), leadingArguments: host)
+        var item = dev("docker-build-cache", "Docker: build cache", note: "The next build is slower once",
+            [], command: ShellCommand(executable: "docker", arguments: ["builder", "prune", "--all", "--force"],
+                                      timeout: .seconds(300), leadingArguments: host),
+            probe: SizeProbe(command: list, precondition: DeveloperTools.dockerDaemonIsRunning,
+                             parse: { output in
+                                 let entries = DeveloperTools.dockerPrunableBuildCache(in: output)
+                                 return entries.isEmpty ? nil : .bytes(entries.reduce(0) { $0 + $1.size })
+                             },
+                             details: (list, DeveloperTools.dockerPrunableBuildCache)),
+            selected: false, selectableEntries: true)
+        item.entryCommand = { url in
+            guard let id = DeveloperTools.dockerBuildCacheID(of: url) else { return nil }
+            return ShellCommand(executable: "docker", arguments: ["builder", "prune", "--all", "--force", "--filter", "id=\(id)"],
+                                timeout: .seconds(120), leadingArguments: host)
         }
         return item
     }()
@@ -439,8 +463,9 @@ nonisolated enum DeveloperTools {
         }
     }
 
-    /// Build cache records `docker builder prune --all` removes, from `docker system df -v --format '{{json .}}'`:
+    /// Build cache records that can be removed, from `docker system df -v --format '{{json .}}'`:
     /// every record not in use ("InUse":"false"; `--all` also takes internal/frontend ones, not only dangling).
+    /// Entry URL `docker-build-cache:<id>`; a record whose ID is not a plain BuildKit ID is left out.
     /// Title "short id · type · description", date = last use. A "Shared" record's data also belongs to an image,
     /// so removing it frees nothing: size 0 and marked, matching docker's Reclaimable (InUse and Shared both false).
     static func dockerPrunableBuildCache(in output: String) -> [ScanEntry] {
@@ -450,7 +475,8 @@ nonisolated enum DeveloperTools {
         struct Report: Decodable { let BuildCache: [Lenient<Record>]? }
         guard let report = try? JSONDecoder().decode(Report.self, from: Data(output.utf8)) else { return [] }
         return readable(report.BuildCache, scheme: "docker-build-cache") { index, record in
-            guard record.InUse == "false", let url = URL(string: "docker-build-cache:\(index)") else { return nil }
+            guard record.InUse == "false", let id = buildCacheID(record.ID),
+                  let url = URL(string: "docker-build-cache:\(id)") else { return nil }
             let shared = record.Shared == "true"
             let description = record.Description.count > 60 ? record.Description.prefix(59) + "…" : record.Description
             var title = [String(record.ID.prefix(12)), record.CacheType, description].joined(separator: " · ")
@@ -458,6 +484,19 @@ nonisolated enum DeveloperTools {
             return ScanEntry(url: url, size: shared ? 0 : bytes(fromDockerSize: record.Size) ?? 0, title: title,
                              date: record.LastUsedAt.flatMap(dockerDate))
         }
+    }
+
+    /// A BuildKit record ID: 12 to 64 lowercase letters and digits (BuildKit's are random base-32, not hex);
+    /// anything else (an option, a filter operator) is not one.
+    static func buildCacheID(_ text: String) -> String? {
+        (12...64).contains(text.count) && text.allSatisfy { $0.isASCII && ($0.isLowercase || $0.isNumber) } ? text : nil
+    }
+
+    /// The record ID in a `docker-build-cache:<id>` entry URL; nil for any other URL.
+    static func dockerBuildCacheID(of url: URL) -> String? {
+        let text = url.absoluteString
+        guard text.hasPrefix("docker-build-cache:") else { return nil }
+        return buildCacheID(String(text.dropFirst("docker-build-cache:".count)))
     }
 
     /// A record of `docker system df -v` decoded on its own: one missing field skips that record, not the list.

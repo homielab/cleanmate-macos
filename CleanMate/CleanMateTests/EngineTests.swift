@@ -331,9 +331,9 @@ struct ScannerCleanerTests {
         #expect(FileManager.default.fileExists(atPath: key.path))
     }
 
-    /// Docker's listed images, containers, volumes, build cache are display-only: even with the
+    /// Docker's listed images, containers, volumes are display-only: even with the
     /// tool gone, the cleaner never removes an entry.
-    @Test(arguments: ["docker-images", "docker-containers", "docker-volumes", "docker-build-cache"])
+    @Test(arguments: ["docker-images", "docker-containers", "docker-volumes"])
     func dockerEntriesAreNeverRemoved(id: String) async throws {
         let box = try Sandbox()
         defer { box.remove() }
@@ -978,7 +978,7 @@ struct DeveloperToolsTests {
         #expect(volumeItem.command?.arguments == ["volume", "prune", "--all", "--force"])
     }
 
-    /// Build cache listed exactly as `builder prune --all` removes it (every record not in use).
+    /// Build cache: every record not in use, one entry each by its ID; an in-use record is never listed.
     @Test func dockerPrunableBuildCache() throws {
         let long = String(repeating: "x", count: 80)
         let output = """
@@ -996,10 +996,53 @@ struct DeveloperToolsTests {
         #expect(cache[1].title?.hasPrefix("bzbo560astpl · regular · pulled from") == true && cache[1].title!.count > 60)
         #expect(cache[2].title == "local0000000 · source.local · " + String(repeating: "x", count: 59) + "…")
         #expect(cache[0].date == Date(timeIntervalSince1970: 1_792_615_687) && cache[2].date == nil)
-        #expect(Set(cache.map(\.url)).count == 3 && cache.allSatisfy { !$0.url.isFileURL })
+        #expect(cache.map(\.url.absoluteString) == ["docker-build-cache:bq3itzl10tm8j1gn19o4ej3pi",
+                                                     "docker-build-cache:bzbo560astpltinpb8pdz91mu",
+                                                     "docker-build-cache:local0000000000"])
+        #expect(!cache.contains { $0.url.absoluteString.contains("inuse") })
         #expect(DeveloperTools.dockerPrunableBuildCache(in: "Cannot connect").isEmpty)
         let item = try #require(CleanerGroup.developer.items.first { $0.id == "docker-build-cache" })
-        #expect(item.command?.arguments == ["builder", "prune", "--all", "--force"]) // never made more aggressive
+        #expect(!item.selectedByDefault && item.selectableEntries && item.paths.isEmpty && item.entryCommand != nil)
+        guard case .bytes(let total)? = item.probe?.parse(output) else { Issue.record("no size"); return }
+        #expect(total == 1_160_235_000)
+        let empty = #"{"Images":[],"BuildCache":[]}"#
+        #expect(item.probe?.parse(empty) == nil) // none: hidden
+        let command = try #require(item.entryCommand?(cache[0].url))
+        #expect(command.arguments == ["builder", "prune", "--all", "--force", "--filter", "id=bq3itzl10tm8j1gn19o4ej3pi"])
+        // An internal/frontend record (source.local) is listed, so its command needs --all to remove it.
+        let local = try #require(item.entryCommand?(cache[2].url))
+        #expect(local.arguments == ["builder", "prune", "--all", "--force", "--filter", "id=local0000000000"])
+        for bad in ["docker-build-cache:--all", "docker-build-cache:abc", "docker-build-cache:ABCDEFGHIJKLMN",
+                    "docker-build-cache:bq3itzl10tm8,id=x", "docker-build-cache:unreadable", "docker-dangling:bq3itzl10tm8j1g"] {
+            #expect(item.entryCommand?(URL(string: bad)!) == nil, "\(bad)")
+        }
+    }
+
+    /// Only the ticked records reach `docker builder prune`, each by its own ID; freed = their sizes.
+    @Test func buildCacheIsRemovedPerEntry() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let log = box.root.appending(path: "calls.txt")
+        let script = try box.file("fake-docker.sh")
+        try "#!/bin/sh\necho \"$@\" >> '\(log.path)'\n[ \"$5\" != id=local0000000000 ]\n".write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        var item = try #require(CleanerGroup.developer.items.first { $0.id == "docker-build-cache" })
+        item.command = ShellCommand(executable: script.path)
+        item.entryCommand = { url in
+            DeveloperTools.dockerBuildCacheID(of: url).map {
+                ShellCommand(executable: script.path, arguments: ["builder", "prune", "--force", "--filter", "id=\($0)"])
+            }
+        }
+        item.probe?.precondition = { true }
+        let scan = ItemScan(entries: [
+            ScanEntry(url: URL(string: "docker-build-cache:bq3itzl10tm8j1gn19o4ej3pi")!, size: 10),
+            ScanEntry(url: URL(string: "docker-build-cache:local0000000000")!, size: 5),
+            ScanEntry(url: URL(string: "docker-build-cache:unreadable")!, size: 0),
+        ], measuredSize: 15)
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.freed == 10 && report.skipped == 2)
+        #expect(try String(contentsOf: log, encoding: .utf8)
+                == "builder prune --force --filter id=bq3itzl10tm8j1gn19o4ej3pi\nbuilder prune --force --filter id=local0000000000\n")
     }
 
     /// A record missing a field drops only itself; the rest still shows, plus a row counting the unreadable.
