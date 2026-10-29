@@ -140,7 +140,7 @@ struct UISnapshots {
             model.phase = .results
             return SmartScanView(model: model, module: .smartScan)
         }
-        // Every group but the first folded away; headers keep their totals and Select All.
+        // Every group but the first folded away; headers keep their totals and group checkboxes.
         try await snapshot("smartscan-3-results-collapsed") {
             let model = cleanerModel(.smartScan)
             fill(model)

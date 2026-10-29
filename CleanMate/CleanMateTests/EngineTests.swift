@@ -1795,11 +1795,13 @@ struct AppCatalogTests {
                        "t161.db": ItemScan(entries: [ScanEntry(url: URL(fileURLWithPath: "/tmp/h.db"), size: 0, isDatabase: true, records: 7)])]
         #expect(model.total(of: group.items) == .init(size: 1300, upTo: 5000, records: 7))
         #expect(model.selectableItems(in: group).map(\.id) == ["t161.a", "t161.b", "t161.db"])
-        #expect(!model.isAllSelected(group))
+        #expect(!model.isAllSelected(group) && !model.isAnySelected(group)) // group checkbox off
+        model.setSelected(a, true)
+        #expect(model.isAnySelected(group) && !model.isAllSelected(group)) // mixed
         model.setSelected(group, true)
         #expect(model.selected == ["t161.a", "t161.b", "t161.db"] && model.isAllSelected(group))
         model.setSelected(group, false)
-        #expect(model.selected.isEmpty && !model.isAllSelected(group))
+        #expect(model.selected.isEmpty && !model.isAllSelected(group) && !model.isAnySelected(group))
         #expect(Preferences.overrides["t161.a"] == false) // remembered like a tick by hand
         model.setSelected(group, true) // back to the default, so the override is forgotten
         #expect(Preferences.overrides["t161.a"] == nil)

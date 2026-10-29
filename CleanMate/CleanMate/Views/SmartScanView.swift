@@ -139,6 +139,7 @@ struct SmartScanView: View {
                                        groupImage: group.systemImage, largestInGroup: largest,
                                        entryOn: item.selectableEntries ? { url in entrySelection(item, url) } : nil,
                                        selectedSize: model.partialSelectedSize(item),
+                                       highlight: { model.highlighted = [item.id] },
                                        neverClean: { url in
                                            if model.neverClean(item, url) { excludedCount += 1 }
                                        })
@@ -221,10 +222,15 @@ struct SmartScanView: View {
         }
     }
 
-    /// Group name and the total of its scanned items, read as one element, then Select All/Deselect All.
+    /// Group checkbox (on: every selectable item ticked, mixed: some), then the group name and the total of its
+    /// scanned items, read as one element. A click anywhere on the header but the arrow ticks or unticks the group.
     private func groupHeader(_ group: CleanerGroup) -> some View {
         let allOn = model.isAllSelected(group)
+        let canSelect = !model.selectableItems(in: group).isEmpty
         let isExpanded = expanded(group)
+        let set = { (on: Bool) in model.setSelected(group, on) }
+        // Two sources that disagree make the checkbox mixed: some items ticked, not all.
+        let sources = [Binding { model.isAnySelected(group) } set: { set($0) }, Binding { allOn } set: { set($0) }]
         return HStack {
             // Plain macOS lists don't draw the native disclosure (only .sidebar does), so the header carries its own.
             Button { withAnimation { isExpanded.wrappedValue.toggle() } } label: {
@@ -237,19 +243,21 @@ struct SmartScanView: View {
             .foregroundStyle(.secondary)
             .accessibilityLabel(isExpanded.wrappedValue ? Text("Collapse \(Text(group.title))") : Text("Expand \(Text(group.title))"))
             HStack {
-                Label { Text(group.title).foregroundStyle(.primary) } icon: {
-                    Image(systemName: group.systemImage).foregroundStyle(.tint)
+                Toggle(sources: sources, isOn: \.self) { EmptyView() }
+                    .toggleStyle(SelectionCheckboxStyle())
+                    .disabled(!canSelect)
+                    .accessibilityLabel(Text("Select All in \(Text(group.title))"))
+                HStack {
+                    Label { Text(group.title).foregroundStyle(.primary) } icon: {
+                        Image(systemName: group.systemImage).foregroundStyle(.tint)
+                    }
+                    .font(.headline)
+                    Spacer()
+                    Self.totalText(model.total(of: group.items)).monospacedDigit().foregroundStyle(.primary)
                 }
-                .font(.headline)
-                Spacer()
-                Self.totalText(model.total(of: group.items)).monospacedDigit().foregroundStyle(.primary)
+                .accessibilityElement(children: .combine)
             }
-            .accessibilityElement(children: .combine)
-            Button(allOn ? "Deselect All" : "Select All") { model.setSelected(group, !allOn) }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .disabled(model.selectableItems(in: group).isEmpty)
-                .accessibilityLabel(allOn ? Text("Deselect All in \(Text(group.title))") : Text("Select All in \(Text(group.title))"))
+            .selectionRow(isOn: false, enabled: canSelect) { set(!allOn) }
         }
     }
 
@@ -331,6 +339,8 @@ struct CleanerItemRow: View {
     var entryOn: ((URL) -> Binding<Bool>)? = nil
     /// Bytes of the ticked entries when only some are ticked; nil = the whole item (or none) is ticked.
     var selectedSize: Int64? = nil
+    /// A click on the row or one of its entries highlights the item, as a click on a List row does.
+    var highlight: (() -> Void)? = nil
     /// "Never Clean This" on an entry; nil hides it (UISnapshots).
     var neverClean: ((URL) -> Void)? = nil
 
@@ -378,10 +388,11 @@ struct CleanerItemRow: View {
             // Selectable items list every entry: none is cleaned without being seen.
             let shown = entryOn == nil ? Array(entries.prefix(shownLimit)) : entries
             ForEach(shown) { entry in
+                let on = entryOn?(entry.url)
                 HStack {
-                    if let entryOn {
-                        Toggle(isOn: entryOn(entry.url)) { EmptyView() }
-                            .labelsHidden()
+                    if let on {
+                        Toggle(isOn: on) { EmptyView() }
+                            .toggleStyle(SelectionCheckboxStyle())
                             .disabled(isLocked)
                             .accessibilityLabel(Self.accessibilityLabel(entry: entry, locale: locale))
                     }
@@ -426,7 +437,10 @@ struct CleanerItemRow: View {
                     .accessibilityHidden(entryOn != nil) // the checkbox already reads the size
                     Color.clear.frame(width: 48, height: 1).accessibilityHidden(true) // the item's SizeBar column: sizes line up
                 }
-                .padding(.leading, 34) // under the item title, past the checkbox and icon
+                .frame(minHeight: 28)
+                .selectionRow(isOn: on?.wrappedValue == true, enabled: !isLocked, highlight: highlight,
+                              toggle: on.map { on in { on.wrappedValue.toggle() } })
+                .padding(.leading, 42) // under the item title, past the checkbox and icon
                 .accessibilityReadsAsOne(Self.rowAccessibilityLabel(entry: entry, selectable: entryOn != nil, locale: locale))
                 .contextMenu {
                     if let neverClean, Preferences.canExclude(entry.url) {
@@ -440,9 +454,10 @@ struct CleanerItemRow: View {
                     .foregroundStyle(.secondary)
             }
         } label: {
+            let ticked = isOn && !isLocked
             HStack {
                 // The links sit outside the Toggle's label: a disabled Toggle disables its label too.
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 4) {
                     // With entry ticks the checkbox shows mixed when only some are on; ticking it ticks them all.
                     Toggle(sources: [$isOn] + (entryOn.map { on in entries.map { on($0.url) } } ?? []), isOn: \.self) {
                         // Icon on the title line, so it lines up with the checkbox; the note sits under the title.
@@ -456,56 +471,61 @@ struct CleanerItemRow: View {
                             }
                         }
                     }
+                    .toggleStyle(SelectionCheckboxStyle(lockReason: isLocked ? lockReason : nil))
                     .disabled(isLocked)
                     .accessibilityLabel(Self.accessibilityLabel(item: item, scan: scan, selectedSize: selectedSize, locale: locale))
                     Group {
                         if isRunning && item.runningAppBundleIDs.isEmpty {
                             Text("The tool is running, so it is skipped. Close its sessions and scan again")
-                                .font(.caption).foregroundStyle(.orange)
+                                .foregroundStyle(.orange)
                         } else if isRunning {
                             HStack {
-                                Text("The app is open, so it is skipped").font(.caption).foregroundStyle(.orange)
+                                Text("The app is open, so it is skipped").foregroundStyle(.orange)
                                 Button("Quit App") { quit() }
                                     .buttonStyle(.link)
-                                    .font(.caption)
                             }
                         }
                         if isBlocked {
                             HStack {
-                                Text("Blocked by a folder in Exclusions").font(.caption).foregroundStyle(.orange)
+                                Text("Blocked by a folder in Exclusions").foregroundStyle(.orange)
                                 Button("Open Exclusions…") { openExclusions() }
                                     .buttonStyle(.link)
-                                    .font(.caption)
                             }
                         }
                         if scan?.permissionDenied == true {
                             HStack {
-                                Text("Needs Full Disk Access").font(.caption).foregroundStyle(.secondary)
+                                Text("Needs Full Disk Access").foregroundStyle(.secondary)
                                 Button("Open Settings…") { FullDiskAccess.openSettings() }
                                     .buttonStyle(.link)
-                                    .font(.caption)
                             }
                         } else if scan?.partlyUnreadable == true {
-                            Text("Some items could not be read — the size may be larger").font(.caption).foregroundStyle(.secondary)
+                            Text("Some items could not be read — the size may be larger").foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.leading, 42) // under the title, past the checkbox and icon
+                    .font(.callout)
+                    .padding(.leading, 52) // under the title, past the checkbox and icon
                 }
                 Spacer()
                 if let size = Self.sizeText(item: item, scan: scan, selectedSize: selectedSize, locale: locale) {
                     Text(verbatim: size)
-                        .sizeColumnStyle(emphasized: isOn && !isLocked)
+                        .sizeColumnStyle(emphasized: ticked)
+                        .fontWeight(ticked ? .semibold : .regular)
                         .accessibilityHidden(true) // read as part of the Toggle's label
                     // The bar keeps the whole item: it compares what was found across the group, as for unticked items.
-                    SizeBar(size: scan?.size ?? 0, largest: largestInGroup,
-                            tint: isOn && !isLocked ? .accentColor : .secondary)
+                    SizeBar(size: scan?.size ?? 0, largest: largestInGroup, tint: ticked ? .accentColor : .secondary, height: 8)
                         .opacity(scan?.records != nil || scan?.unmeasured == true ? 0 : 1) // no bytes to compare
                 } else {
                     ProgressView().controlSize(.small).accessibilityLabel("Scanning…") // still scanning
                 }
             }
-            .padding(.leading, 4) // room between the disclosure arrow and the checkbox
-            .padding(.vertical, 3)
+            .padding(.vertical, 8)
+            .frame(minHeight: 36)
+            .selectionRow(isOn: isOn, enabled: !isLocked, highlight: highlight) {
+                // Like the checkbox: mixed (some entries left out) ticks them all.
+                let mixed = isOn && entries.contains { entryOn?($0.url).wrappedValue == false }
+                isOn = mixed || !isOn
+            }
+            .padding(.leading, 2) // room between the disclosure arrow and the checkbox
         }
     }
 
@@ -516,6 +536,20 @@ struct CleanerItemRow: View {
     }
 
     private var isLocked: Bool { scan?.hasData != true || isRunning || isBlocked }
+
+    /// Why a locked row cannot be ticked, for the lock badge on its checkbox; nil for an item that found nothing.
+    private var lockReason: LocalizedStringKey? {
+        if isRunning {
+            item.runningAppBundleIDs.isEmpty ? "The tool is running, so it is skipped. Close its sessions and scan again"
+                : "The app is open, so it is skipped"
+        } else if isBlocked {
+            "Blocked by a folder in Exclusions"
+        } else if scan?.permissionDenied == true {
+            "Needs Full Disk Access"
+        } else {
+            nil
+        }
+    }
 
     @Environment(\.openSettings) private var openSettings
 

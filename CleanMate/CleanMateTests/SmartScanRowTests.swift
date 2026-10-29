@@ -48,10 +48,27 @@ struct SmartScanRowTests {
         #expect(try await bluePixels(locked, moreThan: 20) > 20)
     }
 
+    /// The large checkbox is filled with the accent color once ticked; unticked it has no blue (see above).
+    @Test func tickedRowDrawsAnAccentCheckbox() async throws {
+        let item = CleanerItem(id: "x", title: "X", paths: [])
+        let row = CleanerItemRow(item: item, scan: scanned, isOn: .constant(true), isRunning: false, quit: {})
+        #expect(try await bluePixels(row, moreThan: 150) > 150) // most of a 20 × 20 pt square
+    }
+
     @Test func openSettingsLinkIsEnabledWithoutFullDiskAccess() async throws {
         let item = CleanerItem(id: "x", title: "X", paths: [])
         let row = CleanerItemRow(item: item, scan: ItemScan(permissionDenied: true), isOn: .constant(false), isRunning: false, quit: {})
         #expect(try await bluePixels(row, moreThan: 20) > 20)
+    }
+}
+
+/// The large checkbox shows each state with its own symbol: off, on, mixed.
+struct SelectionCheckboxStyleTests {
+    @Test func eachStateHasItsOwnSymbol() {
+        #expect(SelectionCheckboxStyle.symbol(isOn: false, isMixed: false) == "square")
+        #expect(SelectionCheckboxStyle.symbol(isOn: true, isMixed: false) == "checkmark.square.fill")
+        #expect(SelectionCheckboxStyle.symbol(isOn: true, isMixed: true) == "minus.square.fill")
+        #expect(SelectionCheckboxStyle.symbol(isOn: false, isMixed: true) == "minus.square.fill")
     }
 }
 

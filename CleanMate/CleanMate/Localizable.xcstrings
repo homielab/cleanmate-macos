@@ -1589,16 +1589,6 @@
         }
       }
     },
-    "Deselect All in %@" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bỏ chọn tất cả trong %@"
-          }
-        }
-      }
-    },
     "Developer Junk" : {
       "localizations" : {
         "vi" : {

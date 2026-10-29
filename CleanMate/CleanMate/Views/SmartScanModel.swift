@@ -209,6 +209,11 @@ final class SmartScanModel {
         return !items.isEmpty && items.allSatisfy(isFullySelected)
     }
 
+    /// Some item of `group` is ticked, even partly or while locked: the group checkbox shows mixed unless all are.
+    func isAnySelected(_ group: CleanerGroup) -> Bool {
+        group.items.contains { selected.contains($0.id) }
+    }
+
     /// Ticks every selectable item of `group`, or unticks every ticked one, remembered like a tick by hand.
     /// Deselect All also unticks a locked row still ticked (Quit App, an app opened after the scan):
     /// it would otherwise be cleaned once its app quits, after the user deselected the whole group.

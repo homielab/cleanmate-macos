@@ -118,12 +118,102 @@ extension View {
     }
 }
 
+/// Large checkbox for lists where the tick decides what gets cleaned: a 20 pt square, accent-filled when on or mixed
+/// (`Toggle(sources:)`), faded when disabled; a click on the label ticks too. `lockReason`: a lock badge on the box,
+/// with the reason as its tooltip, for a row that cannot be ticked. VoiceOver sees a native checkbox.
+struct SelectionCheckboxStyle: ToggleStyle {
+    var lockReason: LocalizedStringKey? = nil
+
+    func makeBody(configuration: Configuration) -> some View {
+        SelectionCheckbox(configuration: configuration, lockReason: lockReason)
+    }
+
+    /// The SF Symbol for each state.
+    static func symbol(isOn: Bool, isMixed: Bool) -> String {
+        isMixed ? "minus.square.fill" : isOn ? "checkmark.square.fill" : "square"
+    }
+}
+
+private struct SelectionCheckbox: View {
+    let configuration: ToggleStyleConfiguration
+    let lockReason: LocalizedStringKey?
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        // Like a native checkbox, a click on mixed ticks everything.
+        Button { configuration.isOn = configuration.isMixed || !configuration.isOn } label: {
+            HStack(spacing: 8) {
+                box
+                configuration.label
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(lockReason.map { Text($0) } ?? Text(verbatim: ""))
+        .accessibilityRepresentation {
+            // Mixed shows as mixed: two sources that disagree.
+            let on = Binding { configuration.isOn } set: { configuration.isOn = $0 }
+            let sources = configuration.isMixed
+                ? [Binding { true } set: { on.wrappedValue = $0 }, Binding { false } set: { on.wrappedValue = $0 }]
+                : [on]
+            Toggle(sources: sources, isOn: \.self) { configuration.label }
+                .toggleStyle(.checkbox)
+        }
+    }
+
+    private var box: some View {
+        let ticked = configuration.isOn || configuration.isMixed
+        return Image(systemName: SelectionCheckboxStyle.symbol(isOn: configuration.isOn, isMixed: configuration.isMixed))
+            .resizable()
+            .scaledToFit()
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(ticked ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary),
+                             ticked ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+            .frame(width: 20, height: 20)
+            .opacity(isEnabled ? 1 : 0.4)
+            .overlay(alignment: .bottomTrailing) {
+                if lockReason != nil {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.orange)
+                        .padding(2)
+                        .background(Color(nsColor: .windowBackgroundColor), in: Circle())
+                        .offset(x: 5, y: 5)
+                }
+            }
+            .frame(width: 22, height: 22)
+    }
+}
+
+extension View {
+    /// A list row ticked by a click anywhere on it — its buttons, links and selectable text keep their own clicks —
+    /// and tinted while ticked. VoiceOver keeps using the row's own checkbox, so the row is not read twice.
+    /// `toggle` nil: a row without a checkbox, only padded like the others. `highlight`: run on every click, locked
+    /// rows too — the tap takes the click from the List, so the row must take the List's highlight (Space) itself.
+    @ViewBuilder func selectionRow(isOn: Bool, enabled: Bool = true, highlight: (() -> Void)? = nil,
+                                   toggle: (() -> Void)?) -> some View {
+        let padded = padding(.horizontal, 6)
+        if let toggle {
+            padded
+                .background(isOn && enabled ? Color.accentColor.opacity(0.08) : .clear, in: .rect(cornerRadius: 6))
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    highlight?()
+                    if enabled { toggle() }
+                }
+        } else {
+            padded
+        }
+    }
+}
+
 /// Small bar beside a size: `size` as a share of `largest` (the largest item in view), same Capsule look as Space
 /// Lens' share column. Decorative: VoiceOver reads the size text beside it instead.
 struct SizeBar: View {
     let size: Int64
     let largest: Int64
     var tint: Color = .accentColor
+    var height: CGFloat = 6
 
     private var fraction: Double { largest > 0 ? Double(size) / Double(largest) : 0 }
 
@@ -134,7 +224,7 @@ struct SizeBar: View {
                     Capsule().fill(tint).frame(width: bar.size.width * min(max(fraction, 0), 1))
                 }
             }
-            .frame(width: 48, height: 6)
+            .frame(width: 48, height: height)
             .accessibilityHidden(true)
     }
 }

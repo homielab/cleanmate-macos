@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Smart Scan** and **Privacy**: larger checkboxes; a click anywhere on a row ticks it, and ticked rows are tinted.
+  Each group header has a checkbox (all, none or some ticked) instead of Select All / Deselect All, and locked rows
+  show a lock with a larger reason text.
+
 ## [1.3] - 2026-10-24
 
 ### Added
