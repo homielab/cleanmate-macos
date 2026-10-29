@@ -288,6 +288,7 @@ struct UninstallerView: View {
                     Text(verbatim: "\(item.name), \(model.extensionSizes[item.url]?.formatted(.fileSize.locale(locale)) ?? "…")")
                 }
                 .labelsHidden()
+                .toggleStyle(SelectionCheckboxStyle())
                 .disabled(!item.trashable || model.isInUse(item) || model.working)
                 AppIcon(url: item.url, size: 20)
                 VStack(alignment: .leading, spacing: 2) {
@@ -328,6 +329,11 @@ struct UninstallerView: View {
                     .labelStyle(.iconOnly).buttonStyle(.borderless).help("Reveal in Finder")
             }
             .padding(.vertical, 3)
+            .selectionRow(isOn: model.checked.contains(item.url),
+                          enabled: item.trashable && !model.isInUse(item) && !model.working,
+                          highlight: { model.highlighted = [item.url] }) {
+                checked(item.url).wrappedValue.toggle()
+            }
         }
         .spaceToggles(model)
         .overlay {
@@ -373,16 +379,13 @@ struct UninstallerView: View {
         return List(selection: $model.highlighted) {
             if let app {
                 // Unticked: reset, only the ticked data goes and the app stays.
-                row(url: app.url, folder: Text("Application"), size: model.appSizes[app.url], checked: model.trashApp, largest: largest) { label in
-                    Toggle(isOn: $model.trashApp) { label }.labelsHidden().disabled(model.working)
-                }
+                row(url: app.url, folder: Text("Application"), size: model.appSizes[app.url], checked: model.trashApp, largest: largest,
+                    isOn: $model.trashApp, enabled: !model.working)
                 .tag(app.url)
             }
             ForEach(model.entries) { entry in
                 row(url: entry.url, folder: location(entry), size: entry.size,
-                    checked: model.checked.contains(entry.url), largest: largest) { label in
-                    Toggle(isOn: checked(entry.url)) { label }.labelsHidden()
-                }
+                    checked: model.checked.contains(entry.url), largest: largest, isOn: checked(entry.url))
                 .tag(entry.url)
             }
         }
@@ -401,11 +404,17 @@ struct UninstallerView: View {
         entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
     }
 
-    /// `check` gets the checkbox's (hidden) label: item name + size, so VoiceOver reads both on the checkbox.
-    private func row<Check: View>(url: URL, folder: Text, size: Int64?, checked: Bool, largest: Int64,
-                                  @ViewBuilder check: (Text) -> Check) -> some View {
+    /// The checkbox's (hidden) label is item name + size, so VoiceOver reads both on the checkbox.
+    /// A click anywhere on the row ticks it, like Smart Scan.
+    private func row(url: URL, folder: Text, size: Int64?, checked: Bool, largest: Int64,
+                     isOn: Binding<Bool>, enabled: Bool = true) -> some View {
         HStack {
-            check(Text(verbatim: "\(url.lastPathComponent), \(size?.formatted(.fileSize.locale(locale)) ?? "…")"))
+            Toggle(isOn: isOn) {
+                Text(verbatim: "\(url.lastPathComponent), \(size?.formatted(.fileSize.locale(locale)) ?? "…")")
+            }
+            .labelsHidden()
+            .toggleStyle(SelectionCheckboxStyle())
+            .disabled(!enabled)
             AppIcon(url: url, size: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(url.lastPathComponent).lineLimit(1).truncationMode(.middle)
@@ -421,6 +430,7 @@ struct UninstallerView: View {
                 .help("Reveal in Finder")
         }
         .padding(.vertical, 3)
+        .selectionRow(isOn: checked, enabled: enabled, highlight: { model.highlighted = [url] }) { isOn.wrappedValue.toggle() }
         .contextMenu {
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
             Button("Show in Space Lens") { ModuleRouter.shared.spaceLensItem = url }

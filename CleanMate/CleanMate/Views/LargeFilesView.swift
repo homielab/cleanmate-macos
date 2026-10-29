@@ -153,9 +153,14 @@ struct LargeFilesView: View {
         let largest = files.lazy.map(\.size).max() ?? 0
         return Table(files, selection: $selection, sortOrder: $sortOrder) {
             TableColumn(Text(verbatim: "")) { file in
-                Toggle(isOn: checked(file.url)) { Text(file.name) }.labelsHidden()
+                Toggle(isOn: checked(file.url)) { Text(file.name) }
+                    .labelsHidden()
+                    .toggleStyle(SelectionCheckboxStyle())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(model.checked.contains(file.url) ? Color.accentColor.opacity(0.08) : .clear,
+                                in: .rect(cornerRadius: 6))
             }
-            .width(24)
+            .width(32)
             TableColumn("Name", value: \.name) { file in
                 Label {
                     VStack(alignment: .leading, spacing: 0) {
