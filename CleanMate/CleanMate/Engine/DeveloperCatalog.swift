@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Synchronization
 
 extension CleanerGroup {
     /// Developer junk: one item per tool, shown only when that tool left something behind.
@@ -213,7 +212,7 @@ extension CleanerGroup {
         "Files projects share with this cache (APFS clones) count in the size but free no space"
     nonisolated private static let simulatorDevices = "~/Library/Developer/CoreSimulator/Devices"
     /// Runtime identifiers the last scan of "old-simulator-runtimes" found.
-    nonisolated private static let staleRuntimeIDs = Mutex<[String]>([])
+    nonisolated private static let staleRuntimeIDs = Locked<[String]>([])
 
     nonisolated private static func simulators(available: Bool) -> SizeProbe {
         SizeProbe(command: ShellCommand(executable: "/usr/bin/xcrun",

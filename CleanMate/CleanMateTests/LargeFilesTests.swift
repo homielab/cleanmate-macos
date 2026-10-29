@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Synchronization
 import Testing
 @testable import CleanMate
 
@@ -464,7 +463,7 @@ struct DuplicateFinderTests {
         let d = try file("d.mov", Data(repeating: 1, count: 200_000)), e = try file("e.mov", Data(repeating: 2, count: 200_000))
         let locked = try file("f.mov", Data(repeating: 1, count: 200_000))
         #expect(chmod(locked.path, 0) == 0)
-        let fractions = Mutex<[Double]>([])
+        let fractions = Locked<[Double]>([])
         let result = try await DuplicateFinder.find([a, b, c, d, e, locked]) { f in fractions.withLock { $0.append(f) } }
         #expect(result.groups == [[a, b]])
         #expect(result.hashedCount == 2) // a and b; c, d, e ruled out by their head, f unreadable
@@ -477,7 +476,7 @@ struct DuplicateFinderTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let content = Data(repeating: 9, count: 8_000_000)
         let urls = [try file("a.mov", content), try file("b.mov", content)]
-        let reports = Mutex(0)
+        let reports = Locked(0)
         let task = Task {
             try await DuplicateFinder.find(urls) { _ in
                 reports.withLock { $0 += 1 }

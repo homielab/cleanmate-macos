@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 import Testing
 @testable import CleanMate
 
@@ -33,10 +32,10 @@ struct CancellationTests {
 
     /// Runs `work` in a task cancelled after `delay` microseconds (0: at once), or by `cancel()` from inside it.
     final class Canceller: Sendable {
-        private let task = Mutex<Task<Void, Never>?>(nil)
+        private let task = Locked<Task<Void, Never>?>(nil)
         func cancel() { task.withLock { $0?.cancel() } }
         func run(after delay: Int? = nil, _ work: @escaping @Sendable () async -> Void) async {
-            let ready = Mutex(false)
+            let ready = Locked(false)
             let handle = Task {
                 while !ready.withLock({ $0 }) { await Task.yield() } // `cancel()` from `work` needs the handle stored
                 await work()
@@ -61,7 +60,7 @@ struct CancellationTests {
     @Test(arguments: [0, 3])
     func measureCancelledBeforeItStartsThrows(splitDepth: Int) async throws {
         let box = try Tree()
-        let thrown = Mutex(false)
+        let thrown = Locked(false)
         await Canceller().run {
             withUnsafeCurrentTask { $0?.cancel() }
             do { _ = try await SpaceLens.measure(Self.folder(box, splitDepth), splitDepth: splitDepth) } catch is CancellationError {
@@ -74,7 +73,7 @@ struct CancellationTests {
     @Test func measureCancelledMidwayThrowsOrReturnsTheFullSize() async throws {
         let box = try Tree()
         let full = try await SpaceLens.measure(box.tree, splitDepth: 3).size
-        let outcomes = Mutex<[Int64?]>([])
+        let outcomes = Locked<[Int64?]>([])
         for delay in Self.delays {
             await Canceller().run(after: delay) {
                 let size = try? await SpaceLens.measure(box.tree, splitDepth: 3).size
@@ -90,7 +89,7 @@ struct CancellationTests {
     func undatedTreeCancelledBeforeItStartsReturnsNil(depth: Int) async throws {
         let box = try Tree()
         let device = try #require(SafetyPolicy.deviceID(box.tree.path))
-        let result = Mutex<(Int64, Date, Bool)??>(nil)
+        let result = Locked<(Int64, Date, Bool)??>(nil)
         await Canceller().run {
             withUnsafeCurrentTask { $0?.cancel() }
             let found = await Scanner.undatedTree(Self.folder(box, depth).path, device: device, links: .init(), depth: depth)
@@ -103,7 +102,7 @@ struct CancellationTests {
     @Test func entryCancelledMidwayIsNilOrTheFullSize() async throws {
         let box = try Tree()
         let full = try #require(await Scanner.entry(at: box.tree, olderThan: nil, splitDepth: Scanner.splitDepth)?.size)
-        let outcomes = Mutex<[Int64?]>([])
+        let outcomes = Locked<[Int64?]>([])
         for delay in Self.delays {
             await Canceller().run(after: delay) {
                 let size = await Scanner.entry(at: box.tree, olderThan: nil, splitDepth: Scanner.splitDepth)?.size
@@ -118,8 +117,8 @@ struct CancellationTests {
     @Test func largeFilesCancelledMidwayThrows() async throws {
         let box = try Tree()
         let canceller = Canceller()
-        let outcome = Mutex<String>("")
-        let checked = Mutex(0)
+        let outcome = Locked<String>("")
+        let checked = Locked(0)
         await canceller.run {
             do {
                 let files = try await LargeFileScanner.scan(root: box.home, minSize: 1, policy: box.policy, spotlightLastUsed: { _ in nil },
@@ -142,7 +141,7 @@ struct CancellationTests {
         let box = try Tree()
         let full = try await LargeFileScanner.scan(root: box.home, minSize: 1, policy: box.policy, spotlightLastUsed: { _ in nil })
         #expect(full.count == 2_000)
-        let outcomes = Mutex<[[URL]?]>([])
+        let outcomes = Locked<[[URL]?]>([])
         for delay in Self.delays {
             await Canceller().run(after: delay) {
                 let files = try? await LargeFileScanner.scan(root: box.home, minSize: 1, policy: box.policy, spotlightLastUsed: { _ in nil })
@@ -164,8 +163,8 @@ struct CancellationTests {
     @Test func scanCancelledWhileListingReturnsNoEntry() async throws {
         let box = try Tree()
         let canceller = Canceller()
-        let seen = Mutex(0)
-        let entries = Mutex<[ScanEntry]?>(nil)
+        let seen = Locked(0)
+        let entries = Locked<[ScanEntry]?>(nil)
         await canceller.run {
             let scan = await Scanner.scan(self.item(box) {
                 { _ in if seen.withLock({ $0 += 1; return $0 }) == 5 { canceller.cancel() }; return false }
@@ -180,7 +179,7 @@ struct CancellationTests {
         let full = await Scanner.scan(item(box), policy: box.policy)
         #expect(full.entries.count == 10)
         let sizes = Dictionary(uniqueKeysWithValues: full.entries.map { ($0.url, $0.size) })
-        let outcomes = Mutex<[[ScanEntry]]>([])
+        let outcomes = Locked<[[ScanEntry]]>([])
         for delay in Self.delays {
             await Canceller().run(after: delay) {
                 let scan = await Scanner.scan(self.item(box), policy: box.policy)

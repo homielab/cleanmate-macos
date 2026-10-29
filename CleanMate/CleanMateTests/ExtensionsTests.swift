@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import Synchronization
 @testable import CleanMate
 
 /// Extensions in ~/Library against a throwaway Library; read-only, nothing is ever removed.
@@ -201,7 +200,7 @@ struct ExtensionsTests {
     @MainActor @Test func paneCheckUsesKind() async throws {
         let pane = library.appending(path: "PreferencePanes/P.prefPane"), odd = library.appending(path: "Services/Odd.prefpane")
         let model = UninstallerModel()
-        let running = Mutex<Set<String>>([])
+        let running = Locked<Set<String>>([])
         model.appBundleIDs = { running.withLock { $0 } }
         model.extensions = {
             [ExtensionItem(url: pane, kind: .preferencePane, modified: nil, bundleID: nil, owner: nil, appRemoved: true),

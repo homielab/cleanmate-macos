@@ -22,10 +22,10 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab("General", systemImage: "gearshape", value: "general") { GeneralSettings() }
-            Tab("Scan Groups", systemImage: "sparkles", value: "groups") { SmartScanSettings() }
-            Tab("Exclusions", systemImage: "nosign", value: Self.exclusionsTab) { ExclusionSettings() }
-            Tab("Activity", systemImage: "list.bullet.rectangle", value: "activity") { ActivitySettings() }
+            GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }.tag("general")
+            SmartScanSettings().tabItem { Label("Scan Groups", systemImage: "sparkles") }.tag("groups")
+            ExclusionSettings().tabItem { Label("Exclusions", systemImage: "nosign") }.tag(Self.exclusionsTab)
+            ActivitySettings().tabItem { Label("Activity", systemImage: "list.bullet.rectangle") }.tag("activity")
         }
         .frame(width: 520, height: 780)  // tallest tab (General) fits without scrolling in EN/VI
     }

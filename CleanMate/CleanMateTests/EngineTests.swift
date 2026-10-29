@@ -1,7 +1,6 @@
 import AppKit
 import CryptoKit
 import Foundation
-import Synchronization
 import Testing
 @testable import CleanMate
 
@@ -1852,7 +1851,7 @@ struct AppCatalogTests {
         #expect(Preferences.overrides["t397.open"] == false) // remembered like a tick by hand
         Preferences.remember(open, selected: true) // back to the default: no override left behind
 
-        let cleaned = Mutex<[String]>([])
+        let cleaned = Locked<[String]>([])
         model.cleanItem = { item, _ in cleaned.withLock { $0.append(item.id) }; return CleanReport() }
         model.phase = .results
         model.selected = ["t397.cmd", "t397.open"] // e.g. ticked before its result came in empty

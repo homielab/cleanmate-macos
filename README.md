@@ -36,7 +36,7 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks
    whether to check automatically; change it any time in Settings › General › Updates.
 
-Requires **macOS 27** or later.
+Requires **macOS 14** or later.
 
 ## Safety
 
@@ -77,7 +77,7 @@ System Settings › General › Language & Region › Applications.
 
 ## Build from source
 
-Requires Xcode 27 on macOS 27. The only third-party dependency is [Sparkle](https://sparkle-project.org) for
+Requires Xcode 27. The only third-party dependency is [Sparkle](https://sparkle-project.org) for
 updates, fetched by Swift Package Manager on the first build. Tests and the smoke test never check for updates.
 
 ```sh

@@ -1,7 +1,6 @@
 import AppKit
 import Darwin
 import Foundation
-import Synchronization
 import Testing
 @testable import CleanMate
 
@@ -42,7 +41,7 @@ struct ScanBenchmark {
             }
             return result == KERN_SUCCESS ? info.phys_footprint : 0
         }
-        let start = footprint(), peak = Mutex(start)
+        let start = footprint(), peak = Locked(start)
         let timer = DispatchSource.makeTimerSource(queue: .global(qos: .userInteractive))
         timer.schedule(deadline: .now(), repeating: .milliseconds(2))
         timer.setEventHandler { let now = footprint(); peak.withLock { $0 = max($0, now) } }

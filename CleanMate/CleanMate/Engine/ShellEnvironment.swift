@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 
 /// Folder variables users set in their shell profile (`export CARGO_HOME=~/dev/cargo`). An app opened from Finder
 /// doesn't get the shell's environment, so the profile files are READ, never run or sourced. Only simple
@@ -113,7 +112,7 @@ nonisolated enum ShellEnvironment {
             return values
         }
     }
-    private static let cache = Mutex<(stamp: [String], values: [String: String])?>(nil)
+    private static let cache = Locked<(stamp: [String], values: [String: String])?>(nil)
 
     /// The folder `name` points to, only when it is absolute, strictly inside home, an existing folder, allowed by
     /// `policy` itself and not reached through a symlink (same rules as `PathLookup`).

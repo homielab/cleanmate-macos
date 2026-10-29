@@ -173,19 +173,19 @@ struct LargeFilesView: View {
                 .padding(.vertical, 3)
             }
             .width(min: 120, ideal: 160)
-            // Own column so the name is not cut by the label.
-            if model.duplicatesOnly {
-                TableColumn("Copies") { file in
-                    if let copies = model.duplicateCount(of: file.url) {
-                        Text("\(copies) copies")
-                            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                            .padding(.horizontal, 6).padding(.vertical, 1)
-                            .background(.quaternary, in: Capsule())
-                            .fixedSize()
-                    }
+            // Own column so the name is not cut by the label. Always present (a conditional column needs macOS 14.4)
+            // and collapsed to zero width outside the duplicates view.
+            TableColumn(model.duplicatesOnly ? LocalizedStringKey("Copies") : "") { file in
+                if model.duplicatesOnly, let copies = model.duplicateCount(of: file.url) {
+                    Text("\(copies) copies")
+                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        .padding(.horizontal, 6).padding(.vertical, 1)
+                        .background(.quaternary, in: Capsule())
+                        .fixedSize()
                 }
-                .width(min: 60, ideal: 64)
             }
+            .width(min: model.duplicatesOnly ? 60 : 0, ideal: model.duplicatesOnly ? 64 : 0,
+                   max: model.duplicatesOnly ? nil : 0)
             TableColumn("Location", value: \.location) { file in
                 Text(verbatim: file.location).truncationMode(.middle).foregroundStyle(.secondary)
                     .help(file.url.deletingLastPathComponent().path(percentEncoded: false))

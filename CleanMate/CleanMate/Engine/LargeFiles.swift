@@ -1,7 +1,6 @@
 import CoreServices
 import CryptoKit
 import Foundation
-import Synchronization
 import UniformTypeIdentifiers
 
 // Large & Old Files: user files found by walking the home folder, moved to the Trash only when the user ticks them.
@@ -114,7 +113,7 @@ nonisolated enum LargeFileScanner {
         let spotlightLastUsed: @Sendable (URL) -> Date?
         let progress: (@Sendable (Int) -> Void)?
         let library: String
-        let checked = Mutex(0)
+        let checked = Locked(0)
 
         init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, spotlightLastUsed: @escaping @Sendable (URL) -> Date?,
              progress: (@Sendable (Int) -> Void)?, library: String) {

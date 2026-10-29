@@ -1,7 +1,6 @@
 import CoreGraphics
 import Darwin
 import Foundation
-import Synchronization
 
 // Space Lens: browse any folder by size. Sizes are allocated bytes like `du -x` (st_blocks × 512): symlinks are
 // not followed, other volumes are not entered, and a hard-linked file is counted once per listing: `list` and every
@@ -69,7 +68,7 @@ nonisolated enum SpaceLens {
 
     /// Files with more than one hard link already counted, as (st_dev, st_ino). Shared by parallel measures.
     final class HardLinks: Sendable {
-        private let seen = Mutex(Set<[UInt64]>())
+        private let seen = Locked(Set<[UInt64]>())
 
         /// True the first time a file is seen; always true for a file with a single link.
         func count(_ info: stat) -> Bool {

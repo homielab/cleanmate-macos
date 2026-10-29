@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import Synchronization
 import Testing
 @testable import CleanMate
 
@@ -10,7 +9,7 @@ import Testing
 struct RaceTests {
     /// Call counter plus gates the injected hooks wait on (gate n opens call n).
     final class Gates: Sendable {
-        let state = Mutex((calls: 0, open: Set<Int>(), left: 0))
+        let state = Locked((calls: 0, open: Set<Int>(), left: 0))
         /// Counts the call and waits for its gate when `gated` holds; returns the call number.
         func enter(gated: (Int) -> Bool = { _ in true }) async -> Int {
             let call = state.withLock { $0.calls += 1; return $0.calls }
