@@ -95,7 +95,7 @@ struct LargeFilesView: View {
         }
         .alert("This Folder Can’t Be Scanned", isPresented: $unsupportedFolder) {
         } message: {
-            Text("Choose a folder inside your home folder, outside Library and hidden folders.")
+            Text("Choose a folder inside your home folder (outside Library and hidden folders) or on an external drive.")
         }
         .focusedSceneValue(\.moveToTrash, moveToTrash)
         .trashUndo(model)
@@ -107,15 +107,25 @@ struct LargeFilesView: View {
         if let name = model.scopeName { Text("Scanning \(name)…") } else { Text("Scanning your home folder…") }
     }
 
-    /// Scope: the whole home, a few home folders, recently chosen folders, or "Choose Folder…".
+    /// Scope: the whole home, a few home folders, external drives, recently chosen folders, or "Choose Folder…".
     private var scopeMenu: some View {
         let presets = LargeFilesModel.scopePresets.map { model.home.appending(path: $0).path }
-        let recent = Preferences.recentFolders(recentFolders).filter { !presets.contains($0) && $0 != model.home.path }
+        let volumes = LargeFilesModel.externalVolumes()
+        let recent = Preferences.recentFolders(recentFolders).filter { path in
+            !presets.contains(path) && path != model.home.path
+                && !volumes.contains { $0.path == LargeFilesModel.folder(path).path }
+        }
         return Menu {
             Picker(selection: Binding(get: { model.scope }, set: { model.setScope($0) })) {
                 Text("Home Folder").tag(URL?.none)
                 ForEach(presets, id: \.self) { path in
                     Text(FileManager.default.displayName(atPath: path)).tag(URL?.some(LargeFilesModel.folder(path)))
+                }
+                if !volumes.isEmpty {
+                    Divider()
+                    ForEach(volumes, id: \.self) { volume in
+                        Text(verbatim: FileManager.default.displayName(atPath: volume.path)).tag(URL?.some(volume))
+                    }
                 }
                 if !recent.isEmpty {
                     Divider()
@@ -131,7 +141,7 @@ struct LargeFilesView: View {
             Divider()
             Button("Choose Folder…") { choosingFolder = true }
         } label: {
-            Label("Scope", systemImage: model.scope == nil ? "house" : "folder")
+            Label("Scope", systemImage: model.scope == nil ? "house" : model.scope!.path.hasPrefix("/Volumes/") ? "externaldrive" : "folder")
         }
         .help(Text("Scope: \(model.scopeName ?? String(localized: "Home Folder"))"))
         .disabled(model.undoing || { if case .trashing = model.phase { true } else { false } }())

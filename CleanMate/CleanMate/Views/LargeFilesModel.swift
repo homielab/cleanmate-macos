@@ -78,6 +78,23 @@ final class LargeFilesModel: ObservableObject {
     @Published var skippedProtected = false
     /// The home folder; tests and snapshots set a fake one.
     var home = SafetyPolicy.current.homeURL
+    /// The scan's rules for `home` (tests set their own home); external volumes as mounted now.
+    private var policy: SafetyPolicy {
+        SafetyPolicy(home: home, temp: FileManager.default.temporaryDirectory, excluded: Preferences.excluded)
+    }
+
+    /// External volumes the Scope menu offers (mounted in /Volumes, browsable, not the startup disk), by name.
+    static func externalVolumes() -> [URL] {
+        let policy = SafetyPolicy.current
+        let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsBrowsableKey],
+                                                         options: [.skipHiddenVolumes]) ?? []
+        return urls.filter { url in
+            (try? url.resourceValues(forKeys: [.volumeIsBrowsableKey]))?.volumeIsBrowsable != false
+                && policy.allowsExternalRoot(url)
+        }
+        .map { folder($0.path) }
+        .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
     /// Folder scanned; nil = the whole home folder.
     @Published private(set) var scope: URL?
     /// Scope of the files shown: a cancelled scan puts `scope` back to it, so a label never names other files.
@@ -99,7 +116,7 @@ final class LargeFilesModel: ObservableObject {
     /// home, in ~/Library or hidden. Ignored while trashing or undoing, like `scan()`.
     @discardableResult
     func setScope(_ folder: URL?) -> Bool {
-        if let folder, !LargeFileScanner.allowsRoot(folder, home: home) { return false }
+        if let folder, !LargeFileScanner.allowsRoot(folder, policy: policy) { return false }
         if case .trashing = phase { return true }
         if undoing { return true }
         let url = folder.map { Self.folder($0.path) }
@@ -119,7 +136,7 @@ final class LargeFilesModel: ObservableObject {
         var isFolder: ObjCBool = false
         let lower = url.path.lowercased()
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder), isFolder.boolValue,
-              LargeFileScanner.allowsRoot(url, home: home),
+              LargeFileScanner.allowsRoot(url, policy: policy),
               !excluded.map({ Self.folder($0).path.lowercased() }).contains(where: { lower == $0 || lower.hasPrefix($0 + "/") }),
               !ProtectedFolders.contains(ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess()), url),
               url != Self.folder(home.path)
@@ -412,8 +429,8 @@ final class LargeFilesModel: ObservableObject {
         }
     }
 
-    /// `counts` with `count` stored under `key`, scopes outside `home` dropped (only home and folders inside it can
-    /// be scanned; older versions also kept other paths) and at most `limit` scopes: `key` plus the others in path
+    /// `counts` with `count` stored under `key`, scopes outside `home` and /Volumes dropped (only those can be
+    /// scanned; older versions also kept other paths) and at most `limit` scopes: `key` plus the others in path
     /// order. Pure string work: never touches a folder macOS may guard.
     static func recordingLastCount(_ count: Int, for key: String, in counts: [String: Int], home: URL,
                                    limit: Int = lastCountLimit) -> [String: Int] {
@@ -421,7 +438,7 @@ final class LargeFilesModel: ObservableObject {
         func insideHome(_ scopeKey: String) -> Bool {
             guard let bar = scopeKey.lastIndex(of: "|") else { return false }
             let path = URL(fileURLWithPath: String(scopeKey[..<bar])).standardizedFileURL.path
-            return path == homePath || path.hasPrefix(homePath + "/")
+            return path == homePath || path.hasPrefix(homePath + "/") || path.hasPrefix("/Volumes/")
         }
         let others = counts.keys.filter { $0 != key && insideHome($0) }.sorted().prefix(max(limit - 1, 0))
         var result = Dictionary(uniqueKeysWithValues: others.map { ($0, counts[$0]!) })

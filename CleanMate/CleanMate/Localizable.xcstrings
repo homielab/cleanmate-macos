@@ -4508,12 +4508,12 @@
         }
       }
     },
-    "Choose a folder inside your home folder, outside Library and hidden folders." : {
+    "Choose a folder inside your home folder (outside Library and hidden folders) or on an external drive." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hãy chọn một thư mục bên trong thư mục người dùng, ngoài Library và các thư mục ẩn."
+            "value" : "Hãy chọn một thư mục bên trong thư mục người dùng (ngoài Library và các thư mục ẩn) hoặc trên ổ ngoài."
           }
         }
       }

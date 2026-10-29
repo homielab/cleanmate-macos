@@ -178,17 +178,61 @@ struct LargeFilesTests {
         #expect(found[0].location == "~/Projects/app")
         for bad in [root, root.appending(path: "tmp"), home.appending(path: "Library/Caches"), home.appending(path: ".ssh"),
                     URL(fileURLWithPath: "/Applications")] {
-            #expect(!LargeFileScanner.allowsRoot(bad, home: home), "\(bad.path)")
+            #expect(!LargeFileScanner.allowsRoot(bad, policy: policy), "\(bad.path)")
             await #expect(throws: LargeFileScanner.OutsideHomeError.self) {
                 try await LargeFileScanner.scan(root: bad, minSize: 1, policy: policy)
             }
         }
-        #expect(LargeFileScanner.allowsRoot(home, home: home) && LargeFileScanner.allowsRoot(home.appending(path: "Projects/app"), home: home))
+        #expect(LargeFileScanner.allowsRoot(home, policy: policy) && LargeFileScanner.allowsRoot(home.appending(path: "Projects/app"), policy: policy))
         // Without Full Disk Access a protected folder, or one inside it, needs access; its neighbours do not.
         let skipped = ProtectedFolders.skipped(home: home, hasFullDiskAccess: false)
         #expect(ProtectedFolders.contains(skipped, home.appending(path: "Downloads")))
         #expect(ProtectedFolders.contains(skipped, home.appending(path: "Documents/Work")))
         #expect(!ProtectedFolders.contains(skipped, home.appending(path: "Projects")) && !ProtectedFolders.contains(skipped, home))
+    }
+
+    /// An external volume (a folder standing in for /Volumes/Ext) or a folder on it can be scanned: its files are listed,
+    /// never through a symlink, never hidden ones (.Trashes) or ones the policy blocks (excluded, another volume inside).
+    @Test func scanOfAnExternalVolume() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let volumes = root.appending(path: "Volumes")
+        let ext = volumes.appending(path: "Ext")
+        try FileManager.default.createDirectory(at: ext, withIntermediateDirectories: true)
+        @discardableResult func put(_ path: String) throws -> URL {
+            let url = ext.appending(path: path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(repeating: 1, count: 20_000).write(to: url)
+            return url
+        }
+        try put("Movies/big.mov"); try put(".Trashes/501/old.mov"); try put("Backups/keep.zip")
+        try put("Nested/inner.zip"); try put("Excluded/x.zip")
+        let outside = try file("Projects/home.zip")
+        try FileManager.default.createSymbolicLink(at: ext.appending(path: "Movies/link.zip"), withDestinationURL: outside)
+        try FileManager.default.createSymbolicLink(at: ext.appending(path: "LinkedFolder"),
+                                                   withDestinationURL: home.appending(path: "Projects"))
+        let nested = ext.appending(path: "Nested").standardizedFileURL.path
+        let realExt = SafetyPolicy.normalize(ext)
+        let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"),
+                                  excluded: [ext.appending(path: "Excluded").path],
+                                  device: { path in
+                                      let real = (path as NSString).resolvingSymlinksInPath
+                                      return real.hasPrefix((nested as NSString).resolvingSymlinksInPath) ? 99 : SafetyPolicy.deviceID(path)
+                                  },
+                                  mounts: { ["/", realExt] }, volumesFolder: volumes.path)
+        let found = try await LargeFileScanner.scan(root: ext, minSize: 10_000, policy: policy)
+        #expect(Set(found.map(\.name)) == ["big.mov", "keep.zip"])
+        #expect(found.allSatisfy { SafetyPolicy.normalize($0.url).hasPrefix(realExt + "/") })
+        let movies = try await LargeFileScanner.scan(root: ext.appending(path: "Movies"), minSize: 10_000, policy: policy)
+        #expect(movies.map(\.name) == ["big.mov"])
+        #expect(LargeFileScanner.allowsRoot(ext, policy: policy) && LargeFileScanner.allowsRoot(ext.appending(path: "Movies"), policy: policy))
+        for bad in [volumes, ext.appending(path: ".Trashes"), ext.appending(path: "Excluded"), ext.appending(path: "Nested"),
+                    root.appending(path: "Other")] {
+            #expect(!LargeFileScanner.allowsRoot(bad, policy: policy), "\(bad.path)")
+        }
+        // Not mounted any more (or never was): the same folder is not a volume.
+        let unmounted = SafetyPolicy(home: home, temp: root.appending(path: "tmp"), mounts: { ["/"] }, volumesFolder: volumes.path)
+        #expect(!LargeFileScanner.allowsRoot(ext, policy: unmounted))
+        #expect(!unmounted.allowsUserFile(ext.appending(path: "Movies/big.mov")))
     }
 
     /// One helper for the Large & Old Files and Space Lens recent folders: newest five, no repeats,

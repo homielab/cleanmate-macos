@@ -34,7 +34,9 @@ nonisolated struct SafetyPolicy: Sendable {
             withUnsafeBytes(of: list[index].f_mntonname) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
         }
     }
-    private let mounts: MountPoints
+    let mounts: MountPoints
+    /// Where external volumes are mounted (`/Volumes`); a test passes a temporary folder.
+    let volumesFolder: String
     /// `device` of each of `allowedRoots`.
     private let rootDevices: [dev_t?]
 
@@ -46,7 +48,8 @@ nonisolated struct SafetyPolicy: Sendable {
 
     /// `device` and `mounts` are injected by tests (they can't mount a volume).
     init(home: URL, temp: URL, excluded: [String] = [], device: @escaping DeviceID = SafetyPolicy.deviceID,
-         mounts: @escaping MountPoints = SafetyPolicy.mountPoints) {
+         mounts: @escaping MountPoints = SafetyPolicy.mountPoints, volumesFolder: String = "/Volumes") {
+        self.volumesFolder = Self.normalize(URL(fileURLWithPath: volumesFolder))
         homeURL = home
         tempURL = temp
         let home = (home.path as NSString).resolvingSymlinksInPath
@@ -145,8 +148,10 @@ nonisolated struct SafetyPolicy: Sendable {
     /// moved to the Trash: documents, Desktop, Movies… are allowed, but only a regular file strictly inside
     /// the home folder, never under ~/Library (iCloud Drive, CloudStorage, Keychains, Mail…), never under a
     /// hidden folder (.ssh, .gnupg, .Trash…) or a hidden file, and never inside a package or app bundle.
+    /// On an external volume (`externalLocation`) the same rule applies: a regular file, not hidden nor under a hidden
+    /// folder (.Trashes, .Spotlight-V100…), not inside a package, on that volume itself.
     func allowsUserFile(_ url: URL) -> Bool {
-        guard let path = userLocation(url) else { return false }
+        guard let path = userLocation(url) ?? externalLocation(url) else { return false }
         let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
         return values?.isRegularFile == true && values?.isSymbolicLink != true
     }
@@ -179,6 +184,47 @@ nonisolated struct SafetyPolicy: Sendable {
         if let homeDevice = rootDevices[0], device(path) != homeDevice { return nil }
         if holdsMount(path) { return nil }
         var folder = URL(fileURLWithPath: home)
+        for part in parts.dropLast() {
+            folder.append(path: String(part))
+            if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return nil }
+        }
+        return path
+    }
+
+    /// Mount point of the volume mounted in `volumesFolder` (never the startup disk, which only links there) that
+    /// holds the normalized `path` or is `path` itself; the innermost one when volumes are nested.
+    func externalVolume(_ path: String) -> String? {
+        mounts()
+            .filter { $0.hasPrefix(volumesFolder + "/") && (path == $0 || path.hasPrefix($0 + "/")) }
+            .max { $0.count < $1.count }
+    }
+
+    /// Large & Old Files scan root outside the home: an external volume (`externalVolume`) or a folder on it, not
+    /// hidden nor under a hidden folder, not excluded nor inside an exclusion, and on that volume (not another one
+    /// mounted inside).
+    func allowsExternalRoot(_ url: URL) -> Bool {
+        // Every symlink resolved (the root too), then the same form as `normalize` gives the files.
+        guard let real = realpath(url.path, nil) else { return false }
+        let path = Self.normalize(URL(fileURLWithPath: String(cString: real)))
+        free(real)
+        // Excluded or inside an exclusion; one inside the root is only skipped by the scan (`allowsUserFile`).
+        let lower = path.lowercased()
+        guard let volume = externalVolume(path),
+              !excluded.map({ $0.lowercased() }).contains(where: { lower == $0 || lower.hasPrefix($0 + "/") })
+        else { return false }
+        guard !path.dropFirst(volume.count).split(separator: "/").contains(where: { $0.hasPrefix(".") }) else { return false }
+        return device(volume) != nil && device(path) == device(volume)
+    }
+
+    /// Normalized path of `url` if it is strictly inside an external volume (`externalVolume`) and on that volume, not
+    /// hidden nor under a hidden folder, not excluded and not inside a package; nil otherwise.
+    private func externalLocation(_ url: URL) -> String? {
+        let path = Self.normalize(url)
+        guard let volume = externalVolume(path), path != volume, !isExcluded(path) else { return nil }
+        let parts = path.dropFirst(volume.count + 1).split(separator: "/")
+        guard !parts.contains(where: { $0.hasPrefix(".") }) else { return nil }
+        guard let volumeDevice = device(volume), device(path) == volumeDevice, !holdsMount(path) else { return nil }
+        var folder = URL(fileURLWithPath: volume)
         for part in parts.dropLast() {
             folder.append(path: String(part))
             if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return nil }

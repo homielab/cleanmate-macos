@@ -69,20 +69,22 @@ nonisolated enum LargeFileScanner {
     /// Folders never walked: regenerable dev trees whose files the user does not manage by hand.
     static let skippedFolderNames: Set = ["node_modules", "Pods", "DerivedData"]
 
-    /// A scan root that is not the home folder or a folder inside it.
+    /// A scan root that is not the home folder, an external volume or a folder inside one.
     struct OutsideHomeError: Error {}
 
-    /// The home folder or a folder inside it, not in ~/Library or a hidden folder: the only places `allowsUserFile`
-    /// lists files from, so any other root would find nothing (or, outside home, nothing it may trash).
-    static func allowsRoot(_ root: URL, home: URL) -> Bool {
-        let (path, base) = (root.standardizedFileURL.path, home.standardizedFileURL.path)
+    /// The home folder or a folder inside it, not in ~/Library or a hidden folder, or an external volume or a folder
+    /// on it (`SafetyPolicy.allowsExternalRoot`): the only places `allowsUserFile` lists files from, so any other root
+    /// would find nothing it may trash.
+    static func allowsRoot(_ root: URL, policy: SafetyPolicy) -> Bool {
+        let (path, base) = (root.standardizedFileURL.path, policy.homeURL.standardizedFileURL.path)
         if path == base { return true }
+        if policy.allowsExternalRoot(root) { return true }
         guard path.hasPrefix(base + "/") else { return false }
         let parts = path.dropFirst(base.count + 1).split(separator: "/")
         return parts.first?.lowercased() != "library" && !parts.contains { $0.hasPrefix(".") }
     }
 
-    /// Regular files of at least `minSize` bytes under `root` (the home folder or a folder in it, else
+    /// Regular files of at least `minSize` bytes under `root` (the home folder, an external volume or a folder in one, else
     /// `OutsideHomeError`), skipping ~/Library, hidden
     /// files and folders, other volumes mounted inside it, and package contents (.app, .photoslibrary…). Throws `CancellationError` when cancelled.
     /// `progress` gets the number of entries checked so far, every 500 entries.
@@ -91,7 +93,7 @@ nonisolated enum LargeFileScanner {
     @concurrent static func scan(root: URL, minSize: Int64, policy: SafetyPolicy = .current, skipping: Set<String> = [],
                                  spotlightLastUsed: @escaping @Sendable (URL) -> Date? = spotlightLastUsedDate,
                                  progress: (@Sendable (Int) -> Void)? = nil) async throws -> [LargeFile] {
-        guard allowsRoot(root, home: policy.homeURL) else { throw OutsideHomeError() }
+        guard allowsRoot(root, policy: policy) else { throw OutsideHomeError() }
         let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, spotlightLastUsed: spotlightLastUsed,
                         progress: progress, library: policy.homeURL.appending(path: "Library").standardizedFileURL.path)
         // The enumerator lists a root's files under its real path (/var → /private/var); the parallel levels do the same.
