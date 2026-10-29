@@ -36,6 +36,9 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks
    whether to check automatically; change it any time in Settings › General › Updates.
 
+Homebrew (coming soon, once the tap is published): `brew install --cask homielab/tap/cleanmate`.
+The cask is in `packaging/Casks/cleanmate.rb`.
+
 Requires **macOS 13** or later.
 
 ## Safety

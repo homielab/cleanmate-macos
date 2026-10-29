@@ -212,6 +212,14 @@ $CDATA_NOTES
 APPCAST_XML
 xmllint --noout "$APPCAST"
 
+# Homebrew cask: the new version and checksum (commit packaging/Casks/cleanmate.rb with the release).
+CASK="$ROOT/packaging/Casks/cleanmate.rb"
+[[ -f "$CASK" ]] || { echo "Cask not found: $CASK" >&2; exit 1; }
+SHA="$(cut -d' ' -f1 "$DMG.sha256")"
+sed -E -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" "$CASK" > "$CASK.tmp" \
+  && mv "$CASK.tmp" "$CASK"
+echo "==> Cask updated: $CASK (version $VERSION)"
+
 echo "==> Done: $DMG"
 cat "$DMG.sha256"
 echo "Release notes: $NOTES_FILE"
