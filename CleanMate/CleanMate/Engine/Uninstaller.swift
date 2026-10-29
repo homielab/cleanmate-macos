@@ -21,7 +21,7 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
 }
 
 /// One item directly inside a ~/Library data folder (`SafetyPolicy.appDataFolders`), or an app's config item directly in
-/// ~, ~/.config or ~/.local/share (`SafetyPolicy.allowsAppConfig`).
+/// ~, ~/.config, ~/.local/share or ~/.local/state (`SafetyPolicy.allowsAppConfig`).
 nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
     /// `data`: surely the app's (ticked when listed). `suggested`: a folder that only starts like the app's name.
     /// `config`: outside ~/Library. Only `data` is ticked for the user.
@@ -30,10 +30,12 @@ nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
     let url: URL
     let size: Int64
     var kind: Kind = .data
+    /// A `config` item in a leftovers list that no installed app or command-line tool is named after.
+    var orphan = false
 
     var id: URL { url }
     var folder: String { url.deletingLastPathComponent().lastPathComponent }
-    /// Where the item is, as shown: its ~/Library folder, `~/.config`, `~/.local/share` or `~`.
+    /// Where the item is, as shown: its ~/Library folder, `~/.config`, `~/.local/share`, `~/.local/state` or `~`.
     var location: String {
         guard kind == .config else { return folder }
         let parent = url.deletingLastPathComponent()
@@ -202,6 +204,22 @@ nonisolated enum AppMatcher {
     /// `com.vendor` of a bundle id.
     static func vendor(_ id: String) -> String {
         id.lowercased().split(separator: ".").prefix(2).joined(separator: ".")
+    }
+
+    /// Folders of the XDG homes that tools and desktop environments share; never offered as orphans.
+    static let sharedConfigNames: Set = ["fonts", "applications", "icons", "mime", "themes", "locale", "bash-completion",
+                                         "zsh", "fish", "systemd", "autostart", "dconf", "pulse", "gtk-3.0", "gtk-4.0", "trash"]
+
+    /// A folder directly in `~/.config`, `~/.local/share` or `~/.local/state` that no installed app is named after (any
+    /// `Names.exact`, its first word, or a part of a bundle id) and no command-line tool in `tools` (lowercased) is
+    /// called. CLI data (`toolConfigNames`) and shared XDG folders never count: nothing is guessed.
+    static func isOrphanConfig(_ name: String, appNames: [Names], installedBundleIDs: Set<String>, tools: Set<String>) -> Bool {
+        let stem = name.lowercased()
+        guard !name.hasPrefix("."), !SafetyPolicy.isApple(stem), stem.count >= 2, !genericNames.contains(stem),
+              !toolConfigNames.contains(stem), !sharedConfigNames.contains(stem), !tools.contains(stem) else { return false }
+        if appNames.contains(where: { $0.exact.contains(stem) || $0.prefix == stem }) { return false }
+        let parts = Set(installedBundleIDs.union(appNames.map(\.bundleID)).flatMap { $0.lowercased().split(separator: ".").map(String.init) })
+        return !parts.contains(stem)
     }
 
     /// Left behind by a removed app: named after a bundle id (not Apple's) of a vendor with no installed or running
@@ -433,17 +451,33 @@ nonisolated enum Uninstaller {
         return tools.subtracting(AppMatcher.genericNames)
     }
 
-    /// Data in ~/Library of apps that are no longer installed, largest first. `tools` defaults to `commandLineTools`.
+    /// Data in ~/Library of apps that are no longer installed, largest first, then config and state folders (`~/.config`,
+    /// `~/.local/share`, `~/.local/state`) that no installed app or command-line tool is named after (`orphanConfig`).
+    /// `tools` defaults to `commandLineTools`; `appNames` to the apps found in the application folders; `toolFolders`: where tool names are looked up.
     @concurrent static func leftovers(installedBundleIDs: Set<String>, tools: Set<String>? = nil,
+                                      appNames: [AppMatcher.Names]? = nil, toolFolders: [String] = configToolFolders,
                                       isRegistered: @Sendable (String) -> Bool,
                                       policy: SafetyPolicy = .current) async -> [AppDataEntry] {
         let agents = policy.homeURL.appending(path: "Library/LaunchAgents")
         let tools = tools ?? commandLineTools(home: policy.homeURL, folders: userToolFolders)
-        return await dataEntries(policy: policy) {
+        let entries = await dataEntries(policy: policy) {
             AppMatcher.isLeftover(name: $0, folder: $1, installedBundleIDs: installedBundleIDs, tools: tools,
                                   isRegistered: isRegistered)
                 && ($1 != "LaunchAgents" || !agentIsActive(agents.appending(path: $0)))
         }
+        let names = appNames ?? allAppURLs(policy: policy).compactMap { url -> AppMatcher.Names? in
+            guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { return nil }
+            let info = bundle.infoDictionary
+            return AppMatcher.Names(bundleID: id, name: url.deletingPathExtension().lastPathComponent,
+                                    bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String)
+        }
+        let foreign = Set(toolPaths(home: policy.homeURL, folders: toolFolders).keys).union(tools)
+        var orphans: [AppDataEntry] = []
+        for item in configItems(policy: policy) where item.inConfig
+            && AppMatcher.isOrphanConfig(item.name, appNames: names, installedBundleIDs: installedBundleIDs, tools: foreign) {
+            orphans.append(AppDataEntry(url: item.url, size: await size(of: item.url), kind: .config, orphan: true))
+        }
+        return entries + orphans.sorted { $0.size > $1.size }
     }
 
     /// A launch agent whose program still exists (or can't be read) is in use, whoever installed it.

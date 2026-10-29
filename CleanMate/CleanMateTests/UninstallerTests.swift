@@ -101,13 +101,13 @@ struct UninstallerTests {
 
     @Test func appConfigPolicyAllowsOnlyTopLevelConfigItems() throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        for path in [".cursor", ".antigravity-ide", ".config/zed", ".config/opencode", ".zed.json", ".local/share/zed"] {
+        for path in [".cursor", ".antigravity-ide", ".config/zed", ".config/opencode", ".zed.json", ".local/share/zed", ".local/state/zed"] {
             #expect(policy.allowsAppConfig(try make(path)), "\(path)")
         }
         try make(".ssh/config")
         for path in [".config", ".cache", ".local", ".Trash", ".ssh", ".SSH", ".ssh/config", ".gnupg", ".aws", ".kube", ".zshrc",
                      ".android", ".cargo", ".config/.DS_Store", ".config/zed/settings.json", ".local/share", ".local/share/.zed",
-                     ".local/share/zed/db.sqlite", ".local/zed", ".local/state/zed", "visible",
+                     ".local/share/zed/db.sqlite", ".local/zed", ".local/state", ".local/state/.zed", "visible",
                      "Documents", "Library/Application Support/Zed", ".com.apple.foo", ".cursor/extensions"] {
             #expect(!policy.allowsAppConfig(home.appending(path: path)), "\(path)")
         }
@@ -135,6 +135,26 @@ struct UninstallerTests {
 
     /// Config outside ~/Library: `~/.config/<name>` and `~/.<name>`/`~/.<name>-…` are listed, never ticked; never a
     /// protected or shared folder, a generic name, or a name a command-line tool outside the app uses.
+    /// Config, data and state folders of no installed app or tool are leftovers (unticked config entries, marked
+    /// orphan); an installed app's, a tool's, a CLI's (`toolConfigNames`) and shared XDG folders are kept.
+    @Test func orphanConfigFoldersAreLeftovers() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for path in [".config/gone/x", ".local/share/gone2/x", ".local/state/gone3/x", ".local/state/zed/x", ".config/Zed Pro/x",
+                     ".config/mytool/x", ".local/state/claude/x", ".local/share/codex/x", ".config/gemini/x", ".config/nvim/x",
+                     ".local/share/fonts/x", ".local/state/data/x", ".config/.hidden/x", ".local/state/dev/x", ".config/ab/x"] {
+            try make(path)
+        }
+        let zed = AppMatcher.Names(bundleID: "dev.zed.Zed", name: "Zed")
+        let pro = AppMatcher.Names(bundleID: "com.x.zedpro", name: "Zed Pro")
+        let leftovers = await Uninstaller.leftovers(installedBundleIDs: ["dev.zed.Zed", "com.x.zedpro"], tools: ["mytool", "nvim"],
+                                                    appNames: [zed, pro], toolFolders: [], isRegistered: { _ in false }, policy: policy)
+        #expect(Set(leftovers.map(\.url.lastPathComponent)) == ["gone", "gone2", "gone3", "ab"])
+        #expect(leftovers.allSatisfy { $0.kind == .config && $0.orphan })
+        #expect(Set(leftovers.map(\.location)) == ["~/.config", "~/.local/share", "~/.local/state"])
+        // An orphan entry is allowed to go to the Trash like any config item, nothing else is.
+        #expect(leftovers.allSatisfy { policy.allowsAppConfig($0.url) })
+    }
+
     @MainActor @Test func listsAppConfigUntickedAndNeverToolOrProtectedFolders() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let cursorApp = try app("Applications/Cursor.app", bundleID: "com.todesktop.cursor")
@@ -144,7 +164,8 @@ struct UninstallerTests {
                      ".config/mytool/x", ".zedx/x", ".gemini/x", ".config/github-copilot/x", "Library/Application Support/Cursor/x",
                      ".local/share/zed/db/0/db.sqlite", ".local/share/cursor/x", ".local/share/mytool/x",
                      ".local/share/settings/x", ".local/share/gemini/x", ".local/share/.zed/x",
-                     ".local/state/zed/x"] {
+                     ".local/state/zed/x", ".local/state/cursor/x", ".local/state/gemini/x", ".local/state/mytool/x",
+                     ".local/state/.zed/x"] {
             try make(path)
         }
         let bin = try make("bin", folder: true)
@@ -157,13 +178,13 @@ struct UninstallerTests {
                 .filter { $0.kind == .config }.map { ($0.url.path as NSString).replacingOccurrences(of: home.path, with: "~") }
         }
         let cursor = InstalledApp(url: cursorApp, name: "Cursor", bundleID: "com.todesktop.cursor", version: nil, lastUsed: nil)
-        #expect(Set(await config(cursor, [])) == ["~/.cursor", "~/.cursor-tutor", "~/.config/cursor", "~/.local/share/cursor"])
+        #expect(Set(await config(cursor, [])) == ["~/.cursor", "~/.cursor-tutor", "~/.config/cursor", "~/.local/share/cursor", "~/.local/state/cursor"])
         #expect(await config(cursor, ["Cursor"]).isEmpty) // another app goes by that name
         let zed = InstalledApp(url: URL(filePath: "/nonexistent/Zed.app"), name: "Zed", bundleID: "dev.zed.Zed", version: nil, lastUsed: nil)
-        // Never ~/.cache/zed, ~/.local/state/zed, ~/.local/share/.zed nor ~/.zedx.
-        #expect(Set(await config(zed, [])) == ["~/.config/zed", "~/.local/share/zed"])
+        // Never ~/.cache/zed, ~/.local/share/.zed, ~/.local/state/.zed nor ~/.zedx; the CLIs' state stays theirs.
+        #expect(Set(await config(zed, [])) == ["~/.config/zed", "~/.local/share/zed", "~/.local/state/zed"])
         let zedEntries = await Uninstaller.data(of: zed, otherBundleIDs: [], tools: tools, policy: policy)
-        #expect(Set(zedEntries.filter { $0.kind == .config }.map(\.location)) == ["~/.config", "~/.local/share"])
+        #expect(Set(zedEntries.filter { $0.kind == .config }.map(\.location)) == ["~/.config", "~/.local/share", "~/.local/state"])
         let ide = InstalledApp(url: URL(filePath: "/nonexistent/Antigravity IDE.app"), name: "Antigravity IDE",
                                bundleID: "com.google.antigravity", version: nil, lastUsed: nil)
         #expect(await config(ide, []) == ["~/.antigravity-ide"])
@@ -182,7 +203,7 @@ struct UninstallerTests {
         }
         model.selection = .app(cursor.url)
         await model.loadEntries()
-        #expect(model.entries.count == 5)
+        #expect(model.entries.count == 6) // + ~/.local/state/cursor
         #expect(model.checked.map(\.lastPathComponent) == ["Cursor"])
         let matches = await Uninstaller.dataMatches(of: [cursor], otherBundleIDs: [], tools: tools, policy: policy)
         #expect(Set(matches[cursor.url] ?? []) == Set(model.entries.map(\.url)))

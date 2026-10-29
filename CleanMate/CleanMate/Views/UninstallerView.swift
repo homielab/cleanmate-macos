@@ -399,7 +399,8 @@ struct UninstallerView: View {
 
     /// The entry's folder (`~/.config`, `~/.local/share`, `~` for config), and whether it is only a suggestion.
     private func location(_ entry: AppDataEntry) -> Text {
-        entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
+        entry.orphan ? Text("\(entry.location) · No app with this name is installed")
+            : entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
     }
 
     /// The checkbox's (hidden) label is item name + size, so VoiceOver reads both on the checkbox.

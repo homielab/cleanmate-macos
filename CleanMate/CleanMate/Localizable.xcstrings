@@ -891,6 +891,16 @@
         }
       }
     },
+    "%@ · No app with this name is installed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Không còn app nào tên này"
+          }
+        }
+      }
+    },
     "%@ · Possibly related" : {
       "localizations" : {
         "vi" : {

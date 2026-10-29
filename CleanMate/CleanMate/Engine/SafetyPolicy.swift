@@ -59,7 +59,7 @@ nonisolated struct SafetyPolicy: Sendable {
             "Library", "Library/Caches", "Library/Logs", "Library/Logs/DiagnosticReports",
             "Library/Application Support", "Library/Containers", "Library/Group Containers",
             "Library/Preferences", "Library/Developer", ".Trash", "Downloads", "Applications",
-            ".config", ".local", ".local/share", ".cache",
+            ".config", ".local", ".local/share", ".local/state", ".cache",
         ].map { (home + "/" + $0).lowercased() }
         protectedTrees = [
             ".ssh", ".gnupg", ".aws", ".kube", "Library/Keychains", "Documents", "Desktop", "Pictures",
@@ -250,11 +250,11 @@ nonisolated struct SafetyPolicy: Sendable {
     ]
 
     /// Folders of the home folder whose non-hidden items can be an app's config or data (XDG config and data homes).
-    static let appConfigFolders = [".config", ".local/share"]
+    static let appConfigFolders = [".config", ".local/share", ".local/state"]
 
     /// Uninstaller rule for an app's config outside ~/Library, only ever moved to the Trash: a hidden item directly in
-    /// the home folder (`~/.cursor`, never a `sharedHomeItems` one) or a non-hidden item directly in ~/.config or
-    /// ~/.local/share (`~/.config/zed`, `~/.local/share/zed`; a symlinked ~/.config, ~/.local or ~/.local/share is never
+    /// the home folder (`~/.cursor`, never a `sharedHomeItems` one) or a non-hidden item directly in ~/.config,
+    /// ~/.local/share or ~/.local/state (`~/.config/zed`, `~/.local/state/zed`; a symlinked ~/.config, ~/.local or ~/.local/share is never
     /// followed), not a symlink itself, not Apple's, and allowed by `allows` (never ~/.config, ~/.cache, ~/.local,
     /// ~/.local/share, ~/.Trash themselves nor anything in .ssh, .gnupg, .aws, .kube).
     func allowsAppConfig(_ url: URL) -> Bool {
