@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Each group header has a checkbox (all, none or some ticked) instead of Select All / Deselect All, and locked rows
   show a lock with a larger reason text.
 
+### Fixed
+- **Smart Scan** and **Privacy**: "Freed" is now the size of what was removed or moved to the Trash, never the noisy
+  change in free disk space (it could show less than was removed). The part moved to the Trash is shown apart, and the
+  free space before and after is shown for reference.
+
 ## [1.3] - 2026-10-24
 
 ### Added

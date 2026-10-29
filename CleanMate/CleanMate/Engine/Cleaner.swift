@@ -9,7 +9,12 @@ extension FormatStyle where Self == ByteCountFormatStyle {
 // MARK: - Clean
 
 nonisolated struct CleanReport: Sendable {
+    /// Bytes of what was removed or moved to the Trash, measured by the scan (a command item: its scan size minus
+    /// a rescan right after). Never the volume's free-space change, which other processes and APFS make noisy.
     var freed: Int64 = 0
+    /// Part of `freed` from items whose size is an upper bound (files shared with projects as APFS clones or hard
+    /// links, pnpm prune): the space really freed may be smaller.
+    var upTo: Int64 = 0
     /// Entries or items not removed (in use, not permitted, refused by the safety policy, command failed).
     var skipped = 0
     /// Not moved because locked in Finder (`Scanner.isLocked`): reported apart from `skipped` so the user knows why.
@@ -22,6 +27,7 @@ nonisolated struct CleanReport: Sendable {
 
     static func += (lhs: inout CleanReport, rhs: CleanReport) {
         lhs.freed += rhs.freed
+        lhs.upTo += rhs.upTo
         lhs.skipped += rhs.skipped
         lhs.locked += rhs.locked
         lhs.trashed += rhs.trashed
@@ -125,15 +131,8 @@ nonisolated enum Cleaner {
                                   trash: @Sendable (URL) throws -> Void = { _ = try CleanReport.moveToTrash($0) },
                                   openPaths: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0) }
     ) async -> CleanReport {
-        guard item.sizeIsUpperBound, item.mode == .delete else {
-            return await remove(item, scan: scan, policy: policy, trash: trash, openPaths: openPaths)
-        }
-        // An upper-bound size (APFS clones, pnpm prune) overstates what goes: report the volume's free-space
-        // gain instead, capped by the measured size. Noisy (other apps write or delete meanwhile, APFS may free late),
-        // but never above the old figure; an under-count is the honest side of the noise.
-        let before = freeSpace(policy.homeURL.path)
         var report = await remove(item, scan: scan, policy: policy, trash: trash, openPaths: openPaths)
-        if let before, let after = freeSpace(policy.homeURL.path) { report.freed = min(report.freed, max(0, after - before)) }
+        if item.sizeIsUpperBound { report.upTo = report.freed }
         return report
     }
 
@@ -147,7 +146,8 @@ nonisolated enum Cleaner {
     }
 
     /// Free bytes on the volume holding `path` (statfs, not URL resource values: those are cached per URL).
-    private static func freeSpace(_ path: String) -> Int64? {
+    /// Shown before and after a clean for reference only; never used for what was freed.
+    static func freeSpace(_ path: String) -> Int64? {
         var info = statfs()
         return statfs(path, &info) == 0 ? Int64(info.f_bavail) * Int64(info.f_bsize) : nil
     }

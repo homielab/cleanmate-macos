@@ -1261,8 +1261,9 @@ struct DeveloperToolsTests {
         #expect(flagged == ["pnpm-store", "bun-cache", "uv-cache"])
     }
 
-    /// Removing a clone frees nothing while the original stays: "freed" is the volume's gain, not the clone's size.
-    @Test func upperBoundItemReportsFreeSpaceGainNotClonedSize() async throws {
+    /// Removing a clone frees nothing while the original stays: "freed" is still the removed size (never the
+    /// volume's noisy free-space change), flagged as an upper bound so the done screen says less may be freed.
+    @Test func upperBoundItemReportsRemovedSizeAsUpTo() async throws {
         let box = try Sandbox()
         defer { box.remove() }
         let original = try box.file("project/lib.bin", bytes: 64_000_000)
@@ -1275,7 +1276,14 @@ struct DeveloperToolsTests {
         #expect(scan.size >= 64_000_000) // allocated size counts the shared blocks
         let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
         #expect(!FileManager.default.fileExists(atPath: cache.path))
-        #expect(report.freed < 32_000_000) // ~0; margin for other processes freeing space meanwhile
+        #expect(report.freed == scan.size && report.upTo == scan.size)
+
+        let plain = CleanerItem(id: "p", title: "p", paths: ["~/project"])
+        let plainScan = await Scanner.scan(plain, policy: box.policy)
+        var total = await Cleaner.clean(plain, scan: plainScan, policy: box.policy)
+        #expect(total.freed == plainScan.size && total.upTo == 0)
+        total += report
+        #expect(total.freed == scan.size + plainScan.size && total.upTo == scan.size)
     }
 
     @Test func simctlDevices() {

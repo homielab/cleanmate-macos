@@ -974,6 +974,26 @@
         }
       }
     },
+    "%@ of it came from caches that share files with your projects, so less space may be freed." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ trong đó thuộc bộ nhớ đệm dùng chung tệp với các dự án của bạn, nên dung lượng thật sự giải phóng có thể ít hơn."
+          }
+        }
+      }
+    },
+    "%@ of it is in the Trash: empty the Trash to free that space." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ trong đó đang nằm trong Thùng rác: dọn sạch Thùng rác để giải phóng phần này."
+          }
+        }
+      }
+    },
     "%@: cache & logs" : {
       "localizations" : {
         "vi" : {
@@ -1955,6 +1975,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dữ liệu tự điền biểu mẫu"
+          }
+        }
+      }
+    },
+    "Free space: %@ → %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ trống: %@ → %@"
           }
         }
       }

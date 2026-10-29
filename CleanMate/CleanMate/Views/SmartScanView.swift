@@ -74,11 +74,24 @@ struct SmartScanView: View {
                     if module == .privacy {
                         Text("The selected traces were erased.")
                     }
+                    let trashed = model.cleanedGroups.reduce(Int64(0)) { $0 + $1.trashed }
+                    if trashed > 0 {
+                        Text("\(trashed, format: .fileSize) of it is in the Trash: empty the Trash to free that space.")
+                    }
+                    if report.upTo > 0 {
+                        Text("\(report.upTo, format: .fileSize) of it came from caches that share files with your projects, so less space may be freed.")
+                    }
                     if report.skipped > 0 {
                         Text("Skipped (in use or not permitted): \(report.skipped)")
                     }
                     if !model.cleanedGroups.isEmpty {
                         cleanedGroups
+                    }
+                    if let change = model.freeSpaceChange {
+                        // Reference only: other apps, Spotlight and snapshots change it too.
+                        Text("Free space: \(change.before, format: .fileSize) → \(change.after, format: .fileSize)")
+                            .font(.caption)
+                            .padding(.top, 4)
                     }
                 } actions: {
                     scanButton("Scan Again")

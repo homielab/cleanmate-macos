@@ -245,8 +245,12 @@ struct EndToEndCleanTests {
             try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
         }
         for item in items {
-            let report = await Cleaner.clean(item, scan: scans[item.id]!, policy: policy, trash: moveToFakeTrash, openPaths: Self.ownOpenPaths)
+            let scan = scans[item.id]!
+            let report = await Cleaner.clean(item, scan: scan, policy: policy, trash: moveToFakeTrash, openPaths: Self.ownOpenPaths)
             #expect(report.skipped == 0, "\(item.id) skipped \(report.skipped)")
+            // Freed = the scanned size of what went (a database erase: how much the file shrank), never negative.
+            #expect(report.freed >= 0 && report.upTo == (item.sizeIsUpperBound ? report.freed : 0), "\(item.id)")
+            if item.database == nil { #expect(report.freed == scan.size, "\(item.id) freed \(report.freed) of \(scan.size)") }
         }
 
         // Junk gone: a rescan finds nothing for any item.
@@ -278,6 +282,55 @@ struct EndToEndCleanTests {
             SELECT group_concat(b.title, ',') FROM moz_bookmarks b LEFT JOIN moz_places p ON p.id = b.fk;
             SELECT url FROM moz_bookmarks JOIN moz_places p ON p.id = fk;
             """) == "0\nhttps://bank.example/ https://search.example/?q=%s https://note.example/\n,Work,Bank\nhttps://bank.example/")
+    }
+
+    /// A whole Smart Scan clean of files of known size: "Freed" is their total (what went to the Trash included and
+    /// shown apart), whatever the volume's free space did meanwhile, and the activity log records the same bytes.
+    @MainActor @Test func freedIsTheSizeOfWhatWasRemovedNotTheFreeSpaceChange() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appending(path: "CleanMateFreed-\(UUID().uuidString)")
+        let home = root.appending(path: "home"), temp = root.appending(path: "tmp"), trash = root.appending(path: "Trash")
+        defer { try? fm.removeItem(at: root) }
+        for dir in [home, temp, trash] { try fm.createDirectory(at: dir, withIntermediateDirectories: true) }
+        let policy = SafetyPolicy(home: home, temp: temp)
+        // Whole 4 KB blocks of non-zero bytes: the allocated size the scan measures is exactly the byte count.
+        let files = ["Library/Caches/junk/a.bin": 40_960, "Library/Caches/junk/b.bin": 81_920, "Library/Caches/old/c.bin": 16_384]
+        for (path, bytes) in files {
+            let url = home.appending(path: path)
+            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(repeating: 7, count: bytes).write(to: url)
+        }
+        let deleted = CleanerItem(id: "freed-delete", title: "Junk", paths: ["~/Library/Caches/junk"])
+        let trashed = CleanerItem(id: "freed-trash", title: "Old", paths: ["~/Library/Caches/old"], mode: .trash)
+        let model = SmartScanModel(module: .smartScan) {
+            [CleanerGroup(id: "a", title: "A", systemImage: "x", items: [deleted]),
+             CleanerGroup(id: "b", title: "B", systemImage: "x", items: [trashed])]
+        }
+        model.processNames = { [] }
+        model.appBundleIDs = { [] }
+        model.blockedByExclusion = { _ in false }
+        model.scanItem = { await Scanner.scan($0, policy: policy) }
+        model.cleanItem = { item, scan in
+            await Cleaner.clean(item, scan: scan, policy: policy, trash: { url in
+                try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
+            })
+        }
+        model.logHome = home
+        // Free space dropped during the clean (another app wrote more than was removed).
+        var reads: [Int64] = [5_000_000_000, 4_999_000_000]
+        model.freeSpace = { reads.isEmpty ? nil : reads.removeFirst() }
+
+        await model.scan()
+        #expect(model.selected == [deleted.id, trashed.id])
+        await model.clean()
+        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(report.freed == 139_264 && report.upTo == 0 && report.skipped == 0)
+        #expect(model.cleanedGroups.map(\.freed) == [122_880, 16_384])
+        #expect(model.cleanedGroups.map(\.trashed) == [0, 16_384])
+        #expect(model.freeSpaceChange == .init(before: 5_000_000_000, after: 4_999_000_000))
+        #expect(files.keys.allSatisfy { !fm.fileExists(atPath: home.appending(path: $0).path) })
+        let logged = ActivityLog.freed(home: home)
+        #expect(logged.deleted == 122_880 && logged.trashed == 16_384)
     }
 
     /// Mail attachment copies: only with Full Disk Access, unticked, trash mode, skipped while Mail runs; only old

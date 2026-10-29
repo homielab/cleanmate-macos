@@ -42,6 +42,11 @@ final class SmartScanModel {
     /// Home whose activity log records each clean; tests pass a throwaway folder.
     @ObservationIgnored var logHome = SafetyPolicy.current.homeURL
     @ObservationIgnored var cleanItem: @Sendable (CleanerItem, ItemScan) async -> CleanReport = { await Cleaner.clean($0, scan: $1) }
+    /// Free bytes on the home volume, read before and after a clean; tests inject fixed values.
+    @ObservationIgnored var freeSpace: () -> Int64? = { Cleaner.freeSpace(SafetyPolicy.current.homeURL.path) }
+    /// The volume's free space before and after the last clean, shown for reference next to what was freed.
+    struct FreeSpaceChange: Equatable { var before: Int64; var after: Int64 }
+    var freeSpaceChange: FreeSpaceChange?
     /// Items scanned so far / items to scan, for the progress bar.
     var scannedItems = 0
     var totalItems = 0
@@ -395,6 +400,7 @@ final class SmartScanModel {
         scannedItems = 0
         totalItems = todo.count
         var byGroup = groups.map { CleanedGroup(id: $0.id, title: $0.title, systemImage: $0.systemImage) }
+        let freeBefore = freeSpace()
         for item in todo {
             guard let scan = selectedScan(item) else { continue } // only the ticked entries
             cleaningItem = item.title
@@ -416,6 +422,7 @@ final class SmartScanModel {
         selected = []
         excludedEntries = [:]
         cleanedGroups = byGroup.filter { $0.freed > 0 }
+        freeSpaceChange = freeBefore.flatMap { before in freeSpace().map { FreeSpaceChange(before: before, after: $0) } }
         phase = .done(report)
         Attention.finished()
     }

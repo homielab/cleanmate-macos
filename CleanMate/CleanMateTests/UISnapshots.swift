@@ -226,7 +226,8 @@ struct UISnapshots {
         }
         try await snapshot("smartscan-5-done") {
             let model = cleanerModel(.smartScan)
-            model.phase = .done(CleanReport(freed: 3_456_000_000, skipped: 2))
+            model.phase = .done(CleanReport(freed: 3_456_000_000, upTo: 300_000_000, skipped: 2))
+            model.freeSpaceChange = .init(before: 41_200_000_000, after: 44_600_000_000)
             let g = model.groups
             model.cleanedGroups = [
                 .init(id: g[0].id, title: g[0].title, systemImage: g[0].systemImage, freed: 2_100_000_000),
