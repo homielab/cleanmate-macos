@@ -33,17 +33,17 @@ struct SpaceLensView: View {
         .focusedSceneValue(\.moveToTrash, moveToTrash)
         .task { model.startIfNeeded() }
         .trashUndo(model)
-        .onChange(of: model.current) { selection = [] }
-        .onChange(of: model.items.count, initial: true) { // count only: sizes update items often
+        .onChange(of: model.current) { _ in selection = [] }
+        .onAppearAndChange(of: model.items.count) { _ in // count only: sizes update items often
             selection = model.pruned(selection)
             if let url = model.revealed, let item = model.items.first(where: { $0.url.standardizedFileURL == url.standardizedFileURL }) {
                 selection = [item.url]
                 model.revealed = nil
             }
         }
-        .onChange(of: model.search) { selection = model.pruned(selection) }
+        .onChange(of: model.search) { _ in selection = model.pruned(selection) }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Items"))
-        .onChange(of: selection) { allowed = SafetyPolicy.current.allowedSpaceLensItems(selection) }
+        .onChange(of: selection) { allowed = SafetyPolicy.current.allowedSpaceLensItems($0) }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button { model.go(to: model.path.count - 1) } label: { Label("Back", systemImage: "chevron.left") }
@@ -130,43 +130,87 @@ struct SpaceLensView: View {
     /// Hidden from VoiceOver: the table's Share column reads the same numbers.
     @ViewBuilder private var donut: some View {
         let slices = SpaceLens.slices(model.items)
+        if !slices.isEmpty {
+            if #available(macOS 14, *) {
+                donutChart(slices)
+            } else {
+                shareBar(slices)
+            }
+        }
+    }
+
+    @available(macOS 14, *)
+    private func donutChart(_ slices: [SpaceLens.Slice]) -> some View {
         let colors = Self.sliceColors(slices)
         let active = slices.first { $0.id == hovered }
-        if !slices.isEmpty {
+        return Chart(slices) { slice in
+            SectorMark(angle: .value("Size", slice.size), innerRadius: .ratio(0.6), angularInset: 1)
+                .foregroundStyle(slice.item.flatMap { colors[$0.url] } ?? Color.gray)
+                .opacity(active == nil || active == slice ? 1 : 0.4)
+        }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                let frame = proxy.plotFrame.map { geometry[$0] } ?? geometry.frame(in: .local)
+                sliceHitArea(slices) { SpaceLens.slice(at: $0, in: frame, of: slices) }
+            }
+        }
+        .overlay {
+            if let hovered = active {
+                hoveredLabel(hovered)
+                    .frame(width: 70)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(width: 120, height: 120)
+        .accessibilityHidden(true)
+    }
+
+    /// macOS 13 has no donut mark: the same slices, colors, hover and clicks as one stacked bar.
+    private func shareBar(_ slices: [SpaceLens.Slice]) -> some View {
+        let colors = Self.sliceColors(slices)
+        let active = slices.first { $0.id == hovered }
+        return VStack(spacing: 4) {
             Chart(slices) { slice in
-                SectorMark(angle: .value("Size", slice.size), innerRadius: .ratio(0.6), angularInset: 1)
+                BarMark(x: .value("Size", slice.size))
                     .foregroundStyle(slice.item.flatMap { colors[$0.url] } ?? Color.gray)
                     .opacity(active == nil || active == slice ? 1 : 0.4)
             }
-            .chartOverlay { proxy in
-                GeometryReader { geometry in
-                    let frame = proxy.plotFrame.map { geometry[$0] } ?? geometry.frame(in: .local)
-                    Rectangle().fill(.clear).contentShape(Rectangle())
-                        .onContinuousHover { phase in
-                            if case .active(let point) = phase { hovered = SpaceLens.slice(at: point, in: frame, of: slices)?.id } else { hovered = nil }
-                        }
-                        .onTapGesture { point in
-                            if let item = SpaceLens.slice(at: point, in: frame, of: slices)?.item, item.isFolder, !item.isProtected {
-                                hovered = nil
-                                model.open(item.url)
-                            }
-                        }
-                }
-            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .chartLegend(.hidden)
             .overlay {
-                if let hovered = active {
-                    VStack(spacing: 0) {
-                        Text(hovered.item.map { $0.name } ?? String(localized: "Other")).lineLimit(1).truncationMode(.middle)
-                        Text(hovered.size, format: .fileSize).monospacedDigit().foregroundStyle(.secondary)
-                    }
-                    .font(.caption)
-                    .frame(width: 70)
-                    .allowsHitTesting(false)
+                GeometryReader { geometry in
+                    sliceHitArea(slices) { SpaceLens.slice(atFraction: $0.x / max(geometry.size.width, 1), of: slices) }
                 }
             }
-            .frame(width: 120, height: 120)
-            .accessibilityHidden(true)
+            .frame(height: 16)
+            // Kept in the layout while nothing is hovered, so the bar does not jump.
+            hoveredLabel(active ?? slices[0]).opacity(active == nil ? 0 : 1)
         }
+        .frame(width: 200)
+        .accessibilityHidden(true)
+    }
+
+    /// Hover highlights the slice under the pointer; a click on a folder slice opens it.
+    private func sliceHitArea(_ slices: [SpaceLens.Slice], at slice: @escaping (CGPoint) -> SpaceLens.Slice?) -> some View {
+        Rectangle().fill(.clear).contentShape(Rectangle())
+            .onContinuousHover { phase in
+                if case .active(let point) = phase { hovered = slice(point)?.id } else { hovered = nil }
+            }
+            .onTapGesture { point in
+                if let item = slice(point)?.item, item.isFolder, !item.isProtected {
+                    hovered = nil
+                    model.open(item.url)
+                }
+            }
+    }
+
+    private func hoveredLabel(_ slice: SpaceLens.Slice) -> some View {
+        VStack(spacing: 0) {
+            Text(slice.item.map { $0.name } ?? String(localized: "Other")).lineLimit(1).truncationMode(.middle)
+            Text(slice.size, format: .fileSize).monospacedDigit().foregroundStyle(.secondary)
+        }
+        .font(.caption)
     }
 
     /// The donut color of each item drawn as its own slice; everything else is gray like "Other".
@@ -253,17 +297,17 @@ struct SpaceLensView: View {
                 NSWorkspace.shared.activateFileViewerSelecting(Array(urls))
             }
         }
-        .onKeyPress(.space) {
+        .onSpaceKey {
             previewURL = previewURL == nil ? items.first { selection.contains($0.url) }?.url : nil
-            return .handled
+            return true
         }
         .quickLookPreview($previewURL, in: items.map(\.url))
         .exclusionNotice(excludedCount)
         .overlay {
             if model.items.isEmpty && !model.measuring {
-                ContentUnavailableView("Empty or Not Readable", systemImage: "folder")
+                EmptyStateView(title: Text("Empty or Not Readable"), systemImage: "folder")
             } else if items.isEmpty && !model.items.isEmpty {
-                ContentUnavailableView("No Matching Items", systemImage: "magnifyingglass")
+                EmptyStateView(title: Text("No Matching Items"), systemImage: "magnifyingglass")
             }
         }
         .safeAreaInset(edge: .bottom) { bottomBar(items) }

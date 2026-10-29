@@ -86,8 +86,9 @@ struct LaunchAgentsView: View {
                     if model.loading {
                         ProgressView().accessibilityLabel("Loading…")
                     } else {
-                        ContentUnavailableView("No Launch Agents Found", systemImage: "gearshape.2",
-                                               description: Text("Nothing in ~/Library/LaunchAgents or in /Library starts at login."))
+                        EmptyStateView(title: Text("No Launch Agents Found"), systemImage: "gearshape.2") {
+                            Text("Nothing in ~/Library/LaunchAgents or in /Library starts at login.")
+                        }
                     }
                 }
             }

@@ -44,9 +44,7 @@ struct LargeFilesView: View {
         Group {
             switch model.phase {
             case .idle:
-                ContentUnavailableView {
-                    Label { Text(Module.largeFiles.title) } icon: { Image(systemName: Module.largeFiles.systemImage) }
-                } description: {
+                EmptyStateView(title: Text(Module.largeFiles.title), systemImage: Module.largeFiles.systemImage) {
                     Text("Find big files in your home folder that you may have forgotten. Nothing is selected for you, and selected files go to the Trash.")
                 } actions: {
                     Button("Scan") { model.scan() }.buttonStyle(.borderedProminent)
@@ -66,9 +64,7 @@ struct LargeFilesView: View {
             case .results:
                 results
             case .done(let report):
-                ContentUnavailableView {
-                    Label("Moved \(report.freed, format: .fileSize) to the Trash", systemImage: "checkmark.circle")
-                } description: {
+                EmptyStateView(title: Text("Moved \(report.freed, format: .fileSize) to the Trash"), systemImage: "checkmark.circle") {
                     Text("Empty the Trash to free the space.")
                     if report.skipped > 0 {
                         Text("Skipped (in use or not permitted): \(report.skipped)")
@@ -104,7 +100,7 @@ struct LargeFilesView: View {
         .focusedSceneValue(\.moveToTrash, moveToTrash)
         .trashUndo(model)
         .onAppear { model.restoreScope(savedScope) }
-        .onChange(of: model.scope) { savedScope = model.scope?.path ?? "" }
+        .onChange(of: model.scope) { scope in savedScope = scope?.path ?? "" }
     }
 
     private var scanningTitle: Text {
@@ -152,7 +148,7 @@ struct LargeFilesView: View {
         let files = model.duplicatesOnly ? model.groupedByDuplicates(sorted) : sorted
         let largest = files.lazy.map(\.size).max() ?? 0
         return Table(files, selection: $selection, sortOrder: $sortOrder) {
-            TableColumn(Text(verbatim: "")) { file in
+            TableColumn("" as String) { file in // a Text title needs macOS 13.5
                 Toggle(isOn: checked(file.url)) { Text(file.name) }
                     .labelsHidden()
                     .toggleStyle(SelectionCheckboxStyle())
@@ -226,9 +222,9 @@ struct LargeFilesView: View {
         } primaryAction: { urls in
             NSWorkspace.shared.activateFileViewerSelecting(Array(urls))
         }
-        .onKeyPress(.space) {
+        .onSpaceKey {
             previewURL = previewURL == nil ? files.first { selection.contains($0.url) }?.url : nil
-            return .handled
+            return true
         }
         .quickLookPreview($previewURL, in: files.map(\.url))
         .exclusionNotice(excludedCount)
@@ -240,17 +236,13 @@ struct LargeFilesView: View {
                     Button("Stop") { model.duplicatesOnly = false }
                 }
             } else if model.needsAccess {
-                ContentUnavailableView {
-                    Label("Full Disk Access Needed", systemImage: "lock.shield")
-                } description: {
+                EmptyStateView(title: Text("Full Disk Access Needed"), systemImage: "lock.shield") {
                     Text("macOS protects this folder. Grant Full Disk Access to scan it.")
                 } actions: {
                     Button("Open Settings…") { FullDiskAccess.openSettings() }
                 }
             } else if model.files.isEmpty {
-                ContentUnavailableView {
-                    Label("No Large Files Found", systemImage: "doc")
-                } description: {
+                EmptyStateView(title: Text("No Large Files Found"), systemImage: "doc") {
                     if let name = model.scopeName {
                         Text("\(name) has no files of \(model.scannedMinSize, format: .fileSize) or more.")
                     } else {
@@ -258,13 +250,11 @@ struct LargeFilesView: View {
                     }
                 }
             } else if files.isEmpty, model.duplicatesOnly, model.duplicateGroups?.isEmpty == true {
-                ContentUnavailableView {
-                    Label("No Duplicate Files", systemImage: "doc.on.doc")
-                } description: {
+                EmptyStateView(title: Text("No Duplicate Files"), systemImage: "doc.on.doc") {
                     Text("No two large files have the same content.")
                 }
             } else if files.isEmpty {
-                ContentUnavailableView("No Files Match the Filters", systemImage: "line.3.horizontal.decrease.circle")
+                EmptyStateView(title: Text("No Files Match the Filters"), systemImage: "line.3.horizontal.decrease.circle")
             }
         }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Files"))
@@ -274,7 +264,8 @@ struct LargeFilesView: View {
                 Picker("Kind", selection: $model.kind) {
                     Text("All Kinds").tag(FileKind?.none)
                     ForEach(FileKind.allCases, id: \.self) { kind in
-                        Text("\(Text(kind.title)) (\(model.files(of: kind).reduce(0) { $0 + $1.size }, format: .fileSize))")
+                        let size = model.files(of: kind).reduce(Int64(0)) { $0 + $1.size }
+                        Text("\(Text(kind.title)) (\(size, format: .fileSize))")
                             .tag(FileKind?.some(kind))
                     }
                 }

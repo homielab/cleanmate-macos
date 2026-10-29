@@ -53,7 +53,9 @@ struct UISnapshots {
                                       backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false
                 window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
-                host.sceneBridgingOptions = [.toolbars, .title] // .toolbar / .searchable / .navigationTitle go to the window
+                if #available(macOS 14, *) { // shots are taken on the dev Mac; on 13 they lack the title bar and toolbar
+                    host.sceneBridgingOptions = [.toolbars, .title] // .toolbar / .searchable / .navigationTitle go to the window
+                }
                 window.contentView = host
                 host.layoutSubtreeIfNeeded()
                 try await Task.sleep(for: .milliseconds(600)) // let .task, List/Table and images settle

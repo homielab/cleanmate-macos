@@ -141,7 +141,7 @@ private struct MenuBarContent: View {
         let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })
         // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘6: only bring the window front.
         ModuleRouter.shared.requested = window?.attachedSheet == nil ? module : nil
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
         if let window {
             window.makeKeyAndOrderFront(nil)
         } else {

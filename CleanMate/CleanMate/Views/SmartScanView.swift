@@ -35,9 +35,7 @@ struct SmartScanView: View {
         Group {
             switch model.phase {
             case .idle:
-                ContentUnavailableView {
-                    Label { Text(module.title) } icon: { Image(systemName: module.systemImage) }
-                } description: {
+                EmptyStateView(title: Text(module.title), systemImage: module.systemImage) {
                     switch module {
                     case .smartScan:
                         Text("Find caches, old logs, crash reports, temporary files, developer junk, AI tool and app caches that are safe to remove.")
@@ -51,7 +49,7 @@ struct SmartScanView: View {
                         scanButton("Scan").buttonStyle(.borderedProminent)
                         if allGroupsOff {
                             Text("Every group is turned off in Settings › Scan Groups.").foregroundStyle(.secondary)
-                            SettingsLink { Text("Open Settings…") }
+                            OpenSettingsButton()
                         }
                         if module == .smartScan, let overview {
                             idleOverview(overview)
@@ -68,9 +66,7 @@ struct SmartScanView: View {
             case .scanning, .results:
                 results
             case .done(let report):
-                ContentUnavailableView {
-                    Label("Freed \(report.freed, format: .fileSize)", systemImage: "checkmark.circle")
-                } description: {
+                EmptyStateView(title: Text("Freed \(report.freed, format: .fileSize)"), systemImage: "checkmark.circle") {
                     if module == .privacy {
                         Text("The selected traces were erased.")
                     }
@@ -138,35 +134,38 @@ struct SmartScanView: View {
                 HStack {
                     Text("Groups turned off in Settings: \(offCount)").font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    SettingsLink { Text("Open Settings…") }.controlSize(.small)
+                    OpenSettingsButton().controlSize(.small)
                 }
             }
             ForEach(model.visibleGroups) { group in
                 // Bars compare items within their group: one huge item (DerivedData) would flatten every bar list-wide.
                 let largest = group.items.compactMap { model.scans[$0.id]?.size }.max() ?? 0
-                Section(isExpanded: expanded(group)) {
-                    ForEach(group.items) { item in
-                        CleanerItemRow(item: item, scan: model.scans[item.id], isOn: selection(item),
-                                       isRunning: model.isRunning(item), isBlocked: model.blocked.contains(item.id),
-                                       quit: { model.quitApps(of: item) },
-                                       groupImage: group.systemImage, largestInGroup: largest,
-                                       entryOn: item.selectableEntries ? { url in entrySelection(item, url) } : nil,
-                                       selectedSize: model.partialSelectedSize(item),
-                                       highlight: { model.highlighted = [item.id] },
-                                       neverClean: { url in
-                                           if model.neverClean(item, url) { excludedCount += 1 }
-                                       })
-                            .tag(item.id)
+                // Section(isExpanded:) needs macOS 14; the header draws the disclosure arrow anyway.
+                Section {
+                    if !model.collapsedGroups.contains(group.id) {
+                        ForEach(group.items) { item in
+                            CleanerItemRow(item: item, scan: model.scans[item.id], isOn: selection(item),
+                                           isRunning: model.isRunning(item), isBlocked: model.blocked.contains(item.id),
+                                           quit: { model.quitApps(of: item) },
+                                           groupImage: group.systemImage, largestInGroup: largest,
+                                           entryOn: item.selectableEntries ? { url in entrySelection(item, url) } : nil,
+                                           selectedSize: model.partialSelectedSize(item),
+                                           highlight: { model.highlighted = [item.id] },
+                                           neverClean: { url in
+                                               if model.neverClean(item, url) { excludedCount += 1 }
+                                           })
+                                .tag(item.id)
+                        }
                     }
                 } header: {
                     groupHeader(group)
                 }
             }
         }
-        .onKeyPress(.space) {
-            guard !model.highlighted.isEmpty else { return .ignored }
+        .onSpaceKey {
+            guard !model.highlighted.isEmpty else { return false }
             model.toggle(ids: model.highlighted)
-            return .handled
+            return true
         }
         .exclusionNotice(excludedCount)
         .safeAreaInset(edge: .bottom) {
@@ -501,7 +500,7 @@ struct CleanerItemRow: View {
                         if isBlocked {
                             HStack {
                                 Text("Blocked by a folder in Exclusions").foregroundStyle(.orange)
-                                Button("Open Exclusions…") { openExclusions() }
+                                OpenSettingsButton(tab: SettingsView.exclusionsTab) { Text("Open Exclusions…") }
                                     .buttonStyle(.link)
                             }
                         }
@@ -562,13 +561,6 @@ struct CleanerItemRow: View {
         } else {
             nil
         }
-    }
-
-    @Environment(\.openSettings) private var openSettings
-
-    private func openExclusions() {
-        UserDefaults.standard.set(SettingsView.exclusionsTab, forKey: Preferences.settingsTab)
-        openSettings()
     }
 
     /// The app's own icon when the item belongs to an installed app, else the group's symbol.

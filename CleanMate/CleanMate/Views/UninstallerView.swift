@@ -18,7 +18,7 @@ struct UninstallerView: View {
         }
         .navigationTitle(Text(Module.uninstaller.title))
         .trashUndo(model)
-        .onChange(of: unused, initial: true) { model.unused = unused }
+        .onAppearAndChange(of: unused) { model.unused = $0 }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Apps"))
         .toolbar {
             Menu("Sort By", systemImage: "arrow.up.arrow.down") {
@@ -158,9 +158,7 @@ struct UninstallerView: View {
     @ViewBuilder private var detail: some View {
         switch model.selection {
         case nil:
-            ContentUnavailableView {
-                Label { Text(Module.uninstaller.title) } icon: { Image(systemName: Module.uninstaller.systemImage) }
-            } description: {
+            EmptyStateView(title: Text(Module.uninstaller.title), systemImage: Module.uninstaller.systemImage) {
                 VStack(spacing: 8) {
                     Text("Select an app to see its files in your Library. The app and the files you keep ticked go to the Trash. Apple’s apps are not listed.")
                     Text("To reset an app instead, untick the app itself: only its data goes to the Trash and the app stays. Files left by apps you already removed are under “Leftovers of Removed Apps” on the left.")
@@ -267,15 +265,15 @@ struct UninstallerView: View {
             }
             .padding(.vertical, 3)
         }
-        .onKeyPress(.space) {
+        .onSpaceKey {
             previewURL = previewURL == nil ? model.hiddenItems?.first { model.highlighted.contains($0.url) }?.url : nil
-            return .handled
+            return true
         }
         .overlay {
             if model.hiddenItems == nil {
                 ProgressView().accessibilityLabel("Loading…")
             } else if model.hiddenItems?.isEmpty == true {
-                ContentUnavailableView { Label { Text("No Unknown Items Found") } icon: { Image(systemName: "checkmark.circle") } }
+                EmptyStateView(title: Text("No Unknown Items Found"), systemImage: "checkmark.circle")
             }
         }
     }
@@ -340,7 +338,7 @@ struct UninstallerView: View {
             if model.extensionItems == nil {
                 ProgressView().accessibilityLabel("Loading…")
             } else if model.extensionItems?.isEmpty == true {
-                ContentUnavailableView { Label { Text("No Extensions Found") } icon: { Image(systemName: "checkmark.circle") } }
+                EmptyStateView(title: Text("No Extensions Found"), systemImage: "checkmark.circle")
             }
         }
     }
@@ -394,7 +392,7 @@ struct UninstallerView: View {
             if model.loadingEntries {
                 ProgressView().accessibilityLabel("Loading…")
             } else if model.entries.isEmpty && app == nil {
-                ContentUnavailableView { Label { empty } icon: { Image(systemName: "checkmark.circle") } }
+                EmptyStateView(title: empty, systemImage: "checkmark.circle")
             }
         }
     }
@@ -478,10 +476,10 @@ struct UninstallerView: View {
 
 private extension View {
     func spaceToggles(_ model: UninstallerModel) -> some View {
-        onKeyPress(.space) {
-            guard !model.highlighted.isEmpty else { return .ignored }
+        onSpaceKey {
+            guard !model.highlighted.isEmpty else { return false }
             model.toggle(urls: model.highlighted)
-            return .handled
+            return true
         }
     }
 }

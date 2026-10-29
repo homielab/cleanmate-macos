@@ -76,7 +76,7 @@ struct GeneralSettings: View {
                                 UserDefaults.standard.removeObject(forKey: Preferences.selectionOverrides)
                                 confirmingReset = false
                                 resetFocus = false
-                                AccessibilityNotification.Announcement(Self.resetDone()).post()
+                                announceForAccessibility(Self.resetDone())
                             }
                         }
                         .onAppear { resetFocus = true }
@@ -202,9 +202,9 @@ struct ExclusionSettings: View {
             if saved != folders { folders = saved }
         }
         // The row appears after a drop or the folder picker, away from where VoiceOver and the keyboard are.
-        .onChange(of: pending) {
+        .onChange(of: pending) { pending in
             guard let broad = pending.first(where: { Preferences.isBroad($0) }) else { return }
-            AccessibilityNotification.Announcement(Self.broadWarning(broad)).post()
+            announceForAccessibility(Self.broadWarning(broad))
             cancelFocused = true
         }
         .fileImporter(isPresented: $choosing, allowedContentTypes: [.folder], allowsMultipleSelection: true) { result in

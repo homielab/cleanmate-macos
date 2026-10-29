@@ -51,7 +51,7 @@ private struct TrashUndoLink<Model: TrashUndoing>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: undoManager, initial: true) { model.undoManager = undoManager }
+            .onAppearAndChange(of: undoManager) { model.undoManager = $0 }
             .onDisappear {
                 undoManager?.removeAllActions(withTarget: model)
                 // A move still running when the module is left must not register ⌘Z for a module not shown.
@@ -272,9 +272,184 @@ private struct ExclusionNotice: View {
         .task(id: count) {
             guard count > 0 else { return }
             shown = true
-            AccessibilityNotification.Announcement(String(localized: "Added to Exclusions")).post()
+            announceForAccessibility(String(localized: "Added to Exclusions"))
             try? await Task.sleep(for: .seconds(2))
             if !Task.isCancelled { shown = false }
         }
+    }
+}
+
+/// Empty, idle and done screens: large icon, title, description and actions, centered, like the system's
+/// empty-state view (macOS 14+).
+struct EmptyStateView<Description: View, Actions: View>: View {
+    let title: Text
+    let systemImage: String
+    let description: Description
+    let actions: Actions
+
+    init(title: Text, systemImage: String, @ViewBuilder description: () -> Description,
+         @ViewBuilder actions: () -> Actions) {
+        self.title = title
+        self.systemImage = systemImage
+        self.description = description()
+        self.actions = actions()
+    }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 7) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 34))
+                    .padding(.bottom, 18)
+                    .accessibilityHidden(true)
+                title
+                    .font(.title3.bold())
+                    .accessibilityAddTraits(.isHeader)
+                VStack(spacing: 19) { description }
+                    .font(.title3)
+                    .lineSpacing(3)
+                    .frame(maxWidth: 360)
+            }
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            HStack(spacing: 8) { actions }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+extension EmptyStateView where Actions == EmptyView {
+    init(title: Text, systemImage: String, @ViewBuilder description: () -> Description) {
+        self.init(title: title, systemImage: systemImage, description: description) { EmptyView() }
+    }
+}
+
+extension EmptyStateView where Description == EmptyView, Actions == EmptyView {
+    init(title: Text, systemImage: String) {
+        self.init(title: title, systemImage: systemImage) { EmptyView() }
+    }
+}
+
+/// Opens CleanMate's Settings window, on `tab` (a `SettingsView` tag) when given: SwiftUI's environment action on
+/// macOS 14+, where AppKit's `showSettingsWindow:` only logs a warning; that AppKit action on macOS 13, which has no
+/// environment action.
+struct OpenSettingsButton<Label: View>: View {
+    private let tab: String?
+    private let label: Label
+
+    init(tab: String? = nil, @ViewBuilder label: () -> Label) {
+        self.tab = tab
+        self.label = label()
+    }
+
+    var body: some View {
+        if #available(macOS 14, *) {
+            OpenSettingsEnvironmentButton(tab: tab, label: label)
+        } else {
+            Button {
+                Self.select(tab)
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            } label: { label }
+        }
+    }
+
+    fileprivate static func select(_ tab: String?) {
+        if let tab { UserDefaults.standard.set(tab, forKey: Preferences.settingsTab) }
+    }
+}
+
+extension OpenSettingsButton where Label == Text {
+    /// "Open Settings…".
+    init(tab: String? = nil) {
+        self.init(tab: tab) { Text("Open Settings…") }
+    }
+}
+
+@available(macOS 14, *)
+private struct OpenSettingsEnvironmentButton<Label: View>: View {
+    let tab: String?
+    let label: Label
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button {
+            OpenSettingsButton<Label>.select(tab)
+            openSettings()
+        } label: { label }
+    }
+}
+
+/// VoiceOver announcement (SwiftUI's `AccessibilityNotification` needs macOS 14).
+@MainActor func announceForAccessibility(_ text: String) {
+    NSAccessibility.post(element: NSApp.keyWindow ?? NSApp as Any, notification: .announcementRequested,
+                         userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+}
+
+extension View {
+    /// Runs `action` when the view appears and whenever `value` changes (`onChange(of:initial: true)` needs macOS 14).
+    func onAppearAndChange<V: Equatable>(of value: V, perform action: @escaping (V) -> Void) -> some View {
+        onAppear { action(value) }.onChange(of: value, perform: action)
+    }
+
+    /// Space on this list or table while it has the keyboard focus and no confirmation is shown; `action` returns
+    /// false to let the key through. An AppKit key monitor, installed while the view is in a window: SwiftUI's
+    /// key-press modifier needs macOS 14.
+    func onSpaceKey(_ action: @escaping () -> Bool) -> some View {
+        modifier(SpaceKeyModifier(action: action))
+    }
+}
+
+private struct SpaceKeyModifier: ViewModifier {
+    let action: () -> Bool
+    @FocusedValue(\.confirming) private var confirming
+
+    func body(content: Content) -> some View {
+        content.background(SpaceKeyMonitor(action: action, blocked: confirming == true))
+    }
+}
+
+/// An empty view behind the list; its frame tells which list in the window it belongs to.
+private struct SpaceKeyMonitor: NSViewRepresentable {
+    let action: () -> Bool
+    let blocked: Bool
+
+    func makeNSView(context: Context) -> SpaceKeyMonitorView { SpaceKeyMonitorView() }
+
+    func updateNSView(_ view: SpaceKeyMonitorView, context: Context) {
+        view.action = action
+        view.blocked = blocked
+    }
+}
+
+final class SpaceKeyMonitorView: NSView {
+    var action: () -> Bool = { false }
+    var blocked = false
+    private var monitor: Any?
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil } // clicks go to the list
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil, monitor == nil {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.handles(event) else { return event }
+                return self.action() ? nil : event
+            }
+        } else if window == nil, let monitor {
+            NSEvent.removeMonitor(monitor)
+            self.monitor = nil
+        }
+    }
+
+    /// Space without ⌘, ⌥ or ⌃ in this view's window, no sheet or confirmation shown, and the focused view is the
+    /// table (SwiftUI `List` and `Table` are `NSTableView`s) this view sits behind, not another list in the window.
+    func handles(_ event: NSEvent) -> Bool {
+        guard !blocked, let window, event.window === window, window.attachedSheet == nil,
+              event.keyCode == 49, event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
+              let table = window.firstResponder as? NSTableView else { return false }
+        let list = table.enclosingScrollView ?? table
+        let listFrame = list.convert(list.bounds, to: nil)
+        return convert(bounds, to: nil).contains(CGPoint(x: listFrame.midX, y: listFrame.midY))
     }
 }

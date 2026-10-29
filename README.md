@@ -36,7 +36,7 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks
    whether to check automatically; change it any time in Settings › General › Updates.
 
-Requires **macOS 14** or later.
+Requires **macOS 13** or later.
 
 ## Safety
 

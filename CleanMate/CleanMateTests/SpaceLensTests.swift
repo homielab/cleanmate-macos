@@ -412,6 +412,21 @@ struct SpaceLensTests {
         #expect(SpaceLens.slice(at: CGPoint(x: 10, y: 30), in: frame, of: uneven)?.item?.name == "b")
     }
 
+    /// The stacked bar drawn instead of the donut on macOS 13: slices left to right by share.
+    @Test func barHitTestByFraction() {
+        func slice(_ name: String, _ size: Int64) -> SpaceLens.Slice {
+            SpaceLens.Slice(item: SpaceItem(url: URL(fileURLWithPath: "/x/\(name)"), isFolder: true, size: size), size: size)
+        }
+        let slices = [slice("a", 3), slice("b", 1)]
+        func hit(_ fraction: Double) -> String? { SpaceLens.slice(atFraction: fraction, of: slices)?.item?.name }
+        #expect(hit(0) == "a")
+        #expect(hit(0.75) == "a") // boundary belongs to the slice ending there
+        #expect(hit(0.76) == "b")
+        #expect(hit(1) == "b")
+        #expect(hit(-0.01) == nil && hit(1.01) == nil)
+        #expect(SpaceLens.slice(atFraction: 0.5, of: []) == nil)
+    }
+
     /// After a trash the selection drops what is gone, and an empty pick keeps the real report.
     @MainActor @Test func trashPrunesSelectionAndEmptyPickKeepsReport() async throws {
         defer { try? FileManager.default.removeItem(at: root) }

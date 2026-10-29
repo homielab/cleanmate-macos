@@ -104,10 +104,10 @@ struct ContentView: View {
             AppDelegate.registerBusyCheck(ObjectIdentifier(smartScan),
                                           Self.busyCheck(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems))
         }
-        .onChange(of: router.requested, initial: true) {
+        .onAppearAndChange(of: router.requested) { _ in
             if let module = router.requested { selection = module; router.requested = nil }
         }
-        .onChange(of: router.spaceLensItem, initial: true) {
+        .onAppearAndChange(of: router.spaceLensItem) { _ in
             if let url = router.spaceLensItem { spaceLens.reveal(url); selection = .spaceLens; router.spaceLensItem = nil }
         }
         .onAppear {

@@ -57,11 +57,18 @@ nonisolated enum SpaceLens {
         guard distance <= radius, distance >= radius * innerRatio else { return nil }
         var angle = atan2(dx, -dy)
         if angle < 0 { angle += 2 * .pi }
+        return slice(atFraction: angle / (2 * .pi), of: slices)
+    }
+
+    /// The slice at `fraction` (0…1) of the way around the donut, or along the stacked bar drawn instead on macOS 13
+    /// (left to right); nil outside 0…1.
+    static func slice(atFraction fraction: Double, of slices: [Slice]) -> Slice? {
         let total = slices.reduce(0) { $0 + $1.size }
+        guard total > 0, (0...1).contains(fraction) else { return nil }
         var end = 0.0
         for slice in slices {
-            end += Double(slice.size) / Double(total) * 2 * .pi
-            if angle <= end { return slice }
+            end += Double(slice.size) / Double(total)
+            if fraction <= end { return slice }
         }
         return slices.last
     }
