@@ -228,6 +228,12 @@ struct EndToEndCleanTests {
                     try OldDownloadsTests.stamp(shot, modified: old, read: old, created: old, added: old)
                     continue
                 }
+                if item.id == AbandonedDownloads.id { // a download Chrome gave up on long ago
+                    let part = folder.appending(path: "junk.dmg.crdownload")
+                    try write(part, Data(repeating: 1, count: 4096))
+                    try OldDownloadsTests.stamp(part, modified: old, read: old, created: old, added: old)
+                    continue
+                }
                 if item.id == OldRuntimes.nodeID { // a Node version other than nvm's default (v22.0.0, bait)
                     try write(folder.appending(path: "v1.0.0/bin/node"), Data(repeating: 1, count: 4096))
                     continue

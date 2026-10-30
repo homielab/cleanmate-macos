@@ -88,7 +88,12 @@ extension CleanerGroup {
             // Screenshots and screen recordings where macOS saves them (`OldScreenshots`), untouched for the downloads
             // age: user files, so unticked, one checkbox each, to the Trash. Only with Full Disk Access: Desktop is
             // protected like Downloads.
-        ] + [OldScreenshots.item(days: ages.downloads, folder: screenshotFolder)].compactMap { $0 } : []) + [
+        ] + [OldScreenshots.item(days: ages.downloads, folder: screenshotFolder)].compactMap { $0 } + [
+            // Unfinished downloads at the top level of Downloads untouched for 7 days (`AbandonedDownloads`), which the
+            // two Downloads items above skip: user files, so unticked, one checkbox each, to the Trash with the file of
+            // the real name Firefox and aria2 keep next to them, never open (still downloading).
+            AbandonedDownloads.item(),
+        ] : []) + [
             // Downloaded iOS/iPadOS updates: only `*.ipsw`, one entry each, unticked (slow to download again),
             // to the Trash, never while Finder or Apple Configurator updates a device. Configurator's cache is a
             // deliberate exception to "never Apple's containers" (like Mail): that one folder, only with FDA.

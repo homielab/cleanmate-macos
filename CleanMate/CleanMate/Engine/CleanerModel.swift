@@ -229,7 +229,7 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// entry's size and `shared` counts once in the item's size when every entry using it is in the scan (ticked), and
     /// again right before removal: only `own` (the files no other entry left on disk uses) is removed, after its
     /// entry, through `SafetyPolicy.allows`, and only when it is a regular file. Removing the last entry using a
-    /// shared file therefore removes it.
+    /// shared file therefore removes it. With `skipsOpenFiles`, an entry whose `own` file is open is kept too.
     var entryFiles: (@Sendable (URL) -> EntryFiles)? = nil
     /// Lists, instead of `paths`, the user's Trash on each external drive (`ExternalTrash`): one entry per drive, named
     /// after it, checked with `SafetyPolicy.allowsExternalTrash` instead of `allows`, and emptied (the folder stays).

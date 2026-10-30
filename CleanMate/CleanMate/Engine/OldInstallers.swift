@@ -7,9 +7,10 @@ nonisolated enum OldInstallers {
     static let extensions = ["dmg", "pkg", "iso", "xip", "zip"]
     /// `CleanerItem.included` patterns (fnmatch is case-sensitive): `Setup.dmg` and `SETUP.DMG`.
     static let patterns = extensions.flatMap { ["*.\($0)", "*.\($0.uppercased())"] }
-    /// Names browsers download to: Safari `<name>.download` (a folder), Chrome `<name>.crdownload`, Firefox
-    /// `<name>.part` (Firefox also creates `<name>` itself, empty, until the download ends).
-    static let partialSuffixes = ["download", "crdownload", "part"]
+    /// Names browsers and download tools download to: Safari `<name>.download` (a folder), Chrome `<name>.crdownload`,
+    /// Firefox `<name>.part` (Firefox also creates `<name>` itself, empty, until the download ends), aria2
+    /// `<name>.aria2` (next to `<name>`, which it fills), qBittorrent `<name>.!qB`. `AbandonedDownloads` lists them.
+    static let partialSuffixes = ["download", "crdownload", "part", "aria2", "!qB"]
     /// A central directory larger than this (millions of entries) is not read: the zip is kept.
     static let centralDirectoryLimit: UInt64 = 64 << 20
 
@@ -25,7 +26,8 @@ nonisolated enum OldInstallers {
 
     /// A download in progress: `url` is a browser's partial download (`partialSuffixes`) or has one next to it.
     static func isDownloading(_ url: URL) -> Bool {
-        if partialSuffixes.contains(url.pathExtension.lowercased()) { return true }
+        let ext = AbandonedDownloads.pathExtension(url.lastPathComponent)
+        if partialSuffixes.contains(where: { $0.lowercased() == ext }) { return true }
         let folder = url.deletingLastPathComponent()
         return partialSuffixes.contains { suffix in
             var other = stat()

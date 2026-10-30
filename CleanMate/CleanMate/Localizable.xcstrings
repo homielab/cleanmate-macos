@@ -101,6 +101,16 @@
         }
       }
     },
+    "Abandoned downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp tải dở bị bỏ"
+          }
+        }
+      }
+    },
     "AI sessions: %lld days" : {
       "localizations" : {
         "en" : {
@@ -1879,6 +1889,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản tải toolchain, rustup sẽ tải lại khi cần"
+          }
+        }
+      }
+    },
+    "Unfinished downloads (.crdownload, .part, .download, .aria2, .!qB) in Downloads not modified or opened for 7 days. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp tải dở (.crdownload, .part, .download, .aria2, .!qB) trong Tải về không sửa hay mở trong 7 ngày. Chuyển vào Thùng rác"
           }
         }
       }

@@ -180,7 +180,7 @@ nonisolated enum Scanner {
                    modified(values) >= cutoff { return [] }
                 guard !item.excluded.contains(name), item.allowsEntry?(policy, url) ?? policy.allows(url),
                       skips?(url) != true, !isLocked(url),
-                      open.isEmpty || !RunningProcesses.holdsOpenFile(url, openPaths: open) else { return [] }
+                      open.isEmpty || !holdsOpenFile(url, of: item, openPaths: open) else { return [] }
                 if prefix.isEmpty, only?.contains(name) == false
                     || item.included?.contains(where: { fnmatch($0, name, 0) == 0 }) == false { return [] }
                 guard holdsExclusion else { return [url] }
@@ -278,6 +278,13 @@ nonisolated enum Scanner {
             found.partlyUnreadable = found.partlyUnreadable || measured.partlyUnreadable
         }
         return found.size > 0 ? found : nil
+    }
+
+    /// Whether the entry `url` is, or holds, one of `openPaths`, or one of its own `CleanerItem.entryFiles` is (the
+    /// file aria2 downloads into next to its `.aria2`).
+    static func holdsOpenFile(_ url: URL, of item: CleanerItem, openPaths: Set<String>) -> Bool {
+        RunningProcesses.holdsOpenFile(url, openPaths: openPaths)
+            || item.entryFiles?(url).own.contains { RunningProcesses.holdsOpenFile($0, openPaths: openPaths) } == true
     }
 
     /// Allocated bytes of a regular file (not through a symlink); 0 for anything else or a missing file.
