@@ -229,26 +229,33 @@ nonisolated struct SafetyPolicy: Sendable {
     }
 
     /// Smart Scan rule for a stale project's dependencies (`StaleNodeModules`), only ever moved to the Trash: a real
-    /// folder named `node_modules` next to a regular `package.json`, strictly inside the home folder, not under ~/Library,
-    /// a hidden folder, another `node_modules` or a package (an app's bundled modules), on the home's volume with no
-    /// other volume mounted inside, not excluded. Unlike `allows`, also inside Documents and Desktop, where people keep
-    /// projects; never inside the other never-touch trees (Pictures, iCloud Drive, .ssh…).
-    func allowsNodeModules(_ url: URL) -> Bool {
+    /// folder named `node_modules` next to a regular `package.json` (see `allowsProjectFolder`).
+    func allowsNodeModules(_ url: URL) -> Bool { allowsProjectFolder(url, named: [StaleNodeModules.folderName]) }
+
+    /// Smart Scan rule for a stale project's build folder (`StaleBuildFolders`), only ever moved to the Trash: a real
+    /// `target` next to a regular `Cargo.toml`, `Pods` next to a `Podfile`, or `.venv`/`venv` holding `pyvenv.cfg`
+    /// next to a Python project file (see `allowsProjectFolder`).
+    func allowsBuildFolder(_ url: URL) -> Bool { allowsProjectFolder(url, named: StaleBuildFolders.folderNames) }
+
+    /// A folder named one of `names` that its parent holds as a project folder (`StaleProjects.isProjectFolder`),
+    /// strictly inside the home folder, not under ~/Library, a hidden folder, a dependency or build folder
+    /// (`StaleProjects.unwalked`) or a package (an app's bundled modules), on the home's volume with no other volume
+    /// mounted inside, not excluded. Unlike `allows`, also inside Documents and Desktop, where people keep projects;
+    /// never inside the other never-touch trees (Pictures, iCloud Drive, .ssh…).
+    private func allowsProjectFolder(_ url: URL, named names: Set<String>) -> Bool {
         let path = Self.normalize(url)
-        guard (path as NSString).lastPathComponent == StaleNodeModules.folderName, let home = allowedRoots.first,
+        guard names.contains((path as NSString).lastPathComponent), let home = allowedRoots.first,
               path.hasPrefix(home + "/"), !isExcluded(path) else { return false }
         let parts = path.dropFirst(home.count + 1).split(separator: "/")
-        guard parts.first?.lowercased() != "library", !parts.contains(where: { $0.hasPrefix(".") }),
-              !parts.dropLast().contains(where: { $0 == StaleNodeModules.folderName }) else { return false }
+        guard parts.first?.lowercased() != "library",
+              !parts.dropLast().contains(where: { $0.hasPrefix(".") || StaleProjects.unwalked.contains(String($0)) })
+        else { return false }
         let key = path.lowercased()
         let projectTrees = ["Documents", "Desktop"].map { (home + "/" + $0).lowercased() }
         guard !protectedTrees.contains(where: { !projectTrees.contains($0) && key.hasPrefix($0 + "/") }) else { return false }
         if let homeDevice = rootDevices[0], device(path) != homeDevice { return false }
         if holdsMount(path) { return false }
-        var info = stat()
-        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
-              lstat((path as NSString).deletingLastPathComponent + "/" + StaleNodeModules.manifest, &info) == 0,
-              info.st_mode & S_IFMT == S_IFREG else { return false }
+        guard StaleProjects.isProjectFolder(path) else { return false }
         var folder = URL(fileURLWithPath: home)
         for part in parts.dropLast() {
             folder.append(path: String(part))

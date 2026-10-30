@@ -177,10 +177,10 @@ struct StaleNodeModulesTests {
         defer { try? fm.removeItem(at: root) }
         try project("x")
         try project("y/z")
-        #expect(StaleNodeModules.find(in: [developer], depth: 1).map(\.lastPathComponent) == ["node_modules"])
-        #expect(StaleNodeModules.find(in: [developer]).count == 2)
-        #expect(StaleNodeModules.find(in: [developer], folderLimit: 1).isEmpty) // only the root itself was read
-        #expect(StaleNodeModules.find(in: [developer], skipping: [developer.appending(path: "y").path]).count == 1)
+        #expect(StaleProjects.find(in: [developer], depth: 1).map(\.lastPathComponent) == ["node_modules"])
+        #expect(StaleProjects.find(in: [developer]).count == 2)
+        #expect(StaleProjects.find(in: [developer], folderLimit: 1).isEmpty) // only the root itself was read
+        #expect(StaleProjects.find(in: [developer], skipping: [developer.appending(path: "y").path]).count == 1)
     }
 
     /// A worktree's `.git` file leads to its own index in the main repository.
@@ -190,7 +190,7 @@ struct StaleNodeModulesTests {
         try write(developer.appending(path: "main/.git/worktrees/tree/index"), bytes: 10, date: .now)
         try Data("gitdir: ../main/.git/worktrees/tree\n".utf8).write(to: developer.appending(path: "tree/.git"))
         try touch(developer.appending(path: "tree/.git"), old)
-        #expect(StaleNodeModules.gitFolder(linkedFrom: developer.appending(path: "tree/.git").path)
+        #expect(StaleProjects.gitFolder(linkedFrom: developer.appending(path: "tree/.git").path)
             == developer.appending(path: "main/.git/worktrees/tree").path)
         let date = try #require(StaleNodeModules.lastWorkedOn(developer.appending(path: "tree/node_modules"), home: home))
         #expect(date > .now.addingTimeInterval(-60))
@@ -201,7 +201,7 @@ struct StaleNodeModulesTests {
         #expect(RunningProcesses.workingFolder(of: getpid()).map { ($0 as NSString).resolvingSymlinksInPath } == own)
         let folders = RunningProcesses.folders(ofProcessesNamed: { _ in true })
         #expect(folders.contains(RunningProcesses.withoutPrivate(own)))
-        #expect(StaleNodeModules.isUsed(URL(fileURLWithPath: "/Users/me/app"), by: ["/Users/me/app/src"]))
-        #expect(!StaleNodeModules.isUsed(URL(fileURLWithPath: "/Users/me/app"), by: ["/Users/me/app-2", "/Users/me"]))
+        #expect(StaleProjects.isUsed(URL(fileURLWithPath: "/Users/me/app"), by: ["/Users/me/app/src"]))
+        #expect(!StaleProjects.isUsed(URL(fileURLWithPath: "/Users/me/app"), by: ["/Users/me/app-2", "/Users/me"]))
     }
 }

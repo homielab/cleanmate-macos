@@ -133,7 +133,7 @@ nonisolated enum Scanner {
         }
         let skips = item.skipsEntry?()
         if let find = item.findEntries {
-            let found = find(roots, policy).filter { url in
+            let found = await find(roots, policy).filter { url in
                 (item.allowsEntry?(policy, url) ?? policy.allows(url)) && skips?(url) != true && !isLocked(url)
             }
             // One open-file read under the home folder, only when something was found (it lists every process).

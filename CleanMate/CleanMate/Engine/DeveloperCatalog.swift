@@ -90,6 +90,9 @@ extension CleanerGroup {
         // Projects' own dependencies, when nobody worked on the project for 90 days: unticked, one entry per project, to
         // the Trash (installing again needs the network). Never while node, Bun, pnpm… run in the project.
         StaleNodeModules.item(),
+        // Cargo's target, Python virtual environments and CocoaPods' Pods of the same stale projects, found by the same
+        // walk: unticked, one entry per folder, to the Trash (building them again takes long).
+        StaleBuildFolders.item(),
         dev("pip-cache", "pip cache", ["~/Library/Caches/pip"], processes: ["pip", "pip3"]),
         dev("uv-cache", "uv cache", note: clonedNote, ["~/.cache/uv"],
             command: ShellCommand(executable: "uv", arguments: ["cache", "clean"], timeout: .seconds(120)),

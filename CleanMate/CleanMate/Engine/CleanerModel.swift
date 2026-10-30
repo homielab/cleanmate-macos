@@ -222,11 +222,11 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// after it, checked with `SafetyPolicy.allowsExternalTrash` instead of `allows`, and emptied (the folder stays).
     var externalTrash = false
     /// Finds the entries in the item's folders (`Scanner.roots`) instead of listing their top-level children
-    /// (`StaleNodeModules`: `node_modules` folders of projects a few levels down). Each one found is then checked like a
-    /// listed entry (`allowsEntry`, `skipsEntry`, locked, open files) and measured whole.
-    var findEntries: (@Sendable ([URL], SafetyPolicy) -> [URL])? = nil
+    /// (`StaleNodeModules`, `StaleBuildFolders`: folders of projects a few levels down). Each one found is then checked
+    /// like a listed entry (`allowsEntry`, `skipsEntry`, locked, open files) and measured whole.
+    var findEntries: (@Sendable ([URL], SafetyPolicy) async -> [URL])? = nil
     /// Replaces `SafetyPolicy.allows` for the item's entries, at scan and again right before removal
-    /// (`SafetyPolicy.allowsNodeModules`, which also reaches projects in Documents and Desktop).
+    /// (`SafetyPolicy.allowsNodeModules`, `allowsBuildFolder`, which also reach projects in Documents and Desktop).
     var allowsEntry: (@Sendable (SafetyPolicy, URL) -> Bool)? = nil
 }
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Developer Junk**: **Stale build folders** lists Cargo `target`, Python `.venv`/`venv` and CocoaPods `Pods` folders of projects nobody changed for 90 days, one by one with the project's path; none are ticked, and they go to the Trash so Undo can put them back.
 - **AI tools**: **LM Studio models** lists each downloaded LM Studio model with its size and date; tick the ones to delete (none are ticked by default, and the row is locked while LM Studio runs).
 - **Settings › General › Language**: choose Same as your Mac, English or Tiếng Việt for CleanMate only, with a Restart button.
 - Homebrew cask definition (`packaging/Casks/cleanmate.rb`); the release script keeps its version and checksum current.

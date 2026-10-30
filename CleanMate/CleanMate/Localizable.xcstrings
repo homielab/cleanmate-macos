@@ -1541,6 +1541,16 @@
         }
       }
     },
+    "Cargo target, Python virtual environment and CocoaPods Pods folders of projects whose files and Git index were not modified for 90 days. Moved to the Trash; cargo build, uv or pip, and pod install make them again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục target của Cargo, môi trường ảo Python và Pods của CocoaPods trong các dự án có tệp và chỉ mục Git không đổi trong 90 ngày. Chuyển vào Thùng rác; cargo build, uv hoặc pip, và pod install sẽ tạo lại"
+          }
+        }
+      }
+    },
     "Changed in the last %lld days" : {
       "localizations" : {
         "en" : {
@@ -4083,6 +4093,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Space Lens"
+          }
+        }
+      }
+    },
+    "Stale build folders" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục build bỏ lâu"
           }
         }
       }

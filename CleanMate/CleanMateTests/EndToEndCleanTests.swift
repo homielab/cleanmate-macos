@@ -159,8 +159,10 @@ struct EndToEndCleanTests {
         let items = (CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) + CleanerGroup.privacy).flatMap(\.items)
             .filter { !$0.paths.isEmpty }.map { item in
                 // Projects are dated up to the fake home, and no real node process counts.
-                var item = Self.ownOpenFiles(item.id != "stale-node-modules" ? item
-                    : StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] }))
+                var item = Self.ownOpenFiles(item.id == "stale-node-modules"
+                    ? StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] })
+                    : item.id == "stale-build-dirs"
+                    ? StaleBuildFolders.item(home: home, hasFullDiskAccess: { true }, running: { [] }) : item)
                 item.command = nil
                 if item.probe != nil {
                     let junk = "junk-" + item.id
@@ -184,11 +186,12 @@ struct EndToEndCleanTests {
                     try (["MCMMetadataCreator": "com.example.app"] as NSDictionary).write(to: folder
                         .deletingLastPathComponent().deletingLastPathComponent().appending(path: ".com.apple.containermanagerd.metadata.plist"))
                 }
-                if item.findEntries != nil { // a stale project in each folder: only its node_modules goes
+                if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes
                     let project = folder.appending(path: "junk-\(item.id)")
-                    try write(project.appending(path: "package.json"), Data("{}".utf8))
-                    try write(project.appending(path: "node_modules/dep/index.js"), Data(repeating: 1, count: 4096))
-                    for url in [project.appending(path: "node_modules/dep"), project.appending(path: "node_modules")] {
+                    let (manifest, built) = item.id == "stale-build-dirs" ? ("Cargo.toml", "target") : ("package.json", "node_modules")
+                    try write(project.appending(path: manifest), Data("{}".utf8))
+                    try write(project.appending(path: built + "/dep/index.js"), Data(repeating: 1, count: 4096))
+                    for url in [project.appending(path: built + "/dep"), project.appending(path: built)] {
                         try fm.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
                     }
                     continue

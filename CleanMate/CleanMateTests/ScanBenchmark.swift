@@ -102,13 +102,35 @@ struct ScanBenchmark {
     /// measuring all of them alone, then a whole Smart Scan with that item instead of the real one — the cost on a
     /// machine full of old projects. Only scans, like the rest of this suite.
     @Test func staleNodeModulesWorstCase() async {
-        let all = StaleNodeModules.item(running: { [] }, now: { .now.addingTimeInterval(3650 * 86_400) })
-        let (scan, seconds) = await timed { await Scanner.scan(all, policy: policy) }
-        report("stale-node-modules all (\(scan.entries.count))", seconds, scan.size)
+        let later: @Sendable () -> Date = { .now.addingTimeInterval(3650 * 86_400) }
+        let all = [StaleNodeModules.item(running: { [] }, now: later), StaleBuildFolders.item(running: { [] }, now: later)]
+        for item in all {
+            let (scan, seconds) = await timed { await Scanner.scan(item, policy: policy) }
+            report("\(item.id) all (\(scan.entries.count))", seconds, scan.size)
+        }
         await scanItems("smart-all-stale", CleanerGroup.smartScan.map { group in
             CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage,
-                         items: group.items.map { $0.id == all.id ? all : $0 })
+                         items: group.items.map { item in all.first { $0.id == item.id } ?? item })
         })
+    }
+
+    /// What the build folders item adds to a scan: node_modules alone, then both items at once as in Smart Scan
+    /// (they share one walk), alternated `runs` times (`CLEANMATE_BENCH_RUNS`, 5 by default); medians.
+    @Test func staleBuildFoldersCost() async {
+        let runs = ProcessInfo.processInfo.environment["CLEANMATE_BENCH_RUNS"].flatMap(Int.init) ?? 5
+        var alone: [Double] = [], both: [Double] = []
+        for _ in 0..<runs {
+            try? await Task.sleep(for: StaleProjects.reuseTime) // no walk reused from the previous run
+            alone.append(await timed { await Scanner.scan(StaleNodeModules.item(), policy: policy) }.1)
+            try? await Task.sleep(for: StaleProjects.reuseTime)
+            both.append(await timed {
+                async let modules = Scanner.scan(StaleNodeModules.item(), policy: policy)
+                async let builds = Scanner.scan(StaleBuildFolders.item(), policy: policy)
+                return await (modules.size, builds.size)
+            }.1)
+        }
+        report("stale node_modules alone (median)", alone.sorted()[runs / 2], 0)
+        report("stale node_modules + build (median)", both.sorted()[runs / 2], 0)
     }
 
     /// Entry label review: every real DerivedData / DeviceSupport folder and every `~/.claude/projects` folder,
