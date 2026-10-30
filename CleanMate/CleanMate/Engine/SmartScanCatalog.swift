@@ -117,7 +117,7 @@ extension CleanerGroup {
         ]),
         developer,
         aiTools(sessionDays: ages.sessions),
-        applications,
+        applications(hasFullDiskAccess: hasFullDiskAccess),
         CleanerGroup(id: "trash", title: "Trash", systemImage: "trash", items: [
             // Unticked by default: emptying the Trash cannot be undone.
             CleanerItem(id: "empty-trash", title: "Empty Trash", note: "Permanently deletes everything in the Trash",
@@ -144,8 +144,12 @@ extension CleanerGroup {
 
     /// Whether `…/Containers/<container>/Data/Library/Caches/<entry>` must be kept: not such an entry, Apple's, or
     /// its bundle id is a running app's or a helper of one (`com.vendor.app.helper` while `com.vendor.app` runs).
+    /// The container of an app item that lists its Caches itself (`CloudSyncCaches.oneDrive`) is kept too: counted once.
     nonisolated static func skipsSandboxCache(_ url: URL, runningApps: Set<String>) -> Bool {
         guard let id = containerBundleID(url) else { return true }
+        let container = url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().lastPathComponent
+        if ownedContainers.contains(container) || ownedContainers.contains(id) { return true }
         return SafetyPolicy.isApple(id) || runningApps.contains { AppMatcher.belongs(id.lowercased(), to: $0) }
     }
 
@@ -178,13 +182,16 @@ extension CleanerGroup {
         return runningApps.contains { vendors.contains(AppMatcher.vendor($0)) }
     }
 
+    /// Containers whose `Data/Library/Caches` an app item lists, kept out of "Sandboxed app caches".
+    nonisolated static let ownedContainers: Set = [CloudSyncCaches.oneDriveContainer]
+
     /// Not caches though under ~/Library/Caches: Poetry's default virtualenvs (`{cache-dir}/virtualenvs`), one
     /// per project; removing them breaks `poetry run` until `poetry install`. The rest of `pypoetry` is still listed.
     nonisolated static let notCaches: Set<String> = ["pypoetry/virtualenvs"]
 
     /// Caches holding iCloud/sync state or in-flight downloads: wiping them forces a re-sync or breaks transfers.
     /// rclone: its VFS cache holds files written to a mount but not uploaded yet. TemporaryItems: saves in progress.
-    nonisolated private static let keptCaches: Set<String> = [
+    nonisolated static let keptCaches: Set<String> = [
         "rclone", "TemporaryItems",
         "com.apple.bird", "CloudKit", "com.apple.akd", "com.apple.nsurlsessiond", "com.apple.homed",
         "FamilyCircle", "com.apple.containermanagerd", "com.apple.ap.adprivacyd",

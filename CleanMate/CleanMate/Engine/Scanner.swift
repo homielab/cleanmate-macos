@@ -105,7 +105,8 @@ nonisolated enum Scanner {
             ShellEnvironment.folder(name, policy: policy).map { below($0, subpaths) } ?? []
         }
         if let config = item.configFolders {
-            extra += config.read(policy.homeURL).compactMap { ShellEnvironment.checkedFolder($0, policy: policy) }
+            extra += config.read(policy.homeURL)
+                .compactMap { ShellEnvironment.checkedFolder($0, policy: policy, allows: config.allows) }
                 .flatMap { below($0, config.subpaths) }
         }
         if let located = await item.locate?.root(policy: policy) { extra.append(located) }

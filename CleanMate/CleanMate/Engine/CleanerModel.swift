@@ -115,6 +115,8 @@ nonisolated struct ConfigFolders: Sendable {
     var read: @Sendable (URL) -> [String]
     /// Below each folder read: `""` = the folder itself, `*` components allowed.
     var subpaths: [String] = [""]
+    /// Replaces `SafetyPolicy.allows` for the folders read (Dropbox's cache in ~/Library/CloudStorage).
+    var allows: (@Sendable (SafetyPolicy, URL) -> Bool)? = nil
 }
 
 /// Erases records inside a SQLite database with `/usr/bin/sqlite3` instead of removing the file.

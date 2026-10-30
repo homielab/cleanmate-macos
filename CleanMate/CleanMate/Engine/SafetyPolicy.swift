@@ -140,18 +140,36 @@ nonisolated struct SafetyPolicy: Sendable {
         return mounts().contains { $0.lowercased().hasPrefix(prefix) }
     }
 
-    func allows(_ url: URL) -> Bool {
+    func allows(_ url: URL) -> Bool { allows(normalized: Self.normalize(url)) }
+
+    /// `allows`, or the one exception to the CloudStorage never-touch tree: Dropbox's own cache in a Dropbox folder
+    /// there, `~/Library/CloudStorage/Dropbox*/.dropbox.cache` and what it holds (never the synced files next to it),
+    /// otherwise checked like `allows` (same volume, no mount inside, not excluded).
+    func allowsDropboxCache(_ url: URL) -> Bool {
         let path = Self.normalize(url)
+        if allows(normalized: path) { return true }
+        guard let home = allowedRoots.first else { return false }
+        let cloud = (home + "/Library/CloudStorage").lowercased()
+        let key = path.lowercased()
+        guard key.hasPrefix(cloud + "/") else { return false }
+        let parts = key.dropFirst(cloud.count + 1).split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count >= 2, parts[0].hasPrefix("dropbox"), parts[1] == ".dropbox.cache" else { return false }
+        return allows(normalized: path, skippingTree: cloud)
+    }
+
+    /// `allows` for a normalized path; `skippingTree` (lowercased) is left out of the never-touch trees.
+    private func allows(normalized path: String, skippingTree: String? = nil) -> Bool {
         guard let root = allowedRoots.firstIndex(where: { path.hasPrefix($0 + "/") }), !isExcluded(path) else { return false }
         // Another volume mounted inside (a mount point or anything on it): never listed, measured nor removed.
         if let rootDevice = rootDevices[root], let entryDevice = device(path), entryDevice != rootDevice { return false }
         if holdsMount(path) { return false }
         // APFS is case-insensitive by default: `~/documents` or `~/.SSH` is the protected folder itself.
         let key = path.lowercased()
-        for folder in protectedFolders + protectedTrees where folder == key || folder.hasPrefix(key + "/") {
+        let trees = skippingTree.map { tree in protectedTrees.filter { $0 != tree } } ?? protectedTrees
+        for folder in protectedFolders + trees where folder == key || folder.hasPrefix(key + "/") {
             return false
         }
-        return !protectedTrees.contains { key.hasPrefix($0 + "/") }
+        return !trees.contains { key.hasPrefix($0 + "/") }
     }
 
     /// Separate, narrower rule for files the user picked by hand (Large & Old Files), which are only ever

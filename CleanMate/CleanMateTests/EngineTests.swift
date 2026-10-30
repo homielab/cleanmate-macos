@@ -1717,7 +1717,7 @@ struct CatalogTests {
     @Test func developerItemsAreUniqueHiddenWhenEmptyAndCleanable() {
         #expect(Set(items.map(\.id)).count == items.count)
         let policy = SafetyPolicy(home: URL(fileURLWithPath: "/Users/test"), temp: URL(fileURLWithPath: "/var/folders/xx/T"))
-        for item in [CleanerGroup.developer, .aiTools(), .applications].flatMap(\.items) {
+        for item in [CleanerGroup.developer, .aiTools(), .applications(hasFullDiskAccess: true)].flatMap(\.items) {
             #expect(!item.showsWhenEmpty, "\(item.id)")
             #expect(!item.paths.isEmpty || item.probe != nil, "\(item.id)")
             // An item finding its entries itself has its own rule (`allowsEntry`), tested with the item.
@@ -1778,7 +1778,7 @@ struct AppCatalogTests {
     /// Adobe media cache: only Media Cache Files, Media Cache and Peak Files are counted and deleted; the rest of
     /// Adobe/Common, Adobe preferences, profiles and projects stay, and so does Adobe/Common itself.
     @Test func adobeMediaCacheCleansOnlyTheCacheFolders() async throws {
-        let item = try #require(CleanerGroup.applications.items.first { $0.id == "adobe-media-cache" })
+        let item = try #require(CleanerGroup.applications().items.first { $0.id == "adobe-media-cache" })
         #expect(!item.selectedByDefault && item.mode == .delete && !item.showsWhenEmpty && item.note != nil)
         #expect(item.skipsOpenFiles && item.command == nil && item.probe == nil)
         let box = try Sandbox()
@@ -1809,7 +1809,7 @@ struct AppCatalogTests {
 
     /// Without Adobe there is nothing to list, and the hidden item shows no row.
     @Test func adobeMediaCacheHiddenWithoutAdobe() async throws {
-        let item = try #require(CleanerGroup.applications.items.first { $0.id == "adobe-media-cache" })
+        let item = try #require(CleanerGroup.applications().items.first { $0.id == "adobe-media-cache" })
         let box = try Sandbox()
         defer { box.remove() }
         try box.file("Library/Application Support/Adobe/Common/Team Projects Cache/t.dat")
@@ -1820,7 +1820,7 @@ struct AppCatalogTests {
     /// Locked while Premiere, After Effects or Media Encoder (any version) runs; Creative Cloud and its helpers,
     /// always running, do not lock it.
     @MainActor @Test func adobeMediaCacheLockedWhileAnAdobeMediaAppRuns() throws {
-        let item = try #require(CleanerGroup.applications.items.first { $0.id == "adobe-media-cache" })
+        let item = try #require(CleanerGroup.applications().items.first { $0.id == "adobe-media-cache" })
         let model = SmartScanModel(module: .smartScan) { [] }
         model.runningApps = ["com.adobe.acc.AdobeCreativeCloud", "com.adobe.CCXProcess"]
         model.runningProcesses = ["Creative Cloud", "AdobeIPCBroker", "CCXProcess", "Core Sync", "Adobe Desktop Service"]
@@ -1923,7 +1923,7 @@ struct AppCatalogTests {
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
                                               ofItemAtPath: box.home.appending(path: ".cursor/projects/Users-me-app/agent-transcripts/1").path)
         var listed: [URL] = []
-        for item in [CleanerGroup.aiTools(), .applications].flatMap(\.items) {
+        for item in [CleanerGroup.aiTools(), .applications(hasFullDiskAccess: true)].flatMap(\.items) {
             listed += await Scanner.scan(item, policy: box.policy).entries.map { $0.url.resolvingSymlinksInPath() }
         }
         for path in protected {
@@ -2748,7 +2748,7 @@ struct AppCatalogTests {
     /// Firefox item, in Privacy and in the app caches.
     @Test func firefoxItemsSkipWhileAnyFirefoxEditionRuns() throws {
         let privacy = try #require(CleanerGroup.privacy.first { $0.id == "privacy-firefox" }).items
-        let cache = try #require(CleanerGroup.applications.items.first { $0.id == "firefox" })
+        let cache = try #require(CleanerGroup.applications().items.first { $0.id == "firefox" })
         #expect(privacy.count == 3)
         for item in privacy + [cache] {
             #expect(Set(item.runningAppBundleIDs) == ["org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition",

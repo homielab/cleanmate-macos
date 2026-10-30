@@ -155,14 +155,16 @@ nonisolated enum ShellEnvironment {
         cached(home: policy.homeURL)[name].flatMap { checkedFolder($0, policy: policy) }
     }
 
-    /// `value` as a folder under the rules of `folder` (also for a folder named in a tool's settings file).
-    static func checkedFolder(_ value: String, policy: SafetyPolicy) -> URL? {
+    /// `value` as a folder under the rules of `folder` (also for a folder named in a tool's settings file);
+    /// `allows` replaces `SafetyPolicy.allows` (see `ConfigFolders.allows`).
+    static func checkedFolder(_ value: String, policy: SafetyPolicy,
+                              allows: (@Sendable (SafetyPolicy, URL) -> Bool)? = nil) -> URL? {
         guard value.hasPrefix("/"), !value.contains(where: { "*?[".contains($0) }) else { return nil }
         let url = URL(fileURLWithPath: value).standardizedFileURL
         var isFolder: ObjCBool = false
         guard url.path.hasPrefix(policy.homeURL.standardizedFileURL.path + "/"),
               FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder), isFolder.boolValue,
-              policy.allows(url), !policy.rootThroughSymlink(url) else { return nil }
+              allows?(policy, url) ?? policy.allows(url), !policy.rootThroughSymlink(url) else { return nil }
         return url
     }
 }

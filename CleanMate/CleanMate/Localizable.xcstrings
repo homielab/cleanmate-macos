@@ -6077,6 +6077,66 @@
           }
         }
       }
+    },
+    "Google Drive cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Google Drive"
+          }
+        }
+      }
+    },
+    "Files available offline are downloaded again when opened. Quit Google Drive only after it finishes uploading" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp có sẵn ngoại tuyến được tải lại khi mở. Chỉ thoát Google Drive khi đã tải lên xong"
+          }
+        }
+      }
+    },
+    "Dropbox cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Dropbox"
+          }
+        }
+      }
+    },
+    "Temporary copies Dropbox makes again when needed; your synced files are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao tạm Dropbox tạo lại khi cần; giữ nguyên tệp đã đồng bộ"
+          }
+        }
+      }
+    },
+    "OneDrive cache & logs" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OneDrive: bộ nhớ đệm & nhật ký"
+          }
+        }
+      }
+    },
+    "Recreated as needed; your synced files are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được tạo lại khi cần; giữ nguyên tệp đã đồng bộ"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

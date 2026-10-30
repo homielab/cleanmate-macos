@@ -56,8 +56,8 @@ struct EditorWorkspacesTests {
     }
 
     @Test func catalogItem() throws {
-        let item = try #require(CleanerGroup.applications.items.first { $0.id == "vscode-stale-workspaces" })
-        let ids = CleanerGroup.applications.items.map(\.id)
+        let item = try #require(CleanerGroup.applications().items.first { $0.id == "vscode-stale-workspaces" })
+        let ids = CleanerGroup.applications().items.map(\.id)
         #expect(ids.firstIndex(of: item.id) == ids.firstIndex(of: "vscode").map { $0 + 1 })
         #expect(!item.selectedByDefault && item.selectableEntries && item.mode == .trash && !item.showsWhenEmpty)
         #expect(item.skipsOpenFiles && item.skipsEntry != nil && item.entryLabel != nil && item.minAge == nil)

@@ -162,8 +162,10 @@ extension CleanerGroup {
         ("brave-nightly", "Brave Nightly", "com.brave.Browser.nightly", "BraveSoftware/Brave-Browser-Nightly"),
     ]
 
-    nonisolated static let applications = CleanerGroup(id: "applications", title: "Applications",
-                                                       systemImage: "macwindow", items: [
+    /// `hasFullDiskAccess`: OneDrive's folders (other apps' containers) and Dropbox folders in privacy-protected places
+    /// are only read with it.
+    nonisolated static func applications(hasFullDiskAccess: Bool = false) -> CleanerGroup {
+        CleanerGroup(id: "applications", title: "Applications", systemImage: "macwindow", items: [
         // Browsers: ~/Library/Caches/<browser> is all cache; Application Support only for the cache folders.
         app("safari", "Safari", bundle: ["com.apple.Safari"], ["~/Library/Caches/com.apple.Safari"]),
         browser("chrome", "Google Chrome", bundle: "com.google.Chrome", caches: "Google/Chrome", support: "Google/Chrome"),
@@ -238,7 +240,11 @@ extension CleanerGroup {
                     included: ["Media Cache Files", "Media Cache", "Peak Files"], selectedByDefault: false,
                     showsWhenEmpty: false, runningAppBundleIDs: adobeMediaBundleIDs,
                     runningProcessNames: adobeMediaProcessNames, skipsOpenFiles: true),
-    ])
+        // Cloud sync apps' caches (`CloudSyncCaches`): unticked, deleted, skipped while the app runs.
+        CloudSyncCaches.googleDrive,
+        CloudSyncCaches.dropbox(hasFullDiskAccess: { hasFullDiskAccess }),
+    ] + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive] : []))
+    }
 
     /// Adobe apps that read and write the media cache. Bundle ids and executables carry the version
     /// (`com.adobe.PremierePro.25`, `Adobe Premiere Pro 2025`), hence the prefixes; `aerender` renders After Effects
@@ -255,7 +261,7 @@ extension CleanerGroup {
     /// `~/Library/Caches` paths owned by a separate item (`Google/Chrome`, `Homebrew`), kept out of "User caches"
     /// so nothing is counted twice; the rest of their top folder (`Google/…`) is still listed. Cut at a `*`.
     /// "Old IDE versions" is left out: it would own all of `Google`; `skipsUserCache` keeps its folders instead.
-    nonisolated static let ownedCachePaths = Set([developer, aiTools(), applications].flatMap(\.items)
+    nonisolated static let ownedCachePaths = Set([developer, aiTools(), applications()].flatMap(\.items)
         .filter { $0.id != oldIDEVersions }.flatMap(\.paths)
         .compactMap { path -> String? in
             guard path.hasPrefix("~/Library/Caches/") else { return nil }
