@@ -96,7 +96,14 @@ extension CleanerGroup {
             // Unticked by default: emptying the Trash cannot be undone.
             CleanerItem(id: "empty-trash", title: "Empty Trash", note: "Permanently deletes everything in the Trash",
                         paths: ["~/.Trash"], selectedByDefault: false),
-        ]),
+        ] + (hasFullDiskAccess ? [
+            // What was deleted from an external drive stays in that drive's Trash (`ExternalTrash`): one entry per
+            // drive, unticked like the Trash above. Only with Full Disk Access: reading a drive without it makes macOS ask.
+            CleanerItem(id: "external-trash", title: "Trash on external drives",
+                        note: "Permanently deletes everything in the Trash of each ticked drive", paths: [],
+                        selectedByDefault: false, showsWhenEmpty: false, skipsOpenFiles: true, selectableEntries: true,
+                        externalTrash: true),
+        ] : [])),
     ] }
 
     /// Bundle id of the app owning `…/Containers/<container>/Data/Library/Caches/<entry>`: containermanagerd's

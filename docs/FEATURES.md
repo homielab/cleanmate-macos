@@ -42,6 +42,7 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 - iPhone and iPad backups made by Finder — only with Full Disk Access; unticked, moved to the Trash; each backup listed with its device name and date when expanded, with its own checkbox so you can keep some; skipped while a backup runs or if written to in the last hour.
 - Downloaded iOS/iPadOS updates (`.ipsw` in `~/Library/iTunes/iPhone|iPad|iPod Software Updates`, plus Apple Configurator's firmware cache with Full Disk Access) — only `.ipsw` files, each listed with device and version (e.g. "iPhone · 18.1 (22B83)") and its own checkbox; unticked, moved to the Trash; skipped while Finder or Apple Configurator updates a device.
 - Old logs, crash reports, old temporary files (an item holding a file a process has open is never old), the Trash (unticked by default).
+- **Trash on external drives** — only with Full Disk Access: what you deleted from a drive stays in that drive's own Trash (`.Trashes/<your user id>`), which the home Trash item does not count. Each mounted external drive whose Trash holds something is listed by name with its size and its own checkbox; unticked by default, emptied permanently (the Trash folder itself stays). Never other users' Trash folders, read-only, network or Time Machine drives, a Trash that is (or sits behind) a symlink, or a drive whose Trash holds a file still open (Finder still moving files there).
 
 **Developer junk** (each item hidden when empty)
 - **Xcode**: DerivedData (skipped while Xcode or `xcodebuild` runs; each project can be ticked on its own when expanded, shown with its workspace path and last use; shared caches such as ModuleCache are marked "shared by all projects"), device support (each OS version can be ticked on its own, e.g. "iOS 18.1 (22B83)"), old archives (moved to the Trash; each archive can be ticked on its own when expanded), simulators, SwiftUI Previews simulators, simulator caches (skipped while Xcode or Simulator runs), old simulator runtimes (unticked; only a runtime that a newer installed runtime of the same platform replaces and that was not used for 30 days, removed with `simctl runtime delete`; skipped while Xcode or Simulator runs).
@@ -83,7 +84,7 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 - **Your choices stick.** Items you untick stay unticked on the next scan (Settings › General › Remembered choices › **Reset…**, which asks before forgetting them).
 - **Turn off whole groups** (Settings › Scan Groups): a group switched off there (for example Developer Junk or AI Tools) is not scanned nor shown, so Smart Scan finishes sooner; the results say how many groups are off, with an Open Settings button. With every group off, Scan is disabled. Privacy has no such switch (its few browser groups are quick to scan and nothing is ticked by default).
 - **Hard blocklist**, checked when scanning and again right before every removal: only paths inside your home or
-  temporary folder; never `.ssh`, `.gnupg`, `.aws`, `.kube`, Keychains, Documents, Desktop, Pictures, Movies,
+  temporary folder (plus your own Trash folder on external drives, which Smart Scan only empties); never `.ssh`, `.gnupg`, `.aws`, `.kube`, Keychains, Documents, Desktop, Pictures, Movies,
   Music, iCloud Drive, CloudStorage, Mail, Messages (Large & Old Files and Space Lens only touch what you pick, and
   only to the Trash). Never another volume mounted inside your home (e.g. a connected iPhone's file system in
   `~/Library/Developer/CoreDevice/DeviceFS`, a network share): it is neither measured nor removed, and no module moves to the Trash or deletes a folder that has one mounted inside it. Never passwords, bookmarks, extensions, sign-ins, settings or AI memory.
@@ -96,7 +97,7 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 
 ## Permissions
 
-- **Full Disk Access** (optional): needed to read the Trash, Safari data and some app containers. CleanMate offers
+- **Full Disk Access** (optional): needed to read the Trash (also on external drives), Safari data and some app containers. CleanMate offers
   it once at first launch; you can skip it and grant it later in System Settings › Privacy & Security ›
   Full Disk Access.
 - Without Full Disk Access, Large & Old Files and Space Lens do not look inside the folders macOS guards with a

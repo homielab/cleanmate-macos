@@ -3141,6 +3141,16 @@
         }
       }
     },
+    "Permanently deletes everything in the Trash of each ticked drive" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá vĩnh viễn mọi thứ trong Thùng rác của từng ổ được chọn"
+          }
+        }
+      }
+    },
     "pip cache" : {
       "localizations" : {
         "vi" : {
@@ -4083,6 +4093,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thùng rác"
+          }
+        }
+      }
+    },
+    "Trash on external drives" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thùng rác trên ổ ngoài"
           }
         }
       }

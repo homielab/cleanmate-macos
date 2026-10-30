@@ -206,6 +206,9 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// model uses). Asked at scan, where they count in the entry's size, and again right before removal; each one
     /// is removed after its entry, through `SafetyPolicy.allows`, and only when it is a regular file.
     var entryFiles: (@Sendable (URL) -> [URL])? = nil
+    /// Lists, instead of `paths`, the user's Trash on each external drive (`ExternalTrash`): one entry per drive, named
+    /// after it, checked with `SafetyPolicy.allowsExternalTrash` instead of `allows`, and emptied (the folder stays).
+    var externalTrash = false
 }
 
 nonisolated struct CleanerGroup: Identifiable, Sendable {

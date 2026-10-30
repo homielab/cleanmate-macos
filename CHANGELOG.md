@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Developer Junk**: Docker untagged build images are listed one by one and can be cleaned individually.
 - **Large & Old Files**: the Scope menu lists mounted external drives, and **Choose Folder…** accepts folders on them; files found there go to that drive's Trash and can be put back with Undo.
 - **Developer Junk**: Docker build cache records not in use are listed one by one; tick the ones to clean (none are ticked by default).
+- **Smart Scan**: **Trash on external drives** lists the Trash of each mounted external drive by name and size, so you can empty it from the same place as your own Trash (needs Full Disk Access; none are ticked by default).
 
 ### Changed
 - **Developer Junk**: rustup downloads are no longer hidden while `cargo` or `rustc` builds; only a running `rustup` skips them.

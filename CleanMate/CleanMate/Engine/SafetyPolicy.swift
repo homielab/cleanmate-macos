@@ -37,6 +37,14 @@ nonisolated struct SafetyPolicy: Sendable {
     let mounts: MountPoints
     /// Where external volumes are mounted (`/Volumes`); a test passes a temporary folder.
     let volumesFolder: String
+    /// Mount flags (statfs `f_flags`: `MNT_RDONLY`, `MNT_LOCAL`, `MNT_DONTBROWSE`…) of the volume holding a path; nil
+    /// when it can't be read. Injected by tests: their folders sit on the startup disk's Data volume (`nobrowse`).
+    typealias VolumeFlags = @Sendable (String) -> UInt32?
+    static let volumeFlags: VolumeFlags = { path in
+        var info = statfs()
+        return statfs(path, &info) == 0 ? info.f_flags : nil
+    }
+    let flags: VolumeFlags
     /// `device` of each of `allowedRoots`.
     private let rootDevices: [dev_t?]
 
@@ -46,10 +54,12 @@ nonisolated struct SafetyPolicy: Sendable {
                      excluded: Preferences.excluded)
     }
 
-    /// `device` and `mounts` are injected by tests (they can't mount a volume).
+    /// `device`, `mounts` and `flags` are injected by tests (they can't mount a volume).
     init(home: URL, temp: URL, excluded: [String] = [], device: @escaping DeviceID = SafetyPolicy.deviceID,
-         mounts: @escaping MountPoints = SafetyPolicy.mountPoints, volumesFolder: String = "/Volumes") {
+         mounts: @escaping MountPoints = SafetyPolicy.mountPoints, volumesFolder: String = "/Volumes",
+         flags: @escaping VolumeFlags = SafetyPolicy.volumeFlags) {
         self.volumesFolder = Self.normalize(URL(fileURLWithPath: volumesFolder))
+        self.flags = flags
         homeURL = home
         tempURL = temp
         let home = (home.path as NSString).resolvingSymlinksInPath
@@ -230,6 +240,42 @@ nonisolated struct SafetyPolicy: Sendable {
             if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return nil }
         }
         return path
+    }
+
+    /// The current user's Trash folder (`.Trashes/<uid>`, where Finder puts what is deleted from that drive) on each
+    /// external drive `holdsUserTrash` accepts, when `allowsExternalTrash` accepts it; by mount point.
+    func externalTrashFolders() -> [URL] {
+        mounts().filter(holdsUserTrash).sorted()
+            .map { URL(fileURLWithPath: $0).appending(path: ".Trashes/\(getuid())") }
+            .filter(allowsExternalTrash)
+    }
+
+    /// Smart Scan rule for an external drive's Trash, only ever emptied (its contents removed): the folder
+    /// `<volume>/.Trashes/<uid>` of the current user or anything inside it, on a volume `holdsUserTrash` accepts. Neither
+    /// `.Trashes` nor `<uid>` may be a symlink, `<uid>` must be owned by the user, and the item must be on that volume
+    /// itself (no other volume mounted inside), not excluded. Another user's folder is never matched.
+    func allowsExternalTrash(_ url: URL) -> Bool {
+        let path = Self.normalize(url) // a symlinked `.Trashes` or `<uid>` above the item leaves the folder's path
+        guard let volume = externalVolume(path), holdsUserTrash(volume), !isExcluded(path) else { return false }
+        let trashes = volume + "/.Trashes", folder = trashes + "/\(getuid())"
+        guard path == folder || path.hasPrefix(folder + "/") else { return false }
+        var info = stat()
+        guard lstat(trashes, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              lstat(folder, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_uid == getuid() else { return false }
+        guard let volumeDevice = device(volume), device(folder) == volumeDevice, device(path) == volumeDevice,
+              !holdsMount(path) else { return false }
+        return true
+    }
+
+    /// A mount point directly in `volumesFolder` (never `.timemachine` snapshots below it) of a local, writable,
+    /// browsable volume that is not the startup disk nor a Time Machine backup disk.
+    private func holdsUserTrash(_ volume: String) -> Bool {
+        guard volume.hasPrefix(volumesFolder + "/"), !volume.dropFirst(volumesFolder.count + 1).contains("/"),
+              !volume.dropFirst(volumesFolder.count + 1).hasPrefix("."), let flags = flags(volume) else { return false }
+        guard flags & UInt32(MNT_LOCAL) != 0,
+              flags & UInt32(MNT_RDONLY | MNT_DONTBROWSE | MNT_ROOTFS) == 0 else { return false }
+        var info = stat()
+        return ["Backups.backupdb", ".com.apple.timemachine.donotpresent"].allSatisfy { lstat(volume + "/" + $0, &info) != 0 }
     }
 
     /// Folders whose apps the Uninstaller lists: /Applications and ~/Applications, directly or up to

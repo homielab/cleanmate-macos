@@ -156,6 +156,7 @@ nonisolated enum Cleaner {
                                trash: @Sendable (URL) throws -> Void,
                                openPaths: @Sendable (String) -> Set<String>) async -> CleanReport {
         if item.probe?.precondition() == false { return CleanReport(skipped: 1) } // e.g. Docker stopped since the scan
+        if item.externalTrash { return await ExternalTrash.empty(item, scan: scan, policy: policy, openPaths: openPaths) }
         if let entryCommand = item.entryCommand {
             guard item.command?.resolvedPath != nil, !(await blockedByExclusion(item, policy: policy)) else {
                 return CleanReport(skipped: 1)

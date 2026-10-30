@@ -95,6 +95,7 @@ nonisolated enum Scanner {
     /// `openPaths` reads the open-file table under a folder (`skipsOpenFiles`), like `Cleaner.clean`'s.
     @concurrent static func scan(_ item: CleanerItem, policy: SafetyPolicy = .current, now: Date = .now,
                                  openPaths: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0) }) async -> ItemScan {
+        if item.externalTrash { return await ExternalTrash.scan(item, policy: policy, openPaths: openPaths) }
         var result = ItemScan()
         let cutoff = item.minAge.map { now.addingTimeInterval(-$0) }
         let roots = await Self.roots(for: item, policy: policy)
