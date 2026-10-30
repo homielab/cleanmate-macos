@@ -236,7 +236,8 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// like a listed entry (`allowsEntry`, `skipsEntry`, locked, open files) and measured whole.
     var findEntries: (@Sendable ([URL], SafetyPolicy) async -> [URL])? = nil
     /// Replaces `SafetyPolicy.allows` for the item's entries, at scan and again right before removal
-    /// (`SafetyPolicy.allowsNodeModules`, `allowsBuildFolder`, which also reach projects in Documents and Desktop).
+    /// (`SafetyPolicy.allowsNodeModules`, `allowsBuildFolder`, which also reach projects in Documents and Desktop;
+    /// `allowsOldDownload`, narrower).
     var allowsEntry: (@Sendable (SafetyPolicy, URL) -> Bool)? = nil
     /// Sizes of the item's folder entries kept between scans (`FolderSizeCache`): an entry whose top level did not
     /// change since it was measured is not walked again. Only for items without `minAge` (a cached size has no date).

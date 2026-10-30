@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan**: **Old downloads** lists the files and folders in Downloads you haven't modified, added or opened for 90 days (a folder only when nothing inside was touched either), one by one with the date it was last touched; none are ticked, they go to the Trash so Undo can put them back, and installers stay under **Old installers** (needs Full Disk Access). Set the age in **Settings › General** (7 to 365 days).
 - **Developer Junk**: **conda package archives** (downloaded `.tar.bz2`/`.conda` files and the index cache in conda's `pkgs` folders) and the **Dart and Flutter pub cache** (`~/.pub-cache` downloads) are listed; neither is ticked, and both are locked while conda/mamba or dart/flutter runs.
 - **Overview**: **Free space over time** charts the startup disk's free space over the last 30 days, recorded once a day when CleanMate starts and after Smart Scan scans or cleans; hover a day to see its free space, and a sentence says whether the disk is filling up (and when it would be full at that rate), freeing up or stable.
 - **Apps**: **Code editors: data of deleted projects** lists what VS Code, Cursor, Windsurf and VSCodium keep for project folders you have since deleted, one by one with the project name, editor and size; none are ticked, they go to the Trash so Undo can put them back, and the row is locked while one of these editors runs.

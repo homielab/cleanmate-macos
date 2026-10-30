@@ -175,7 +175,8 @@ nonisolated enum Scanner {
                 if let cutoff, item.database == nil, !holdsExclusion,
                    let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileResourceTypeKey]),
                    modified(values) >= cutoff { return [] }
-                guard !item.excluded.contains(name), policy.allows(url), skips?(url) != true, !isLocked(url),
+                guard !item.excluded.contains(name), item.allowsEntry?(policy, url) ?? policy.allows(url),
+                      skips?(url) != true, !isLocked(url),
                       open.isEmpty || !RunningProcesses.holdsOpenFile(url, openPaths: open) else { return [] }
                 if prefix.isEmpty, only?.contains(name) == false
                     || item.included?.contains(where: { fnmatch($0, name, 0) == 0 }) == false { return [] }

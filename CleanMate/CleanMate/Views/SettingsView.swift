@@ -49,6 +49,7 @@ struct GeneralSettings: View {
     @AppStorage(Preferences.tempFilesDays) private var tempDays = CleanupAges.default.temp
     @AppStorage(Preferences.sessionDays) private var sessionDays = CleanupAges.default.sessions
     @AppStorage(Preferences.installerDays) private var installerDays = CleanupAges.default.installers
+    @AppStorage(Preferences.downloadDays) private var downloadDays = CleanupAges.default.downloads
     @AppStorage(Preferences.showMenuBarExtra) private var showMenuBarExtra = false
     @AppStorage(Preferences.scanReminder) private var reminder = ScanReminder.Frequency.off
     /// Reminders are on but CleanMate may not post notifications: shows how to allow them.
@@ -88,7 +89,7 @@ struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
             Section("Smart Scan") {
-                // Two columns, not four rows: General has no height to spare (`SettingsView.size`).
+                // Two columns, not five rows: General has no height to spare (`SettingsView.size`).
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Clean items not modified for:")
                     Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
@@ -103,6 +104,11 @@ struct GeneralSettings: View {
                             Stepper("Installers in Downloads: \(installerDays) days",
                                     onIncrement: { installerDays = CleanupAges.step(from: installerDays, up: true) },
                                     onDecrement: { installerDays = CleanupAges.step(from: installerDays, up: false) })
+                        }
+                        GridRow {
+                            Stepper("Files in Downloads: \(downloadDays) days",
+                                    onIncrement: { downloadDays = CleanupAges.step(from: downloadDays, up: true) },
+                                    onDecrement: { downloadDays = CleanupAges.step(from: downloadDays, up: false) })
                         }
                     }
                 }

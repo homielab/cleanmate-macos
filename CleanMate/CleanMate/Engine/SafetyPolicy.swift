@@ -228,6 +228,24 @@ nonisolated struct SafetyPolicy: Sendable {
         }
     }
 
+    /// Smart Scan rule for an old download (`OldDownloads`), only ever moved to the Trash: a direct child of the real
+    /// ~/Downloads folder (not a symlink, so never elsewhere), not hidden, passing `allows`, and a regular file
+    /// (`allowsUserFile`) or a real folder (`allowsSpaceLensItem`: not a symlink, not inside a package).
+    func allowsOldDownload(_ url: URL) -> Bool {
+        guard let home = allowedRoots.first else { return false }
+        let downloads = home + "/Downloads"
+        let path = Self.normalize(url)
+        guard (path as NSString).deletingLastPathComponent.lowercased() == downloads.lowercased(),
+              !(path as NSString).lastPathComponent.hasPrefix("."), allows(url) else { return false }
+        var folder = stat(), info = stat()
+        guard lstat(downloads, &folder) == 0, folder.st_mode & S_IFMT == S_IFDIR, lstat(path, &info) == 0 else { return false }
+        switch info.st_mode & S_IFMT {
+        case S_IFREG: return allowsUserFile(url)
+        case S_IFDIR: return allowsSpaceLensItem(url)
+        default: return false
+        }
+    }
+
     /// Smart Scan rule for a stale project's dependencies (`StaleNodeModules`), only ever moved to the Trash: a real
     /// folder named `node_modules` next to a regular `package.json` (see `allowsProjectFolder`).
     func allowsNodeModules(_ url: URL) -> Bool { allowsProjectFolder(url, named: [StaleNodeModules.folderName]) }

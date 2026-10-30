@@ -10,6 +10,7 @@ nonisolated enum Preferences {
     static let tempFilesDays = "tempFilesDays"
     static let sessionDays = "sessionDays"
     static let installerDays = "installerDays"
+    static let downloadDays = "downloadDays"
     /// The one-time Full Disk Access sheet was shown.
     static let fullDiskAccessPrompted = "fullDiskAccessPrompted"
     /// Bool, off by default: free-space item in the menu bar.
@@ -159,10 +160,12 @@ nonisolated struct CleanupAges: Sendable, Equatable {
     var sessions = 30
     /// Installers in ~/Downloads: kept longer than logs, a disk image from last week may still be wanted.
     var installers = 30
+    /// Anything else in ~/Downloads: only what was neither modified, added nor opened for a season.
+    var downloads = 90
 
     static let `default` = CleanupAges()
 
-    /// Values the AI-sessions and installers steppers step through; contains their default (30).
+    /// Values the AI-sessions, installers and downloads steppers step through; contains their defaults (30, 90).
     static let steps = [7, 14, 30, 60, 90, 180, 365]
 
     /// Next step above/below `days`; an old saved value off the list (e.g. 37) snaps to its neighbour.
@@ -176,6 +179,7 @@ nonisolated struct CleanupAges: Sendable, Equatable {
         return CleanupAges(logs: defaults.object(forKey: Preferences.oldLogsDays) as? Int ?? Self.default.logs,
                            temp: defaults.object(forKey: Preferences.tempFilesDays) as? Int ?? Self.default.temp,
                            sessions: defaults.object(forKey: Preferences.sessionDays) as? Int ?? Self.default.sessions,
-                           installers: defaults.object(forKey: Preferences.installerDays) as? Int ?? Self.default.installers)
+                           installers: defaults.object(forKey: Preferences.installerDays) as? Int ?? Self.default.installers,
+                           downloads: defaults.object(forKey: Preferences.downloadDays) as? Int ?? Self.default.downloads)
     }
 }

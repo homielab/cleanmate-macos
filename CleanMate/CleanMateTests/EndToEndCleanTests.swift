@@ -209,6 +209,11 @@ struct EndToEndCleanTests {
                         : folder.lastPathComponent == "Google" ? "AndroidStudio2020.1" : "GoLand2020.1"
                     try write(folder.appending(path: "\(name)/data.bin"), Data(repeating: 1, count: 4096))
                     try fm.setAttributes([.modificationDate: old], ofItemAtPath: folder.appending(path: name).path)
+                    if item.id == "old-downloads" { // also created, added and read long ago
+                        for path in ["\(name)/data.bin", name] {
+                            try OldDownloadsTests.stamp(folder.appending(path: path), modified: old, read: old, created: old, added: old)
+                        }
+                    }
                     continue
                 }
                 for pattern in included {

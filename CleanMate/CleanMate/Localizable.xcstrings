@@ -497,6 +497,62 @@
         }
       }
     },
+    "Files and folders in Downloads not modified, added or opened for %lld days. Moved to the Trash" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Files and folders in Downloads not modified, added or opened for %lld day. Moved to the Trash"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Files and folders in Downloads not modified, added or opened for %lld days. Moved to the Trash"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp và thư mục trong Tải về không sửa, thêm hay mở trong %lld ngày. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "Files in Downloads: %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Files in Downloads: %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Files in Downloads: %lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp trong Tải về: %lld ngày"
+          }
+        }
+      }
+    },
     "Filtered. The totals above still count every entry." : {
       "localizations" : {
         "vi" : {
@@ -949,6 +1005,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "LM Studio: mô hình đã tải"
+          }
+        }
+      }
+    },
+    "Old downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tải về cũ"
           }
         }
       }

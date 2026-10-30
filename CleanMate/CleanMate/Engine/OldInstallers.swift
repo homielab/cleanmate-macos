@@ -19,13 +19,18 @@ nonisolated enum OldInstallers {
         let ext = url.pathExtension.lowercased()
         guard extensions.contains(ext) else { return true }
         var info = stat()
-        guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG else { return true }
-        let folder = url.deletingLastPathComponent()
-        for suffix in partialSuffixes {
-            var other = stat()
-            if lstat(folder.appending(path: url.lastPathComponent + "." + suffix).path, &other) == 0 { return true }
-        }
+        guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, !isDownloading(url) else { return true }
         return ext == "zip" && !zipHoldsApp(url)
+    }
+
+    /// A download in progress: `url` is a browser's partial download (`partialSuffixes`) or has one next to it.
+    static func isDownloading(_ url: URL) -> Bool {
+        if partialSuffixes.contains(url.pathExtension.lowercased()) { return true }
+        let folder = url.deletingLastPathComponent()
+        return partialSuffixes.contains { suffix in
+            var other = stat()
+            return lstat(folder.appending(path: url.lastPathComponent + "." + suffix).path, &other) == 0
+        }
     }
 
     /// Whether the zip archive at `url` has an app at its top level (`Name.app/…`). Reads only the names in its
@@ -42,9 +47,20 @@ nonisolated enum OldInstallers {
     }
 
     /// Entry names from the central directory of the zip at `url`; nil when it is not a readable zip.
+    /// The file's access date is put back afterwards: this read is not the user opening it (`OldDownloads`).
     static func zipEntryNames(_ url: URL) -> [String]? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
+        var before = stat()
+        let hasDates = fstat(handle.fileDescriptor, &before) == 0
+        defer {
+            var after = stat()
+            if hasDates, fstat(handle.fileDescriptor, &after) == 0,
+               (after.st_atimespec.tv_sec, after.st_atimespec.tv_nsec) != (before.st_atimespec.tv_sec, before.st_atimespec.tv_nsec) {
+                var times = [before.st_atimespec, timespec(tv_sec: 0, tv_nsec: Int(UTIME_OMIT))]
+                _ = futimens(handle.fileDescriptor, &times)
+            }
+            try? handle.close()
+        }
         func read(_ offset: UInt64, _ count: UInt64) -> [UInt8]? {
             guard (try? handle.seek(toOffset: offset)) != nil,
                   let data = try? handle.read(upToCount: Int(count)), data.count == Int(count) else { return nil }

@@ -70,6 +70,16 @@ extension CleanerGroup {
                         paths: [OldInstallers.folder], minAge: Double(ages.installers) * 86_400,
                         included: OldInstallers.patterns, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
                         skipsOpenFiles: true, skipsEntry: { OldInstallers.skips }, selectableEntries: true),
+            // Everything else at the top level of Downloads (`OldDownloads`) that was neither modified, added nor
+            // opened for the downloads age, folders by everything inside them: user files, so unticked, one checkbox
+            // each, to the Trash, never open, still downloading or an installer (listed just above).
+            CleanerItem(id: "old-downloads", title: "Old downloads",
+                        note: "Files and folders in Downloads not modified, added or opened for \(ages.downloads) days. Moved to the Trash",
+                        paths: [OldDownloads.folder], minAge: Double(ages.downloads) * 86_400, mode: .trash,
+                        selectedByDefault: false, showsWhenEmpty: false, skipsOpenFiles: true,
+                        skipsEntry: { [days = ages.downloads] in OldDownloads.skips(olderThan: days) },
+                        entryLabel: OldDownloads.label(of:), selectableEntries: true,
+                        allowsEntry: { $0.allowsOldDownload($1) }),
         ] : []) + [
             // Downloaded iOS/iPadOS updates: only `*.ipsw`, one entry each, unticked (slow to download again),
             // to the Trash, never while Finder or Apple Configurator updates a device. Configurator's cache is a
