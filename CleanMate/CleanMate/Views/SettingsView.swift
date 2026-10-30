@@ -48,6 +48,7 @@ struct GeneralSettings: View {
     @AppStorage(Preferences.oldLogsDays) private var logsDays = CleanupAges.default.logs
     @AppStorage(Preferences.tempFilesDays) private var tempDays = CleanupAges.default.temp
     @AppStorage(Preferences.sessionDays) private var sessionDays = CleanupAges.default.sessions
+    @AppStorage(Preferences.installerDays) private var installerDays = CleanupAges.default.installers
     @AppStorage(Preferences.showMenuBarExtra) private var showMenuBarExtra = false
     @AppStorage(Preferences.scanReminder) private var reminder = ScanReminder.Frequency.off
     /// Reminders are on but CleanMate may not post notifications: shows how to allow them.
@@ -87,11 +88,24 @@ struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
             Section("Smart Scan") {
-                Stepper("Old logs: not modified for \(logsDays) days", value: $logsDays, in: 1...90)
-                Stepper("Temporary files: not modified for \(tempDays) days", value: $tempDays, in: 1...30)
-                Stepper("AI sessions: not modified for \(sessionDays) days",
-                        onIncrement: { sessionDays = CleanupAges.sessionStep(from: sessionDays, up: true) },
-                        onDecrement: { sessionDays = CleanupAges.sessionStep(from: sessionDays, up: false) })
+                // Two columns, not four rows: General has no height to spare (`SettingsView.size`).
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Clean items not modified for:")
+                    Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 4) {
+                        GridRow {
+                            Stepper("Logs: \(logsDays) days", value: $logsDays, in: 1...90)
+                            Stepper("Temporary files: \(tempDays) days", value: $tempDays, in: 1...30)
+                        }
+                        GridRow {
+                            Stepper("AI sessions: \(sessionDays) days",
+                                    onIncrement: { sessionDays = CleanupAges.step(from: sessionDays, up: true) },
+                                    onDecrement: { sessionDays = CleanupAges.step(from: sessionDays, up: false) })
+                            Stepper("Installers in Downloads: \(installerDays) days",
+                                    onIncrement: { installerDays = CleanupAges.step(from: installerDays, up: true) },
+                                    onDecrement: { installerDays = CleanupAges.step(from: installerDays, up: false) })
+                        }
+                    }
+                }
                 LabeledContent("Remembered choices") {
                     // Asks inline first: it forgets every tick changed by hand, with no Undo.
                     if confirmingReset {

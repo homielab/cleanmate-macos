@@ -10,10 +10,10 @@ struct OldInstallersTests {
     var downloads: URL { home.appending(path: "Downloads") }
     var trash: URL { root.appending(path: "Trash") }
     var policy: SafetyPolicy { SafetyPolicy(home: home, temp: root.appending(path: "tmp")) }
-    let old = Date.now.addingTimeInterval(-30 * 86_400)
+    let old = Date.now.addingTimeInterval(-40 * 86_400)
 
-    static func item(fda: Bool = true) -> CleanerItem? {
-        CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: fda).flatMap(\.items).first { $0.id == "old-installers" }
+    static func item(fda: Bool = true, ages: CleanupAges = .default) -> CleanerItem? {
+        CleanerGroup.smartScan(ages: ages, hasFullDiskAccess: fda).flatMap(\.items).first { $0.id == "old-installers" }
     }
 
     func write(_ path: String, date: Date? = nil, bytes: Int = 4096) throws {
@@ -83,8 +83,23 @@ struct OldInstallersTests {
         #expect(Self.item(fda: false) == nil) // reading ~/Downloads without it makes macOS ask
         let item = try #require(Self.item())
         #expect(item.paths == ["~/Downloads"] && item.mode == .trash && !item.selectedByDefault && item.selectableEntries)
-        #expect(item.skipsOpenFiles && !item.showsWhenEmpty && item.minAge == Double(CleanupAges.default.logs) * 86_400)
+        #expect(item.skipsOpenFiles && !item.showsWhenEmpty && item.minAge == 30 * 86_400)
         #expect(policy.allows(policy.expand(item.paths[0]).appending(path: "a.dmg")))
+    }
+
+    /// Its own age (default 30 days), not the logs one: a 10-day-old image shows only once the setting is 7 days.
+    @Test func usesTheInstallersAge() async throws {
+        defer { try? fm.removeItem(at: root) }
+        try write("recent.dmg", date: .now.addingTimeInterval(-10 * 86_400))
+        try write("old.dmg")
+        func listed(_ ages: CleanupAges) async throws -> Set<String> {
+            let item = try #require(Self.item(ages: ages))
+            let scan = await Scanner.scan(item, policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+            return Set(scan.entries.map(\.url.lastPathComponent))
+        }
+        #expect(CleanupAges.default.installers == 30)
+        #expect(try await listed(.default) == ["old.dmg"])
+        #expect(try await listed(CleanupAges(logs: 90, installers: 7)) == ["old.dmg", "recent.dmg"])
     }
 
     /// Old top-level installers only, each its own entry; to the (fake) Trash, and put back by Undo.

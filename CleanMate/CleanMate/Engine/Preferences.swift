@@ -9,6 +9,7 @@ nonisolated enum Preferences {
     static let oldLogsDays = "oldLogsDays"
     static let tempFilesDays = "tempFilesDays"
     static let sessionDays = "sessionDays"
+    static let installerDays = "installerDays"
     /// The one-time Full Disk Access sheet was shown.
     static let fullDiskAccessPrompted = "fullDiskAccessPrompted"
     /// Bool, off by default: free-space item in the menu bar.
@@ -156,22 +157,25 @@ nonisolated struct CleanupAges: Sendable, Equatable {
     var logs = 7
     var temp = 3
     var sessions = 30
+    /// Installers in ~/Downloads: kept longer than logs, a disk image from last week may still be wanted.
+    var installers = 30
 
     static let `default` = CleanupAges()
 
-    /// Values the AI-sessions stepper steps through; contains the default (30).
-    static let sessionSteps = [7, 14, 30, 60, 90, 180, 365]
+    /// Values the AI-sessions and installers steppers step through; contains their default (30).
+    static let steps = [7, 14, 30, 60, 90, 180, 365]
 
     /// Next step above/below `days`; an old saved value off the list (e.g. 37) snaps to its neighbour.
-    static func sessionStep(from days: Int, up: Bool) -> Int {
-        up ? sessionSteps.first { $0 > days } ?? sessionSteps.last!
-           : sessionSteps.last { $0 < days } ?? sessionSteps.first!
+    static func step(from days: Int, up: Bool) -> Int {
+        up ? steps.first { $0 > days } ?? steps.last!
+           : steps.last { $0 < days } ?? steps.first!
     }
 
     static var current: CleanupAges {
         let defaults = UserDefaults.standard
         return CleanupAges(logs: defaults.object(forKey: Preferences.oldLogsDays) as? Int ?? Self.default.logs,
                            temp: defaults.object(forKey: Preferences.tempFilesDays) as? Int ?? Self.default.temp,
-                           sessions: defaults.object(forKey: Preferences.sessionDays) as? Int ?? Self.default.sessions)
+                           sessions: defaults.object(forKey: Preferences.sessionDays) as? Int ?? Self.default.sessions,
+                           installers: defaults.object(forKey: Preferences.installerDays) as? Int ?? Self.default.installers)
     }
 }

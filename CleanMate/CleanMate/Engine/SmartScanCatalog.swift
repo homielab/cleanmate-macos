@@ -66,8 +66,8 @@ extension CleanerGroup {
             // Only with Full Disk Access: reading ~/Downloads without it makes macOS ask (`ProtectedFolders`).
             // Top-level regular files only, old ones, never open (a mounted image) nor still downloading.
             CleanerItem(id: "old-installers", title: "Old installers",
-                        note: "Disk images, packages and zipped apps in Downloads older than \(ages.logs) days. Moved to the Trash",
-                        paths: [OldInstallers.folder], minAge: Double(ages.logs) * 86_400,
+                        note: "Disk images, packages and zipped apps in Downloads older than \(ages.installers) days. Moved to the Trash",
+                        paths: [OldInstallers.folder], minAge: Double(ages.installers) * 86_400,
                         included: OldInstallers.patterns, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
                         skipsOpenFiles: true, skipsEntry: { OldInstallers.skips }, selectableEntries: true),
         ] : []) + [

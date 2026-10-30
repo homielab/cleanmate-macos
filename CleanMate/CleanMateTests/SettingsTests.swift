@@ -69,7 +69,7 @@ struct SettingsTests {
     }
 
     @Test func catalogsUseTheAgeSettings() {
-        let ages = CleanupAges(logs: 14, temp: 5, sessions: 60)
+        let ages = CleanupAges(logs: 14, temp: 5, sessions: 60, installers: 90)
         let items = CleanerGroup.smartScan(ages: ages).flatMap(\.items)
         func age(_ id: String) -> Int? { items.first { $0.id == id }?.minAge.map { Int($0) } }
         #expect(age("old-logs") == 14 * 86_400)
@@ -295,13 +295,13 @@ struct SettingsTests {
     }
 
     @Test func sessionStepperSnapsToEvenSteps() {
-        #expect(CleanupAges.sessionSteps.contains(CleanupAges.default.sessions))
-        #expect(CleanupAges.sessionStep(from: 30, up: true) == 60)
-        #expect(CleanupAges.sessionStep(from: 30, up: false) == 14)
-        #expect(CleanupAges.sessionStep(from: 37, up: true) == 60)   // old value from step 7
-        #expect(CleanupAges.sessionStep(from: 37, up: false) == 30)
-        #expect(CleanupAges.sessionStep(from: 365, up: true) == 365)
-        #expect(CleanupAges.sessionStep(from: 7, up: false) == 7)
+        #expect(CleanupAges.steps.contains(CleanupAges.default.sessions) && CleanupAges.steps.contains(CleanupAges.default.installers))
+        #expect(CleanupAges.step(from: 30, up: true) == 60)
+        #expect(CleanupAges.step(from: 30, up: false) == 14)
+        #expect(CleanupAges.step(from: 37, up: true) == 60)   // old value from step 7
+        #expect(CleanupAges.step(from: 37, up: false) == 30)
+        #expect(CleanupAges.step(from: 365, up: true) == 365)
+        #expect(CleanupAges.step(from: 7, up: false) == 7)
     }
 
     /// The add button, drag & drop and "Never Clean This" share one path: folders and regular files,

@@ -31,6 +31,34 @@
         }
       }
     },
+    "AI sessions: %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "AI sessions: %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "AI sessions: %lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên AI: %lld ngày"
+          }
+        }
+      }
+    },
     "All Apps" : {
       "localizations" : {
         "vi" : {
@@ -137,6 +165,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản Chromium cho trình duyệt của Windsurf, sẽ được tải lại khi mở trình duyệt"
+          }
+        }
+      }
+    },
+    "Clean items not modified for:" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn mục không thay đổi trong:"
           }
         }
       }
@@ -411,6 +449,34 @@
         }
       }
     },
+    "Installers in Downloads: %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Installers in Downloads: %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Installers in Downloads: %lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ cài trong Tải về: %lld ngày"
+          }
+        }
+      }
+    },
     "Intermediate images left by docker build; the next build makes them again. Sizes may count layers shared with other images" : {
       "localizations" : {
         "vi" : {
@@ -497,6 +563,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Do ollama pull bị ngắt để lại; tải lại mô hình sẽ bắt đầu từ đầu"
+          }
+        }
+      }
+    },
+    "Logs: %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Logs: %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Logs: %lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhật ký: %lld ngày"
           }
         }
       }
@@ -697,6 +791,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quét ngay"
+          }
+        }
+      }
+    },
+    "Temporary files: %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Temporary files: %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Temporary files: %lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp tạm: %lld ngày"
           }
         }
       }
@@ -1278,16 +1400,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thêm thư mục…"
-          }
-        }
-      }
-    },
-    "AI sessions: not modified for %lld days" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Phiên AI: không thay đổi trong %lld ngày"
           }
         }
       }
@@ -3133,34 +3245,6 @@
         }
       }
     },
-    "Old logs: not modified for %lld days" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Old logs: not modified for %lld day"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Old logs: not modified for %lld days"
-                }
-              }
-            }
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nhật ký cũ: không thay đổi trong %lld ngày"
-          }
-        }
-      }
-    },
     "Old temporary files" : {
       "localizations" : {
         "vi" : {
@@ -4173,34 +4257,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rác hệ thống"
-          }
-        }
-      }
-    },
-    "Temporary files: not modified for %lld days" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Temporary files: not modified for %lld day"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Temporary files: not modified for %lld days"
-                }
-              }
-            }
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tệp tạm: không thay đổi trong %lld ngày"
           }
         }
       }
