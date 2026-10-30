@@ -273,6 +273,48 @@ nonisolated struct SafetyPolicy: Sendable {
     /// next to a Python project file (see `allowsProjectFolder`).
     func allowsBuildFolder(_ url: URL) -> Bool { allowsProjectFolder(url, named: StaleBuildFolders.folderNames) }
 
+    /// Smart Scan rule for a Final Cut Pro or iMovie library (`VideoRenderFiles`), never removed itself (only its
+    /// render files, `allowsRenderFiles`): a real folder named `*.fcpbundle` or `*.imovielibrary` directly in Movies,
+    /// Desktop or Documents or in a folder there (not hidden, not a package), on the home's volume with no other volume
+    /// mounted inside, not excluded.
+    func allowsVideoLibrary(_ url: URL) -> Bool {
+        let path = Self.normalize(url)
+        guard VideoRenderFiles.isLibrary((path as NSString).lastPathComponent), let home = allowedRoots.first,
+              path.hasPrefix(home + "/"), !isExcluded(path) else { return false }
+        let parts = path.dropFirst(home.count + 1).split(separator: "/").map(String.init)
+        guard parts.count == 2 || parts.count == 3, VideoRenderFiles.folderNames.contains(parts[0].lowercased()),
+              !parts.contains(where: { $0.hasPrefix(".") }) else { return false }
+        if let homeDevice = rootDevices[0], device(path) != homeDevice { return false }
+        if holdsMount(path) { return false }
+        var info = stat()
+        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return false }
+        if parts.count == 3 {
+            let folder = URL(fileURLWithPath: home + "/" + parts[0] + "/" + parts[1])
+            if VideoRenderFiles.isLibrary(parts[1])
+                || (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage != false { return false }
+        }
+        return true
+    }
+
+    /// Smart Scan rule for render files (`VideoRenderFiles`), deleted: a real folder named `Render Files` in a real,
+    /// non-hidden event folder directly inside an `allowsVideoLibrary` library, on the home's volume with no other
+    /// volume mounted inside, not excluded. The only place in Movies, Desktop and Documents Smart Scan deletes from;
+    /// never the media, the library's databases nor anything else next to it.
+    func allowsRenderFiles(_ url: URL) -> Bool {
+        let path = Self.normalize(url)
+        let event = (path as NSString).deletingLastPathComponent
+        let library = (event as NSString).deletingLastPathComponent
+        guard (path as NSString).lastPathComponent == VideoRenderFiles.renderFolder,
+              !(event as NSString).lastPathComponent.hasPrefix("."),
+              !VideoRenderFiles.isLibrary((event as NSString).lastPathComponent),
+              allowsVideoLibrary(URL(fileURLWithPath: library)), !isExcluded(path) else { return false }
+        if let homeDevice = rootDevices[0], device(path) != homeDevice { return false }
+        if holdsMount(path) { return false }
+        var folder = stat(), info = stat()
+        return lstat(event, &folder) == 0 && folder.st_mode & S_IFMT == S_IFDIR
+            && lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+    }
+
     /// A folder named one of `names` that its parent holds as a project folder (`StaleProjects.isProjectFolder`),
     /// strictly inside the home folder, not under ~/Library, a hidden folder, a dependency or build folder
     /// (`StaleProjects.unwalked`) or a package (an app's bundled modules), on the home's volume with no other volume

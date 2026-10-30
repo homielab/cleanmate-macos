@@ -233,6 +233,15 @@ nonisolated enum Cleaner {
                     }
                 }
             }
+            // The entry stays (a video library): only its parts go, each listed again now and measured as it is.
+            if let parts = item.entryParts {
+                for part in parts(policy, entry.url) {
+                    guard !Scanner.isLocked(part), let size = await Scanner.entry(at: part, olderThan: nil)?.size,
+                          (try? remove(part, size: size)) != nil else { report.skipped += 1; continue }
+                    report.freed += size
+                }
+                continue
+            }
             do {
                 try remove(entry.url, size: entry.size - entry.filesSize)
                 report.freed += entry.size - entry.filesSize

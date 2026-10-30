@@ -12,6 +12,11 @@ struct EndToEndCleanTests {
     static let bait = [
         ".ssh/id_ed25519", ".ssh/config", ".gnupg/pubring.kbx", "Library/Keychains/login.keychain-db",
         "Documents/report.txt", "Desktop/notes.txt",
+        // A video library's media and databases next to its render files
+        "Movies/junk-video-render-files.fcpbundle/CurrentVersion.flexolibrary/db",
+        "Movies/junk-video-render-files.fcpbundle/Event/CurrentVersion.fcpevent",
+        "Movies/junk-video-render-files.fcpbundle/Event/Original Media/clip.mov",
+        "Movies/junk-video-render-files.fcpbundle/Event/Transcoded Media/clip.mov",
         // Browser bookmarks, passwords, extensions
         "Library/Safari/Bookmarks.plist",
         "Library/Application Support/Google/Chrome/Default/Bookmarks",
@@ -193,6 +198,11 @@ struct EndToEndCleanTests {
                 if item.id == "group-caches" { // a group with no known creator is never cleaned
                     try (["MCMMetadataCreator": "com.example.app"] as NSDictionary).write(to: folder
                         .deletingLastPathComponent().deletingLastPathComponent().appending(path: ".com.apple.containermanagerd.metadata.plist"))
+                }
+                if item.id == VideoRenderFiles.id { // a library in each folder: only its render files go
+                    try write(folder.appending(path: "junk-\(item.id).fcpbundle/Event/Render Files/r.mov"),
+                              Data(repeating: 1, count: 4096))
+                    continue
                 }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes
                     let project = folder.appending(path: "junk-\(item.id)")

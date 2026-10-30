@@ -5762,6 +5762,26 @@
         }
       }
     },
+    "Final Cut Pro and iMovie render files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp render của Final Cut Pro và iMovie"
+          }
+        }
+      }
+    },
+    "Rendered again when a project is played or exported; the first open is slower" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được render lại khi phát hoặc xuất dự án; mở lần đầu chậm hơn"
+          }
+        }
+      }
+    },
     "ZCode: remote server files" : {
       "localizations" : {
         "vi" : {

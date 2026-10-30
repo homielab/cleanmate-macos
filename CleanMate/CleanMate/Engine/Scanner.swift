@@ -221,6 +221,7 @@ nonisolated enum Scanner {
             for url in candidates {
                 group.addTask {
                     if Task.isCancelled { return nil } // no walk or sqlite3 run for what the caller discards
+                    if let parts = item.entryParts { return await measureParts(parts(policy, url), of: url, cutoff: cutoff) }
                     guard let database = item.database, database.applies(to: url) else {
                         // Read before measuring: a change during the walk makes the next scan measure again.
                         let fingerprint = item.entrySizes != nil && cutoff == nil ? FolderSizeCache.Fingerprint(url) : nil
@@ -265,6 +266,18 @@ nonisolated enum Scanner {
         }
         result.entries.sort { $0.size > $1.size }
         return result
+    }
+
+    /// `entry` measured as the total of its `parts` (`CleanerItem.entryParts`), locked ones left out; nil when none
+    /// holds anything.
+    private static func measureParts(_ parts: [URL], of entry: URL, cutoff: Date?) async -> ScanEntry? {
+        var found = ScanEntry(url: entry, size: 0)
+        for part in parts where !isLocked(part) {
+            guard let measured = await self.entry(at: part, olderThan: cutoff) else { continue }
+            found.size += measured.size
+            found.partlyUnreadable = found.partlyUnreadable || measured.partlyUnreadable
+        }
+        return found.size > 0 ? found : nil
     }
 
     /// Allocated bytes of a regular file (not through a symlink); 0 for anything else or a missing file.

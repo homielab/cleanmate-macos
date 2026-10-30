@@ -240,6 +240,8 @@ extension CleanerGroup {
                     included: ["Media Cache Files", "Media Cache", "Peak Files"], selectedByDefault: false,
                     showsWhenEmpty: false, runningAppBundleIDs: adobeMediaBundleIDs,
                     runningProcessNames: adobeMediaProcessNames, skipsOpenFiles: true),
+        // Final Cut Pro and iMovie render files (`VideoRenderFiles`): one entry per library, unticked, deleted.
+        VideoRenderFiles.item(hasFullDiskAccess: { hasFullDiskAccess }),
         // Cloud sync apps' caches (`CloudSyncCaches`): unticked, deleted, skipped while the app runs.
         CloudSyncCaches.googleDrive,
         CloudSyncCaches.dropbox(hasFullDiskAccess: { hasFullDiskAccess }),

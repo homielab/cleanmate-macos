@@ -251,6 +251,10 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Empty folders above a removed entry also removed, at most this many levels (an Android image's tag and API
     /// folders); `rmdir` only, so a folder holding anything stays.
     var removesEmptyParents = 0
+    /// Folders inside an entry cleaned instead of the entry itself (the render files of a video library): the entry is
+    /// one row measured as their total and is never removed. Returns only folders the policy allows; asked at scan and
+    /// again right before removal, where each one is checked (locked) and removed on its own.
+    var entryParts: (@Sendable (SafetyPolicy, URL) -> [URL])? = nil
 }
 
 nonisolated struct CleanerGroup: Identifiable, Sendable {
