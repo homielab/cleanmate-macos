@@ -1401,8 +1401,10 @@ struct DeveloperToolsTests {
         #expect(logs.paths == ["~/.cache/firebase"] && logs.included == ["firebase-debug.log", "firebase-debug.*.log"])
         #expect(logs.selectedByDefault && logs.mode == .delete && logs.skipsOpenFiles && logs.runningProcessNames.isEmpty)
         #expect(emulators.paths == ["~/.cache/firebase/emulators"] && !emulators.selectedByDefault)
-        #expect(emulators.mode == .delete && emulators.skipsOpenFiles && emulators.runningProcessNames.isEmpty)
-        for item in [logs, emulators] { #expect(item.command == nil && item.probe == nil && item.shellFolders.isEmpty) }
+        #expect(emulators.mode == .delete && emulators.skipsOpenFiles && emulators.runningProcessNames == ["firebase-emulators"])
+        #expect(logs.shellFolders.isEmpty && logs.configFolders != nil)
+        #expect(emulators.shellFolders == ["FIREBASE_EMULATORS_PATH": [""]] && emulators.configFolders == nil)
+        for item in [logs, emulators] { #expect(item.command == nil && item.probe == nil) }
 
         let held = try box.file(".cache/firebase/firebase-debug.log")
         let rotated = try box.file(".cache/firebase/firebase-debug.1.log")
@@ -1430,6 +1432,53 @@ struct DeveloperToolsTests {
         #expect(kept.allSatisfy(exists))
         try handle.close()
         #expect(await Scanner.scan(logs, policy: box.policy, openPaths: own).entries.map(\.url.lastPathComponent) == ["firebase-debug.log"])
+    }
+
+    /// FIREBASE_EMULATORS_PATH / FIREBASE_DEBUG_PATH from the shell profile add their folder, only inside home,
+    /// never through a symlink, only the CLI's own names; a debug path naming another file adds nothing.
+    @Test func firebaseFoldersFromShellProfile() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let items = CleanerGroup.developer.items
+        let logs = try #require(items.first { $0.id == "firebase-logs" })
+        let emulators = try #require(items.first { $0.id == "firebase-emulators" })
+        #expect(ShellEnvironment.variables.isSuperset(of: ["FIREBASE_EMULATORS_PATH", "FIREBASE_DEBUG_PATH"]))
+        let profile = box.home.appending(path: ".zshrc")
+        func set(_ text: String) throws { try text.write(to: profile, atomically: true, encoding: .utf8) }
+        func names(_ item: CleanerItem) async -> Set<String> {
+            Set(await Scanner.scan(item, policy: box.policy, openPaths: { _ in [] }).entries.map(\.url.lastPathComponent))
+        }
+        try box.file(".cache/firebase/emulators/cloud-firestore-emulator-v1.22.0.jar")
+        try box.file(".local/firebase-emulators/firebase-database-emulator-v4.11.2.jar")
+        try box.file(".local/firebase-emulators/ui-v1.15.0/server/server.mjs")
+        try box.file(".local/firebase-emulators/notes.txt")
+        try box.file("logs/firebase-debug.log")
+        try box.file("logs/firebase-debug.2.log")
+        try box.file("logs/app.log")
+
+        try set("export FIREBASE_EMULATORS_PATH=~/.local/firebase-emulators\nexport FIREBASE_DEBUG_PATH=$HOME/logs\n")
+        #expect(await names(emulators) == ["cloud-firestore-emulator-v1.22.0.jar", "firebase-database-emulator-v4.11.2.jar", "ui-v1.15.0"])
+        #expect(await names(logs) == ["firebase-debug.log", "firebase-debug.2.log"])
+        let lock = RunningProcesses.shellInstallPaths(policy: box.policy)
+        #expect(lock.map(\.name) == ["firebase-emulators"])
+        let java: [UInt8] = withUnsafeBytes(of: Int32(3)) { Array($0) }
+            + ["/usr/bin/java", "java", "-jar", lock.first.map { $0.path + "x.jar" } ?? ""].flatMap { Array($0.utf8) + [0] }
+        #expect(RunningProcesses.argumentNames(java, extra: lock).contains("firebase-emulators"))
+
+        // A log file: its folder, still only the log names; another file name: nothing.
+        try set("export FIREBASE_DEBUG_PATH=~/logs/firebase-debug.log\n")
+        #expect(await names(logs) == ["firebase-debug.log", "firebase-debug.2.log"])
+        try set("export FIREBASE_DEBUG_PATH=~/logs/app.log\n")
+        #expect(await names(logs).isEmpty)
+
+        // Outside home or through a symlink: ignored.
+        let outside = try box.file("../outside/firebase-database-emulator-v1.jar").deletingLastPathComponent().standardizedFileURL
+        try FileManager.default.createSymbolicLink(at: box.home.appending(path: "linked"), withDestinationURL: box.home.appending(path: ".local/firebase-emulators"))
+        for value in [outside.path, "~/linked"] {
+            try set("export FIREBASE_EMULATORS_PATH=\(value)\nexport FIREBASE_DEBUG_PATH=\(value)\n")
+            #expect(await names(emulators) == ["cloud-firestore-emulator-v1.22.0.jar"], "\(value)")
+            #expect(await names(logs).isEmpty && RunningProcesses.shellInstallPaths(policy: box.policy).isEmpty, "\(value)")
+        }
     }
 
     /// pnpm prune may remove far less than the store; bun and uv caches share APFS clones with projects:

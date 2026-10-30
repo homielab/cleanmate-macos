@@ -210,17 +210,39 @@ extension CleanerGroup {
         // those names (`included`): the same folder holds downloaded tools (crashlytics, universal-maker, extensions).
         // The CLI runs as `node`, so there is no process name to wait for; a log a CLI process still has open is kept.
         // Never ~/.config/configstore/firebase-tools.json (the login) nor a project's own firebase-debug.log.
+        // `FIREBASE_DEBUG_PATH` in the shell profile moves every CLI log (`logger.js` `resolveLogTarget`): see `firebaseDebugFolders`.
         dev("firebase-logs", "\("Firebase CLI"): debug logs",
             note: "Written by the Firebase CLI and its MCP server; a log still open is kept",
-            [firebaseCache], included: ["firebase-debug.log", "firebase-debug.*.log"], openFiles: true),
+            [firebaseCache], included: firebaseLogNames, openFiles: true,
+            config: ConfigFolders(read: firebaseDebugFolders(home:))),
         // Unticked: emulator JARs, zips and binaries (`downloadableEmulators.js`); the next `firebase emulators:start`
         // downloads them again (needs network). Locked while an emulator runs. Exported emulator data lives in the user's project, never here.
+        // Only the CLI's own download names (`downloadableEmulatorInfo.json`): `FIREBASE_EMULATORS_PATH` may name a folder holding other files.
         dev("firebase-emulators", "\("Firebase CLI"): emulators",
             note: "Downloaded emulators, downloaded again by the next firebase emulators:start",
-            [firebaseCache + "/emulators"], selected: false, processes: ["firebase-emulators"], openFiles: true),
+            [firebaseCache + "/emulators"], included: firebaseEmulatorNames, shell: ["FIREBASE_EMULATORS_PATH": [""]], selected: false,
+            processes: ["firebase-emulators"], openFiles: true),
     ])
 
     nonisolated private static let firebaseCache = "~/.cache/firebase"
+    nonisolated static let firebaseLogNames = ["firebase-debug.log", "firebase-debug.*.log"]
+    /// Jars, zips, unpacked folders and binaries, each name followed by a version.
+    nonisolated static let firebaseEmulatorNames = [
+        "firebase-database-emulator-v*", "cloud-firestore-emulator-v*", "cloud-storage-rules-runtime-v*", "ui-v*",
+        "pubsub-emulator-*", "dataconnect-emulator-*",
+    ]
+
+    /// The folder `FIREBASE_DEBUG_PATH` puts logs in: the folder itself, or a log file's folder when the file's name is
+    /// one of `firebaseLogNames` (the item lists only those names there). Another file name is skipped: its fallbacks
+    /// (`<name>.1.log`) can't be told from the user's own files. Checked like a shell folder (inside home, no symlink).
+    nonisolated static func firebaseDebugFolders(home: URL) -> [String] {
+        guard let value = ShellEnvironment.cached(home: home)["FIREBASE_DEBUG_PATH"] else { return [] }
+        var isFolder: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: value, isDirectory: &isFolder) else { return [] }
+        if isFolder.boolValue { return [value] }
+        let name = URL(fileURLWithPath: value).lastPathComponent
+        return firebaseLogNames.contains { fnmatch($0, name, 0) == 0 } ? [URL(fileURLWithPath: value).deletingLastPathComponent().path] : []
+    }
     /// In a running emulator's executable or arguments (`RunningProcesses.installPaths`).
     nonisolated static let firebaseEmulatorsPath = "/.cache/firebase/emulators/"
 
@@ -249,10 +271,11 @@ extension CleanerGroup {
         minAge: TimeInterval? = nil, included: [String]? = nil, mode: RemovalMode = .delete, command: ShellCommand? = nil,
         probe: SizeProbe? = nil, locate: PathLookup? = nil, shell: [String: [String]] = [:], selected: Bool = true, apps: [String] = [],
         processes: [String] = [], upperBound: Bool = false, openFiles: Bool = false,
-        entryLabel: CleanerItem.EntryLabel? = nil, selectableEntries: Bool = false
+        entryLabel: CleanerItem.EntryLabel? = nil, selectableEntries: Bool = false, config: ConfigFolders? = nil
     ) -> CleanerItem {
         CleanerItem(id: id, title: title, note: note, paths: paths, minAge: minAge, included: included, mode: mode,
                     selectedByDefault: selected, command: command, probe: probe, locate: locate, shellFolders: shell,
+                    configFolders: config,
                     sizeIsUpperBound: upperBound,
                     showsWhenEmpty: false,
                     runningAppBundleIDs: apps, runningProcessNames: processes, skipsOpenFiles: openFiles,

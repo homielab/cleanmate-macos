@@ -11,8 +11,9 @@ nonisolated enum RunningProcesses {
     /// Processes of other users cannot be read and are left out.
     static func names() -> Set<String> {
         var names = Set<String>()
+        let extra = shellInstallPaths(policy: .current)
         for pid in allPIDs() where pid > 0 {
-            names.formUnion(argumentNames(arguments(of: pid)))
+            names.formUnion(argumentNames(arguments(of: pid), extra: extra))
         }
         return names
     }
@@ -42,6 +43,12 @@ nonisolated enum RunningProcesses {
         // downloaded binary run from that folder; the unpacked `ui-v*` folder is not kept open, so a path is the only sign.
         (CleanerGroup.firebaseEmulatorsPath, "firebase-emulators"),
     ]
+
+    /// `installPaths` moved by a shell profile variable: emulators run from `FIREBASE_EMULATORS_PATH` (checked like
+    /// any `shellFolders` folder, so never outside home).
+    static func shellInstallPaths(policy: SafetyPolicy) -> [(path: String, name: String)] {
+        ShellEnvironment.folder("FIREBASE_EMULATORS_PATH", policy: policy).map { [($0.path + "/", "firebase-emulators")] } ?? []
+    }
 
     /// `node`, `node22`, `python3.12`…
     static func isInterpreter(_ name: String) -> Bool {
@@ -86,13 +93,13 @@ nonisolated enum RunningProcesses {
     }
 
     /// Names a process goes by, from a `KERN_PROCARGS2` buffer (see `names`).
-    static func argumentNames(_ buffer: [UInt8]) -> Set<String> {
+    static func argumentNames(_ buffer: [UInt8], extra: [(path: String, name: String)] = []) -> Set<String> {
         let strings = argumentStrings(buffer)
         let base = strings.map { $0.split(separator: "/").last.map(String.init) ?? $0 }
         var names = Set(base.prefix(2))
         if base.count > 2, isInterpreter(base[1]) { names.insert(base[2]) }
         if base.count > 3, isInterpreter(base[1]), base[2] == "-m" { names.insert(base[3]) } // `python3 -m pip`
-        for (path, name) in installPaths where strings.contains(where: { $0.contains(path) }) { names.insert(name) }
+        for (path, name) in installPaths + extra where strings.contains(where: { $0.contains(path) }) { names.insert(name) }
         // The Gradle daemon is `java … org.gradle.launcher.daemon.bootstrap.GradleDaemon <version>`.
         if strings.contains("org.gradle.launcher.daemon.bootstrap.GradleDaemon") { names.insert("GradleDaemon") }
         // The Kotlin compile daemon is `java … org.jetbrains.kotlin.daemon.KotlinCompileDaemon …`.
