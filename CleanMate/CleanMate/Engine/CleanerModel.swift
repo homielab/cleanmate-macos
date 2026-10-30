@@ -205,7 +205,8 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     var showsWhenEmpty = true
     /// The item is skipped while one of these apps is running (a trailing `*` matches a bundle id prefix).
     var runningAppBundleIDs: [String] = []
-    /// The item is skipped while a command-line tool with one of these names runs (see `RunningProcesses`).
+    /// The item is skipped while a command-line tool with one of these names runs (see `RunningProcesses`); a trailing
+    /// `*` matches a name prefix (`Adobe Premiere Pro*`: the executable carries the version year).
     var runningProcessNames: [String] = []
     /// An entry that is, or holds, a file any process has open under the item's folders is kept.
     /// The open-file table (libproc, ~30 ms) is read once per scan, and at clean once per item, refreshed every 2 s.

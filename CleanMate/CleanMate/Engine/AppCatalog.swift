@@ -226,7 +226,31 @@ extension CleanerGroup {
             chromium("~/Library/Application Support/Postman") + ["~/Library/Caches/com.postmanlabs.mac"]),
         app("signal", "Signal", bundle: ["org.whispersystems.signal-desktop"],
             chromium("~/Library/Application Support/Signal")),
+        // Media cache Premiere Pro, After Effects, Media Encoder and Audition share: conformed audio, peak files and
+        // the cache database, often tens of GB, rebuilt from the source media when a project opens. Only these three
+        // folders at the default location (a folder chosen in Premiere's Preferences › Media Cache is not scanned),
+        // never the rest of Adobe/Common, preferences or projects. Unticked (the next open is slower), deleted
+        // (regenerable), the folders made again by the app. Skipped while an app using the cache runs; Creative Cloud
+        // and its helpers (`AdobeIPCBroker`, `CCXProcess`) run all the time and never touch it.
+        CleanerItem(id: "adobe-media-cache", title: "Adobe media cache",
+                    note: "Premiere rebuilds it when a project is opened; the first open is slower",
+                    paths: ["~/Library/Application Support/Adobe/Common"],
+                    included: ["Media Cache Files", "Media Cache", "Peak Files"], selectedByDefault: false,
+                    showsWhenEmpty: false, runningAppBundleIDs: adobeMediaBundleIDs,
+                    runningProcessNames: adobeMediaProcessNames, skipsOpenFiles: true),
     ])
+
+    /// Adobe apps that read and write the media cache. Bundle ids and executables carry the version
+    /// (`com.adobe.PremierePro.25`, `Adobe Premiere Pro 2025`), hence the prefixes; `aerender` renders After Effects
+    /// projects from the command line.
+    nonisolated static let adobeMediaBundleIDs = [
+        "com.adobe.Premiere*", "com.adobe.AfterEffects*", "com.adobe.ame*", "com.adobe.Audition*",
+        "com.adobe.Character*", "com.adobe.Rush*",
+    ]
+    nonisolated static let adobeMediaProcessNames = [
+        "Adobe Premiere*", "After Effects*", "Adobe After Effects*", "aerender", "Adobe Media Encoder*",
+        "Adobe Audition*", "Character Animator*", "Adobe Character Animator*",
+    ]
 
     /// `~/Library/Caches` paths owned by a separate item (`Google/Chrome`, `Homebrew`), kept out of "User caches"
     /// so nothing is counted twice; the rest of their top folder (`Google/…`) is still listed. Cut at a `*`.

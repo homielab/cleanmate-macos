@@ -1775,6 +1775,66 @@ struct AppCatalogTests {
         #expect((entries.first?.size ?? 0) >= 200_000 && (entries.first?.size ?? 0) < 400_000)
     }
 
+    /// Adobe media cache: only Media Cache Files, Media Cache and Peak Files are counted and deleted; the rest of
+    /// Adobe/Common, Adobe preferences, profiles and projects stay, and so does Adobe/Common itself.
+    @Test func adobeMediaCacheCleansOnlyTheCacheFolders() async throws {
+        let item = try #require(CleanerGroup.applications.items.first { $0.id == "adobe-media-cache" })
+        #expect(!item.selectedByDefault && item.mode == .delete && !item.showsWhenEmpty && item.note != nil)
+        #expect(item.skipsOpenFiles && item.command == nil && item.probe == nil)
+        let box = try Sandbox()
+        defer { box.remove() }
+        let common = "Library/Application Support/Adobe/Common"
+        try box.file(common + "/Media Cache Files/clip 48000.cfa", bytes: 300_000)
+        try box.file(common + "/Media Cache Files/clip.pek", bytes: 20_000)
+        try box.file(common + "/Media Cache/media_cache_db.mcdb", bytes: 50_000)
+        try box.file(common + "/Peak Files/voice.pkf", bytes: 30_000)
+        let kept = [
+            common + "/Team Projects Cache/t.dat", common + "/Plug-ins/7.0/MediaCore/p.bundle",
+            "Library/Application Support/Adobe/Adobe Premiere Pro/25.0/Profile-me/Adobe Premiere Pro Prefs",
+            "Library/Preferences/Adobe/After Effects/25.0/prefs.txt", "Movies/Film/Film.prproj",
+        ]
+        for path in kept { try box.file(path) }
+        let scan = await Scanner.scan(item, policy: box.policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(Set(scan.entries.map { $0.url.lastPathComponent }) == ["Media Cache Files", "Media Cache", "Peak Files"])
+        #expect(scan.size >= 400_000 && scan.size < 600_000)
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(report.freed >= 400_000)
+        let fm = FileManager.default
+        for name in ["Media Cache Files", "Media Cache", "Peak Files"] {
+            #expect(!fm.fileExists(atPath: box.home.appending(path: common + "/" + name).path), "\(name)")
+        }
+        #expect(fm.fileExists(atPath: box.home.appending(path: common).path))
+        for path in kept { #expect(fm.fileExists(atPath: box.home.appending(path: path).path), "\(path)") }
+    }
+
+    /// Without Adobe there is nothing to list, and the hidden item shows no row.
+    @Test func adobeMediaCacheHiddenWithoutAdobe() async throws {
+        let item = try #require(CleanerGroup.applications.items.first { $0.id == "adobe-media-cache" })
+        let box = try Sandbox()
+        defer { box.remove() }
+        try box.file("Library/Application Support/Adobe/Common/Team Projects Cache/t.dat")
+        #expect(await Scanner.scan(item, policy: box.policy, openPaths: EndToEndCleanTests.ownOpenPaths).entries.isEmpty)
+        #expect(!item.showsWhenEmpty)
+    }
+
+    /// Locked while Premiere, After Effects or Media Encoder (any version) runs; Creative Cloud and its helpers,
+    /// always running, do not lock it.
+    @MainActor @Test func adobeMediaCacheLockedWhileAnAdobeMediaAppRuns() throws {
+        let item = try #require(CleanerGroup.applications.items.first { $0.id == "adobe-media-cache" })
+        let model = SmartScanModel(module: .smartScan) { [] }
+        model.runningApps = ["com.adobe.acc.AdobeCreativeCloud", "com.adobe.CCXProcess"]
+        model.runningProcesses = ["Creative Cloud", "AdobeIPCBroker", "CCXProcess", "Core Sync", "Adobe Desktop Service"]
+        #expect(!model.isLocked(item))
+        for name in ["Adobe Premiere Pro 2025", "Adobe Premiere Pro (Beta)", "After Effects", "Adobe Media Encoder 2025",
+                     "Adobe Audition 2025", "aerender"] {
+            model.runningProcesses = ["AdobeIPCBroker", name]
+            #expect(model.isLocked(item), "\(name)")
+        }
+        model.runningProcesses = []
+        model.runningApps = ["com.adobe.PremierePro.25"]
+        #expect(model.isLocked(item))
+    }
+
     @Test func credentialsSettingsAndMemoryAreNeverListed() async throws {
         let box = try Sandbox()
         defer { box.remove() }

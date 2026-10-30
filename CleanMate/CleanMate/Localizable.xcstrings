@@ -5594,6 +5594,26 @@
         }
       }
     },
+    "Adobe media cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache media của Adobe"
+          }
+        }
+      }
+    },
+    "Premiere rebuilds it when a project is opened; the first open is slower" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premiere dựng lại khi mở dự án; mở lần đầu chậm hơn"
+          }
+        }
+      }
+    },
     "ZCode: remote server files" : {
       "localizations" : {
         "vi" : {

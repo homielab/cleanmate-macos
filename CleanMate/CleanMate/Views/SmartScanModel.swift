@@ -132,7 +132,7 @@ final class SmartScanModel: ObservableObject {
         Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
     }
 
-    /// `pattern` is a bundle id or ends with `*` (`com.jetbrains.*`: every JetBrains IDE).
+    /// `pattern` is a bundle id (or process name) or ends with `*` (`com.jetbrains.*`: every JetBrains IDE).
     nonisolated static func bundleID(_ id: String, matches pattern: String) -> Bool {
         pattern.hasSuffix("*") ? id.hasPrefix(pattern.dropLast()) : id == pattern
     }
@@ -143,7 +143,10 @@ final class SmartScanModel: ObservableObject {
 
     func isRunning(_ item: CleanerItem) -> Bool {
         runningApps.contains { id in item.runningAppBundleIDs.contains { Self.bundleID(id, matches: $0) } }
-            || item.runningProcessNames.contains(where: runningProcesses.contains)
+            || item.runningProcessNames.contains { name in
+                name.hasSuffix("*") ? runningProcesses.contains { Self.bundleID($0, matches: name) }
+                    : runningProcesses.contains(name)
+            }
     }
 
     /// The catalog without the groups turned off in Settings.
