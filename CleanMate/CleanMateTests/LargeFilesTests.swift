@@ -479,22 +479,33 @@ struct DuplicateFinderTests {
         #expect(result.groups.isEmpty && result.hashedCount == 0)
     }
 
-    /// Whole-file APFS clones share their blocks, so trashing one frees nothing; a plain copy or a changed clone does.
-    @Test func apfsClonesAreNotDuplicates() async throws {
+    /// APFS clones are duplicates, the clones of one file grouped without reading them; trashing one frees only the
+    /// blocks it alone holds: 0 for a whole-file clone, the rewritten part for a clone changed in place. A plain
+    /// copy frees its whole size (no private size). Skipped when the temporary folder is not on APFS.
+    @Test func apfsClonesAreDuplicatesThatFreeOnlyTheirOwnBlocks() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
-        let a = try file("a.mov", Data(repeating: 7, count: 100_000))
-        let clone = root.appending(path: "b.mov"), changed = root.appending(path: "d.mov")
-        #expect(clonefile(a.path, clone.path, 0) == 0)
+        let a = try file("a.mov", Data((0..<1_048_576).map { UInt8($0 % 251) }))
+        let clone = root.appending(path: "b.mov")
+        guard clonefile(a.path, clone.path, 0) == 0, DuplicateFinder.cloneID(of: a) != nil else { return } // not APFS
+        #expect(DuplicateFinder.cloneID(of: a) == DuplicateFinder.cloneID(of: clone))
+        let pair = try await DuplicateFinder.find([a, clone])
+        #expect(pair.groups == [[a, clone]] && pair.hashedCount == 0)
+        #expect(pair.privateSizes == [a: 0, clone: 0])
         let copy = try file("c.mov", Data(contentsOf: a)) // plain write: own blocks
-        #expect(DuplicateFinder.cloneID(of: a) != nil && DuplicateFinder.cloneID(of: a) == DuplicateFinder.cloneID(of: clone))
-        #expect(DuplicateFinder.cloneID(of: copy) == nil)
-        #expect(try await DuplicateFinder.find([a, clone, copy]).groups == [[a, copy]])
-        // A clone written to after cloning only may share blocks: still a duplicate.
-        #expect(clonefile(a.path, changed.path, 0) == 0)
+        #expect(DuplicateFinder.cloneID(of: copy) == nil && DuplicateFinder.privateSize(of: copy) == nil)
+        let three = try await DuplicateFinder.find([a, clone, copy])
+        #expect(three.groups == [[a, clone, copy]] && three.hashedCount == 2) // a and the copy; the clone is not read
+        #expect(three.privateSizes == [a: 0, clone: 0])
+        // The first 64 KB of a fresh clone rewritten with the same bytes: same content, those blocks are its own
+        // now, and the original's old ones only the original's.
+        let original = try file("d.mov", Data(contentsOf: a)), changed = root.appending(path: "e.mov")
+        #expect(clonefile(original.path, changed.path, 0) == 0)
         let handle = try FileHandle(forWritingTo: changed)
-        try handle.seek(toOffset: 50); try handle.write(contentsOf: Data([7])); try handle.close()
+        try handle.write(contentsOf: try Data(contentsOf: original).prefix(65_536)); try handle.close()
         #expect(DuplicateFinder.cloneID(of: changed) == nil)
-        #expect(try await DuplicateFinder.find([a, changed]).groups == [[a, changed]])
+        let partly = try await DuplicateFinder.find([original, changed])
+        #expect(partly.groups == [[original, changed]])
+        #expect(partly.privateSizes == [original: 65_536, changed: 65_536])
     }
 
     /// Chunks read in their own autorelease pool still hash the whole file: several chunks plus a partial one.
@@ -660,6 +671,34 @@ struct DuplicateFinderTests {
     model.search = ""
     #expect(model.checked == [new.url])
     #expect(model.groupsLosingEveryCopy.isEmpty)
+}
+
+/// APFS clones: the selection counts only what they free, Select Extra Copies leaves them unticked, and a group
+/// that frees nothing is still shown.
+@MainActor @Test func apfsClonesCountWhatTheyFreeAndAreNotSelectedAsExtraCopies() async throws {
+    let model = LargeFilesModel()
+    let f = { (path: String, age: Double) in
+        LargeFile(url: URL(fileURLWithPath: path), size: 100_000_000, lastUsed: .now, kind: .other, modified: .now.addingTimeInterval(-age))
+    }
+    let (original, clone, copy, a, b) = (f("/original", 9), f("/clone", 5), f("/copy", 1), f("/a", 9), f("/b", 1))
+    model.files = [original, clone, copy, a, b]
+    model.phase = .results
+    model.findDuplicateFiles = { _, _, _ in
+        DuplicateFinder.Result(groups: [[clone.url, copy.url, original.url], [a.url, b.url]],
+                               privateSizes: [original.url: 0, clone.url: 0, a.url: 0, b.url: 4_096])
+    }
+    model.duplicatesOnly = true
+    while model.duplicateGroups == nil { await Task.yield() }
+    #expect(model.visibleFiles.count == 5)
+    #expect(model.cloneFreedSize(of: clone) == 0 && model.cloneFreedSize(of: b) == 4_096 && model.cloneFreedSize(of: copy) == nil)
+    model.checkExtraCopies()
+    #expect(model.checked == [copy.url]) // the original is kept, its clone and the a/b clones are not ticked
+    #expect(model.checkedSize == 100_000_000)
+    model.checked = [clone.url, b.url]
+    #expect(model.checkedSize == 4_096)
+    model.duplicatesOnly = false
+    model.duplicateGroups = nil // a new scan: sizes are full again
+    #expect(model.privateSizes.isEmpty && model.checkedSize == 200_000_000)
 }
 
 @Test func largeFilesProgressFractionNeedsAnEstimateAndStopsAt99Percent() {

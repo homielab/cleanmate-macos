@@ -235,6 +235,9 @@ nonisolated enum DuplicateFinder {
         var hashes: [Key: Data] = [:]
         /// Files read in full this run (not answered from the cache nor ruled out by their head).
         var hashedCount = 0
+        /// Grouped files that share blocks with another file (APFS clones) → the bytes only they hold
+        /// (`privateSize`): what trashing that one file frees. Files not listed free their whole size.
+        var privateSizes: [URL: Int64] = [:]
     }
 
     /// Thrown instead of `CancellationError` by `find`: carries the cache passed in plus every full-file hash
@@ -244,15 +247,19 @@ nonisolated enum DuplicateFinder {
     /// One file on disk: a hard link's inode, or an APFS clone ID shared by whole-file clones (`number` vs `clone`).
     private struct Inode: Hashable { let device: Int32, number: UInt64, clone: Bool }
 
-    /// Hard links to one file (same device + inode) and APFS clones that still share every block (Finder
-    /// Duplicate, `cp -c`) count once: trashing one of them frees nothing. A clone changed after cloning shares only
-    /// some blocks; APFS cannot say how many, so it is still reported as a duplicate.
+    /// Hard links to one file (same device + inode) count once. APFS clones that still share every block (Finder
+    /// Duplicate, `cp -c`, same `cloneID`) are grouped without being read: only the first one found is hashed.
+    /// Grouped files that share blocks get their freeable size in `privateSizes` (0 for a whole-file clone).
     /// `progress` gets the fraction of bytes to read done so far. Throws `Cancelled` when cancelled.
     @concurrent static func find(_ urls: [URL], cache: [Key: Data] = [:],
                                  progress: (@Sendable (Double) -> Void)? = nil) async throws -> Result {
         var result = Result(hashes: cache)
         do {
             try findGroups(urls, cache: cache, into: &result, progress: progress)
+            for url in result.groups.joined() {
+                try Task.checkCancellation()
+                if let size = privateSize(of: url) { result.privateSizes[url] = size }
+            }
         } catch is CancellationError {
             throw Cancelled(hashes: result.hashes)
         }
@@ -262,17 +269,27 @@ nonisolated enum DuplicateFinder {
     private static func findGroups(_ urls: [URL], cache: [Key: Data], into result: inout Result,
                                    progress: (@Sendable (Double) -> Void)?) throws {
         var seen = Set<Inode>()
+        var firstClone: [Inode: URL] = [:]
+        /// First whole-file clone found → the other files of its clone ID: same content, never read.
+        var clonesOf: [URL: [(url: URL, key: Key)]] = [:]
         var bySize: [Int64: [(url: URL, key: Key)]] = [:]
         for url in urls {
             var info = stat()
             guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-                  seen.insert(Inode(device: info.st_dev, number: info.st_ino, clone: false)).inserted,
-                  cloneID(of: url).map({ seen.insert(Inode(device: info.st_dev, number: $0, clone: true)).inserted }) ?? true
+                  seen.insert(Inode(device: info.st_dev, number: info.st_ino, clone: false)).inserted
             else { continue }
             let modified = Date(timeIntervalSince1970: Double(info.st_mtimespec.tv_sec) + Double(info.st_mtimespec.tv_nsec) / 1e9)
-            bySize[info.st_size, default: []].append((url, Key(path: url.path, size: info.st_size, modified: modified, inode: info.st_ino)))
+            let file = (url: url, key: Key(path: url.path, size: info.st_size, modified: modified, inode: info.st_ino))
+            if let id = cloneID(of: url) {
+                let clone = Inode(device: info.st_dev, number: id, clone: true)
+                if let first = firstClone[clone] { clonesOf[first, default: []].append(file); continue }
+                firstClone[clone] = url
+            }
+            bySize[info.st_size, default: []].append(file)
         }
-        let candidates = bySize.filter { $0.value.count >= 2 }.sorted { $0.key > $1.key }
+        /// A file and its whole-file clones, in that order.
+        func copies(_ file: (url: URL, key: Key)) -> [(url: URL, key: Key)] { [file] + (clonesOf[file.url] ?? []) }
+        let candidates = bySize.filter { $0.value.reduce(0) { $0 + copies($1).count } >= 2 }.sorted { $0.key > $1.key }
         let total = candidates.reduce(0.0) { $0 + Double($1.key) * Double($1.value.count) }
         var done = 0.0
         var reported = 0.0
@@ -287,9 +304,14 @@ nonisolated enum DuplicateFinder {
         }
         for (size, files) in candidates {
             var pending = files
-            // Head pass: a file whose first `headSize` bytes no other file of its size shares is not read in full.
-            // Skipped when a cached hash is in the group: that file's head is unknown.
-            if size > headSize, !files.contains(where: { cache[$0.key] != nil }) {
+            // Files of this size whose only copies are their whole-file clones: grouped without reading.
+            var alone: [(url: URL, key: Key)] = []
+            if files.count == 1 {
+                (pending, alone) = ([], files)
+                settled(size)
+            } else if size > headSize, !files.contains(where: { cache[$0.key] != nil }) {
+                // Head pass: a file whose first `headSize` bytes no other file of its size shares is not read in full.
+                // Skipped when a cached hash is in the group: that file's head is unknown.
                 var heads: [Data: Int] = [:]
                 var headOf: [URL: Data] = [:]
                 for file in files {
@@ -299,8 +321,10 @@ nonisolated enum DuplicateFinder {
                     heads[head, default: 0] += 1
                 }
                 pending = files.filter { headOf[$0.url].map { heads[$0, default: 0] >= 2 } ?? false }
+                alone = files.filter { headOf[$0.url].map { heads[$0, default: 0] == 1 } ?? false }
                 for _ in pending.count..<files.count { settled(size) }
             }
+            var found = alone.map { copies($0).map(\.url) }.filter { $0.count >= 2 }
             var byHash: [Data: [URL]] = [:]
             for file in pending {
                 try Task.checkCancellation()
@@ -315,12 +339,14 @@ nonisolated enum DuplicateFinder {
                     hash = read
                     result.hashedCount += 1
                 }
-                result.hashes[file.key] = hash
-                byHash[hash, default: []].append(file.url)
+                for copy in copies(file) {
+                    result.hashes[copy.key] = hash
+                    byHash[hash, default: []].append(copy.url)
+                }
                 settled(size)
             }
-            result.groups += byHash.values.filter { $0.count >= 2 }
-                .map { $0.sorted { $0.path < $1.path } }.sorted { $0[0].path < $1[0].path }
+            found += byHash.values.filter { $0.count >= 2 }
+            result.groups += found.map { $0.sorted { $0.path < $1.path } }.sorted { $0[0].path < $1[0].path }
         }
     }
 
@@ -367,21 +393,44 @@ nonisolated enum DuplicateFinder {
     /// `EF_SHARES_ALL_BLOCKS`; a plain copy gets its own ID with no flags; writing to a clone gives it a new ID and
     /// leaves both with only `EF_MAY_SHARE_BLOCKS`.
     static func cloneID(of url: URL) -> UInt64? {
+        cloneAttributes(of: url).flatMap { $0.flags & UInt64(EF_SHARES_ALL_BLOCKS) != 0 ? $0.id : nil }
+    }
+
+    /// Bytes of the file no other file shares (`ATTR_CMNEXT_PRIVATESIZE`): what trashing it frees. nil when it
+    /// shares no blocks (`EF_MAY_SHARE_BLOCKS` / `EF_SHARES_ALL_BLOCKS` unset: it frees its whole size) or the
+    /// volume does not say (not APFS). Measured on macOS 26: 0 for a whole-file clone, the rewritten blocks for a
+    /// clone changed in place.
+    static func privateSize(of url: URL) -> Int64? {
+        let sharing = UInt64(EF_MAY_SHARE_BLOCKS | EF_SHARES_ALL_BLOCKS)
+        guard let attrs = cloneAttributes(of: url, privateSize: true), attrs.flags & sharing != 0 else { return nil }
+        return attrs.privateSize
+    }
+
+    /// `getattrlist` clone ID, extended flags and (when asked) private size; nil when the volume returns neither
+    /// clone ID nor flags, or a private size asked for is missing.
+    private static func cloneAttributes(of url: URL, privateSize: Bool = false) -> (id: UInt64, flags: UInt64, privateSize: Int64?)? {
         var attrs = attrlist()
         attrs.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
         attrs.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS)
-        attrs.forkattr = attrgroup_t(ATTR_CMNEXT_CLONEID | ATTR_CMNEXT_EXT_FLAGS)
-        // u_int32 length, attribute_set_t returned, u_int64 clone ID, u_int64 extended flags
+        let wanted = attrgroup_t(ATTR_CMNEXT_CLONEID | ATTR_CMNEXT_EXT_FLAGS)
+        attrs.forkattr = wanted | (privateSize ? attrgroup_t(ATTR_CMNEXT_PRIVATESIZE) : 0)
+        // u_int32 length, attribute_set_t returned, then in bit order: off_t private size (if asked),
+        // u_int64 clone ID, u_int64 extended flags
         var buffer = [UInt8](repeating: 0, count: 64)
         guard getattrlist(url.path, &attrs, &buffer, buffer.count, UInt32(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW)) == 0
         else { return nil }
         return buffer.withUnsafeBytes { raw in
             let returned = raw.loadUnaligned(fromByteOffset: 4, as: attribute_set_t.self)
-            let offset = 4 + MemoryLayout<attribute_set_t>.size
-            guard returned.forkattr & attrs.forkattr == attrs.forkattr,
-                  raw.loadUnaligned(fromByteOffset: offset + 8, as: UInt64.self) & UInt64(EF_SHARES_ALL_BLOCKS) != 0
-            else { return nil }
-            return raw.loadUnaligned(fromByteOffset: offset, as: UInt64.self)
+            var offset = 4 + MemoryLayout<attribute_set_t>.size
+            guard returned.forkattr & wanted == wanted else { return nil }
+            var size: Int64?
+            if privateSize {
+                guard returned.forkattr & attrgroup_t(ATTR_CMNEXT_PRIVATESIZE) != 0 else { return nil }
+                size = raw.loadUnaligned(fromByteOffset: offset, as: Int64.self)
+                offset += 8
+            }
+            return (raw.loadUnaligned(fromByteOffset: offset, as: UInt64.self),
+                    raw.loadUnaligned(fromByteOffset: offset + 8, as: UInt64.self), size)
         }
     }
 

@@ -173,6 +173,15 @@ struct LargeFilesView: View {
                         Text(file.name).help(file.url.path)
                         if file.hardLinked {
                             Text("Hard link — moving it frees no space").font(.caption).foregroundStyle(.secondary)
+                        } else if let freed = model.cloneFreedSize(of: file) {
+                            Group {
+                                if freed == 0 {
+                                    Text("APFS clone — moving it frees no space")
+                                } else {
+                                    Text("APFS clone — moving it frees only \(freed, format: .fileSize)")
+                                }
+                            }
+                            .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 } icon: {

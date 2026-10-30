@@ -40,8 +40,14 @@ final class LargeFilesModel: ObservableObject {
     }
     /// Same-content groups of the current scan, nil until found (the filter has not been on since the scan).
     @Published var duplicateGroups: [[URL]]? {
-        didSet { duplicateIndex = Dictionary((duplicateGroups ?? []).enumerated().flatMap { i, g in g.map { ($0, i) } }) { a, _ in a } }
+        didSet {
+            duplicateIndex = Dictionary((duplicateGroups ?? []).enumerated().flatMap { i, g in g.map { ($0, i) } }) { a, _ in a }
+            if duplicateGroups == nil { privateSizes = [:] }
+        }
     }
+    /// Grouped files sharing blocks with another file (APFS clones) → bytes trashing them frees
+    /// (`DuplicateFinder.Result.privateSizes`); set with `duplicateGroups`, cleared when they are.
+    @Published var privateSizes: [URL: Int64] = [:]
     /// File → its index in `duplicateGroups`; kept so the filter does no work per file.
     @Published private(set) var duplicateIndex: [URL: Int] = [:]
     /// Fraction of bytes read while finding duplicates; nil when not running.
@@ -268,6 +274,7 @@ final class LargeFilesModel: ObservableObject {
             duplicateTask = nil
             guard let result else { return }
             duplicateHashes = result.hashes
+            privateSizes = result.privateSizes
             duplicateGroups = result.groups
         }
     }
@@ -281,7 +288,19 @@ final class LargeFilesModel: ObservableObject {
 
     /// Only ticked files that the current filters still show are trashed.
     var checkedFiles: [LargeFile] { visibleFiles.filter { checked.contains($0.url) } }
-    var checkedSize: Int64 { checkedFiles.reduce(0) { $0 + $1.size } }
+    /// What the ticked files free: an APFS clone counts only its own blocks.
+    var checkedSize: Int64 { checkedFiles.reduce(0) { $0 + freedSize(of: $1) } }
+
+    /// Bytes trashing `file` frees: its size, or only the blocks it alone holds when it is an APFS clone.
+    func freedSize(of file: LargeFile) -> Int64 {
+        privateSizes[file.url].map { min($0, file.size) } ?? file.size
+    }
+
+    /// What trashing an APFS clone frees (less than its size: 0 for a whole-file clone); nil for any other file.
+    func cloneFreedSize(of file: LargeFile) -> Int64? {
+        let freed = freedSize(of: file)
+        return freed < file.size ? freed : nil
+    }
     /// Every shown file is ticked (false when nothing is shown): the bottom bar's button reads "Deselect All".
     var allVisibleChecked: Bool {
         let visible = visibleFiles
@@ -306,11 +325,13 @@ final class LargeFilesModel: ObservableObject {
         }
     }
 
-    /// Select Extra Copies: ticks every shown duplicate except the kept copy of its group, and unticks kept
-    /// copies: one ticked earlier, maybe hidden by a filter then, would leave no copy once shown again.
+    /// Select Extra Copies: ticks every shown duplicate except the kept copy of its group and APFS clones (trashing
+    /// one frees little or nothing), and unticks kept copies: one ticked earlier, maybe hidden by a filter then,
+    /// would leave no copy once shown again.
     func checkExtraCopies() {
         let keep = keptCopies
-        checked.formUnion(visibleFiles.map(\.url).filter { duplicateIndex[$0] != nil && !keep.contains($0) })
+        checked.formUnion(visibleFiles.filter { duplicateIndex[$0.url] != nil && !keep.contains($0.url) && cloneFreedSize(of: $0) == nil }
+            .map(\.url))
         checked.subtract(keep)
     }
 

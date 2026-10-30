@@ -813,6 +813,26 @@
         }
       }
     },
+    "APFS clone — moving it frees no space" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao APFS — chuyển đi không giải phóng chỗ"
+          }
+        }
+      }
+    },
+    "APFS clone — moving it frees only %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao APFS — chuyển đi chỉ giải phóng %@"
+          }
+        }
+      }
+    },
     "Hard link — moving it frees no space" : {
       "localizations" : {
         "vi" : {
