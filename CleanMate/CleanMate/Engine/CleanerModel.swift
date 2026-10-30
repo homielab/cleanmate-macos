@@ -27,6 +27,7 @@ nonisolated struct SizeProbe: Sendable {
     var parse: @Sendable (String) -> Result?
     /// With `.bytes`: a second command whose parsed rows are listed in the expanded row (Docker's unused images).
     /// Display only: the item's command does the cleaning, these entries are never removed (see `Cleaner.remove`).
+    /// The same command as `command` is not run again: the probe's output is parsed.
     var details: (command: ShellCommand, parse: @Sendable (String) -> [ScanEntry])? = nil
     /// What the command's output depends on (e.g. `folderDates`). Same value as the last run, less than `reuseLimit`
     /// ago → that run's output is reused from `Preferences.probeOutputs` instead of running the command (brew).

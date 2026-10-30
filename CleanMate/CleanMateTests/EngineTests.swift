@@ -1117,6 +1117,48 @@ struct DeveloperToolsTests {
         #expect(DeveloperTools.brewReclaimable(in: "") == nil) // nothing to clean: brew prints no total
     }
 
+    /// `brew autoremove --dry-run`: listed formulae measured in the Cellar (a tap formula by its name; unknown or odd
+    /// names left out), shown as display-only entries with their total; nothing to remove → no size, item hidden.
+    @Test func brewAutoremoveDryRun() async throws {
+        let item = try #require(CleanerGroup.developer.items.first { $0.id == "brew-autoremove" })
+        #expect(!item.selectedByDefault && item.paths.isEmpty && !item.showsWhenEmpty && !item.selectableEntries)
+        #expect(item.command?.arguments == ["autoremove"] && item.runningProcessNames == ["brew"])
+        #expect(item.probe?.command.arguments == ["autoremove", "--dry-run"] && item.probe?.fingerprint != nil)
+
+        let root = FileManager.default.temporaryDirectory.appending(path: "CleanMateBrew-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cellar = root.appending(path: "Cellar")
+        for (path, bytes) in [("libyaml/0.2.5/lib/libyaml.dylib", 8192), ("oniguruma/6.9.9/lib/a.dylib", 4096), ("etc", 4096)] {
+            let url = cellar.appending(path: path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(repeating: 1, count: bytes).write(to: url)
+        }
+        let output = """
+        ==> Would autoremove 4 unneeded formulae:
+        libyaml
+        user/tap/oniguruma
+        missing
+        ../etc
+        libyaml
+        """
+        let entries = DeveloperTools.brewAutoremovable(in: output, cellar: cellar)
+        #expect(entries.map(\.title) == ["libyaml", "oniguruma"])
+        #expect(entries.map(\.size) == [8192, 4096] && entries.allSatisfy { !$0.url.isFileURL })
+        #expect(DeveloperTools.brewAutoremovable(in: "", cellar: cellar).isEmpty)
+        #expect(DeveloperTools.brewAutoremovable(in: output, cellar: nil).isEmpty)
+
+        // Through the scanner with a stand-in for brew: the dry run's output gives the total and the listed formulae.
+        func scan(_ text: String) async -> ItemScan {
+            let probe = DeveloperTools.brewAutoremoveProbe(dryRun: ShellCommand(executable: "/usr/bin/printf", arguments: ["%s", text]),
+                                                           cellar: { cellar })
+            return await Scanner.scan(CleanerItem(id: "brew-test", title: "Brew", paths: [], probe: probe))
+        }
+        let found = await scan(output)
+        #expect(found.measuredSize == 12_288 && found.entries.map(\.title) == ["libyaml", "oniguruma"])
+        let empty = await scan("")
+        #expect(empty.measuredSize == nil && empty.entries.isEmpty && !empty.hasData)
+    }
+
     /// The brew dry run is reused while its folders are unchanged and less than `reuseLimit` old.
     @Test func probeOutputReuse() async throws {
         let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
@@ -1216,6 +1258,9 @@ struct DeveloperToolsTests {
         #expect(RunningProcesses.argumentNames(buffer(4, ["/usr/bin/python3", "python3", "-m", "pip", "install"])).contains("pip"))
         #expect(RunningProcesses.argumentNames(buffer(3, ["/v/bin/python3.12", "python3.12", "/v/bin/pip3", "list"])).contains("pip3"))
         #expect(RunningProcesses.argumentNames(buffer(2, ["/u/.cargo/bin/cargo", "cargo", "build"])).contains("cargo"))
+        // brew: `bash …/brew.sh` and then `ruby … …/brew.rb`.
+        #expect(RunningProcesses.argumentNames(buffer(3, ["/bin/bash", "/bin/bash", "-p", "/opt/homebrew/Library/Homebrew/brew.sh"])).contains("brew"))
+        #expect(RunningProcesses.argumentNames(buffer(4, ["/r/bin/ruby", "ruby", "-W1", "--", "/usr/local/Homebrew/Library/Homebrew/brew.rb"])).contains("brew"))
         #expect(RunningProcesses.argumentNames(buffer(2, ["/u/.bun/bin/bun", "bun", "install"])).contains("bun"))
     }
 

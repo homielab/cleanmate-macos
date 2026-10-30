@@ -36,6 +36,8 @@ nonisolated enum RunningProcesses {
         ("/@openai/codex/", "codex"), ("/@google/gemini-cli/", "gemini"), ("/@github/copilot/", "copilot"),
         // Yarn run by node: a project's pinned release (`.yarn/releases/yarn-4.5.0.cjs`) or the npm package's yarn.js.
         ("/.yarn/releases/yarn-", "yarn"), ("/node_modules/yarn/bin/", "yarn"),
+        // Homebrew: `bin/brew` runs `bash …/Library/Homebrew/brew.sh`, which runs `ruby … …/Library/Homebrew/brew.rb`.
+        ("/Library/Homebrew/brew.sh", "brew"), ("/Library/Homebrew/brew.rb", "brew"),
     ]
 
     /// `node`, `node22`, `python3.12`…

@@ -1999,6 +1999,16 @@
         }
       }
     },
+    "Formulae installed as dependencies that nothing needs any more (brew autoremove)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formula được cài làm phụ thuộc mà không còn gói nào cần (brew autoremove)"
+          }
+        }
+      }
+    },
     "Form autofill data" : {
       "localizations" : {
         "vi" : {
@@ -4184,6 +4194,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mục không đọc được: %lld (lệnh dọn vẫn có thể xoá chúng)"
+          }
+        }
+      }
+    },
+    "Unused Homebrew dependencies" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phụ thuộc Homebrew không còn dùng"
           }
         }
       }

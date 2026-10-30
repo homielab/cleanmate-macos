@@ -155,6 +155,12 @@ extension CleanerGroup {
             probe: SizeProbe(command: ShellCommand(executable: "brew", arguments: ["cleanup", "-s", "--dry-run"]),
                              parse: { DeveloperTools.brewReclaimable(in: $0).map(SizeProbe.Result.bytes) },
                              fingerprint: { DeveloperTools.brewFingerprint() })),
+        // Formulae installed only as dependencies of ones since uninstalled. Unticked: one may still be used directly
+        // (a library linked by the user's own builds). Each one is listed (display only); `brew autoremove` removes them.
+        dev("brew-autoremove", "Unused Homebrew dependencies",
+            note: "Formulae installed as dependencies that nothing needs any more (brew autoremove)", [],
+            command: ShellCommand(executable: "brew", arguments: ["autoremove"], timeout: .seconds(300)),
+            probe: DeveloperTools.brewAutoremoveProbe(), selected: false, processes: ["brew"]),
         dev("composer-cache", "Composer cache", ["~/Library/Caches/composer", "~/.composer/cache", "~/.cache/composer"]),
         // Unticked like Playwright: since Puppeteer 19 this is where its browsers are installed; an existing
         // node_modules does not download them again, so launch() fails until `npx puppeteer browsers install`.
@@ -538,6 +544,46 @@ nonisolated enum DeveloperTools {
         return SizeProbe.folderDates(["~/Library/Caches/Homebrew", "~/Library/Caches/Homebrew/api", "~/Library/Logs/Homebrew"]
             .map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
             + (prefix.map { [$0.appending(path: "Cellar"), $0.appending(path: "Caskroom")] } ?? []))
+    }
+
+    /// `brew autoremove --dry-run` (`dryRun`; tests pass a stand-in): the formulae it would remove, each measured in
+    /// `cellar`, total as the size and listed in the details; nothing listed → no size (the item is hidden).
+    static func brewAutoremoveProbe(
+        dryRun: ShellCommand = ShellCommand(executable: "brew", arguments: ["autoremove", "--dry-run"], timeout: .seconds(120)),
+        cellar: @escaping @Sendable () -> URL? = { brewCellar }
+    ) -> SizeProbe {
+        let sizes: @Sendable (String) -> [ScanEntry] = { brewAutoremovable(in: $0, cellar: cellar()) }
+        return SizeProbe(command: dryRun, parse: { output in
+            let total = sizes(output).reduce(0) { $0 + $1.size }
+            return total > 0 ? .bytes(total) : nil
+        }, details: (dryRun, sizes), fingerprint: { brewFingerprint() })
+    }
+
+    /// The Cellar of the prefix brew runs from (`/opt/homebrew/bin/brew` → `/opt/homebrew/Cellar`); nil without brew.
+    static var brewCellar: URL? {
+        ShellCommand(executable: "brew").resolvedPath.map {
+            URL(fileURLWithPath: $0).deletingLastPathComponent().deletingLastPathComponent().appending(path: "Cellar")
+        }
+    }
+
+    /// Formulae `brew autoremove --dry-run` lists after "==> Would autoremove N unneeded formulae:", one per line, each
+    /// with the size of its `Cellar/<name>` folder (every installed version); a tap formula (`user/tap/name`) by its
+    /// name. Names that aren't plain formula names, or have no folder in `cellar`, are left out. Display only:
+    /// `brew-formula:<name>` URLs, never files.
+    static func brewAutoremovable(in output: String, cellar: URL?) -> [ScanEntry] {
+        guard let cellar, let start = output.range(of: "==> Would autoremove") else { return [] }
+        let lines = output[start.upperBound...].split(whereSeparator: \.isNewline).dropFirst()
+        var seen = Set<String>()
+        return lines.prefix { !$0.hasPrefix("==>") }.compactMap { line -> ScanEntry? in
+            let name = String(line.trimmingCharacters(in: .whitespaces).split(separator: "/").last ?? "")
+            guard !name.isEmpty, !name.hasPrefix("."), name.allSatisfy({ $0.isLetter || $0.isNumber || "@+._-".contains($0) }),
+                  seen.insert(name).inserted, let url = URL(string: "brew-formula:" + name) else { return nil }
+            let folder = cellar.appending(path: name)
+            var info = stat()
+            guard lstat(folder.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+                  let (size, _, _) = Scanner.tree(folder, dates: false, device: info.st_dev) else { return nil }
+            return ScanEntry(url: url, size: size, title: name)
+        }
     }
 
     /// Bytes from the last line of `brew cleanup --dry-run`: "==> This operation would free approximately 54.5MB

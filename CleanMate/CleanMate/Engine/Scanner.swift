@@ -114,8 +114,13 @@ nonisolated enum Scanner {
             switch parsed {
             case .bytes(let bytes):
                 result.measuredSize = bytes
-                if let details = probe.details, let output = await details.command.output() {
-                    result.entries = details.parse(output).sorted { $0.size > $1.size }
+                if let details = probe.details {
+                    // The probe's own command again (`brew autoremove --dry-run`): its output is reused, not run twice.
+                    let same = details.command.executable == probe.command.executable
+                        && details.command.arguments == probe.command.arguments
+                    let listed: String?
+                    if same { listed = output } else { listed = await details.command.output() }
+                    if let listed { result.entries = details.parse(listed).sorted { $0.size > $1.size } }
                 }
                 return result
             case .only(let names): only = names
