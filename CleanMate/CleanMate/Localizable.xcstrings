@@ -91,6 +91,16 @@
         }
       }
     },
+    "A program runs from this version, so it is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Có chương trình đang chạy từ phiên bản này nên được giữ lại"
+          }
+        }
+      }
+    },
     "AI sessions: %lld days" : {
       "localizations" : {
         "en" : {
@@ -693,6 +703,16 @@
         }
       }
     },
+    "Flutter versions other than fvm's global one, installed again with fvm install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản Flutter khác bản global của fvm, cài lại bằng fvm install"
+          }
+        }
+      }
+    },
     "Free space" : {
       "localizations" : {
         "vi" : {
@@ -1079,6 +1099,16 @@
         }
       }
     },
+    "Node.js versions other than nvm's default, installed again with nvm install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản Node.js khác bản mặc định của nvm, cài lại bằng nvm install"
+          }
+        }
+      }
+    },
     "Not Used for 3 Months" : {
       "localizations" : {
         "vi" : {
@@ -1155,6 +1185,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tải về cũ"
+          }
+        }
+      }
+    },
+    "Old Flutter SDKs (fvm)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flutter SDK cũ (fvm)"
+          }
+        }
+      }
+    },
+    "Old Node.js versions (nvm)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản Node.js cũ (nvm)"
           }
         }
       }

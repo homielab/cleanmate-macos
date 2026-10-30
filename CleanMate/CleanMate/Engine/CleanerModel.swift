@@ -243,6 +243,12 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Sizes of the item's folder entries kept between scans (`FolderSizeCache`): an entry whose top level did not
     /// change since it was measured is not walked again. Only for items without `minAge` (a cached size has no date).
     var entrySizes: FolderSizeCache? = nil
+    /// Per-entry lock: the entry is listed with this reason but can't be ticked, and is skipped at clean (an old Node
+    /// version a program still runs from). Makes the check like `skipsEntry`: once per scan, anew for each entry removed.
+    var locksEntry: (@Sendable () -> @Sendable (URL) -> String?)? = nil
+    /// Empty folders above a removed entry also removed, at most this many levels (an Android image's tag and API
+    /// folders); `rmdir` only, so a folder holding anything stays.
+    var removesEmptyParents = 0
 }
 
 nonisolated struct CleanerGroup: Identifiable, Sendable {

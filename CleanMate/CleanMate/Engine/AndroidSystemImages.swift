@@ -9,7 +9,7 @@ import Foundation
 /// Any AVD that can't be read (a broken or missing `config.ini`, a folder on a drive that isn't plugged in, a variable
 /// the profile sets in a way CleanMate can't read) keeps every image: nothing is listed.
 /// One entry per image, unticked, deleted whole (the SDK Manager downloads it again; removing the folder is also how
-/// `sdkmanager --uninstall` does it). `platforms`, `build-tools`, `ndk`, `emulator` and the AVDs are never listed.
+/// `sdkmanager --uninstall` does it), then its `<tag>` and `<android-N>` folders once empty. `platforms`, `build-tools`, `ndk`, `emulator` and the AVDs are never listed.
 nonisolated enum AndroidSystemImages {
     static let id = "android-system-images"
     /// One level per API and tag; the entries are the ABI folders inside.
@@ -31,12 +31,14 @@ nonisolated enum AndroidSystemImages {
 
     /// The Smart Scan item. `volumesFolder` is where drives mount (tests use their own).
     static func item(volumesFolder: String = "/Volumes") -> CleanerItem {
-        CleanerItem(id: id, title: "Android system images without a device",
+        var item = CleanerItem(id: id, title: "Android system images without a device",
                     note: "Emulator images no virtual device uses; downloaded again with Android Studio's SDK Manager",
                     paths: paths, selectedByDefault: false, shellFolders: shellFolders, showsWhenEmpty: false,
                     runningAppBundleIDs: bundleIDs, runningProcessNames: processNames, skipsOpenFiles: true,
                     entryLabel: label(of:), selectableEntries: true,
                     allowsEntry: { policy, url in allows(url, policy: policy, volumesFolder: volumesFolder) })
+        item.removesEmptyParents = 2 // `<tag>`, then `<android-N>`, once empty (as `sdkmanager --uninstall` leaves none)
+        return item
     }
 
     /// `url` is an image no AVD uses, allowed by `policy`. Asked at scan and again right before removal, so an AVD

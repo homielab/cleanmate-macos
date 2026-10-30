@@ -140,8 +140,21 @@ final class SmartScanModel: ObservableObject {
     }
 
     /// The item's app is open: it is not selected by default and is skipped when cleaning.
-    /// Running, or blocked by an exclusion: the row's checkbox is locked and the item is never counted or cleaned.
-    func isLocked(_ item: CleanerItem) -> Bool { isRunning(item) || blocked.contains(item.id) }
+    /// Running, blocked by an exclusion, or every entry locked: the row's checkbox is locked and the item is never
+    /// counted or cleaned.
+    func isLocked(_ item: CleanerItem) -> Bool {
+        isRunning(item) || blocked.contains(item.id) || scans[item.id].map(Self.allEntriesLocked) == true
+    }
+
+    /// The scan lists entries and each one is locked (`ScanEntry.lockReason`).
+    nonisolated static func allEntriesLocked(_ scan: ItemScan) -> Bool {
+        !scan.entries.isEmpty && scan.entries.allSatisfy { $0.lockReason != nil }
+    }
+
+    /// Entries listed locked: never ticked, counted nor cleaned.
+    func lockedEntries(_ item: CleanerItem) -> Set<URL> {
+        Set(scans[item.id]?.entries.filter { $0.lockReason != nil }.map(\.url) ?? [])
+    }
 
     func isRunning(_ item: CleanerItem) -> Bool {
         runningApps.contains { id in item.runningAppBundleIDs.contains { Self.bundleID(id, matches: $0) } }
@@ -194,13 +207,13 @@ final class SmartScanModel: ObservableObject {
     }
 
     func isEntrySelected(_ item: CleanerItem, _ url: URL) -> Bool {
-        selected.contains(item.id) && excludedEntries[item.id]?.contains(url) != true
+        selected.contains(item.id) && excludedEntries[item.id]?.contains(url) != true && !lockedEntries(item).contains(url)
     }
 
     /// Ticks or unticks one entry. Ticking one of an unticked item ticks the item with only that entry;
     /// unticking the last one unticks the item. Not remembered, unlike an item tick.
     func setEntry(_ item: CleanerItem, _ url: URL, _ on: Bool) {
-        let all = Set(scans[item.id]?.entries.map(\.url) ?? [])
+        let all = Set(scans[item.id]?.entries.map(\.url) ?? []).subtracting(lockedEntries(item))
         var out = selected.contains(item.id) ? excludedEntries[item.id, default: []] : all
         if on { out.remove(url) } else { out.insert(url) }
         if out.isSuperset(of: all) {
@@ -220,7 +233,7 @@ final class SmartScanModel: ObservableObject {
         scans[item.id] = scan
         excludedEntries[item.id]?.remove(url)
         // Nothing left to clean, or only entries the user left out: the item is no longer ticked.
-        if !scan.hasData || excludedEntries[item.id]?.isSuperset(of: scan.entries.map(\.url)) == true {
+        if !scan.hasData || excludedEntries[item.id]?.isSuperset(of: scan.entries.filter { $0.lockReason == nil }.map(\.url)) == true {
             selected.remove(item.id)
             excludedEntries[item.id] = nil
         } else if excludedEntries[item.id]?.isEmpty == true {
@@ -229,10 +242,12 @@ final class SmartScanModel: ObservableObject {
         return true
     }
 
-    /// The item's scan as it will be cleaned: without the entries left out.
+    /// The item's scan as it will be cleaned: without the entries left out or locked.
     func selectedScan(_ item: CleanerItem) -> ItemScan? {
         guard var scan = scans[item.id] else { return nil }
-        if let out = excludedEntries[item.id] {
+        let locked = lockedEntries(item)
+        if excludedEntries[item.id] != nil || !locked.isEmpty {
+            let out = excludedEntries[item.id, default: []].union(locked)
             scan.entries.removeAll { out.contains($0.url) }
             if item.entryCommand != nil { scan.measuredSize = nil } // its entries are what is removed: their sum counts
         }
@@ -241,7 +256,7 @@ final class SmartScanModel: ObservableObject {
 
     /// Bytes to clean when only some of the item's entries are ticked; nil when it is ticked whole or not at all.
     func partialSelectedSize(_ item: CleanerItem) -> Int64? {
-        selected.contains(item.id) && !isFullySelected(item) ? selectedScan(item)?.size : nil
+        selected.contains(item.id) && (!isFullySelected(item) || !lockedEntries(item).isEmpty) ? selectedScan(item)?.size : nil
     }
 
     /// Items a group's Select All/Deselect All acts on: the same rows whose checkbox is enabled.

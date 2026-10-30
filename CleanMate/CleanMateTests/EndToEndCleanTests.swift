@@ -204,6 +204,10 @@ struct EndToEndCleanTests {
                     }
                     continue
                 }
+                if item.id == OldRuntimes.nodeID { // a Node version other than nvm's default (v22.0.0, bait)
+                    try write(folder.appending(path: "v1.0.0/bin/node"), Data(repeating: 1, count: 4096))
+                    continue
+                }
                 if item.id == AndroidSystemImages.id { // an installed image no AVD uses
                     try write(folder.appending(path: "junk-\(item.id)/package.xml"), Data("<package/>".utf8))
                     try write(folder.appending(path: "junk-\(item.id)/system.img"), Data(repeating: 1, count: 4096))
@@ -263,6 +267,12 @@ struct EndToEndCleanTests {
                 baitData[path] = Self.avdConfig
                 try write(home.appending(path: path), Self.avdConfig)
             }
+        }
+        // nvm's default alias names the bait version: without one no Node version is listed.
+        for nvm in [".nvm", tools + "NVM_DIR"] {
+            let path = nvm + "/alias/default"
+            baitData[path] = Data("v22.0.0\n".utf8)
+            try write(home.appending(path: path), baitData[path]!)
         }
         let profile = ShellEnvironment.variables.sorted().map { "export \($0)=\(Self.shellTools)\($0)\n" }.joined()
         baitData[".zprofile"] = Data(profile.utf8)

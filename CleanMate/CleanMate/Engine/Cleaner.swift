@@ -205,7 +205,7 @@ nonisolated enum Cleaner {
             // A fresh check per entry: an app launched since the scan (or during this loop) keeps its entry.
             // `included` and `excluded` again too: only names the item may remove, whatever the scan handed in.
             guard item.allowsEntry?(policy, entry.url) ?? policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
-                  !RunningProcesses.holdsOpenFile(entry.url, openPaths: open),
+                  item.locksEntry?()(entry.url) == nil, !RunningProcesses.holdsOpenFile(entry.url, openPaths: open),
                   item.included?.contains(where: { fnmatch($0, entry.url.lastPathComponent, 0) == 0 }) != false,
                   !isExcluded(entry.url, excluded: item.excluded, roots: rootPaths),
                   only.map({ isListed(entry.url, names: $0, roots: rootPaths) }) != false
@@ -239,6 +239,11 @@ nonisolated enum Cleaner {
             } catch {
                 report.skipped += 1 // permission / SIP / in use: leave it
                 continue
+            }
+            var parent = entry.url.deletingLastPathComponent()
+            for _ in 0..<item.removesEmptyParents {
+                guard policy.allows(parent), rmdir(parent.path) == 0 else { break }
+                parent = parent.deletingLastPathComponent()
             }
             // Each file counts as it is now: one shared at scan and removed with the last of its models counts too.
             for file in files {

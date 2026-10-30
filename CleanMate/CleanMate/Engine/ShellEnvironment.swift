@@ -9,6 +9,7 @@ nonisolated enum ShellEnvironment {
     static let variables: Set<String> = [
         "NVM_DIR", "RUSTUP_HOME", "CARGO_HOME", "GRADLE_USER_HOME", "HF_HOME", "HF_HUB_CACHE",
         "ANDROID_AVD_HOME", "ANDROID_EMULATOR_HOME", "OLLAMA_MODELS", "FIREBASE_EMULATORS_PATH", "FIREBASE_DEBUG_PATH", "PUB_CACHE",
+        "FVM_CACHE_PATH",
         // Android SDK folders (scanned for system images) and where AVDs are kept (only read: which images they use).
         "ANDROID_HOME", "ANDROID_SDK_ROOT", "ANDROID_USER_HOME", "ANDROID_SDK_HOME", "ANDROID_PREFS_ROOT",
     ]

@@ -403,11 +403,12 @@ struct CleanerItemRow: View {
          sizeText(item: item, scan: scan, selectedSize: selectedSize, locale: locale)].compactMap { $0 }.joined(separator: ", ")
     }
 
-    /// An entry's checkbox reads "label or file name, date, size" (and `shared`, see `sharedText`): never the long path.
+    /// An entry's checkbox reads "label or file name, date, size" (then `shared`, see `sharedText`, and why it is
+    /// locked): never the long path.
     static func accessibilityLabel(entry: ScanEntry, shared: String? = nil, locale: Locale = .current) -> String {
         [entry.title ?? entry.url.lastPathComponent,
          entry.date?.formatted(.dateTime.year().month().day().locale(locale)),
-         entry.size.formatted(.fileSize.locale(locale)), shared].compactMap { $0 }.joined(separator: ", ")
+         entry.size.formatted(.fileSize.locale(locale)), shared, entry.lockReason].compactMap { $0 }.joined(separator: ", ")
     }
 
     /// "+2 GB shared with llama3.2:1b": files the entry shares with other entries (Ollama blobs), in none of their
@@ -443,11 +444,12 @@ struct CleanerItemRow: View {
             ForEach(shown) { entry in
                 let on = entryOn?(entry.url)
                 let shared = Self.sharedText(entry: entry, in: entries, label: item.entryLabel, locale: locale)
+                let entryLocked = isLocked || entry.lockReason != nil
                 HStack {
                     if let on {
                         Toggle(isOn: on) { EmptyView() }
-                            .toggleStyle(SelectionCheckboxStyle())
-                            .disabled(isLocked)
+                            .toggleStyle(SelectionCheckboxStyle(lockReason: entry.lockReason.map { Text(verbatim: $0) }))
+                            .disabled(entryLocked)
                             .accessibilityLabel(Self.accessibilityLabel(entry: entry, shared: shared, locale: locale))
                     }
                     VStack(alignment: .leading, spacing: 1) {
@@ -466,6 +468,9 @@ struct CleanerItemRow: View {
                                 .textSelection(.enabled)
                                 .foregroundStyle(entry.title == nil ? .primary : .secondary)
                                 .accessibilityHidden(entry.title != nil) // the label names it; the path is long
+                        }
+                        if let reason = entry.lockReason {
+                            Text(verbatim: reason).font(.callout).foregroundStyle(.orange)
                         }
                     }
                     Spacer()
@@ -493,7 +498,7 @@ struct CleanerItemRow: View {
                     Color.clear.frame(width: 48, height: 1).accessibilityHidden(true) // the item's SizeBar column: sizes line up
                 }
                 .frame(minHeight: 28)
-                .selectionRow(isOn: on?.wrappedValue == true, enabled: !isLocked, highlight: highlight,
+                .selectionRow(isOn: on?.wrappedValue == true, enabled: !entryLocked, highlight: highlight,
                               toggle: on.map { on in { on.wrappedValue.toggle() } })
                 .padding(.leading, 42) // under the item title, past the checkbox and icon
                 .accessibilityReadsAsOne(Self.rowAccessibilityLabel(entry: entry, selectable: entryOn != nil, locale: locale))
@@ -514,7 +519,8 @@ struct CleanerItemRow: View {
                 // The links sit outside the Toggle's label: a disabled Toggle disables its label too.
                 VStack(alignment: .leading, spacing: 4) {
                     // With entry ticks the checkbox shows mixed when only some are on; ticking it ticks them all.
-                    Toggle(sources: [$isOn] + (entryOn.map { on in entries.map { on($0.url) } } ?? []), isOn: \.self) {
+                    // Locked entries are never ticked: they don't make the item mixed.
+                    Toggle(sources: [$isOn] + (entryOn.map { on in tickable.map { on($0.url) } } ?? []), isOn: \.self) {
                         // Icon on the title line, so it lines up with the checkbox; the note sits under the title.
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
@@ -577,7 +583,7 @@ struct CleanerItemRow: View {
             .frame(minHeight: 36)
             .selectionRow(isOn: isOn, enabled: !isLocked, highlight: highlight) {
                 // Like the checkbox: mixed (some entries left out) ticks them all.
-                let mixed = isOn && entries.contains { entryOn?($0.url).wrappedValue == false }
+                let mixed = isOn && tickable.contains { entryOn?($0.url).wrappedValue == false }
                 isOn = mixed || !isOn
             }
             .padding(.leading, 2) // room between the disclosure arrow and the checkbox
@@ -590,17 +596,24 @@ struct CleanerItemRow: View {
         }
     }
 
-    private var isLocked: Bool { scan?.hasData != true || isRunning || isBlocked }
+    private var isLocked: Bool {
+        scan?.hasData != true || isRunning || isBlocked || scan.map(SmartScanModel.allEntriesLocked) == true
+    }
+
+    /// Entries that can be ticked: not locked on their own.
+    private var tickable: [ScanEntry] { (scan?.entries ?? []).filter { $0.lockReason == nil } }
 
     /// Why a locked row cannot be ticked, for the lock badge on its checkbox; nil for an item that found nothing.
-    private var lockReason: LocalizedStringKey? {
+    private var lockReason: Text? {
         if isRunning {
-            item.runningAppBundleIDs.isEmpty ? "The tool is running, so it is skipped. Close its sessions and scan again"
-                : "The app is open, so it is skipped"
+            item.runningAppBundleIDs.isEmpty ? Text("The tool is running, so it is skipped. Close its sessions and scan again")
+                : Text("The app is open, so it is skipped")
         } else if isBlocked {
-            "Blocked by a folder in Exclusions"
+            Text("Blocked by a folder in Exclusions")
         } else if scan?.permissionDenied == true {
-            "Needs Full Disk Access"
+            Text("Needs Full Disk Access")
+        } else if let reason = scan?.entries.first?.lockReason, scan.map(SmartScanModel.allEntriesLocked) == true {
+            Text(verbatim: reason)
         } else {
             nil
         }

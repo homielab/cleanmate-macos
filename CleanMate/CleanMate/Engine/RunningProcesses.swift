@@ -83,6 +83,18 @@ nonisolated enum RunningProcesses {
         return folders.map(withoutPrivate)
     }
 
+    /// Executable path, working folder and absolute-path arguments of every readable process, without the `/private`
+    /// prefix: what runs from, or works in, a folder (`node` of an nvm version, the Dart VM of a Flutter SDK).
+    static func usedPaths() -> [String] {
+        var paths: [String] = []
+        for pid in allPIDs() where pid > 0 {
+            if let folder = workingFolder(of: pid) { paths.append(folder) }
+            let strings = argumentStrings(arguments(of: pid))
+            paths += strings.prefix(1) + strings.dropFirst().filter { $0.hasPrefix("/") }
+        }
+        return paths.map(withoutPrivate)
+    }
+
     /// The current folder of `pid` (`PROC_PIDVNODEPATHINFO`); nil when the process cannot be read.
     static func workingFolder(of pid: pid_t) -> String? {
         var info = proc_vnodepathinfo()

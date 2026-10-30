@@ -19,6 +19,8 @@ nonisolated struct ScanEntry: Identifiable, Hashable, Sendable {
     /// Entry files it shares with other entries (a blob two Ollama models use): in no entry's `size`, counted once in
     /// `ItemScan.size` when every entry using it is in the scan.
     var shared: [SharedFile] = []
+    /// Why the entry can't be ticked nor cleaned now (`CleanerItem.locksEntry`); nil when it can.
+    var lockReason: String? = nil
     var id: URL { url }
 }
 
@@ -256,6 +258,9 @@ nonisolated enum Scanner {
                 result.entries[i].title = found?.title
                 result.entries[i].date = found?.date
             }
+        }
+        if let locks = item.locksEntry?() {
+            for i in result.entries.indices { result.entries[i].lockReason = locks(result.entries[i].url) }
         }
         result.entries.sort { $0.size > $1.size }
         return result

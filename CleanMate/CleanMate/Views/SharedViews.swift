@@ -122,7 +122,7 @@ extension View {
 /// (`Toggle(sources:)`), faded when disabled; a click on the label ticks too. `lockReason`: a lock badge on the box,
 /// with the reason as its tooltip, for a row that cannot be ticked. VoiceOver sees a native checkbox.
 struct SelectionCheckboxStyle: ToggleStyle {
-    var lockReason: LocalizedStringKey? = nil
+    var lockReason: Text? = nil
 
     func makeBody(configuration: Configuration) -> some View {
         SelectionCheckbox(configuration: configuration, lockReason: lockReason)
@@ -136,7 +136,7 @@ struct SelectionCheckboxStyle: ToggleStyle {
 
 private struct SelectionCheckbox: View {
     let configuration: ToggleStyleConfiguration
-    let lockReason: LocalizedStringKey?
+    let lockReason: Text?
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
@@ -149,7 +149,7 @@ private struct SelectionCheckbox: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(lockReason.map { Text($0) } ?? Text(verbatim: ""))
+        .help(lockReason ?? Text(verbatim: ""))
         .accessibilityRepresentation {
             // Mixed shows as mixed: two sources that disagree.
             let on = Binding { configuration.isOn } set: { configuration.isOn = $0 }

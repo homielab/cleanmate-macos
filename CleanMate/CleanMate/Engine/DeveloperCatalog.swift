@@ -125,6 +125,10 @@ extension CleanerGroup {
         // not hide the item; a download still open is kept.
         dev("rustup-downloads", "rustup downloads", note: "Toolchain downloads, downloaded again by rustup when needed",
             ["~/.rustup/downloads", "~/.rustup/tmp"], shell: ["RUSTUP_HOME": ["downloads", "tmp"]], processes: ["rustup"], openFiles: true),
+        // Unticked, deleted: Node versions other than nvm's default and Flutter SDKs other than fvm's global one, one
+        // entry per version; a version a program runs from is listed locked (`OldRuntimes`).
+        OldRuntimes.nodeItem(),
+        OldRuntimes.flutterItem(),
         // Unticked: models can be many GB to download again. One entry per `models--org--name` folder (blobs plus
         // snapshot symlinks into them): always removed whole, never inside. ~/.cache/huggingface/token and
         // stored_tokens sit next to these folders and are never listed. Only hub repo folders (`included`, checked at

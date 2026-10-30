@@ -99,8 +99,36 @@ struct AndroidSystemImagesTests {
         let size = try #require(onlyTablet.entries.first?.size)
         let report = await Cleaner.clean(item, scan: onlyTablet, policy: box.policy)
         #expect(report.skipped == 0 && report.freed == size)
-        #expect(!box.exists(tablet) && box.exists(tablet.deletingLastPathComponent()))
+        // Its `google_apis` and `android-34` folders were left empty: removed too.
+        #expect(!box.exists(tablet.deletingLastPathComponent().deletingLastPathComponent()))
+        #expect(box.exists(box.home.appending(path: Home.sdk + "/system-images")))
         #expect(([used, preview, avd, avd.appending(path: "config.ini")] + kept).allSatisfy(box.exists))
+    }
+
+    /// After an image is deleted, its `<tag>` and `<android-N>` folders go once empty; one still holding anything (another
+    /// image, a file) stays, and nothing above `system-images/<android-N>` is ever removed.
+    @Test func removesTheEmptyTagAndAPIFolders() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let arm = try box.image("android-34/google_apis/arm64-v8a")
+        let intel = try box.image("android-34/google_apis/x86_64")
+        let other = try box.image("android-33/default/arm64-v8a")
+        try box.file(Home.sdk + "/system-images/android-33/notes.txt")
+        let item = try item
+        let scan = await Scanner.scan(item, policy: box.policy)
+        func clean(_ image: URL) async {
+            var one = scan
+            one.entries = scan.entries.filter { $0.url.standardizedFileURL.path == image.path }
+            #expect(await Cleaner.clean(item, scan: one, policy: box.policy).skipped == 0)
+        }
+        let tag = arm.deletingLastPathComponent(), api = tag.deletingLastPathComponent()
+        await clean(arm)
+        #expect(!box.exists(arm) && box.exists(tag)) // x86_64 is still there
+        await clean(intel)
+        #expect(!box.exists(tag) && !box.exists(api))
+        await clean(other)
+        #expect(!box.exists(other.deletingLastPathComponent()) && box.exists(other.deletingLastPathComponent().deletingLastPathComponent()))
+        #expect(box.exists(box.home.appending(path: Home.sdk + "/system-images")))
     }
 
     /// An AVD that can't be read keeps every image: a broken, missing or empty config.ini, an image named outside a
