@@ -211,13 +211,15 @@ extension CleanerGroup {
             note: "Written by the Firebase CLI and its MCP server; a log still open is kept",
             [firebaseCache], included: ["firebase-debug.log", "firebase-debug.*.log"], openFiles: true),
         // Unticked: emulator JARs, zips and binaries (`downloadableEmulators.js`); the next `firebase emulators:start`
-        // downloads them again (needs network). Exported emulator data lives in the user's project, never here.
+        // downloads them again (needs network). Locked while an emulator runs. Exported emulator data lives in the user's project, never here.
         dev("firebase-emulators", "\("Firebase CLI"): emulators",
             note: "Downloaded emulators, downloaded again by the next firebase emulators:start",
-            [firebaseCache + "/emulators"], selected: false, openFiles: true),
+            [firebaseCache + "/emulators"], selected: false, processes: ["firebase-emulators"], openFiles: true),
     ])
 
     nonisolated private static let firebaseCache = "~/.cache/firebase"
+    /// In a running emulator's executable or arguments (`RunningProcesses.installPaths`).
+    nonisolated static let firebaseEmulatorsPath = "/.cache/firebase/emulators/"
 
     nonisolated static let oldIDEVersions = "old-ide-versions"
     nonisolated private static let clonedNote: LocalizedStringResource =

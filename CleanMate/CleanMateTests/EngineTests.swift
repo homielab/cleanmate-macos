@@ -1234,6 +1234,22 @@ struct DeveloperToolsTests {
         #expect(model.isRunning(rustup))
     }
 
+    /// A running Firebase emulator (a JVM or binary run from ~/.cache/firebase/emulators) locks the emulators item.
+    @MainActor @Test func firebaseEmulatorsLockedWhileOneRuns() throws {
+        let item = try #require(CleanerGroup.developer.items.first { $0.id == "firebase-emulators" })
+        func names(_ strings: [String]) -> Set<String> {
+            let argc = Int32(strings.count - 1)
+            return RunningProcesses.argumentNames(withUnsafeBytes(of: argc) { Array($0) } + strings.flatMap { Array($0.utf8) + [0] })
+        }
+        let model = SmartScanModel(module: .smartScan) { [] }
+        model.runningProcesses = names(["/usr/bin/java", "java", "-jar",
+                                        "/Users/u/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.jar"])
+        #expect(model.isRunning(item) && model.isLocked(item))
+        model.runningProcesses = names(["/usr/bin/java", "java", "-jar", "/Users/u/app.jar"])
+            .union(names(["/opt/bin/node", "node", "/opt/bin/firebase", "login"]))
+        #expect(!model.isLocked(item))
+    }
+
     /// DerivedData skipped while Xcode builds; Yarn Berry and Cypress unticked; package caches skipped while their tool runs.
     @Test func catalogAuditItems393() {
         let items = Dictionary(uniqueKeysWithValues: CleanerGroup.developer.items.map { ($0.id, $0) })

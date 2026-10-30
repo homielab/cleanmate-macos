@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings › General › Remind me to scan**: an optional weekly or monthly notification (off by default) when CleanMate has gone unused that long; clicking it opens Smart Scan. It is local and uses no network.
 
 ### Changed
+- Developer junk: the Firebase emulators row is locked while an emulator is running, so its files are never removed from under it.
 - **Uninstaller**: folders your shell profile adds to `PATH` (for example `~/.cargo/bin`, nvm or pnpm) count as installed command-line tools, so their config in `~/.config` is no longer listed as a leftover of a removed app.
 - **Developer Junk**: rustup downloads are no longer hidden while `cargo` or `rustc` builds; only a running `rustup` skips them.
 - Now runs on macOS 13 or later (was macOS 27). On macOS 13, **Space Lens** shows its contents as a stacked bar
