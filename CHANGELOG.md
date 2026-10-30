@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings › General › Remind me to scan**: an optional weekly or monthly notification (off by default) when CleanMate has gone unused that long; clicking it opens Smart Scan. It is local and uses no network.
 
 ### Changed
+- **Smart Scan**: the list of files other apps have open is read once per scan and once per clean, shared by every item that skips open files, instead of once per folder of each item (17 items: 31 reads → 1, scan CPU time 4.8 s → 4.4 s); open files are still never listed or removed.
 - **Smart Scan**: stale `node_modules` and build folders remember their sizes between scans and are found in one parallel walk, so a machine full of old projects no longer slows every scan (33 projects, 21 GB: 2.9 s on the first scan, 0.06 s on the next).
 - Developer junk: the Firebase emulators row is locked while an emulator is running, so its files are never removed from under it.
 - **Uninstaller**: folders your shell profile adds to `PATH` (for example `~/.cargo/bin`, nvm or pnpm) count as installed command-line tools, so their config in `~/.config` is no longer listed as a leftover of a removed app.

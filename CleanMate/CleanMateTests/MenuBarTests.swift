@@ -45,8 +45,8 @@ struct MenuBarTests {
         model.appBundleIDs = { [] }
         model.processNames = { [] }
         model.blockedByExclusion = { _ in false }
-        model.scanItem = { _ in ItemScan(measuredSize: 4096) }
-        model.cleanItem = { _, _ in var report = CleanReport(); report.freed = 4096; return report }
+        model.scanItem = { _, _ in ItemScan(measuredSize: 4096) }
+        model.cleanItem = { _, _, _ in var report = CleanReport(); report.freed = 4096; return report }
         model.logHome = FileManager.default.temporaryDirectory.appending(path: "CleanMateMenuBarTests-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: model.logHome) }
         var scanned: [Int64] = [], freed: [Int64] = []

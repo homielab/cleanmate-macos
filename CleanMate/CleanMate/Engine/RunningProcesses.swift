@@ -110,7 +110,7 @@ nonisolated enum RunningProcesses {
 
 nonisolated extension RunningProcesses {
     /// Paths of files any readable process has open under `root` (`$TMPDIR` by default), without the `/private`
-    /// prefix. Read once per scan from libproc (`PROC_PIDLISTFDS` + `PROC_PIDFDVNODEPATHINFO`), never `lsof`;
+    /// prefix. Read from libproc (`PROC_PIDLISTFDS` + `PROC_PIDFDVNODEPATHINFO`), never `lsof`;
     /// processes that cannot be read (other users, exited meanwhile) are left out. `only` reads just those processes
     /// (tests: their own, so another process walking `$TMPDIR` cannot hold their folders).
     static func openPaths(under root: String = NSTemporaryDirectory(), only: [pid_t]? = nil) -> Set<String> {
@@ -149,9 +149,11 @@ nonisolated extension RunningProcesses {
         path.hasPrefix("/private/") ? String(path.dropFirst("/private".count)) : path
     }
 
-    /// Open paths under any of an item's `roots` (`Scanner.roots`), read per root by `read` (tests count calls).
-    static func openPaths(under roots: [URL], read: (String) -> Set<String> = { openPaths(under: $0) }) -> Set<String> {
-        roots.reduce(into: []) { $0.formUnion(read($1.path)) }
+    /// Open paths under any of an item's `roots` (`Scanner.roots`), asked of `read` per root.
+    static func openPaths(under roots: [URL], read: OpenPaths) async -> Set<String> {
+        var paths = Set<String>()
+        for root in roots { paths.formUnion(await read(root.path)) }
+        return paths
     }
 
     /// Whether `url` is, or is a folder holding, one of `openPaths`.

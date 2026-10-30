@@ -10,9 +10,9 @@ nonisolated enum ExternalTrash {
     /// titled with the drive's name. A folder that is locked, unreadable or holds a file a process has open (Finder
     /// still moving files there) is left out.
     static func scan(_ item: CleanerItem, policy: SafetyPolicy,
-                     openPaths: @Sendable (String) -> Set<String>) async -> ItemScan {
+                     openPaths: OpenPaths) async -> ItemScan {
         let folders = policy.externalTrashFolders()
-        let open = item.skipsOpenFiles ? RunningProcesses.openPaths(under: folders, read: openPaths) : []
+        let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: folders, read: openPaths) : []
         var result = ItemScan()
         for folder in folders where !Task.isCancelled {
             guard !Scanner.isLocked(folder), !RunningProcesses.holdsOpenFile(folder, openPaths: open),
@@ -35,12 +35,12 @@ nonisolated enum ExternalTrash {
     /// in it is removed (never moved), each one checked with `allowsExternalTrash` and skipped when locked. The folder
     /// itself stays. Freed = the scanned size less what is left.
     static func empty(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy,
-                      openPaths: @Sendable (String) -> Set<String>) async -> CleanReport {
+                      openPaths: OpenPaths) async -> CleanReport {
         let folders = Set(policy.externalTrashFolders().map(SafetyPolicy.normalize))
         var report = CleanReport()
         for entry in scan.entries {
-            // Read now, per drive (a few at most): Finder may have started moving files there since the scan.
-            let open = item.skipsOpenFiles ? RunningProcesses.openPaths(under: [entry.url], read: openPaths) : []
+            // Checked now, per drive: Finder may have started moving files there since the scan.
+            let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: [entry.url], read: openPaths) : []
             guard folders.contains(SafetyPolicy.normalize(entry.url)), !Scanner.isLocked(entry.url),
                   !RunningProcesses.holdsOpenFile(entry.url, openPaths: open),
                   let children = try? FileManager.default.contentsOfDirectory(at: entry.url, includingPropertiesForKeys: nil)

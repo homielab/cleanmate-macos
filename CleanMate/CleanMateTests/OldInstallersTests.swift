@@ -155,9 +155,10 @@ struct OldInstallersTests {
         model.processNames = { [] }
         model.appBundleIDs = { [] }
         model.blockedByExclusion = { _ in false }
-        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths) }
-        model.cleanItem = { item, scan in
-            await Cleaner.clean(item, scan: scan, policy: policy, trash: moveToFakeTrash, openPaths: EndToEndCleanTests.ownOpenPaths)
+        model.readOpenFiles = EndToEndCleanTests.ownOpenPaths
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        model.cleanItem = { item, scan, openPaths in
+            await Cleaner.clean(item, scan: scan, policy: policy, trash: moveToFakeTrash, openPaths: openPaths)
         }
         model.restore = { items, logName in await TrashUndo.restore(items, module: "Smart Scan", home: home, logName: logName) }
         model.logHome = home

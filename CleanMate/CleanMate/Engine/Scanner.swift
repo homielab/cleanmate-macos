@@ -97,9 +97,10 @@ nonisolated enum Scanner {
 
     /// Lists what `item` would remove, largest first. Never follows symlinks; unreadable files are skipped.
     /// When the task is cancelled it stops early and returns a partial result: callers must discard it.
-    /// `openPaths` reads the open-file table under a folder (`skipsOpenFiles`), like `Cleaner.clean`'s.
+    /// `openPaths` lists open files under a folder (`skipsOpenFiles`); Smart Scan passes one table shared by all items
+    /// (`OpenFiles`), a scan on its own reads one for itself.
     @concurrent static func scan(_ item: CleanerItem, policy: SafetyPolicy = .current, now: Date = .now,
-                                 openPaths: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0) }) async -> ItemScan {
+                                 openPaths: OpenPaths = OpenFiles.reader()) async -> ItemScan {
         if item.externalTrash { return await ExternalTrash.scan(item, policy: policy, openPaths: openPaths) }
         var result = ItemScan()
         let cutoff = item.minAge.map { now.addingTimeInterval(-$0) }
@@ -136,13 +137,13 @@ nonisolated enum Scanner {
             let found = await find(roots, policy).filter { url in
                 (item.allowsEntry?(policy, url) ?? policy.allows(url)) && skips?(url) != true && !isLocked(url)
             }
-            // One open-file read under the home folder, only when something was found (it lists every process).
-            let open = item.skipsOpenFiles && !found.isEmpty ? openPaths(policy.homeURL.path) : []
+            // Open files under the home folder, only when something was found.
+            let open = item.skipsOpenFiles && !found.isEmpty ? await openPaths(policy.homeURL.path) : []
             // One level deeper in parallel: pnpm keeps every package under one `.pnpm` folder (~100 k files).
             return await measure(found.filter { !RunningProcesses.holdsOpenFile($0, openPaths: open) }, of: item,
                                  into: result, policy: policy, cutoff: cutoff, split: 1)
         }
-        let open = item.skipsOpenFiles ? RunningProcesses.openPaths(under: roots, read: openPaths) : []
+        let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: roots, read: openPaths) : []
         func listed(_ urls: [URL], under prefix: String) -> [URL] {
             urls.flatMap { url -> [URL] in
                 let name = prefix + url.lastPathComponent

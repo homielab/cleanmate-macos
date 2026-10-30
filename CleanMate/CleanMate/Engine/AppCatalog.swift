@@ -84,7 +84,8 @@ extension CleanerGroup {
         // Orca: Electron caches, crash reports and logs only; never its accounts, keys, profiles, terminal history,
         // session index (ai-vault) nor the terminal host it unpacks (daemon-host). Skipped while Orca, a helper or
         // its terminal host (which keeps terminals alive after Orca quits, and writes the daemon log) runs.
-        // Not `skipsOpenFiles`: the open-file table is read once per root, and `chromium` globs ~500 roots here (~60 s).
+        // Not `skipsOpenFiles`: the running check covers it, and `chromium` globs ~500 roots here, each one looked up in
+        // the open-file table per entry while cleaning.
         running(app("orca", "Orca", bundle: ["com.stablyai.orca*"],
                     chromium(orca) + [orca + "/Crashpad/completed", orca + "/logs"]), processes: ["orca-terminal-host"]),
         // ZCode: Electron caches of its session folder (and partitions), daily app logs and the CLI's event logs.
@@ -92,7 +93,7 @@ extension CleanerGroup {
         // cli/{config.json,db,memories,agents,plugins,rollout,artifacts,exec} (rollout holds model input and output
         // of sessions), skills, workspace, plugin-workspace, backup, computer-use, nor the session's cookies, Local
         // Storage or IndexedDB. Skipped while the app or its agent processes (`zcode-cli`) run, so today's log, still
-        // being written, stays. Not `skipsOpenFiles`: `chromium` globs the partitions, one open-file read per root.
+        // being written, stays. Not `skipsOpenFiles`: `chromium` globs the partitions, one open-file lookup per root.
         cache("zcode-cache", "ZCode", chromium(zcode) + ["~/.zcode/v2/logs", "~/.zcode/cli/log"],
               apps: ["dev.zcode.app"], processes: ["zcode-cli"]),
         // Unticked like Windsurf's browsers: the Linux server, Node.js, node-pty and tools ZCode copies to remote

@@ -138,8 +138,8 @@ struct LMStudioModelsTests {
         smartScan.processNames = { ["lms", "zsh"] }
         let policy = box.policy // not this Mac's Exclusions, Trash or activity log
         smartScan.logHome = box.home
-        smartScan.scanItem = { await Scanner.scan($0, policy: policy) }
-        smartScan.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy) }
+        smartScan.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        smartScan.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy, openPaths: $2) }
         await smartScan.scan()
         #expect(smartScan.isRunning(item) && smartScan.selected.isEmpty)
         smartScan.selected = [item.id]

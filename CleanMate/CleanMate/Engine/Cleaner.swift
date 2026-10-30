@@ -129,10 +129,11 @@ nonisolated enum Cleaner {
     /// against `minAge` (nothing inside modified since the cutoff, measured again now).
     /// `trash` moves a `.trash` entry to the Trash and returns where it went (`report.trashed`, for Undo); tests pass
     /// a fake one so the real Trash is never touched.
-    /// `openPaths` reads the open-file table under a folder (`skipsOpenFiles`); tests pass one that counts calls.
+    /// `openPaths` lists open files under a folder (`skipsOpenFiles`): Smart Scan passes one table shared by the items
+    /// of a clean, read when it starts (never the scan's) and again every `OpenFiles.cleanMaxAge`.
     @concurrent static func clean(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy = .current,
                                   trash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash,
-                                  openPaths: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0) }
+                                  openPaths: OpenPaths = OpenFiles.reader(maxAge: OpenFiles.cleanMaxAge)
     ) async -> CleanReport {
         var report = await remove(item, scan: scan, policy: policy, trash: trash, openPaths: openPaths)
         if item.sizeIsUpperBound { report.upTo = report.freed }
@@ -157,7 +158,7 @@ nonisolated enum Cleaner {
 
     private static func remove(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy,
                                trash: @Sendable (URL) throws -> URL?,
-                               openPaths: @Sendable (String) -> Set<String>) async -> CleanReport {
+                               openPaths: OpenPaths) async -> CleanReport {
         if item.probe?.precondition() == false { return CleanReport(skipped: 1) } // e.g. Docker stopped since the scan
         if item.externalTrash { return await ExternalTrash.empty(item, scan: scan, policy: policy, openPaths: openPaths) }
         if let entryCommand = item.entryCommand {
@@ -186,10 +187,9 @@ nonisolated enum Cleaner {
         // their entries (if any) are display-only, so a tool uninstalled since the scan skips the item.
         if item.command != nil && item.paths.isEmpty || scan.measuredSize != nil { return CleanReport(skipped: 1) }
         var report = CleanReport()
-        // Open files: one snapshot taken when this item's removal starts (never the scan's), shared by its
-        // entries and re-read every 2 s, not per entry (~30 ms each: seconds for hundreds of entries). A file opened
-        // within those 2 s may be missed, like one opened just after its check; an open file is not lost when unlinked.
-        var open: (paths: Set<String>, at: ContinuousClock.Instant)? = nil
+        // Open files: asked of `openPaths` per entry; Smart Scan's table is at most `OpenFiles.cleanMaxAge` old, not
+        // read per entry (~30 ms a read: seconds for hundreds of entries). A file opened since that read may be missed,
+        // like one opened just after its check; an open file is not lost when unlinked.
         // Globbed once per item (a Chromium item has ~1000 roots), only when a check below needs them; the scan's
         // own roots, so a folder from `shellFolders`/`locate` is checked like one from `paths`.
         // A `.only` probe is asked again now: a name no longer reported since the scan (a simulator made
@@ -201,13 +201,11 @@ nonisolated enum Cleaner {
         let roots = item.skipsOpenFiles || !item.excluded.isEmpty || only != nil ? await Scanner.roots(for: item, policy: policy) : []
         let rootPaths = roots.map(\.standardizedFileURL.path)
         for entry in scan.entries {
-            if item.skipsOpenFiles, open.map({ ContinuousClock.now - $0.at > .seconds(2) }) ?? true {
-                open = (RunningProcesses.openPaths(under: roots, read: openPaths), .now)
-            }
+            let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: roots, read: openPaths) : []
             // A fresh check per entry: an app launched since the scan (or during this loop) keeps its entry.
             // `included` and `excluded` again too: only names the item may remove, whatever the scan handed in.
             guard item.allowsEntry?(policy, entry.url) ?? policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
-                  !RunningProcesses.holdsOpenFile(entry.url, openPaths: open?.paths ?? []),
+                  !RunningProcesses.holdsOpenFile(entry.url, openPaths: open),
                   item.included?.contains(where: { fnmatch($0, entry.url.lastPathComponent, 0) == 0 }) != false,
                   !isExcluded(entry.url, excluded: item.excluded, roots: rootPaths),
                   only.map({ isListed(entry.url, names: $0, roots: rootPaths) }) != false

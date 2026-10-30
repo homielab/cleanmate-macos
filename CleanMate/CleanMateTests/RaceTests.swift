@@ -34,7 +34,7 @@ struct RaceTests {
         let item = CleanerItem(id: "x", title: "X", paths: [])
         let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { [] }
-        model.scanItem = { _ in ItemScan(measuredSize: Int64(await gates.enter(gated: gated)) * 100) }
+        model.scanItem = { _, _ in ItemScan(measuredSize: Int64(await gates.enter(gated: gated)) * 100) }
         return model
     }
 
@@ -332,7 +332,7 @@ struct RaceTests {
         let gates = Gates()
         let junk = CleanerItem(id: "race.junk", title: "Junk", paths: ["~/nonexistent"])
         let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [junk])] }
-        model.scanItem = { _ in ItemScan() }
+        model.scanItem = { _, _ in ItemScan() }
         model.blockedByExclusion = { _ in false }
         model.processNames = { [] }
         model.restore = { items, _ in _ = await gates.enter(); return TrashUndo.Result(restored: items.count, skipped: 0) }

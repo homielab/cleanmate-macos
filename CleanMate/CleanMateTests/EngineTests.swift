@@ -1890,7 +1890,7 @@ struct AppCatalogTests {
         let model = SmartScanModel(module: .smartScan) { [group] }
         model.processNames = { [] }
         model.appBundleIDs = { [] }
-        model.scanItem = { await Scanner.scan($0, policy: policy) }
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
         model.blockedByExclusion = { await Cleaner.blockedByExclusion($0, policy: policy) }
         await model.scan()
         #expect(model.scans[tool.id]?.hasData == true)
@@ -1912,7 +1912,7 @@ struct AppCatalogTests {
         let item = CleanerItem(id: "x", title: "X", paths: [box.temp.appending(path: "c").path])
         let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         let policy = box.policy // not this Mac's Settings › Exclusions
-        model.scanItem = { await Scanner.scan($0, policy: policy) }
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
         await Task {
             withUnsafeCurrentTask { $0?.cancel() }
             await model.scan()
@@ -1935,7 +1935,7 @@ struct AppCatalogTests {
         let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
         model.processNames = { [] }
         let (gate, open) = AsyncStream<Void>.makeStream()
-        model.scanItem = { item in
+        model.scanItem = { item, _ in
             if item.id == "tie" { for await _ in gate { break } }
             return results[item.id]!
         }
@@ -1956,7 +1956,7 @@ struct AppCatalogTests {
             [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [fast, slow])]
         }
         model.processNames = { [] }
-        model.scanItem = { item in
+        model.scanItem = { item, _ in
             if item.id == "slow" { for await _ in gate { break } }
             return ItemScan(measuredSize: 1000)
         }
@@ -1996,7 +1996,7 @@ struct AppCatalogTests {
         UserDefaults.standard.set(["other": 3.0], forKey: key)
         model.durationsKey = key
         model.processNames = { [] }
-        model.scanItem = { _ in try? await Task.sleep(for: .milliseconds(50)); return ItemScan(measuredSize: 1) }
+        model.scanItem = { _, _ in try? await Task.sleep(for: .milliseconds(50)); return ItemScan(measuredSize: 1) }
         await model.scan()
         let saved = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
         #expect(saved["other"] == 3 && (saved["timed"] ?? 0) >= 0.04)
@@ -2012,7 +2012,7 @@ struct AppCatalogTests {
             [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [sure, upTo])]
         }
         model.processNames = { [] }
-        model.scanItem = { ItemScan(measuredSize: $0.id == "sure" ? 1000 : 5000) }
+        model.scanItem = { item, _ in ItemScan(measuredSize: item.id == "sure" ? 1000 : 5000) }
         await model.scan()
         #expect(model.selected == ["sure", "upto"])
         #expect(model.selectedSize == 1000 && model.selectedUpToSize == 5000)
@@ -2090,7 +2090,7 @@ struct AppCatalogTests {
         Preferences.remember(open, selected: true) // back to the default: no override left behind
 
         let cleaned = Locked<[String]>([])
-        model.cleanItem = { item, _ in cleaned.withLock { $0.append(item.id) }; return CleanReport() }
+        model.cleanItem = { item, _, _ in cleaned.withLock { $0.append(item.id) }; return CleanReport() }
         model.phase = .results
         model.selected = ["t397.cmd", "t397.open"] // e.g. ticked before its result came in empty
         await model.clean()
@@ -2110,8 +2110,8 @@ struct AppCatalogTests {
         let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [backups, other])] }
         let policy = box.policy
         model.logHome = box.home // not the real ~/Library/Logs/CleanMate/activity.log
-        model.scanItem = { await Scanner.scan($0, policy: policy) }
-        model.cleanItem = { item, scan in
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        model.cleanItem = { item, scan, _ in
             await Cleaner.clean(item, scan: scan, policy: policy) {
                 let target = trash.appending(path: $0.lastPathComponent)
                 try FileManager.default.moveItem(at: $0, to: target)
@@ -2167,8 +2167,8 @@ struct AppCatalogTests {
         model.appBundleIDs = { [] }
         model.processNames = { [] }
         func run(_ entries: [ScanEntry], _ report: CleanReport) async -> [String] {
-            model.scanItem = { _ in ItemScan(entries: entries, measuredSize: 3_000) }
-            model.cleanItem = { _, _ in report }
+            model.scanItem = { _, _ in ItemScan(entries: entries, measuredSize: 3_000) }
+            model.cleanItem = { _, _, _ in report }
             await model.scan()
             await model.clean()
             return ActivityLog.read(home: home).split(separator: "\n").map { String($0.split(separator: "\t")[3]) }
@@ -2211,7 +2211,7 @@ struct AppCatalogTests {
         model.appBundleIDs = { ["test.running.app"] }
         model.runningApps = ["test.running.app"]
         // An app launching on the Mac mid-scan refreshes the list; it used to bring back the real one.
-        model.scanItem = { item in
+        model.scanItem = { item, _ in
             await MainActor.run { NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didLaunchApplicationNotification, object: nil) }
             return await Scanner.scan(item, policy: policy)
         }
@@ -2234,8 +2234,8 @@ struct AppCatalogTests {
         model.processNames = { ["claude", "zsh"] }
         let policy = box.policy // not this Mac's Exclusions, Trash or activity log
         model.logHome = box.home
-        model.scanItem = { await Scanner.scan($0, policy: policy) }
-        model.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy) }
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        model.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy, openPaths: $2) }
         await model.scan()
         #expect(model.isRunning(item) && model.selected.isEmpty)
         model.selected = ["cli"]

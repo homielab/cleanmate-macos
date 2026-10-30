@@ -156,9 +156,10 @@ struct EditorWorkspacesTests {
         let policy = box.policy // not this Mac's Exclusions, Trash or activity log
         let trash = box.moveToFakeTrash
         smartScan.logHome = box.home
-        smartScan.scanItem = { await Scanner.scan($0, policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths) }
+        smartScan.readOpenFiles = EndToEndCleanTests.ownOpenPaths
+        smartScan.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
         smartScan.cleanItem = {
-            await Cleaner.clean($0, scan: $1, policy: policy, trash: trash, openPaths: EndToEndCleanTests.ownOpenPaths)
+            await Cleaner.clean($0, scan: $1, policy: policy, trash: trash, openPaths: $2)
         }
         await smartScan.scan()
         #expect(smartScan.isRunning(item) && smartScan.selected.isEmpty)

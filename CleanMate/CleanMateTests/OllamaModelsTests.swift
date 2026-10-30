@@ -190,8 +190,8 @@ struct OllamaModelsTests {
         model.processNames = { ["ollama", "zsh"] }
         let policy = box.policy // not this Mac's Exclusions, Trash or activity log
         model.logHome = box.home
-        model.scanItem = { await Scanner.scan($0, policy: policy) }
-        model.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy) }
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        model.cleanItem = { await Cleaner.clean($0, scan: $1, policy: policy, openPaths: $2) }
         await model.scan()
         #expect(model.isRunning(item) && model.selected.isEmpty)
         model.selected = [item.id]

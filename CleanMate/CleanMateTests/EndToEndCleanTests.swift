@@ -332,8 +332,8 @@ struct EndToEndCleanTests {
         model.processNames = { [] }
         model.appBundleIDs = { [] }
         model.blockedByExclusion = { _ in false }
-        model.scanItem = { await Scanner.scan($0, policy: policy) }
-        model.cleanItem = { item, scan in
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        model.cleanItem = { item, scan, _ in
             await Cleaner.clean(item, scan: scan, policy: policy, trash: { url in
                 let target = trash.appending(path: UUID().uuidString)
                 try FileManager.default.moveItem(at: url, to: target)
@@ -786,10 +786,11 @@ struct EndToEndCleanTests {
         let reads = OSAllocatedUnfairLock(initialState: 0)
         let held = RunningProcesses.withoutPrivate(tmp.appending(path: "f7.bin").path)
         let start = ContinuousClock.now
-        let report = await Cleaner.clean(item, scan: scan, policy: policy, openPaths: { _ in
+        let files = OpenFiles(maxAge: OpenFiles.cleanMaxAge) { _ in // the clean's table, as Smart Scan passes it
             reads.withLock { $0 += 1 }
             return [held]
-        })
+        }
+        let report = await Cleaner.clean(item, scan: scan, policy: policy, openPaths: { await files.paths(under: $0) })
         let elapsed = ContinuousClock.now - start
         print("BENCH clean 300 temp entries: \(elapsed), open-file reads: \(reads.withLock { $0 })")
         // One read, then one more per 2 s of cleaning (a fixed `<= 2` failed when a busy machine took > 4 s).

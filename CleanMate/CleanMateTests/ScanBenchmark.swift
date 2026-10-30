@@ -77,8 +77,12 @@ struct ScanBenchmark {
         let start = ContinuousClock.now
         let (finished, seconds) = await timed { await peakMemory("\(name) parallel") {
             await withTaskGroup(of: (String, Int64, Duration).self) { group in
+                let openFiles = OpenFiles() // one open-file table for the pass, like `SmartScanModel`
                 for item in items {
-                    group.addTask { (item.id, await Scanner.scan(item, policy: policy).size, start.duration(to: .now)) }
+                    group.addTask {
+                        let scan = await Scanner.scan(item, policy: policy, openPaths: { await openFiles.paths(under: $0) })
+                        return (item.id, scan.size, start.duration(to: .now))
+                    }
                 }
                 return await group.reduce(into: []) { $0.append($1) }
             }
@@ -96,6 +100,42 @@ struct ScanBenchmark {
         let (cached, cachesSeconds) = await timed { RunningProcesses.openPaths(under: policy.expand("~/Library/Caches").path) }
         report("open files in Caches (\(cached.count))", cachesSeconds, 0)
         await scanItems("smart", CleanerGroup.smartScan)
+    }
+
+    /// The Smart Scan items that skip open files, scanned in parallel: the open-file table read per root of each
+    /// item, then one table shared by all (as `SmartScanModel` does), alternated `CLEANMATE_BENCH_RUNS` times (5);
+    /// medians of wall and process CPU time, with how many times the table was read.
+    @Test func openFilesReads() async {
+        let items = CleanerGroup.smartScan.flatMap(\.items).filter(\.skipsOpenFiles)
+        let runs = ProcessInfo.processInfo.environment["CLEANMATE_BENCH_RUNS"].flatMap(Int.init) ?? 5
+        func cpu() -> Double { Double(clock_gettime_nsec_np(CLOCK_PROCESS_CPUTIME_ID)) / 1e9 }
+        func pass(shared: Bool) async -> (Double, Double, Int) {
+            let reads = Locked(0)
+            let read: @Sendable (String) -> Set<String> = { reads.withLock { $0 += 1 }; return RunningProcesses.openPaths(under: $0) }
+            let openFiles = OpenFiles(read: read)
+            let openPaths: OpenPaths = shared ? { await openFiles.paths(under: $0) } : read
+            let cpuStart = cpu()
+            let (_, seconds) = await timed {
+                await withTaskGroup(of: Void.self) { group in
+                    for item in items { group.addTask { _ = await Scanner.scan(item, policy: policy, openPaths: openPaths) } }
+                }
+            }
+            return (seconds, cpu() - cpuStart, reads.withLock { $0 })
+        }
+        var perRoot: [(Double, Double, Int)] = [], shared: [(Double, Double, Int)] = []
+        for _ in 0..<runs {
+            perRoot.append(await pass(shared: false))
+            shared.append(await pass(shared: true))
+        }
+        func median(_ runs: [(Double, Double, Int)]) -> (wall: Double, cpu: Double, reads: Int) {
+            (runs.map(\.0).sorted()[runs.count / 2], runs.map(\.1).sorted()[runs.count / 2], runs[0].2)
+        }
+        let (open, readSeconds) = await timed { RunningProcesses.openPaths(under: "/") }
+        report("open-file table (\(open.count) paths)", readSeconds, 0)
+        for (label, result) in [("per root", median(perRoot)), ("shared", median(shared))] {
+            report("\(items.count) items, table \(label), \(result.reads) reads", result.wall, 0)
+            report("  cpu", result.cpu, 0)
+        }
     }
 
     /// Stale node_modules as if every project were stale (a clock 10 years ahead, no node running): finding and

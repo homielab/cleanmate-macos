@@ -33,14 +33,20 @@ final class SmartScanModel: ObservableObject {
     @Published var blocked: Set<String> = []
     /// The check `Cleaner` makes before running the item's command; tests pass a sandbox policy.
     var blockedByExclusion: @Sendable (CleanerItem) async -> Bool = { await Cleaner.blockedByExclusion($0) }
-    /// Injected by tests (e.g. a slow scan).
-    var scanItem: @Sendable (CleanerItem) async -> ItemScan = { await Scanner.scan($0) }
+    /// Injected by tests (e.g. a slow scan). The second argument lists open files under a folder from the table this
+    /// scan shares across its items.
+    var scanItem: @Sendable (CleanerItem, @escaping OpenPaths) async -> ItemScan = { await Scanner.scan($0, openPaths: $1) }
+    /// Reads the open-file table under a folder (`RunningProcesses.openPaths(under:)`): once per scan, and once per
+    /// clean plus every `OpenFiles.cleanMaxAge`. Tests count calls or read their own process only.
+    var readOpenFiles: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0) }
     /// Injected by tests (a sandbox policy and a fake Trash).
     /// Saves exclusions ("Never Clean This"); tests inject a throwaway defaults domain.
     var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
     /// Home whose activity log records each clean; tests pass a throwaway folder.
     var logHome = SafetyPolicy.current.homeURL
-    var cleanItem: @Sendable (CleanerItem, ItemScan) async -> CleanReport = { await Cleaner.clean($0, scan: $1) }
+    var cleanItem: @Sendable (CleanerItem, ItemScan, @escaping OpenPaths) async -> CleanReport = {
+        await Cleaner.clean($0, scan: $1, openPaths: $2)
+    }
     /// Puts back what the last clean moved to the Trash; `logName` names each file's catalog item as the clean logged
     /// it. Tests inject a throwaway log home.
     var restore: ([TrashedItem], _ logName: @escaping @Sendable (URL) -> String) async -> TrashUndo.Result = { items, logName in
@@ -377,13 +383,15 @@ final class SmartScanModel: ObservableObject {
         let overrides = Preferences.overrides
         let scanItem = scanItem
         let blockedByExclusion = blockedByExclusion
+        let openFiles = OpenFiles(read: readOpenFiles) // read when the first item needs it, if any does
+        let openPaths: OpenPaths = { await openFiles.paths(under: $0) }
         estimates = durationsKey.map { Preferences.dictionary($0) } ?? [:]
         var durations: [String: Double] = [:]
         await withTaskGroup(of: (CleanerItem, ItemScan, Duration, Bool).self) { group in
             for item in newItems {
                 group.addTask {
                     let start = ContinuousClock.now
-                    let scan = await scanItem(item)
+                    let scan = await scanItem(item, openPaths)
                     let took = start.duration(to: .now)
                     return (item, scan, took, await blockedByExclusion(item))
                 }
@@ -435,6 +443,9 @@ final class SmartScanModel: ObservableObject {
         totalItems = todo.count
         var byGroup = groups.map { CleanedGroup(id: $0.id, title: $0.title, systemImage: $0.systemImage) }
         let freeBefore = freeSpace()
+        // Read again for the clean, never the scan's table: files opened since the scan are kept.
+        let openFiles = OpenFiles(maxAge: OpenFiles.cleanMaxAge, read: readOpenFiles)
+        let openPaths: OpenPaths = { await openFiles.paths(under: $0) }
         undoManager?.removeAllActions(withTarget: self)
         trashedItemNames = [:]
         for item in todo {
@@ -442,7 +453,7 @@ final class SmartScanModel: ObservableObject {
             cleaningItem = item.title
             defer { scannedItems += 1 }
             if isLocked(item) { report.skipped += 1; continue }
-            let result = await cleanItem(item, scan)
+            let result = await cleanItem(item, scan, openPaths)
             report += result
             if let index = groups.firstIndex(where: { $0.items.contains { $0.id == item.id } }) {
                 byGroup[index].freed += result.freed

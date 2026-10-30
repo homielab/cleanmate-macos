@@ -374,7 +374,7 @@ struct SettingsTests {
         let item = CleanerItem(id: "c", title: "C", paths: ["~/Library/Caches"], selectableEntries: true)
         let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { [] }
-        model.scanItem = { [policy = policy()] in await Scanner.scan($0, policy: policy) }
+        model.scanItem = { [policy = policy()] in await Scanner.scan($0, policy: policy, openPaths: $1) }
         model.exclude = { Preferences.exclude($0, defaults: defaults) }
         await model.scan()
         // The scanner's URLs (home resolved through /private), as the row passes them.
@@ -461,7 +461,7 @@ struct SettingsTests {
         model.disabledGroups = { Preferences.disabledGroups(defaults: defaults) }
         model.processNames = { [] }
         let scanned = OSAllocatedUnfairLock<[String]>(initialState: [])
-        model.scanItem = { item in scanned.withLock { $0.append(item.id) }; return ItemScan(measuredSize: 10) }
+        model.scanItem = { item, _ in scanned.withLock { $0.append(item.id) }; return ItemScan(measuredSize: 10) }
         await model.scan()
         #expect(scanned.withLock { $0 } == ["a"])
         #expect(model.visibleGroups.map(\.id) == ["junk"] && model.totalItems == 1)
@@ -489,7 +489,7 @@ struct SettingsTests {
         model.disabledGroups = { Preferences.disabledGroups(defaults: defaults) }
         model.processNames = { [] }
         model.appBundleIDs = { [] }
-        model.scanItem = { _ in ItemScan(measuredSize: 10) }
+        model.scanItem = { _, _ in ItemScan(measuredSize: 10) }
         await model.scan()
         #expect(model.visibleGroups.map(\.id) == ["junk", "dev"] && model.selectedSize == 20)
 
@@ -503,7 +503,7 @@ struct SettingsTests {
 
         defaults.set("dev", forKey: Preferences.disabledScanGroups) // clean() re-reads the setting itself
         let cleaned = OSAllocatedUnfairLock<[String]>(initialState: [])
-        model.cleanItem = { item, _ in cleaned.withLock { $0.append(item.id) }; return CleanReport() }
+        model.cleanItem = { item, _, _ in cleaned.withLock { $0.append(item.id) }; return CleanReport() }
         await model.clean()
         #expect(cleaned.withLock { $0 } == ["a"])
     }
