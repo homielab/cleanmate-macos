@@ -1039,6 +1039,16 @@
         }
       }
     },
+    "Models and datasets Python libraries downloaded; downloaded again when a program loads them" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình và bộ dữ liệu do thư viện Python tải về; sẽ được tải lại khi chương trình nạp chúng"
+          }
+        }
+      }
+    },
     "Module" : {
       "localizations" : {
         "vi" : {
@@ -1335,6 +1345,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tổng quan"
+          }
+        }
+      }
+    },
+    "PyTorch, Whisper and Keras models" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình PyTorch, Whisper và Keras"
           }
         }
       }

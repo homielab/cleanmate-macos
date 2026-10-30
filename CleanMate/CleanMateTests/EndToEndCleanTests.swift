@@ -79,6 +79,10 @@ struct EndToEndCleanTests {
         // The global Python and Ruby versions and the Go SDK in use next to old ones
         ".pyenv/versions/3.12.0/bin/python3", ".pyenv/shims/python3", ".rbenv/versions/3.3.0/bin/ruby", ".rbenv/shims/ruby",
         "sdk/go1.99.0/bin/go",
+        // Torch kernels and hub repos, Keras settings and a sentence-transformers folder without a model next to models
+        ".cache/torch/kernels/kernel.bin", ".cache/torch/hub/pytorch_vision_main/hubconf.py", ".keras/keras.json",
+        ".cache/torch/sentence_transformers/plain/model.bin",
+        "Developer/tools/TORCH_HOME/kernels/kernel.bin", "Developer/tools/KERAS_HOME/keras.json",
         // Hugging Face login next to its model cache
         ".cache/huggingface/token", ".cache/huggingface/stored_tokens",
         // Google Updater itself, its settings and logs next to its downloaded packages
@@ -230,6 +234,15 @@ struct EndToEndCleanTests {
                 }
                 if item.id == OldRuntimes.goID { // a Go SDK other than the one in use (go1.99.0, bait)
                     try write(folder.appending(path: "go1.0.0/bin/go"), Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if item.id == AIModelCaches.id { // a model of the library this folder belongs to
+                    let path = folder.path
+                    let junk = path.hasSuffix("/checkpoints") ? "junk.pth"
+                        : path.hasSuffix("/whisper") ? "junk.pt"
+                        : path.hasSuffix("sentence_transformers") || path.hasSuffix("SENTENCE_TRANSFORMERS_HOME") ? "junk/modules.json"
+                        : "models/junk.h5"
+                    try write(folder.appending(path: junk), Data(repeating: 1, count: 4096))
                     continue
                 }
                 if item.id == AndroidSystemImages.id { // an installed image no AVD uses

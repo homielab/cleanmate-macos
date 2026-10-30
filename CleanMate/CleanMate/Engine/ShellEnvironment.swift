@@ -10,6 +10,8 @@ nonisolated enum ShellEnvironment {
         "NVM_DIR", "RUSTUP_HOME", "CARGO_HOME", "GRADLE_USER_HOME", "HF_HOME", "HF_HUB_CACHE",
         "ANDROID_AVD_HOME", "ANDROID_EMULATOR_HOME", "OLLAMA_MODELS", "FIREBASE_EMULATORS_PATH", "FIREBASE_DEBUG_PATH", "PUB_CACHE",
         "FVM_CACHE_PATH", "PYENV_ROOT", "RBENV_ROOT",
+        // Where PyTorch, Whisper, sentence-transformers and Keras keep downloaded models (`AIModelCaches`).
+        "TORCH_HOME", "SENTENCE_TRANSFORMERS_HOME", "KERAS_HOME", "XDG_CACHE_HOME",
         // Android SDK folders (scanned for system images) and where AVDs are kept (only read: which images they use).
         "ANDROID_HOME", "ANDROID_SDK_ROOT", "ANDROID_USER_HOME", "ANDROID_SDK_HOME", "ANDROID_PREFS_ROOT",
     ]

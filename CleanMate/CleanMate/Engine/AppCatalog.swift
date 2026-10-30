@@ -146,6 +146,14 @@ extension CleanerGroup {
                     showsWhenEmpty: false, runningAppBundleIDs: LMStudioModels.bundleIDs,
                     runningProcessNames: LMStudioModels.processNames, skipsOpenFiles: true,
                     skipsEntry: { LMStudioModels.skips }, entryLabel: LMStudioModels.label(of:), selectableEntries: true),
+        // Models PyTorch Hub, Whisper, sentence-transformers and Keras downloaded (`AIModelCaches`): GBs each, unticked,
+        // one entry per model file or folder, deleted (downloaded again on the next load). A model a program has open is
+        // kept; Python runs for many other things, so no process name locks the item.
+        CleanerItem(id: AIModelCaches.id, title: "PyTorch, Whisper and Keras models",
+                    note: "Models and datasets Python libraries downloaded; downloaded again when a program loads them",
+                    paths: AIModelCaches.paths, selectedByDefault: false, shellFolders: AIModelCaches.shellFolders,
+                    showsWhenEmpty: false, skipsOpenFiles: true, entryLabel: AIModelCaches.label(of:),
+                    selectableEntries: true, allowsEntry: AIModelCaches.allows),
     ])
     }
 
