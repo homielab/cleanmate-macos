@@ -206,6 +206,19 @@ struct OldRuntimesTests {
         #expect(flutterScan.entries.count == 1 && flutterScan.entries.first?.lockReason != nil)
     }
 
+    /// The kernel reports a running program by its resolved path: a version reached through a symlinked nvm folder is
+    /// still locked.
+    @Test func versionsBehindASymlinkAreLocked() throws {
+        let box = try Home()
+        defer { box.remove() }
+        let real = try box.node("v18.20.4", nvm: "Volumes/nvm")
+        try box.link(".nvm", to: box.home.appending(path: "Volumes/nvm").path)
+        let linked = box.home.appending(path: ".nvm/versions/node/v18.20.4")
+        let check = OldRuntimes.locks(reason: "busy", running: { [real.resolvingSymlinksInPath().path + "/bin/node"] })()
+        #expect(check(linked) == "busy" && check(real) == "busy")
+        #expect(check(box.home.appending(path: ".nvm/versions/node/v18")) == nil)
+    }
+
     /// Smart Scan never ticks, counts or cleans a locked entry: ticking the item takes only the others, and an item
     /// whose every entry is locked is locked itself.
     @MainActor @Test func smartScanLeavesLockedEntriesOut() async throws {

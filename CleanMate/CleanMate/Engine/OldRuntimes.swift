@@ -98,13 +98,14 @@ nonisolated enum OldRuntimes {
 
     // MARK: Items
 
-    /// Locks an entry a program runs from or works in (`RunningProcesses.usedPaths`, read once per check).
+    /// Locks an entry a program runs from or works in (`RunningProcesses.usedPaths`, read once per check). The kernel
+    /// reports resolved paths, so a version reached through a symlink (`~/.nvm` linked elsewhere) is matched resolved too.
     static func locks(reason: String, running: @escaping @Sendable () -> [String]) -> @Sendable () -> @Sendable (URL) -> String? {
         {
             let paths = running()
             return { url in
-                let path = url.standardizedFileURL.path
-                return paths.contains { $0 == path || $0.hasPrefix(path + "/") } ? reason : nil
+                let own = Set([url.standardizedFileURL.path, url.resolvingSymlinksInPath().path])
+                return paths.contains { path in own.contains { path == $0 || path.hasPrefix($0 + "/") } } ? reason : nil
             }
         }
     }
