@@ -89,7 +89,7 @@ struct ScanReminderTests {
         #expect(setup.center.prompts == 1)
         let request = try #require(setup.request)
         #expect(request.components == DateComponents(hour: 10, minute: 0, weekday: 2))
-        #expect(Self.firstFire(request.components, after: monday) == Self.date(2026, 11, 9, 10))
+        #expect(Self.firstFire(try #require(request.components), after: monday) == Self.date(2026, 11, 9, 10))
         #expect(!request.title.isEmpty && !request.body.isEmpty)
         // Asked once: turning it on again does not prompt.
         #expect(await setup.scheduler.update())
@@ -99,7 +99,7 @@ struct ScanReminderTests {
     @Test func offRemovesThePendingReminder() async {
         let setup = Setup(.monthly, now: Self.date(2026, 11, 2, 15))
         await setup.scheduler.update()
-        #expect(setup.request?.components.day == 2)
+        #expect(setup.request?.components?.day == 2)
         setup.set(.off)
         #expect(await setup.scheduler.update())
         #expect(setup.center.pending.isEmpty)
@@ -124,8 +124,8 @@ struct ScanReminderTests {
         setup.now = Self.date(2026, 11, 5, 12) // Thursday
         await setup.scheduler.postpone()
         let request = try #require(setup.request)
-        #expect(request.components.weekday == 5)
-        #expect(Self.firstFire(request.components, after: setup.now) == Self.date(2026, 11, 12, 10))
+        #expect(request.components?.weekday == 5)
+        #expect(Self.firstFire(try #require(request.components), after: setup.now) == Self.date(2026, 11, 12, 10))
     }
 
     @Test func postponeNeverAsksAndLeavesTheCenterAloneWhileOff() async {
@@ -163,14 +163,16 @@ struct ScanReminderTests {
     }
 }
 
-/// Settings › General must fit its window without scrolling, in English and Vietnamese, even with the reminder's
-/// "notifications are off" row shown.
+/// Settings › General must fit its window without scrolling, in English and Vietnamese, even with the reminder's and
+/// the low-disk warning's "notifications are off" buttons shown.
 @MainActor
 struct GeneralSettingsLayoutTests {
     @Test(arguments: ["en", "vi"], [false, true])
     func generalSettingsFitsWithoutScrolling(language: String, denied: Bool) async throws {
         let setup = ScanReminderTests.Setup(.weekly, center: FakeReminderCenter(status: .denied), now: .now)
-        let host = NSHostingView(rootView: GeneralSettings(reminders: setup.scheduler, reminderDenied: denied)
+        let lowDisk = LowDiskWarningChecker(center: setup.center, defaults: setup.defaults)
+        let host = NSHostingView(rootView: GeneralSettings(reminders: setup.scheduler, lowDiskWarning: lowDisk,
+                                                           notificationsDenied: denied)
             .environment(\.locale, Locale(identifier: language))
             .frame(width: SettingsView.size.width, height: SettingsView.size.height))
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: SettingsView.size), styleMask: [.titled],

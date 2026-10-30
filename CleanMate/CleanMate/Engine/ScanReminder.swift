@@ -20,8 +20,8 @@ nonisolated enum ScanReminder {
         var id = requestID
         var title: String
         var body: String
-        /// Matched by a repeating calendar trigger.
-        var components: DateComponents
+        /// Matched by a repeating calendar trigger; nil = shown now, once (the low-disk warning).
+        var components: DateComponents?
     }
 
     static func frequency(defaults: UserDefaults = .standard) -> Frequency {
@@ -94,7 +94,7 @@ nonisolated struct SystemReminderCenter: ReminderCenter {
         content.title = request.title
         content.body = request.body
         content.sound = .default
-        let trigger = UNCalendarNotificationTrigger(dateMatching: request.components, repeats: true)
+        let trigger = request.components.map { UNCalendarNotificationTrigger(dateMatching: $0, repeats: true) }
         let notification = UNNotificationRequest(identifier: request.id, content: content, trigger: trigger)
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             UNUserNotificationCenter.current().add(notification) { _ in continuation.resume() }

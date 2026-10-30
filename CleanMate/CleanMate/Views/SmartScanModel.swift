@@ -88,10 +88,10 @@ final class SmartScanModel: ObservableObject {
     /// Item id → seconds from the last finished scan, read when a scan starts.
     private var estimates: [String: Double] = [:]
     /// Called when a scan finishes; the real Smart Scan records it for the menu bar item, records the free space for the
-    /// Overview chart and moves the scan reminder.
+    /// Overview chart, moves the scan reminder and checks for the low-disk warning.
     var scanFinished: (SmartScanModel) -> Void = { _ in }
-    /// Called when a clean finishes; the real Smart Scan adds what it freed to the menu bar item's last scan and records
-    /// the free space for the Overview chart.
+    /// Called when a clean finishes; the real Smart Scan adds what it freed to the menu bar item's last scan, records
+    /// the free space for the Overview chart and checks for the low-disk warning.
     var cleanFinished: (CleanReport) -> Void = { _ in }
 
     /// `catalog` defaults to the module's own (Privacy or Smart Scan).
@@ -106,10 +106,12 @@ final class SmartScanModel: ObservableObject {
                 LastScan(date: .now, size: model.selectedSize).save()
                 DiskHistory.shared.recordNow()
                 Task { await ScanReminderScheduler.shared.postpone() }
+                Task { await LowDiskWarningChecker.shared.check() }
             }
             cleanFinished = {
                 LastScan.recordClean(freed: $0.freed)
                 DiskHistory.shared.recordNow()
+                Task { await LowDiskWarningChecker.shared.check() }
             }
         }
         groups = []

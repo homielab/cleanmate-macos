@@ -30,6 +30,9 @@ struct CleanMateApp: App {
 /// A lone SwiftUI `Window` scene quits the app when it closes; keep running like a normal Mac app,
 /// the Dock icon / `open` brings the window back.
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// Low-disk check every hour while CleanMate runs, also with its window closed.
+    private var lowDiskTimer: Timer?
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     /// Not under tests: they must never reach the real notification center.
@@ -39,18 +42,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         UNUserNotificationCenter.current().delegate = self
         Task { await ScanReminderScheduler.shared.postpone() } // CleanMate was used: next reminder one period from now
         DiskHistory.shared.recordNow() // today's free space for the Overview chart
+        Task { await LowDiskWarningChecker.shared.check() }
+        let timer = Timer(timeInterval: LowDiskWarning.checkInterval, repeats: true) { _ in
+            Task { @MainActor in await LowDiskWarningChecker.shared.check() }
+        }
+        timer.tolerance = LowDiskWarning.checkInterval / 10
+        RunLoop.main.add(timer, forMode: .common)
+        lowDiskTimer = timer
     }
 
-    /// The reminder arrives while CleanMate is the active app: not shown, the user is already here.
+    /// A notification arrives while CleanMate is the active app: no banner, the user is already here. The low-disk
+    /// warning still goes to Notification Center, as only one is posted a day.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                             withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        completionHandler([])
+        completionHandler(notification.request.identifier == LowDiskWarning.requestID ? [.list] : [])
     }
 
-    /// A click on the reminder opens Smart Scan; it does not start a scan.
+    /// A click on the reminder or the low-disk warning opens Smart Scan; it does not start a scan.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
-        let isReminder = response.notification.request.identifier == ScanReminder.requestID
+        let isReminder = [ScanReminder.requestID, LowDiskWarning.requestID].contains(response.notification.request.identifier)
         completionHandler()
         guard isReminder else { return }
         Task { @MainActor in ModuleRouter.shared.show(.smartScan) }

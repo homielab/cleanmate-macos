@@ -81,6 +81,16 @@
         }
       }
     },
+    "A notification when the startup disk runs low, checked when CleanMate opens, after Smart Scan and every hour while it runs; at most one a day." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thông báo khi ổ khởi động sắp đầy, kiểm tra khi mở CleanMate, sau Quét thông minh và mỗi giờ khi app đang chạy; tối đa một lần mỗi ngày."
+          }
+        }
+      }
+    },
     "AI sessions: %lld days" : {
       "localizations" : {
         "en" : {
@@ -1725,6 +1735,16 @@
         }
       }
     },
+    "Warn when free space is below" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cảnh báo khi ổ còn dưới"
+          }
+        }
+      }
+    },
     "Weekly" : {
       "localizations" : {
         "vi" : {
@@ -1791,6 +1811,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhớ đệm Yarn Berry"
+          }
+        }
+      }
+    },
+    "Your disk has %@ free (%@). Open CleanMate to free up space." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ đĩa còn %1$@ (%2$@). Mở CleanMate để giải phóng dung lượng."
+          }
+        }
+      }
+    },
+    "Your disk is almost full" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ đĩa sắp đầy"
           }
         }
       }
@@ -5936,6 +5976,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld snapshot"
+          }
+        }
+      }
+    },
+    "“%@” has %@ free (%@). Open CleanMate to free up space." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ “%1$@” còn %2$@ (%3$@). Mở CleanMate để giải phóng dung lượng."
           }
         }
       }

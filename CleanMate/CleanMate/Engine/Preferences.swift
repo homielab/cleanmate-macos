@@ -37,6 +37,11 @@ nonisolated enum Preferences {
     static let lastSmartScan = "lastSmartScan"
     /// String (`ScanReminder.Frequency` raw value): Settings › General › Remind me to scan, off by default.
     static let scanReminder = "scanReminder"
+    /// Int: Settings › General › Warn when free space is below, in percent of the disk; 0 = off, 10 by default
+    /// (`LowDiskWarning.percent`).
+    static let lowDiskWarning = "lowDiskWarning"
+    /// Date: when the last low-disk warning was posted (at most one a day).
+    static let lowDiskWarned = "lowDiskWarned"
     /// Settings tab shown when the window opens.
     static let settingsTab = "settingsTab"
 

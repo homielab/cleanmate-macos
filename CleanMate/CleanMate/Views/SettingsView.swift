@@ -28,7 +28,7 @@ extension ScanReminder {
 struct SettingsView: View {
     static let exclusionsTab = "exclusions"
     /// The tallest tab (General) fits without scrolling in EN/VI (`GeneralSettingsLayoutTests`).
-    static let size = CGSize(width: 520, height: 780)
+    static let size = CGSize(width: 520, height: 800)
     /// Remembered, and set by a blocked Smart Scan row to open on Exclusions.
     @AppStorage(Preferences.settingsTab) private var tab = "general"
 
@@ -54,22 +54,44 @@ struct GeneralSettings: View {
     @AppStorage(Preferences.scanReminder) private var reminder = ScanReminder.Frequency.off
     /// Reminders are on but CleanMate may not post notifications: shows how to allow them.
     @State private var reminderDenied: Bool
+    @AppStorage(Preferences.lowDiskWarning) private var lowDisk = LowDiskWarning.defaultPercent
+    /// The low-disk warning is on but CleanMate may not post notifications.
+    @State private var lowDiskDenied: Bool
     @State private var language = AppLanguage.current()
     private let reminders: ScanReminderScheduler
+    private let lowDiskWarning: LowDiskWarningChecker
     @State private var confirmingReset = false
     /// The pressed button disappears when the inline confirmation swaps in: keyboard focus follows it.
     @FocusState private var resetFocus: Bool?
 
-    /// Tests pass a scheduler with a fake notification center, and `reminderDenied` to measure the tallest layout.
-    init(reminders: ScanReminderScheduler = .shared, reminderDenied: Bool = false) {
+    /// Tests pass a scheduler and checker with a fake notification center, and `notificationsDenied` to measure the
+    /// tallest layout.
+    init(reminders: ScanReminderScheduler = .shared, lowDiskWarning: LowDiskWarningChecker = .shared,
+         notificationsDenied: Bool = false) {
         self.reminders = reminders
-        _reminderDenied = State(initialValue: reminderDenied)
+        self.lowDiskWarning = lowDiskWarning
+        _reminderDenied = State(initialValue: notificationsDenied)
+        _lowDiskDenied = State(initialValue: notificationsDenied)
     }
 
     var body: some View {
         Form {
             Section {
                 Toggle("Show free space in the menu bar", isOn: $showMenuBarExtra)
+                LabeledContent("Warn when free space is below") {
+                    HStack {
+                        // In the same row, not one more: General has no height to spare.
+                        if lowDiskDenied { TurnOnNotificationsButton() }
+                        Picker("Warn when free space is below", selection: $lowDisk) {
+                            ForEach(LowDiskWarning.choices, id: \.self) { percent in
+                                if percent == 0 { Text("Off").tag(0) } else { Text(verbatim: LowDiskWarning.share(percent)).tag(percent) }
+                            }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+                .help("A notification when the startup disk runs low, checked when CleanMate opens, after Smart Scan and every hour while it runs; at most one a day.")
             } footer: {
                 Text("CleanMate keeps running in the menu bar after its window is closed. It does not start at login.")
                     .font(.caption)
@@ -134,12 +156,7 @@ struct GeneralSettings: View {
                 LabeledContent("Remind me to scan") {
                     HStack {
                         // In the same row, not one more: General has no height to spare.
-                        if reminderDenied {
-                            Button { ScanReminder.openNotificationSettings() } label: {
-                                Label("Turn On Notifications…", systemImage: "exclamationmark.triangle.fill")
-                            }
-                            .help("Notifications from CleanMate are turned off in System Settings.")
-                        }
+                        if reminderDenied { TurnOnNotificationsButton() }
                         Picker("Remind me to scan", selection: $reminder) {
                             Text("Off").tag(ScanReminder.Frequency.off)
                             Text("Weekly").tag(ScanReminder.Frequency.weekly)
@@ -178,18 +195,38 @@ struct GeneralSettings: View {
         .formStyle(.grouped)
         .onAppear {
             granted = FullDiskAccess.isGranted
-            Task { reminderDenied = !(await reminders.refresh()) }
+            refreshNotifications()
         }
         // Granting access happens in System Settings: refresh when the user comes back.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             granted = FullDiskAccess.isGranted
-            Task { reminderDenied = !(await reminders.refresh()) }
+            refreshNotifications()
         }
-        // The first time a reminder is turned on, macOS asks whether CleanMate may post notifications.
+        // The first time a reminder or the warning is turned on, macOS asks whether CleanMate may post notifications.
         .onChange(of: reminder) { _ in
             Task { reminderDenied = !(await reminders.update()) }
         }
+        .onChange(of: lowDisk) { _ in
+            Task { lowDiskDenied = !(await lowDiskWarning.update()) }
+        }
         .onChange(of: language) { AppLanguage.set($0) }
+    }
+
+    private func refreshNotifications() {
+        Task {
+            reminderDenied = !(await reminders.refresh())
+            lowDiskDenied = !(await lowDiskWarning.refresh())
+        }
+    }
+}
+
+/// Shown next to a notification setting that is on while notifications from CleanMate are off.
+private struct TurnOnNotificationsButton: View {
+    var body: some View {
+        Button { ScanReminder.openNotificationSettings() } label: {
+            Label("Turn On Notifications…", systemImage: "exclamationmark.triangle.fill")
+        }
+        .help("Notifications from CleanMate are turned off in System Settings.")
     }
 }
 
