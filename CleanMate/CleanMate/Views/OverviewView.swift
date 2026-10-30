@@ -1,8 +1,8 @@
 import Charts
 import SwiftUI
 
-/// First module: drives, free space over time, what CleanMate freed, the largest folders in the home folder and
-/// whether macOS's protections are on. Nothing here removes files or changes a setting.
+/// First module: drives, free space over time, what CleanMate freed, space outside the user's folders, the largest
+/// folders in the home folder and whether macOS's protections are on. Nothing here removes files or changes a setting.
 struct OverviewView: View {
     @ObservedObject var model: OverviewModel
 
@@ -13,6 +13,7 @@ struct OverviewView: View {
             }
             historySection
             freedSection
+            outsideSection
             foldersSection
             securitySection
         }
@@ -60,6 +61,37 @@ struct OverviewView: View {
             Text("Freed by CleanMate")
         } footer: {
             Text("Counts what was deleted; items moved to the Trash are not included.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    /// Local snapshots, purgeable space and everything outside the home folder: space no folder in the list explains.
+    private var outsideSection: some View {
+        Section {
+            let purgeable = model.purgeable, system = model.systemAndApps
+            let largest = max(purgeable ?? 0, system ?? 0)
+            SnapshotsRow(snapshots: model.snapshots)
+            if let purgeable {
+                OutsideRow(symbol: "icloud.and.arrow.down", title: Text("Purgeable space"),
+                           value: Text(purgeable, format: .fileSize), size: purgeable, largest: largest,
+                           note: Text("macOS can free \(purgeable, format: .fileSize) when it needs space (downloaded iCloud files, snapshots, system caches). It is already counted as available."))
+            }
+            if let system {
+                let note = Text("In use on the startup disk outside your home folder: macOS, apps, other users and local snapshots. For information only.")
+                OutsideRow(symbol: "macwindow", title: Text("System and apps"),
+                           value: Text(system, format: .fileSize), size: system, largest: largest,
+                           note: model.skippedProtected
+                               ? note + Text(verbatim: " ") + Text("Includes the folders skipped without Full Disk Access.")
+                               : note)
+            }
+        } header: {
+            HStack {
+                Text("Space outside your folders")
+                Spacer()
+                if model.measuring { ProgressView().controlSize(.small) }
+            }
+        } footer: {
+            Text("In use, but in none of your folders. Shown for information: CleanMate changes nothing here.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -155,7 +187,7 @@ private struct SecurityRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     if let url = check.settingsURL {
-                        Button("Open System Settings…") { SecurityRow.open(url) }.controlSize(.small)
+                        Button("Open System Settings…") { openSettingsPane(url) }.controlSize(.small)
                     }
                 }
                 .padding(.leading, 28)
@@ -163,12 +195,90 @@ private struct SecurityRow: View {
         }
         .padding(.vertical, 2)
     }
+}
 
-    /// The pane, else System Settings itself (an older macOS that doesn't know the pane).
-    private static func open(_ url: URL) {
-        if !NSWorkspace.shared.open(url) {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
+/// The pane, else System Settings itself (an older macOS that doesn't know the pane).
+private func openSettingsPane(_ url: URL) {
+    if !NSWorkspace.shared.open(url) {
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
+    }
+}
+
+/// A row of "Space outside your folders": icon, name and size, and a line saying what it is and what to do.
+private struct OutsideRow: View {
+    let symbol: String
+    let title: Text
+    let value: Text
+    /// nil: no size bar (the value is not a size).
+    var size: Int64?
+    var largest: Int64 = 0
+    let note: Text
+    var help: Text?
+    var action: (title: LocalizedStringKey, url: URL)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let help { line.help(help) } else { line }
+            HStack(alignment: .firstTextBaseline) {
+                note.font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                if let action {
+                    Button(action.title) { openSettingsPane(action.url) }.controlSize(.small)
+                }
+            }
+            .padding(.leading, 28)
         }
+        .padding(.vertical, 2)
+    }
+
+    private var line: some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).foregroundStyle(.secondary).frame(width: 20)
+                .accessibilityHidden(true)
+            title
+            Spacer()
+            value.sizeColumnStyle(emphasized: false)
+            if let size {
+                SizeBar(size: size, largest: largest)
+            } else {
+                Color.clear.frame(width: 48, height: 6) // keeps the value in line with the sized rows
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Time Machine's local snapshots: how many and from when. Their size needs admin rights to measure, so none is shown.
+private struct SnapshotsRow: View {
+    let snapshots: LocalSnapshots?
+
+    private static let settings = URL(string: "x-apple.systempreferences:com.apple.Time-Machine-Settings.extension")!
+
+    var body: some View {
+        let title = Text("Time Machine local snapshots")
+        let about = Text("Copies of your disk that Time Machine keeps on this Mac between backups.")
+        let help = Text("Measuring their size needs administrator rights.")
+        switch snapshots {
+        case nil:
+            OutsideRow(symbol: "clock.arrow.circlepath", title: title, value: Text("Checking…"), note: about)
+        case let list? where !list.readable:
+            OutsideRow(symbol: "clock.arrow.circlepath", title: title, value: Text("Unknown"),
+                       note: Text("Couldn’t list them."))
+        case let list? where list.count == 0:
+            OutsideRow(symbol: "clock.arrow.circlepath", title: title, value: Text("None"), note: about)
+        case let list?:
+            OutsideRow(symbol: "clock.arrow.circlepath", title: title, value: Text("\(list.count) snapshots"),
+                       note: dates(list) + Text("macOS deletes them by itself when it needs the space. To delete them now: Time Machine settings, or “tmutil thinlocalsnapshots” in Terminal (needs an administrator)."),
+                       help: help, action: ("Open Time Machine Settings…", Self.settings))
+        }
+    }
+
+    /// "From 12 Oct 2026 to 30 Oct 2026. ", or nothing when no date could be read.
+    private func dates(_ list: LocalSnapshots) -> Text {
+        guard let oldest = list.oldest, let newest = list.newest else { return Text(verbatim: "") }
+        let format = Date.FormatStyle.dateTime.day().month().year()
+        return Text("From \(oldest, format: format) to \(newest, format: format).") + Text(verbatim: " ")
     }
 }
 

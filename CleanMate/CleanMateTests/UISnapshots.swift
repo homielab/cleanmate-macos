@@ -512,7 +512,8 @@ struct UISnapshots {
         model.measure = { url, _, _ in (sizes[url.lastPathComponent] ?? 0, [:]) }
         model.readDisks = {
             [OverviewModel.Disk(url: URL(fileURLWithPath: "/"),
-                                volume: .init(name: "Macintosh HD", total: 494_000_000_000, available: 182_000_000_000)),
+                                volume: .init(name: "Macintosh HD", total: 494_000_000_000, available: 182_000_000_000,
+                                              purgeable: 14_600_000_000)),
              OverviewModel.Disk(url: URL(fileURLWithPath: "/Volumes"),
                                 volume: .init(name: "Backup Drive", total: 1_000_000_000_000, available: 62_000_000_000))]
         }
@@ -520,11 +521,16 @@ struct UISnapshots {
         let security = SecurityStatus(gatekeeper: .on, firewall: .off, sip: .unknown, fileVault: .on,
                                       xprotect: .init(version: "5368", date: Self.today.addingTimeInterval(-3 * 86_400)))
         model.readSecurity = { security }
+        let snapshots = LocalSnapshots(count: 4, oldest: Self.today.addingTimeInterval(-86_400),
+                                       newest: Self.today.addingTimeInterval(-3_600))
+        model.readSnapshots = { snapshots }
         model.refresh()
-        while model.measuring || model.security == nil { try await Task.sleep(for: .milliseconds(50)) }
+        while model.measuring || model.security == nil || model.snapshots == nil {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         try await snapshot("overview") { OverviewView(model: model) }
-        // Tall enough for the whole form, down to "System protection" at the bottom.
-        try await snapshot("overview-protection", size: CGSize(width: Self.detailSize.width, height: 1_500)) {
+        // Tall enough for the whole form, from "Space outside your folders" down to "System protection" at the bottom.
+        try await snapshot("overview-protection", size: CGSize(width: Self.detailSize.width, height: 1_900)) {
             OverviewView(model: model)
         }
     }

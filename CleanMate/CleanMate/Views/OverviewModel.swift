@@ -1,9 +1,10 @@
 import Combine
 import Foundation
 
-/// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, the largest
-/// folders in the home folder and whether macOS's protections are on.
-/// Read-only. Drives and freed space are read at once; folder sizes and protections are read in the background.
+/// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, space outside
+/// the user's folders, the largest folders in the home folder and whether macOS's protections are on.
+/// Read-only. Drives and freed space are read at once; folder sizes, local snapshots and protections are read in the
+/// background.
 final class OverviewModel: ObservableObject {
     nonisolated struct Disk: Identifiable, Equatable, Sendable {
         let url: URL
@@ -25,6 +26,8 @@ final class OverviewModel: ObservableObject {
 
     /// At most this many folders are listed.
     static let folderLimit = 12
+    /// Less purgeable space than this is not shown.
+    static let purgeableMinimum: Int64 = 100_000_000
 
     @Published private(set) var disks: [Disk] = []
     @Published private(set) var cleanups = ActivityLog.Cleanups()
@@ -39,6 +42,10 @@ final class OverviewModel: ObservableObject {
     @Published private(set) var skippedProtected = false
     /// Gatekeeper, firewall, SIP, FileVault, XProtect; nil until first read.
     @Published private(set) var security: SecurityStatus?
+    /// Time Machine's local snapshots of the startup disk; nil until first read.
+    @Published private(set) var snapshots: LocalSnapshots?
+    /// The home folder's size from the last measure: its folders plus the files directly in it.
+    @Published private(set) var homeSize: Int64?
 
     /// Injectable for tests: the folder measured and the activity log read.
     var home = SafetyPolicy.current.homeURL
@@ -56,11 +63,16 @@ final class OverviewModel: ObservableObject {
     var readSecurity: @Sendable () async -> SecurityStatus = {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? await SecurityStatus.read() : SecurityStatus()
     }
+    /// Like `readSecurity`: under tests without one, no command runs.
+    var readSnapshots: @Sendable () async -> LocalSnapshots = {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? await LocalSnapshots.read() : .unreadable
+    }
     /// Space Lens takes the sizes measured here, so opening a folder from the list is instant.
     weak var spaceLens: SpaceLensModel?
 
     private var task: Task<Void, Never>?
     private var securityTask: Task<Void, Never>?
+    private var snapshotsTask: Task<Void, Never>?
     private var started = false
     /// Something was removed since the last measure: measure again next time the Overview is shown.
     private var stale = false
@@ -74,10 +86,10 @@ final class OverviewModel: ObservableObject {
         }
     }
 
-    /// When the Overview is shown: everything the first time or after a removal, else drives, freed space and
-    /// protections only (a setting may have changed in System Settings meanwhile).
+    /// When the Overview is shown: everything the first time or after a removal, else drives, freed space, local
+    /// snapshots and protections only (a setting may have changed in System Settings meanwhile).
     func startIfNeeded() {
-        if !started || stale { refresh() } else { readQuick(); readSecurityStatus() }
+        if !started || stale { refresh() } else { readQuick(); readSnapshotList(); readSecurityStatus() }
     }
 
     /// "Refresh" and ⌘R: reads everything again.
@@ -85,6 +97,7 @@ final class OverviewModel: ObservableObject {
         started = true
         stale = false
         readQuick()
+        readSnapshotList()
         readSecurityStatus()
         measureFolders()
     }
@@ -113,6 +126,31 @@ final class OverviewModel: ObservableObject {
         }
     }
 
+    /// Space macOS frees when it needs it on the startup disk; nil under `purgeableMinimum`.
+    var purgeable: Int64? {
+        guard let size = disks.first?.volume.purgeable, size >= Self.purgeableMinimum else { return nil }
+        return size
+    }
+
+    /// Space in use on the startup disk outside the home folder (macOS, apps, other users, local snapshots); nil
+    /// before the home folder is measured or when nothing is left.
+    var systemAndApps: Int64? {
+        guard let homeSize, let volume = disks.first?.volume, volume.total > 0 else { return nil }
+        let size = volume.used - homeSize
+        return size > 0 ? size : nil
+    }
+
+    /// Like the protections: alongside the folder measure, not stopped by ⌘. (`tmutil` times out within seconds).
+    private func readSnapshotList() {
+        snapshotsTask?.cancel()
+        let read = readSnapshots
+        snapshotsTask = Task {
+            let list = await read()
+            guard !Task.isCancelled else { return }
+            snapshots = list
+        }
+    }
+
     private func measureFolders() {
         task?.cancel()
         let home = home.standardizedFileURL
@@ -123,7 +161,9 @@ final class OverviewModel: ObservableObject {
         task = Task {
             // One per listing, as in Space Lens: sibling folders don't count a shared hard link twice.
             let links = SpaceLens.HardLinks()
-            var listed = await SpaceLens.list(home, links: links).filter(\.isFolder)
+            let entries = await SpaceLens.list(home, links: links)
+            let looseFiles = entries.reduce(0) { $0 + ($1.isFolder ? 0 : $1.size ?? 0) }
+            var listed = entries.filter(\.isFolder)
             for index in listed.indices {
                 listed[index].isProtected = skipping.contains(listed[index].url.standardizedFileURL.path)
             }
@@ -145,6 +185,7 @@ final class OverviewModel: ObservableObject {
             let sized = listed.filter { $0.size != nil }
             folders = Array(sized.filter { $0.sortSize > 0 }.sorted { $0.sortSize > $1.sortSize }.prefix(Self.folderLimit))
             skippedProtected = listed.contains(where: \.isProtected)
+            homeSize = sized.reduce(looseFiles) { $0 + max($1.sortSize, 0) }
             measured = true
             measuring = false
             if let epoch {

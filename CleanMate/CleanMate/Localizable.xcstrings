@@ -5741,6 +5741,184 @@
           }
         }
       }
+    },
+    "Space outside your folders" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng ngoài thư mục"
+          }
+        }
+      }
+    },
+    "In use, but in none of your folders. Shown for information: CleanMate changes nothing here." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang dùng nhưng không nằm trong thư mục nào của bạn. Chỉ để bạn biết: CleanMate không thay đổi gì ở đây."
+          }
+        }
+      }
+    },
+    "Time Machine local snapshots" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Snapshot Time Machine cục bộ"
+          }
+        }
+      }
+    },
+    "None" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có"
+          }
+        }
+      }
+    },
+    "Copies of your disk that Time Machine keeps on this Mac between backups." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao ổ đĩa mà Time Machine giữ trên máy này giữa các lần sao lưu."
+          }
+        }
+      }
+    },
+    "Couldn’t list them." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đọc được danh sách."
+          }
+        }
+      }
+    },
+    "From %@ to %@." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Từ %1$@ đến %2$@."
+          }
+        }
+      }
+    },
+    "macOS deletes them by itself when it needs the space. To delete them now: Time Machine settings, or “tmutil thinlocalsnapshots” in Terminal (needs an administrator)." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS tự xoá khi cần chỗ. Xoá ngay: cài đặt Time Machine, hoặc “tmutil thinlocalsnapshots” trong Terminal (cần quyền quản trị)."
+          }
+        }
+      }
+    },
+    "Measuring their size needs administrator rights." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đo dung lượng của chúng cần quyền quản trị."
+          }
+        }
+      }
+    },
+    "Open Time Machine Settings…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở cài đặt Time Machine…"
+          }
+        }
+      }
+    },
+    "Purgeable space" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng có thể giải phóng"
+          }
+        }
+      }
+    },
+    "macOS can free %@ when it needs space (downloaded iCloud files, snapshots, system caches). It is already counted as available." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS có thể giải phóng %@ khi cần chỗ (tệp iCloud đã tải, snapshot, bộ nhớ đệm hệ thống). Phần này đã tính vào dung lượng còn trống."
+          }
+        }
+      }
+    },
+    "System and apps" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hệ thống và ứng dụng"
+          }
+        }
+      }
+    },
+    "In use on the startup disk outside your home folder: macOS, apps, other users and local snapshots. For information only." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang dùng trên ổ khởi động ngoài thư mục người dùng: macOS, ứng dụng, người dùng khác và snapshot cục bộ. Chỉ để bạn biết."
+          }
+        }
+      }
+    },
+    "Includes the folders skipped without Full Disk Access." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gồm cả các thư mục bị bỏ qua khi chưa cấp quyền Truy cập toàn bộ ổ đĩa."
+          }
+        }
+      }
+    },
+    "%lld snapshots" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshot"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshots"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld snapshot"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
