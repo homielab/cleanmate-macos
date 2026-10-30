@@ -76,6 +76,9 @@ struct EndToEndCleanTests {
         "Library/Caches/pypoetry/virtualenvs/app-AbC123-py3.12/bin/python",
         // Installed toolchains next to the download caches of nvm and rustup
         ".nvm/versions/node/v22.0.0/bin/node", ".rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+        // The global Python and Ruby versions and the Go SDK in use next to old ones
+        ".pyenv/versions/3.12.0/bin/python3", ".pyenv/shims/python3", ".rbenv/versions/3.3.0/bin/ruby", ".rbenv/shims/ruby",
+        "sdk/go1.99.0/bin/go",
         // Hugging Face login next to its model cache
         ".cache/huggingface/token", ".cache/huggingface/stored_tokens",
         // Google Updater itself, its settings and logs next to its downloaded packages
@@ -107,6 +110,7 @@ struct EndToEndCleanTests {
         // Tool data next to the junk in folders set by shell variables (`shellTools`)
         "Developer/tools/NVM_DIR/versions/node/v22.0.0/bin/node",
         "Developer/tools/RUSTUP_HOME/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+        "Developer/tools/PYENV_ROOT/versions/3.12.0/bin/python3", "Developer/tools/RBENV_ROOT/versions/3.3.0/bin/ruby",
         "Developer/tools/CARGO_HOME/config.toml", "Developer/tools/CARGO_HOME/bin/cargo",
         "Developer/tools/GRADLE_USER_HOME/gradle.properties", "Developer/tools/HF_HOME/token",
         "Developer/tools/HF_HUB_CACHE/version.txt", "Developer/tools/ANDROID_AVD_HOME/Pixel.avd/config.ini",
@@ -224,6 +228,10 @@ struct EndToEndCleanTests {
                     try write(folder.appending(path: "v1.0.0/bin/node"), Data(repeating: 1, count: 4096))
                     continue
                 }
+                if item.id == OldRuntimes.goID { // a Go SDK other than the one in use (go1.99.0, bait)
+                    try write(folder.appending(path: "go1.0.0/bin/go"), Data(repeating: 1, count: 4096))
+                    continue
+                }
                 if item.id == AndroidSystemImages.id { // an installed image no AVD uses
                     try write(folder.appending(path: "junk-\(item.id)/package.xml"), Data("<package/>".utf8))
                     try write(folder.appending(path: "junk-\(item.id)/system.img"), Data(repeating: 1, count: 4096))
@@ -290,7 +298,18 @@ struct EndToEndCleanTests {
             baitData[path] = Data("v22.0.0\n".utf8)
             try write(home.appending(path: path), baitData[path]!)
         }
-        let profile = ShellEnvironment.variables.sorted().map { "export \($0)=\(Self.shellTools)\($0)\n" }.joined()
+        // The version files of pyenv and rbenv and rustup's settings name the bait versions: without them none is listed.
+        let defaults = [(".pyenv", "version", "3.12.0\n"), (tools + "PYENV_ROOT", "version", "3.12.0\n"),
+                        (".rbenv", "version", "3.3.0\n"), (tools + "RBENV_ROOT", "version", "3.3.0\n"),
+                        (".rustup", "settings.toml", "default_toolchain = \"stable-aarch64-apple-darwin\"\n"),
+                        (tools + "RUSTUP_HOME", "settings.toml", "default_toolchain = \"stable-aarch64-apple-darwin\"\n")]
+        for (root, name, text) in defaults {
+            let path = root + "/" + name
+            baitData[path] = Data(text.utf8)
+            try write(home.appending(path: path), baitData[path]!)
+        }
+        // The profile puts the bait Go SDK on PATH.
+        let profile = "export PATH=\"$HOME/sdk/go1.99.0/bin:$PATH\"\n" + ShellEnvironment.variables.sorted().map { "export \($0)=\(Self.shellTools)\($0)\n" }.joined()
         baitData[".zprofile"] = Data(profile.utf8)
         try write(home.appending(path: ".zprofile"), baitData[".zprofile"]!)
         // An old folder in the temp folder holding a socket/pipe of a running process (ssh-agent, VS Code): kept.

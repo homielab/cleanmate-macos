@@ -1,12 +1,18 @@
 import Foundation
 
-/// Node.js versions installed by nvm and Flutter SDKs installed by fvm, other than the one in use: 100–200 MB per Node
-/// version, 1–2 GB per Flutter SDK, and `nvm install` / `fvm install` downloads them again. One entry per version,
-/// unticked, deleted whole. A version a program runs from (its `node`, the Dart VM of a Flutter SDK, a global CLI
-/// installed in it) is listed locked. `alias/`, `default`, `.nvmrc` and project files are never touched.
+/// Runtime versions installed by version managers, other than the one in use: Node.js (nvm, 100–200 MB each), Flutter
+/// (fvm, 1–2 GB), Python (pyenv), Ruby (rbenv), Rust toolchains (rustup) and Go SDKs (golang.org/dl, `~/sdk`),
+/// 0.3–2 GB each; the tool downloads them again. One entry per version, unticked, deleted whole. When the version in
+/// use can't be told, nothing of that tool is listed. A version a program runs from (its `node`, the Dart VM of a
+/// Flutter SDK, a global CLI installed in it) is listed locked. The tools' own files (`alias/`, `default`, `version`,
+/// `settings.toml`, shims) and project files are never touched: only folders inside `versions`, `toolchains`, `~/sdk`.
 nonisolated enum OldRuntimes {
     static let nodeID = "nvm-old-node"
     static let flutterID = "fvm-old-flutter"
+    static let pythonID = "pyenv-old-python"
+    static let rubyID = "rbenv-old-ruby"
+    static let rustID = "rustup-old-toolchains"
+    static let goID = "go-old-sdks"
 
     /// `v20.11.1`: the folders nvm installs in `versions/node`.
     static func isNodeVersion(_ name: String) -> Bool { name.wholeMatch(of: /v\d+\.\d+\.\d+/) != nil }
@@ -96,6 +102,138 @@ nonisolated enum OldRuntimes {
             && !pathVersions(home: policy.homeURL, versionsFolder: folder).contains(url.standardizedFileURL.path)
     }
 
+    // MARK: pyenv and rbenv
+
+    /// The installed versions (folder names in `versions`) a version file names, as pyenv and rbenv read it: the first
+    /// word of each line (`firstOnly`: of the first line, rbenv), `#` comments skipped, a `python-`/`ruby-` prefix
+    /// dropped when no such folder exists, a partial version (`3.11`) keeping every installed match, `system` none. A
+    /// name that is a link in `versions` (a pyenv-virtualenv env) keeps the version it lives in too. nil when it can't be
+    /// told: no readable file, no version in it, or a name nothing installed matches.
+    static func namedVersions(file: URL, versions: URL, prefix: String, firstOnly: Bool) -> Set<String>? {
+        guard let text = smallText(file) else { return nil }
+        let installed = (try? FileManager.default.contentsOfDirectory(atPath: versions.path))?.filter { !$0.hasPrefix(".") } ?? []
+        var words = text.split(whereSeparator: \.isNewline).compactMap { line in
+            line.split(whereSeparator: \.isWhitespace).first.map(String.init)
+        }.filter { !$0.hasPrefix("#") }
+        if firstOnly { words = Array(words.prefix(1)) }
+        guard !words.isEmpty else { return nil }
+        var kept = Set<String>()
+        for word in words where word != "system" {
+            guard word != ".", word != "..", !word.contains("/") else { return nil }
+            let name = installed.contains(word) || !word.hasPrefix(prefix) ? word : String(word.dropFirst(prefix.count))
+            let matches = installed.contains(name) ? [name] : installed.filter { $0.hasPrefix(name + ".") }
+            guard !matches.isEmpty else { return nil }
+            for match in matches {
+                kept.insert(match)
+                let target = versions.appending(path: match).resolvingSymlinksInPath().path
+                let base = versions.resolvingSymlinksInPath().path + "/"
+                if target.hasPrefix(base), let first = target.dropFirst(base.count).split(separator: "/").first {
+                    kept.insert(String(first))
+                }
+            }
+        }
+        return kept
+    }
+
+    /// `url` is `<root>/versions/<name>`, not one the root's `version` file names nor one the profile's PATH runs, and
+    /// (pyenv) holds no virtualenv in `envs/`: those are the user's environments, not downloaded again.
+    static func allowsVersion(_ url: URL, policy: SafetyPolicy, prefix: String, firstOnly: Bool) -> Bool {
+        let folder = url.deletingLastPathComponent()
+        guard isVersionFolder(url, policy: policy), folder.lastPathComponent == "versions",
+              let kept = namedVersions(file: folder.deletingLastPathComponent().appending(path: "version"), versions: folder,
+                                       prefix: prefix, firstOnly: firstOnly)
+        else { return false }
+        let envs = (try? FileManager.default.contentsOfDirectory(atPath: url.appending(path: "envs").path)) ?? []
+        return !kept.contains(url.lastPathComponent) && !envs.contains { !$0.hasPrefix(".") }
+            && !pathVersions(home: policy.homeURL, versionsFolder: folder).contains(url.standardizedFileURL.path)
+    }
+
+    // MARK: rustup
+
+    /// Toolchain names rustup's `settings.toml` keeps: `default_toolchain` and every value of `[overrides]` (a folder's
+    /// pinned toolchain), each also with `-<default_host_triple>` (`stable` is installed as `stable-aarch64-apple-darwin`).
+    /// Without a host triple a short name also ends with `-*`, matching any host (see `rustKeeps`). nil when it can't
+    /// be told: no readable file or no default toolchain (`rustup default none`).
+    static func rustKept(settings: URL) -> Set<String>? {
+        guard let text = smallText(settings) else { return nil }
+        var section = "", names: [String] = [], defaultName: String?, host: String?
+        for raw in text.split(whereSeparator: \.isNewline) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") { section = line; continue }
+            guard let match = line.wholeMatch(of: /("[^"]*"|'[^']*'|[A-Za-z0-9_-]+)\s*=\s*("([^"]*)"|'([^']*)')\s*(#.*)?/) else { continue }
+            let value = String(match.3 ?? match.4 ?? "")
+            guard !value.isEmpty else { continue }
+            if section == "[overrides]" { names.append(value) }
+            if section.isEmpty, match.1 == "default_toolchain" { defaultName = value }
+            if section.isEmpty, match.1 == "default_host_triple" { host = value }
+        }
+        guard let defaultName else { return nil }
+        return Set((names + [defaultName]).flatMap { name in [name, name + "-" + (host ?? "*")] })
+    }
+
+    /// `kept` (from `rustKept`) holds the toolchain folder `name`.
+    static func rustKeeps(_ kept: Set<String>, _ name: String) -> Bool {
+        kept.contains(name) || kept.contains { $0.hasSuffix("-*") && name.hasPrefix($0.dropLast()) }
+    }
+
+    /// `url` is `<rustup>/toolchains/<name>`, not the default toolchain nor an override.
+    static func allowsRust(_ url: URL, policy: SafetyPolicy) -> Bool {
+        let folder = url.deletingLastPathComponent()
+        guard isVersionFolder(url, policy: policy), folder.lastPathComponent == "toolchains",
+              let kept = rustKept(settings: folder.deletingLastPathComponent().appending(path: "settings.toml")) else { return false }
+        return !rustKeeps(kept, url.lastPathComponent)
+            && !pathVersions(home: policy.homeURL, versionsFolder: folder).contains(url.standardizedFileURL.path)
+    }
+
+    // MARK: Go
+
+    /// `go1.21.0`, `go1.22rc1`, `gotip`: the folders `golang.org/dl` wrappers download to in `~/sdk`.
+    static func isGoVersion(_ name: some StringProtocol) -> Bool {
+        String(name).wholeMatch(of: /go(\d+(\.\d+)*((rc|beta)\d+)?|tip)/) != nil
+    }
+
+    /// Bin folders a `go` command may be linked from besides the profile's `PATH` (`~` = home).
+    static let goBinFolders = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/local/go/bin", "~/go/bin", "~/bin", "~/.local/bin"]
+
+    /// Go's own settings (`go env -w GOROOT=…`), relative to home.
+    static let goEnvFile = "Library/Application Support/go/env"
+
+    /// The Go SDKs in `<home>/sdk` in use: every one a line of the shell profile or Go's settings names
+    /// (`PATH=$HOME/sdk/go1.21.0/bin`, `GOROOT`, `alias go=go1.21.0`) and the one a `go` in a bin folder links into
+    /// (`binFolders`: the profile's `PATH` is added). nil when it can't be told: a profile line picks the SDK folder
+    /// with a variable (`$HOME/sdk/$GOVERSION`), or no `go` command is found and no line names an SDK. Comment lines
+    /// don't count.
+    static func goKept(home: URL, binFolders: [String] = goBinFolders) -> Set<String>? {
+        var kept = Set<String>()
+        for name in ShellEnvironment.zshFiles + ShellEnvironment.bashFiles + [goEnvFile] {
+            guard let text = try? String(contentsOf: home.appending(path: name), encoding: .utf8) else { continue }
+            for line in text.split(whereSeparator: \.isNewline) where !line.trimmingCharacters(in: .whitespaces).hasPrefix("#") {
+                if line.contains("sdk/$") || line.contains("sdk/go$") || line.contains("sdk/go`") { return nil }
+                kept.formUnion(line.split { !($0.isLetter || $0.isNumber || "._-".contains($0)) }.filter(isGoVersion).map(String.init))
+            }
+        }
+        let sdk = home.appending(path: "sdk").resolvingSymlinksInPath().path + "/"
+        let folders = ShellEnvironment.pathFolders(home: home)
+            + binFolders.map { $0.hasPrefix("~/") ? home.path + $0.dropFirst() : $0 }
+        var found = false
+        for folder in folders {
+            let command = URL(fileURLWithPath: folder).appending(path: "go")
+            guard FileManager.default.isExecutableFile(atPath: command.path) else { continue }
+            found = true
+            let target = command.resolvingSymlinksInPath().path
+            if target.hasPrefix(sdk), let first = target.dropFirst(sdk.count).split(separator: "/").first { kept.insert(String(first)) }
+        }
+        return found || !kept.isEmpty ? kept : nil
+    }
+
+    /// `url` is `<home>/sdk/go<version>`, not one in use (`goKept`).
+    static func allowsGo(_ url: URL, policy: SafetyPolicy) -> Bool {
+        guard isGoVersion(url.lastPathComponent), isVersionFolder(url, policy: policy),
+              url.deletingLastPathComponent().standardizedFileURL.path == policy.homeURL.appending(path: "sdk").standardizedFileURL.path,
+              let kept = goKept(home: policy.homeURL) else { return false }
+        return !kept.contains(url.lastPathComponent)
+    }
+
     // MARK: Items
 
     /// Locks an entry a program runs from or works in (`RunningProcesses.usedPaths`, read once per check). The kernel
@@ -110,10 +248,12 @@ nonisolated enum OldRuntimes {
         }
     }
 
-    static func label(_ prefix: String) -> CleanerItem.EntryLabel {
+    /// `<prefix> <folder name>`, minus `dropping` at its start (`go1.21.0` → `Go 1.21.0`), dated by the folder.
+    static func label(_ prefix: String, dropping: String = "") -> CleanerItem.EntryLabel {
         { url in
             let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            return (prefix + " " + url.lastPathComponent, date)
+            let name = url.lastPathComponent
+            return (prefix + " " + (name.hasPrefix(dropping) ? String(name.dropFirst(dropping.count)) : name), date)
         }
     }
 
@@ -142,13 +282,60 @@ nonisolated enum OldRuntimes {
         return item
     }
 
+    static func pythonItem(running: @escaping @Sendable () -> [String] = RunningProcesses.usedPaths) -> CleanerItem {
+        versionItem(id: pythonID, title: "Old Python versions (pyenv)",
+                    note: "Python versions other than pyenv's global ones, installed again with pyenv install",
+                    paths: ["~/.pyenv/versions"], shell: ["PYENV_ROOT": ["versions"]], label: label("Python"),
+                    allows: { policy, url in allowsVersion(url, policy: policy, prefix: "python-", firstOnly: false) },
+                    running: running)
+    }
+
+    static func rubyItem(running: @escaping @Sendable () -> [String] = RunningProcesses.usedPaths) -> CleanerItem {
+        versionItem(id: rubyID, title: "Old Ruby versions (rbenv)",
+                    note: "Ruby versions other than rbenv's global one, installed again with rbenv install",
+                    paths: ["~/.rbenv/versions"], shell: ["RBENV_ROOT": ["versions"]], label: label("Ruby"),
+                    allows: { policy, url in allowsVersion(url, policy: policy, prefix: "ruby-", firstOnly: true) },
+                    running: running)
+    }
+
+    static func rustItem(running: @escaping @Sendable () -> [String] = RunningProcesses.usedPaths) -> CleanerItem {
+        versionItem(id: rustID, title: "Old Rust toolchains (rustup)",
+                    note: "Toolchains other than rustup's default and overrides, installed again with rustup toolchain install",
+                    paths: ["~/.rustup/toolchains"], shell: ["RUSTUP_HOME": ["toolchains"]], label: label("Rust"),
+                    allows: { policy, url in allowsRust(url, policy: policy) }, running: running)
+    }
+
+    static func goItem(running: @escaping @Sendable () -> [String] = RunningProcesses.usedPaths) -> CleanerItem {
+        versionItem(id: goID, title: "Old Go SDKs (golang.org/dl)",
+                    note: "Go versions in ~/sdk other than the go you use, downloaded again with go<version> download",
+                    paths: ["~/sdk"], shell: [:], label: label("Go", dropping: "go"),
+                    allows: { policy, url in allowsGo(url, policy: policy) }, running: running)
+    }
+
+    private static func versionItem(id: String, title: LocalizedStringResource, note: LocalizedStringResource,
+                                    paths: [String], shell: [String: [String]], label: @escaping CleanerItem.EntryLabel,
+                                    allows: @escaping @Sendable (SafetyPolicy, URL) -> Bool,
+                                    running: @escaping @Sendable () -> [String]) -> CleanerItem {
+        var item = CleanerItem(id: id, title: title, note: note, paths: paths, selectedByDefault: false,
+                               shellFolders: shell, showsWhenEmpty: false, skipsOpenFiles: true,
+                               entryLabel: label, selectableEntries: true, allowsEntry: allows)
+        item.locksEntry = locks(reason: String(localized: "A program runs from this version, so it is kept"), running: running)
+        return item
+    }
+
     /// The first line of a small regular file, trimmed; nil when missing, empty or unreadable.
     private static func firstLine(of file: URL) -> String? {
-        var info = stat()
-        guard stat(file.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_size <= 4096,
-              let text = try? String(contentsOf: file, encoding: .utf8),
-              let line = text.split(whereSeparator: \.isNewline).first?.trimmingCharacters(in: .whitespaces),
+        guard let line = smallText(file)?.split(whereSeparator: \.isNewline).first?.trimmingCharacters(in: .whitespaces),
               !line.isEmpty else { return nil }
         return line
+    }
+
+    /// The text of a regular file of at most 64 KB; nil when missing, bigger, empty or unreadable.
+    private static func smallText(_ file: URL) -> String? {
+        var info = stat()
+        guard stat(file.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_size <= 65_536,
+              let text = try? String(contentsOf: file, encoding: .utf8),
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
     }
 }

@@ -2,9 +2,10 @@ import Foundation
 import Testing
 @testable import CleanMate
 
-/// Old Node versions (nvm) and Flutter SDKs (fvm) in Smart Scan: every version but the default one is listed on its
-/// own, unticked, and deleted whole; a version a program runs from is listed locked; aliases, the default link and
-/// project files stay. Everything happens in a throwaway fake home.
+/// Old Node versions (nvm), Flutter SDKs (fvm), Python (pyenv), Ruby (rbenv), Rust toolchains (rustup) and Go SDKs
+/// (`~/sdk`) in Smart Scan: every version but the default one is listed on its own, unticked, and deleted whole; a
+/// version a program runs from is listed locked; aliases, the default link, version files, settings, shims and project
+/// files stay. Everything happens in a throwaway fake home.
 struct OldRuntimesTests {
     private struct Home {
         let root = TestTemp.url("CleanMateOldRuntimes")
@@ -55,8 +56,10 @@ struct OldRuntimesTests {
     @Test func catalogItems() throws {
         let ids = CleanerGroup.developer.items.map(\.id)
         let rustup = try #require(ids.firstIndex(of: "rustup-downloads"))
-        #expect(Array(ids[(rustup + 1)...(rustup + 2)]) == [OldRuntimes.nodeID, OldRuntimes.flutterID])
-        for id in [OldRuntimes.nodeID, OldRuntimes.flutterID] {
+        let all = [OldRuntimes.nodeID, OldRuntimes.flutterID, OldRuntimes.pythonID, OldRuntimes.rubyID,
+                   OldRuntimes.rustID, OldRuntimes.goID]
+        #expect(Array(ids[(rustup + 1)...(rustup + all.count)]) == all)
+        for id in all {
             let item = try #require(CleanerGroup.developer.items.first { $0.id == id })
             #expect(!item.selectedByDefault && item.selectableEntries && item.mode == .delete && !item.showsWhenEmpty)
             #expect(item.skipsOpenFiles && item.allowsEntry != nil && item.locksEntry != nil && item.entryLabel != nil)
@@ -204,6 +207,186 @@ struct OldRuntimesTests {
         let flutter = OldRuntimes.flutterItem(running: { [fvmBusy.path + "/bin/cache/dart-sdk/bin/dart"] })
         let flutterScan = await Scanner.scan(flutter, policy: box.policy)
         #expect(flutterScan.entries.count == 1 && flutterScan.entries.first?.lockReason != nil)
+    }
+
+    /// Three Python versions, the global file naming one exactly and one by its minor version (as pyenv resolves it):
+    /// only the third is listed as `Python <version>`, and cleaning it leaves shims, `version` and the others.
+    @Test func listsPythonVersionsButTheGlobalOnes() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let old = try box.file(".pyenv/versions/3.10.13/bin/python3").deletingLastPathComponent().deletingLastPathComponent()
+        try box.file(".pyenv/versions/3.11.4/bin/python3")
+        try box.file(".pyenv/versions/3.12.1/bin/python3")
+        let kept = try [box.file(".pyenv/version", "3.11.4\n# a comment\n3.12\n"), box.file(".pyenv/shims/python3", "#!/bin/sh"),
+                        box.file("Developer/app/.python-version", "3.10.13\n")]
+        let item = OldRuntimes.pythonItem(running: { [] })
+        let scan = await Scanner.scan(item, policy: box.policy)
+        #expect(scan.entries.map(\.url.lastPathComponent) == ["3.10.13"])
+        #expect(scan.entries.first.flatMap { item.entryLabel?($0.url)?.title } == "Python 3.10.13")
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.skipped == 0 && !box.exists(old) && kept.allSatisfy(box.exists))
+        #expect(box.exists(box.home.appending(path: ".pyenv/versions/3.11.4")) && box.exists(box.home.appending(path: ".pyenv/versions/3.12.1")))
+    }
+
+    /// pyenv: `system` keeps none, `python-` is dropped, a virtualenv's link keeps its version and a version holding
+    /// virtualenvs is never listed; no version file, an empty one or a version nothing installed matches: nothing listed.
+    @Test func resolvesPyenvGlobalLikePyenv() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        try box.file(".pyenv/versions/3.10.13/bin/python3")
+        try box.file(".pyenv/versions/3.11.4/bin/python3")
+        try box.file(".pyenv/versions/3.12.1/envs/work/bin/python")
+        try box.link(".pyenv/versions/work", to: box.home.appending(path: ".pyenv/versions/3.12.1/envs/work").path)
+        let item = OldRuntimes.pythonItem(running: { [] })
+        #expect(await listed(item, box).isEmpty) // no version file
+        for (text, expected) in [("system\n", ["3.10.13", "3.11.4"]), ("python-3.11.4\n", ["3.10.13"]), ("work\n", ["3.10.13", "3.11.4"]),
+                                 ("3.9\n", []), ("3.11.4\n2.7\n", []), ("# only a comment\n", []), ("../3.11.4\n", [])] {
+            try box.file(".pyenv/version", text)
+            #expect(await listed(item, box) == expected, "\(text)")
+        }
+        try box.file(".zprofile", "export PATH=\"$HOME/.pyenv/versions/3.10.13/bin:$PATH\"\n")
+        try box.file(".pyenv/version", "system\n")
+        #expect(await listed(item, box) == ["3.11.4"])
+    }
+
+    @Test func readsPyenvRootAndRbenvRootFromTheProfile() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        try box.file("dev/pyenv/versions/3.10.13/bin/python3")
+        try box.file("dev/pyenv/versions/3.11.4/bin/python3")
+        try box.file("dev/pyenv/version", "3.11.4\n")
+        try box.file("dev/rbenv/versions/3.1.4/bin/ruby")
+        try box.file("dev/rbenv/versions/3.2.2/bin/ruby")
+        try box.file("dev/rbenv/version", "3.2.2\n")
+        try box.file(".zshrc", "export PYENV_ROOT=\"$HOME/dev/pyenv\"\nexport RBENV_ROOT=~/dev/rbenv\n")
+        #expect(await listed(OldRuntimes.pythonItem(running: { [] }), box) == ["3.10.13"])
+        #expect(await listed(OldRuntimes.rubyItem(running: { [] }), box) == ["3.1.4"])
+    }
+
+    /// rbenv reads only the first word of its version file and drops `ruby-`; no file or nothing installed: none listed.
+    @Test func listsRubyVersionsButTheGlobalOne() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let old = try box.file(".rbenv/versions/3.1.4/bin/ruby").deletingLastPathComponent().deletingLastPathComponent()
+        try box.file(".rbenv/versions/3.2.2/bin/ruby")
+        try box.file(".rbenv/versions/3.3.0/bin/ruby")
+        let item = OldRuntimes.rubyItem(running: { [] })
+        #expect(await listed(item, box).isEmpty)
+        let kept = try [box.file(".rbenv/version", "ruby-3.2.2\n3.3.0\n"), box.file(".rbenv/shims/ruby", "#!/bin/sh")]
+        let scan = await Scanner.scan(item, policy: box.policy)
+        #expect(scan.entries.map(\.url.lastPathComponent).sorted() == ["3.1.4", "3.3.0"])
+        #expect(Set(scan.entries.compactMap { item.entryLabel?($0.url)?.title }) == ["Ruby 3.1.4", "Ruby 3.3.0"])
+        var onlyOld = scan
+        onlyOld.entries = scan.entries.filter { $0.url.lastPathComponent == old.lastPathComponent }
+        let report = await Cleaner.clean(item, scan: onlyOld, policy: box.policy)
+        #expect(report.skipped == 0 && !box.exists(old) && kept.allSatisfy(box.exists))
+        try box.file(".rbenv/version", "2.7.8\n")
+        #expect(await listed(item, box).isEmpty)
+    }
+
+    /// rustup keeps its default toolchain and every override (`stable` names `stable-<host>`); cleaning a toolchain
+    /// leaves settings.toml, update hashes and downloads. No settings or no default toolchain: none listed.
+    @Test func listsRustToolchainsButTheDefaultAndOverrides() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let host = "aarch64-apple-darwin"
+        let old = try box.file(".rustup/toolchains/1.75.0-\(host)/bin/rustc").deletingLastPathComponent().deletingLastPathComponent()
+        try box.file(".rustup/toolchains/stable-\(host)/bin/rustc")
+        try box.file(".rustup/toolchains/nightly-2024-01-01-\(host)/bin/rustc")
+        let item = OldRuntimes.rustItem(running: { [] })
+        #expect(await listed(item, box).isEmpty)
+        let settings = """
+            version = "12"
+            default_host_triple = "\(host)"
+            default_toolchain = "stable"
+            profile = "default"
+
+            [overrides]
+            "/Users/me/Developer/app" = "nightly-2024-01-01-\(host)"
+            """
+        let kept = try [box.file(".rustup/settings.toml", settings), box.file(".rustup/update-hashes/stable-\(host)", "abc"),
+                        box.file(".rustup/downloads/abc.partial"), box.file("Developer/app/rust-toolchain.toml", "[toolchain]\n")]
+        let scan = await Scanner.scan(item, policy: box.policy)
+        #expect(scan.entries.map(\.url.lastPathComponent) == ["1.75.0-\(host)"])
+        #expect(scan.entries.first.flatMap { item.entryLabel?($0.url)?.title } == "Rust 1.75.0-\(host)")
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.skipped == 0 && !box.exists(old) && kept.allSatisfy(box.exists))
+        #expect(box.exists(box.home.appending(path: ".rustup/toolchains/stable-\(host)")))
+
+        try box.file(".rustup/toolchains/1.75.0-\(host)/bin/rustc")
+        try box.file(".rustup/settings.toml", "default_toolchain = '1.75.0-\(host)' # pinned\n")
+        #expect(await listed(item, box) == ["nightly-2024-01-01-\(host)", "stable-\(host)"])
+        // No host triple (older rustup): a short name keeps that channel for any host.
+        try box.file(".rustup/settings.toml", "default_toolchain = \"stable\"\n")
+        #expect(await listed(item, box) == ["1.75.0-\(host)", "nightly-2024-01-01-\(host)"])
+        try box.file(".rustup/settings.toml", "version = \"12\"\n[overrides]\n\"/p\" = \"stable-\(host)\"\n") // `rustup default none`
+        #expect(await listed(item, box).isEmpty)
+    }
+
+    /// Go SDKs in `~/sdk` (`go1.21.0`, `gotip`; never another SDK there) are listed as `Go <version>`, except one a profile
+    /// line or Go's settings name or a `go` in a bin folder links into; a profile line picking the SDK with a variable
+    /// lists none.
+    @Test func listsGoSDKsButTheOneInUse() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let old = try box.file("sdk/go1.21.0/bin/go").deletingLastPathComponent().deletingLastPathComponent()
+        let used = try box.file("sdk/go1.22.1/bin/go").deletingLastPathComponent().deletingLastPathComponent()
+        try box.file("sdk/gotip/bin/go")
+        try box.file("sdk/flutter/bin/flutter")
+        try box.file("sdk/go1.20.0.tar.gz")
+        // No `go` command anywhere and nothing naming an SDK: the one in use can't be told.
+        #expect(OldRuntimes.goKept(home: box.home, binFolders: []) == nil)
+        // A `go` of its own (Homebrew, the official installer): every SDK in ~/sdk is unused.
+        let command = try box.file("go/bin/go", "#!/bin/sh")
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: command.path)
+        #expect(OldRuntimes.goKept(home: box.home, binFolders: ["~/go/bin"]) == [])
+        let item = OldRuntimes.goItem(running: { [] })
+        let all = await Scanner.scan(item, policy: box.policy)
+        #expect(all.entries.map(\.url.lastPathComponent).sorted() == ["go1.21.0", "go1.22.1", "gotip"])
+        #expect(Set(all.entries.compactMap { item.entryLabel?($0.url)?.title }) == ["Go 1.21.0", "Go 1.22.1", "Go tip"])
+
+        try box.file(".zprofile", "# export PATH=$HOME/sdk/gotip/bin:$PATH\nexport PATH=\"$HOME/sdk/go1.22.1/bin:$PATH\"\n")
+        let scan = await Scanner.scan(item, policy: box.policy)
+        #expect(scan.entries.map(\.url.lastPathComponent).sorted() == ["go1.21.0", "gotip"])
+        try box.file(".zshrc", "alias go=gotip\n")
+        #expect(await listed(item, box) == ["go1.21.0"])
+        try FileManager.default.removeItem(at: command)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: old.appending(path: "bin/go").path)
+        try box.link("go/bin/go", to: old.appending(path: "bin/go").path)
+        #expect(await listed(item, box).isEmpty)
+        try FileManager.default.removeItem(at: command)
+        try box.file(".zshrc", "")
+        try box.file("Library/Application Support/go/env", "GOROOT=\(box.home.path)/sdk/gotip\n")
+        #expect(await listed(item, box) == ["go1.21.0"])
+
+        var onlyOld = scan
+        onlyOld.entries = scan.entries.filter { $0.url.lastPathComponent == old.lastPathComponent }
+        let report = await Cleaner.clean(item, scan: onlyOld, policy: box.policy)
+        #expect(report.skipped == 0 && !box.exists(old) && box.exists(used))
+        #expect(box.exists(box.home.appending(path: "sdk/flutter/bin/flutter")))
+
+        try box.file(".zprofile", "export GOROOT=$HOME/sdk/$GOVERSION\n")
+        #expect(await listed(item, box).isEmpty)
+    }
+
+    /// A Python version or Rust toolchain a program runs from is listed locked and kept when cleaned.
+    @Test func pyenvAndRustupVersionsInUseAreLocked() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let busy = try box.file(".pyenv/versions/3.10.13/bin/python3")
+        let idle = try box.file(".pyenv/versions/3.11.4/bin/python3").deletingLastPathComponent().deletingLastPathComponent()
+        try box.file(".pyenv/version", "system\n")
+        let item = OldRuntimes.pythonItem(running: { [busy.path] })
+        let scan = await Scanner.scan(item, policy: box.policy)
+        #expect(scan.entries.filter { $0.lockReason != nil }.map(\.url.lastPathComponent) == ["3.10.13"])
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.skipped == 1 && box.exists(busy) && !box.exists(idle))
+
+        let rustc = try box.file(".rustup/toolchains/1.75.0-aarch64-apple-darwin/bin/rustc")
+        try box.file(".rustup/settings.toml", "default_toolchain = \"stable-aarch64-apple-darwin\"\n")
+        let rust = OldRuntimes.rustItem(running: { [rustc.path] })
+        let rustScan = await Scanner.scan(rust, policy: box.policy)
+        #expect(rustScan.entries.count == 1 && rustScan.entries.first?.lockReason != nil)
     }
 
     /// The kernel reports a running program by its resolved path: a version reached through a symlinked nvm folder is

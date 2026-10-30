@@ -120,15 +120,19 @@ extension CleanerGroup {
             locate: lookup("go", ["env", "GOMODCACHE"])),
         dev("cargo-registry", "Cargo registry cache", note: "Downloaded crates, downloaded again on the next build",
             ["~/.cargo/registry", "~/.cargo/git"], shell: ["CARGO_HOME": ["registry", "git"]], processes: ["cargo"]),
-        // Partial and finished downloads of rustup; ~/.rustup/toolchains is never touched. Only `rustup` itself
+        // Partial and finished downloads of rustup; toolchains are a separate item (`OldRuntimes`). Only `rustup` itself
         // writes them (a `cargo`/`rustc` proxy installing a pinned toolchain runs as `rustup`), so a plain build does
         // not hide the item; a download still open is kept.
         dev("rustup-downloads", "rustup downloads", note: "Toolchain downloads, downloaded again by rustup when needed",
             ["~/.rustup/downloads", "~/.rustup/tmp"], shell: ["RUSTUP_HOME": ["downloads", "tmp"]], processes: ["rustup"], openFiles: true),
-        // Unticked, deleted: Node versions other than nvm's default and Flutter SDKs other than fvm's global one, one
-        // entry per version; a version a program runs from is listed locked (`OldRuntimes`).
+        // Unticked, deleted: runtime versions other than the version manager's default (nvm, fvm, pyenv, rbenv,
+        // rustup, golang.org/dl), one entry per version; a version a program runs from is listed locked (`OldRuntimes`).
         OldRuntimes.nodeItem(),
         OldRuntimes.flutterItem(),
+        OldRuntimes.pythonItem(),
+        OldRuntimes.rubyItem(),
+        OldRuntimes.rustItem(),
+        OldRuntimes.goItem(),
         // Unticked: models can be many GB to download again. One entry per `models--org--name` folder (blobs plus
         // snapshot symlinks into them): always removed whole, never inside. ~/.cache/huggingface/token and
         // stored_tokens sit next to these folders and are never listed. Only hub repo folders (`included`, checked at

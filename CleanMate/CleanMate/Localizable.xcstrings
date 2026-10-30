@@ -773,6 +773,16 @@
         }
       }
     },
+    "Go versions in ~/sdk other than the go you use, downloaded again with go<version> download" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản Go trong ~/sdk khác bản go bạn đang dùng, tải lại bằng go<phiên bản> download"
+          }
+        }
+      }
+    },
     "Google Updater: downloaded updates" : {
       "localizations" : {
         "vi" : {
@@ -1199,12 +1209,52 @@
         }
       }
     },
+    "Old Go SDKs (golang.org/dl)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go SDK cũ (golang.org/dl)"
+          }
+        }
+      }
+    },
     "Old Node.js versions (nvm)" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Phiên bản Node.js cũ (nvm)"
+          }
+        }
+      }
+    },
+    "Old Python versions (pyenv)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản Python cũ (pyenv)"
+          }
+        }
+      }
+    },
+    "Old Ruby versions (rbenv)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản Ruby cũ (rbenv)"
+          }
+        }
+      }
+    },
+    "Old Rust toolchains (rustup)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toolchain Rust cũ (rustup)"
           }
         }
       }
@@ -1289,6 +1339,16 @@
         }
       }
     },
+    "Python versions other than pyenv's global ones, installed again with pyenv install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản Python khác bản global của pyenv, cài lại bằng pyenv install"
+          }
+        }
+      }
+    },
     "Read from macOS. CleanMate does not change these settings." : {
       "localizations" : {
         "vi" : {
@@ -1315,6 +1375,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Khởi động lại CleanMate để dùng ngôn ngữ mới. Ngôn ngữ của máy Mac không đổi."
+          }
+        }
+      }
+    },
+    "Ruby versions other than rbenv's global one, installed again with rbenv install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản Ruby khác bản global của rbenv, cài lại bằng rbenv install"
           }
         }
       }
@@ -1469,6 +1539,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhận diện mã độc macOS dùng để kiểm tra ứng dụng, tự động cập nhật."
+          }
+        }
+      }
+    },
+    "Toolchains other than rustup's default and overrides, installed again with rustup toolchain install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các toolchain khác bản mặc định và override của rustup, cài lại bằng rustup toolchain install"
           }
         }
       }
