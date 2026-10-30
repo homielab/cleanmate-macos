@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **AI tools**: **LM Studio models** lists each downloaded LM Studio model with its size and date; tick the ones to delete (none are ticked by default, and the row is locked while LM Studio runs).
 - **Settings › General › Language**: choose Same as your Mac, English or Tiếng Việt for CleanMate only, with a Restart button.
 - Homebrew cask definition (`packaging/Casks/cleanmate.rb`); the release script keeps its version and checksum current.
 - **Uninstaller**: an app's `~/.local/state/<name>` is listed with its other config, and **Leftovers of Removed Apps** also shows

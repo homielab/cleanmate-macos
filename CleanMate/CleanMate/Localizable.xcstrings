@@ -221,6 +221,16 @@
         }
       }
     },
+    "Downloaded again from LM Studio's Discover tab; an imported model must be imported again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sẽ được tải lại từ thẻ Discover của LM Studio; mô hình đã nhập phải nhập lại"
+          }
+        }
+      }
+    },
     "Downloaded again with ollama pull; a model made with ollama create must be made again" : {
       "localizations" : {
         "vi" : {
@@ -617,6 +627,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tắt"
+          }
+        }
+      }
+    },
+    "LM Studio: downloaded models" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LM Studio: mô hình đã tải"
           }
         }
       }

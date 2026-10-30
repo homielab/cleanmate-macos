@@ -51,7 +51,7 @@ nonisolated enum Scanner {
         return values.contentModificationDate ?? .distantFuture
     }
 
-    /// Every folder `item` lists: its globbed `paths`, `shellFolders` and `locate`, nested ones
+    /// Every folder `item` lists: its globbed `paths`, `shellFolders`, `configFolders` and `locate`, nested ones
     /// dropped. Shared by the scan and the cleaner's open-file and `excluded` checks, so they cover the same folders.
     static func roots(for item: CleanerItem, policy: SafetyPolicy) async -> [URL] {
         // Deduplicated: a `*` can match a folder also listed on its own (`Chrome/*` and `Chrome/Network`).
@@ -74,10 +74,15 @@ nonisolated enum Scanner {
                 return true
             }
         }
+        func below(_ base: URL, _ subpaths: [String]) -> [URL] {
+            subpaths.flatMap { policy.roots($0.isEmpty ? base.path : base.path + "/" + $0) }.filter { !policy.rootThroughSymlink($0) }
+        }
         var extra = item.shellFolders.sorted { $0.key < $1.key }.flatMap { name, subpaths -> [URL] in
-            guard let base = ShellEnvironment.folder(name, policy: policy) else { return [] }
-            return subpaths.flatMap { policy.roots($0.isEmpty ? base.path : base.path + "/" + $0) }
-                .filter { !policy.rootThroughSymlink($0) }
+            ShellEnvironment.folder(name, policy: policy).map { below($0, subpaths) } ?? []
+        }
+        if let config = item.configFolders {
+            extra += config.read(policy.homeURL).compactMap { ShellEnvironment.checkedFolder($0, policy: policy) }
+                .flatMap { below($0, config.subpaths) }
         }
         if let located = await item.locate?.root(policy: policy) { extra.append(located) }
         for located in extra.map(\.standardizedFileURL.path) {

@@ -136,7 +136,12 @@ nonisolated enum ShellEnvironment {
     /// The folder `name` points to, only when it is absolute, strictly inside home, an existing folder, allowed by
     /// `policy` itself and not reached through a symlink (same rules as `PathLookup`).
     static func folder(_ name: String, policy: SafetyPolicy) -> URL? {
-        guard let value = cached(home: policy.homeURL)[name], value.hasPrefix("/"), !value.contains(where: { "*?[".contains($0) }) else { return nil }
+        cached(home: policy.homeURL)[name].flatMap { checkedFolder($0, policy: policy) }
+    }
+
+    /// `value` as a folder under the rules of `folder` (also for a folder named in a tool's settings file).
+    static func checkedFolder(_ value: String, policy: SafetyPolicy) -> URL? {
+        guard value.hasPrefix("/"), !value.contains(where: { "*?[".contains($0) }) else { return nil }
         let url = URL(fileURLWithPath: value).standardizedFileURL
         var isFolder: ObjCBool = false
         guard url.path.hasPrefix(policy.homeURL.standardizedFileURL.path + "/"),

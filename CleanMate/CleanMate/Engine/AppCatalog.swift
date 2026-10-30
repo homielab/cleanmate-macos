@@ -131,9 +131,19 @@ extension CleanerGroup {
                     paths: [OllamaModels.partialFolder], included: OllamaModels.partialNames, selectedByDefault: false,
                     shellFolders: OllamaModels.partialShellFolders, showsWhenEmpty: false,
                     runningAppBundleIDs: ["com.electron.ollama"], runningProcessNames: ["ollama"]),
-        // LM Studio: app caches only; models live in ~/.lmstudio (older versions: ~/.cache/lm-studio).
-        app("lm-studio", "LM Studio", bundle: ["ai.elementlabs.lmstudio"],
+        // LM Studio: app caches only; its models are the item below.
+        app("lm-studio", "LM Studio", bundle: LMStudioModels.bundleIDs,
             chromium("~/Library/Application Support/LM Studio")),
+        // LM Studio models: GBs each, unticked, one entry per `<publisher>/<model>` folder (`LMStudioModels`), deleted
+        // whole like Ollama's (downloaded again in LM Studio). Skipped while the app, `lms` or `llmster` runs: a model
+        // may be loaded or downloading.
+        CleanerItem(id: "lmstudio-models", title: "LM Studio: downloaded models",
+                    note: "Downloaded again from LM Studio's Discover tab; an imported model must be imported again",
+                    paths: LMStudioModels.paths, selectedByDefault: false,
+                    configFolders: ConfigFolders(read: LMStudioModels.configuredFolders(home:), subpaths: ["*"]),
+                    showsWhenEmpty: false, runningAppBundleIDs: LMStudioModels.bundleIDs,
+                    runningProcessNames: LMStudioModels.processNames, skipsOpenFiles: true,
+                    skipsEntry: { LMStudioModels.skips }, entryLabel: LMStudioModels.label(of:), selectableEntries: true),
     ])
     }
 

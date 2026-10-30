@@ -110,6 +110,13 @@ nonisolated struct PathLookup: Sendable {
     }
 }
 
+/// Folders named in a tool's settings file, read at each scan (see `CleanerItem.configFolders`).
+nonisolated struct ConfigFolders: Sendable {
+    var read: @Sendable (URL) -> [String]
+    /// Below each folder read: `""` = the folder itself, `*` components allowed.
+    var subpaths: [String] = [""]
+}
+
 /// Erases records inside a SQLite database with `/usr/bin/sqlite3` instead of removing the file.
 nonisolated struct DatabaseErase: Sendable {
     /// Returns one number: the records `erase` would remove. Also checks the schema (a failing count lists the
@@ -179,6 +186,10 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Folders under a variable set in the shell profile (`ShellEnvironment`), scanned besides `paths` like `locate`:
     /// `["CARGO_HOME": ["registry", "git"]]`; `""` = the folder itself, `*` components allowed.
     var shellFolders: [String: [String]] = [:]
+    /// Folders the tool's own settings file names (LM Studio's models folder moved in its app), scanned besides `paths`
+    /// like `shellFolders`: `read` gets the home folder and returns the folders as written, each checked like a
+    /// `shellFolders` folder (`ShellEnvironment.checkedFolder`), then `subpaths` below it are scanned.
+    var configFolders: ConfigFolders? = nil
     /// The measured size is only a maximum: the command may remove less (`pnpm store prune` keeps packages
     /// projects still use). Shown as "Up to …" and kept out of the selected total.
     var sizeIsUpperBound = false
