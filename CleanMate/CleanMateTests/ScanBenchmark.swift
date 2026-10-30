@@ -98,6 +98,19 @@ struct ScanBenchmark {
         await scanItems("smart", CleanerGroup.smartScan)
     }
 
+    /// Stale node_modules as if every project were stale (a clock 10 years ahead, no node running): finding and
+    /// measuring all of them alone, then a whole Smart Scan with that item instead of the real one — the cost on a
+    /// machine full of old projects. Only scans, like the rest of this suite.
+    @Test func staleNodeModulesWorstCase() async {
+        let all = StaleNodeModules.item(running: { [] }, now: { .now.addingTimeInterval(3650 * 86_400) })
+        let (scan, seconds) = await timed { await Scanner.scan(all, policy: policy) }
+        report("stale-node-modules all (\(scan.entries.count))", seconds, scan.size)
+        await scanItems("smart-all-stale", CleanerGroup.smartScan.map { group in
+            CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage,
+                         items: group.items.map { $0.id == all.id ? all : $0 })
+        })
+    }
+
     /// Entry label review: every real DerivedData / DeviceSupport folder and every `~/.claude/projects` folder,
     /// whatever its age, labelled like the scan does and checked against the source: DerivedData title = project name
     /// (+ `info.plist` WorkspacePath when there is one), DeviceSupport title has a version, a Claude Code path exists

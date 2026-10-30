@@ -45,18 +45,46 @@ nonisolated enum RunningProcesses {
         interpreters.contains(name) || interpreters.contains { name.hasPrefix($0) && name.dropFirst($0.count).allSatisfy { $0.isNumber || $0 == "." } }
     }
 
-    /// Parses a `KERN_PROCARGS2` buffer: Int32 argc, executable path, NUL padding, then argv strings.
-    static func argumentNames(_ buffer: [UInt8]) -> Set<String> {
+    /// The executable path and every argument of a `KERN_PROCARGS2` buffer: Int32 argc, executable path, NUL padding,
+    /// then argv strings (a JVM's main class sits after many options); empty runs are padding.
+    static func argumentStrings(_ buffer: [UInt8]) -> [String] {
         guard buffer.count > 4 else { return [] }
         let argc = buffer.prefix(4).withUnsafeBytes { Int($0.loadUnaligned(as: Int32.self)) }
         var strings: [String] = []
         var start = 4
-        // executable path + all arguments (a JVM's main class sits after many options); empty runs are padding.
         while start < buffer.count, strings.count < 1 + max(argc, 0) {
             let end = buffer[start...].firstIndex(of: 0) ?? buffer.count
             if end > start { strings.append(String(decoding: buffer[start..<end], as: UTF8.self)) }
             start = end + 1
         }
+        return strings
+    }
+
+    /// Working folder and absolute-path arguments (a script, `--prefix <folder>`) of each readable process whose
+    /// `argumentNames` include one `named` accepts, without the `/private` prefix.
+    static func folders(ofProcessesNamed named: (String) -> Bool) -> [String] {
+        var folders: [String] = []
+        for pid in allPIDs() where pid > 0 {
+            let buffer = arguments(of: pid)
+            guard argumentNames(buffer).contains(where: named) else { continue }
+            if let folder = workingFolder(of: pid) { folders.append(folder) }
+            folders += argumentStrings(buffer).dropFirst().filter { $0.hasPrefix("/") }
+        }
+        return folders.map(withoutPrivate)
+    }
+
+    /// The current folder of `pid` (`PROC_PIDVNODEPATHINFO`); nil when the process cannot be read.
+    static func workingFolder(of pid: pid_t) -> String? {
+        var info = proc_vnodepathinfo()
+        let size = Int32(MemoryLayout<proc_vnodepathinfo>.size)
+        guard proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &info, size) == size else { return nil }
+        let path = withUnsafeBytes(of: info.pvi_cdir.vip_path) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        return path.isEmpty ? nil : path
+    }
+
+    /// Names a process goes by, from a `KERN_PROCARGS2` buffer (see `names`).
+    static func argumentNames(_ buffer: [UInt8]) -> Set<String> {
+        let strings = argumentStrings(buffer)
         let base = strings.map { $0.split(separator: "/").last.map(String.init) ?? $0 }
         var names = Set(base.prefix(2))
         if base.count > 2, isInterpreter(base[1]) { names.insert(base[2]) }

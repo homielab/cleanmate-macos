@@ -1655,7 +1655,8 @@ struct CatalogTests {
         for item in [CleanerGroup.developer, .aiTools(), .applications].flatMap(\.items) {
             #expect(!item.showsWhenEmpty, "\(item.id)")
             #expect(!item.paths.isEmpty || item.probe != nil, "\(item.id)")
-            for path in item.paths {
+            // An item finding its entries itself has its own rule (`allowsEntry`), tested with the item.
+            for path in item.paths where item.allowsEntry == nil {
                 // Contents must pass the safety policy, otherwise the item could never clean anything.
                 let path = path.replacingOccurrences(of: "*", with: "x")
                 #expect(policy.allows(policy.expand(path).appending(path: "entry")), "\(path)")

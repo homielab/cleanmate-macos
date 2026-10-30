@@ -183,6 +183,35 @@ nonisolated struct SafetyPolicy: Sendable {
         return values?.isRegularFile == true
     }
 
+    /// Smart Scan rule for a stale project's dependencies (`StaleNodeModules`), only ever moved to the Trash: a real
+    /// folder named `node_modules` next to a regular `package.json`, strictly inside the home folder, not under ~/Library,
+    /// a hidden folder, another `node_modules` or a package (an app's bundled modules), on the home's volume with no
+    /// other volume mounted inside, not excluded. Unlike `allows`, also inside Documents and Desktop, where people keep
+    /// projects; never inside the other never-touch trees (Pictures, iCloud Drive, .ssh…).
+    func allowsNodeModules(_ url: URL) -> Bool {
+        let path = Self.normalize(url)
+        guard (path as NSString).lastPathComponent == StaleNodeModules.folderName, let home = allowedRoots.first,
+              path.hasPrefix(home + "/"), !isExcluded(path) else { return false }
+        let parts = path.dropFirst(home.count + 1).split(separator: "/")
+        guard parts.first?.lowercased() != "library", !parts.contains(where: { $0.hasPrefix(".") }),
+              !parts.dropLast().contains(where: { $0 == StaleNodeModules.folderName }) else { return false }
+        let key = path.lowercased()
+        let projectTrees = ["Documents", "Desktop"].map { (home + "/" + $0).lowercased() }
+        guard !protectedTrees.contains(where: { !projectTrees.contains($0) && key.hasPrefix($0 + "/") }) else { return false }
+        if let homeDevice = rootDevices[0], device(path) != homeDevice { return false }
+        if holdsMount(path) { return false }
+        var info = stat()
+        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              lstat((path as NSString).deletingLastPathComponent + "/" + StaleNodeModules.manifest, &info) == 0,
+              info.st_mode & S_IFMT == S_IFREG else { return false }
+        var folder = URL(fileURLWithPath: home)
+        for part in parts.dropLast() {
+            folder.append(path: String(part))
+            if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return false }
+        }
+        return true
+    }
+
     /// Normalized path of `url` if it is strictly inside the home folder and on the home's volume, not under ~/Library, not hidden nor
     /// under a hidden folder, and not inside a package or app bundle; nil otherwise.
     private func userLocation(_ url: URL) -> String? {

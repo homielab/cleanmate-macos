@@ -206,7 +206,7 @@ nonisolated enum Cleaner {
             }
             // A fresh check per entry: an app launched since the scan (or during this loop) keeps its entry.
             // `included` and `excluded` again too: only names the item may remove, whatever the scan handed in.
-            guard policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
+            guard item.allowsEntry?(policy, entry.url) ?? policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
                   !RunningProcesses.holdsOpenFile(entry.url, openPaths: open?.paths ?? []),
                   item.included?.contains(where: { fnmatch($0, entry.url.lastPathComponent, 0) == 0 }) != false,
                   !isExcluded(entry.url, excluded: item.excluded, roots: rootPaths),

@@ -223,7 +223,7 @@ struct SmartScanView: View {
         } message: {
             switch module {
             case .smartScan:
-                Text("Selected items are deleted permanently, except old Xcode archives and old AI sessions, which go to the Trash. Apps and tools recreate caches as needed.")
+                Text("Selected items are deleted permanently, except those marked “Moved to the Trash”. Apps and tools recreate caches as needed.")
             case .privacy:
                 Text("Selected data is deleted permanently, not moved to the Trash, and cannot be recovered. Erasing cookies signs you out of websites.")
             case .largeFiles, .uninstaller, .spaceLens, .loginItems:

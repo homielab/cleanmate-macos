@@ -87,6 +87,9 @@ extension CleanerGroup {
         // bun (clonefile) and uv (link-mode clone) install by cloning from their cache on APFS: blocks a project still
         // uses are counted in the cache's size but not freed by removing it. No cheap API gives a clone's private size.
         dev("bun-cache", "Bun cache", note: clonedNote, ["~/.bun/install/cache"], processes: ["bun"], upperBound: true),
+        // Projects' own dependencies, when nobody worked on the project for 90 days: unticked, one entry per project, to
+        // the Trash (installing again needs the network). Never while node, Bun, pnpm… run in the project.
+        StaleNodeModules.item(),
         dev("pip-cache", "pip cache", ["~/Library/Caches/pip"], processes: ["pip", "pip3"]),
         dev("uv-cache", "uv cache", note: clonedNote, ["~/.cache/uv"],
             command: ShellCommand(executable: "uv", arguments: ["cache", "clean"], timeout: .seconds(120)),

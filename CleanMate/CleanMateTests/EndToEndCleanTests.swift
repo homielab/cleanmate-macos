@@ -158,7 +158,9 @@ struct EndToEndCleanTests {
         // Every item that has paths, commands removed, probes stubbed to report only this item's junk.
         let items = (CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) + CleanerGroup.privacy).flatMap(\.items)
             .filter { !$0.paths.isEmpty }.map { item in
-                var item = Self.ownOpenFiles(item)
+                // Projects are dated up to the fake home, and no real node process counts.
+                var item = Self.ownOpenFiles(item.id != "stale-node-modules" ? item
+                    : StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] }))
                 item.command = nil
                 if item.probe != nil {
                     let junk = "junk-" + item.id
@@ -181,6 +183,15 @@ struct EndToEndCleanTests {
                 if item.id == "group-caches" { // a group with no known creator is never cleaned
                     try (["MCMMetadataCreator": "com.example.app"] as NSDictionary).write(to: folder
                         .deletingLastPathComponent().deletingLastPathComponent().appending(path: ".com.apple.containermanagerd.metadata.plist"))
+                }
+                if item.findEntries != nil { // a stale project in each folder: only its node_modules goes
+                    let project = folder.appending(path: "junk-\(item.id)")
+                    try write(project.appending(path: "package.json"), Data("{}".utf8))
+                    try write(project.appending(path: "node_modules/dep/index.js"), Data(repeating: 1, count: 4096))
+                    for url in [project.appending(path: "node_modules/dep"), project.appending(path: "node_modules")] {
+                        try fm.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
+                    }
+                    continue
                 }
                 guard let included = item.included else {
                     // Old IDE versions only lists a version older than the newest (bait above) of its product.

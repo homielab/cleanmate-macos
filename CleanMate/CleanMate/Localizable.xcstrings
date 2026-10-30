@@ -691,6 +691,16 @@
         }
       }
     },
+    "Projects whose package.json, lockfile and Git index were not modified for 90 days. Moved to the Trash; npm install brings them back" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dự án có package.json, lockfile và chỉ mục Git không đổi trong 90 ngày. Chuyển vào Thùng rác; npm install sẽ tải lại"
+          }
+        }
+      }
+    },
     "Remind me to scan" : {
       "localizations" : {
         "vi" : {
@@ -3749,12 +3759,12 @@
         }
       }
     },
-    "Selected items are deleted permanently, except old Xcode archives and old AI sessions, which go to the Trash. Apps and tools recreate caches as needed." : {
+    "Selected items are deleted permanently, except those marked “Moved to the Trash”. Apps and tools recreate caches as needed." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Các mục đã chọn bị xoá vĩnh viễn, trừ archive Xcode cũ và phiên AI cũ được chuyển vào Thùng rác. Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
+            "value" : "Các mục đã chọn bị xoá vĩnh viễn, trừ các mục ghi “Chuyển vào Thùng rác”. Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
           }
         }
       }
@@ -4033,6 +4043,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Space Lens"
+          }
+        }
+      }
+    },
+    "Stale node_modules" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "node_modules bỏ lâu"
           }
         }
       }

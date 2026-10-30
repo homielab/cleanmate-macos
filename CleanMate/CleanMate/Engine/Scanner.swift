@@ -127,6 +127,16 @@ nonisolated enum Scanner {
             }
         }
         let skips = item.skipsEntry?()
+        if let find = item.findEntries {
+            let found = find(roots, policy).filter { url in
+                (item.allowsEntry?(policy, url) ?? policy.allows(url)) && skips?(url) != true && !isLocked(url)
+            }
+            // One open-file read under the home folder, only when something was found (it lists every process).
+            let open = item.skipsOpenFiles && !found.isEmpty ? openPaths(policy.homeURL.path) : []
+            // One level deeper in parallel: pnpm keeps every package under one `.pnpm` folder (~100 k files).
+            return await measure(found.filter { !RunningProcesses.holdsOpenFile($0, openPaths: open) }, of: item,
+                                 into: result, policy: policy, cutoff: cutoff, split: 1)
+        }
         let open = item.skipsOpenFiles ? RunningProcesses.openPaths(under: roots, read: openPaths) : []
         func listed(_ urls: [URL], under prefix: String) -> [URL] {
             urls.flatMap { url -> [URL] in
@@ -167,7 +177,14 @@ nonisolated enum Scanner {
         }
         // An item filtered by its probe starts walking only once the tool answered, ~1–3 s into a Smart Scan whose other
         // walks fill the thread pool: one thread per entry left a simulator's 66 k-file `data` as the scan's tail.
-        let split = only != nil ? splitDepth : 0
+        return await measure(candidates, of: item, into: result, policy: policy, cutoff: cutoff,
+                             split: only != nil ? splitDepth : 0)
+    }
+
+    /// `result` with `candidates` measured at once (or their database records counted), labelled, largest first.
+    private static func measure(_ candidates: [URL], of item: CleanerItem, into result: ItemScan, policy: SafetyPolicy,
+                                cutoff: Date?, split: Int) async -> ItemScan {
+        var result = result
         result.entries = await withTaskGroup(of: ScanEntry?.self) { group in
             for url in candidates {
                 group.addTask {
