@@ -4,7 +4,8 @@ extension CleanerGroup {
     /// Smart Scan with the age thresholds set in Settings, the current Full Disk Access state and running apps.
     nonisolated static var smartScan: [CleanerGroup] {
         // NSWorkspace documents `runningApplications` as safe to read from any thread.
-        smartScan(ages: .current, hasFullDiskAccess: FullDiskAccess.isGranted, runningAppNames: {
+        smartScan(ages: .current, hasFullDiskAccess: FullDiskAccess.isGranted, screenshotFolder: OldScreenshots.folder(),
+                  runningAppNames: {
             Set(NSWorkspace.shared.runningApplications.flatMap { app in
                 [app.localizedName, app.bundleURL?.deletingPathExtension().lastPathComponent].compactMap { $0 }
             })
@@ -18,7 +19,9 @@ extension CleanerGroup {
     /// `runningApps` is read once per scan of the user, sandboxed, group cache and temp items, and again right
     /// before removing each of their entries. `runningAppNames` (display and .app file names) is read with it for
     /// user caches only: sandboxed and group caches are named by bundle/group id, never by app name.
+    /// `screenshotFolder`: where screenshots are saved (`OldScreenshots.folder`), Desktop unless given.
     nonisolated static func smartScan(ages: CleanupAges, hasFullDiskAccess: Bool = false,
+                                      screenshotFolder: String? = OldScreenshots.defaultFolder,
                                       runningAppNames: @escaping @Sendable () -> Set<String> = { [] },
                                       runningApps: @escaping @Sendable () -> Set<String> = { [] }) -> [CleanerGroup] { [
         CleanerGroup(id: "system-junk", title: "System Junk", systemImage: "internaldrive", items: [
@@ -77,10 +80,15 @@ extension CleanerGroup {
                         note: "Files and folders in Downloads not modified, added or opened for \(ages.downloads) days. Moved to the Trash",
                         paths: [OldDownloads.folder], minAge: Double(ages.downloads) * 86_400, mode: .trash,
                         selectedByDefault: false, showsWhenEmpty: false, skipsOpenFiles: true,
-                        skipsEntry: { [days = ages.downloads] in OldDownloads.skips(olderThan: days) },
+                        skipsEntry: { [days = ages.downloads] in
+                            OldDownloads.skips(olderThan: days, screenshotFolder: screenshotFolder)
+                        },
                         entryLabel: OldDownloads.label(of:), selectableEntries: true,
                         allowsEntry: { $0.allowsOldDownload($1) }),
-        ] : []) + [
+            // Screenshots and screen recordings where macOS saves them (`OldScreenshots`), untouched for the downloads
+            // age: user files, so unticked, one checkbox each, to the Trash. Only with Full Disk Access: Desktop is
+            // protected like Downloads.
+        ] + [OldScreenshots.item(days: ages.downloads, folder: screenshotFolder)].compactMap { $0 } : []) + [
             // Downloaded iOS/iPadOS updates: only `*.ipsw`, one entry each, unticked (slow to download again),
             // to the Trash, never while Finder or Apple Configurator updates a device. Configurator's cache is a
             // deliberate exception to "never Apple's containers" (like Mail): that one folder, only with FDA.

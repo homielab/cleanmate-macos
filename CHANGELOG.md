@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan**: **Old screenshots** lists screenshots and screen recordings you haven't modified or opened for 90 days (the downloads age in Settings) in the folder macOS saves them to, Desktop by default, one by one; none are ticked, they go to the Trash so Undo can put them back (needs Full Disk Access).
 - **Developer Junk**: **Old Node.js versions (nvm)** and **Old Flutter SDKs (fvm)** list each installed version other than nvm's default or fvm's global one (100–200 MB per Node version, 1–2 GB per Flutter SDK); none are ticked, they are deleted (`nvm install` / `fvm install` installs them again), and a version a program is running from is shown locked with the reason.
 - **Low disk warning**: CleanMate posts a notification when the startup disk has less than 10% free (5–20% or Off in **Settings › General**), checked when it opens, after Smart Scan scans or cleans, and every hour while it runs (also with its window closed); at most one a day, and clicking it opens Smart Scan. Local only, no network.
 - **Developer Junk**: **Android system images without a device** lists each emulator system image no virtual device uses (often 1–8 GB each, left behind when a device is deleted); none are ticked, they are deleted (Android Studio's SDK Manager downloads them again) along with their API and tag folders once empty, nothing is listed when a device can't be read, and the row is locked while Android Studio, the emulator, sdkmanager or avdmanager runs.

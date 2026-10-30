@@ -204,6 +204,12 @@ struct EndToEndCleanTests {
                     }
                     continue
                 }
+                if item.id == OldScreenshots.id { // an old screenshot on the Desktop
+                    let shot = folder.appending(path: "Screenshot 2020-01-01 at 10.00.00.png")
+                    try write(shot, Data(repeating: 1, count: 4096))
+                    try OldDownloadsTests.stamp(shot, modified: old, read: old, created: old, added: old)
+                    continue
+                }
                 if item.id == OldRuntimes.nodeID { // a Node version other than nvm's default (v22.0.0, bait)
                     try write(folder.appending(path: "v1.0.0/bin/node"), Data(repeating: 1, count: 4096))
                     continue

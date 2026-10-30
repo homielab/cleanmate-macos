@@ -11,9 +11,18 @@ nonisolated enum OldDownloads {
     static let walkLimit = 10_000
 
     /// The per-entry check of one scan or one removal: true keeps the entry (see `skips(_:cutoff:)`).
-    static func skips(olderThan days: Int, now: Date = .now) -> @Sendable (URL) -> Bool {
+    /// `screenshotFolder` (`OldScreenshots.folder`) in Downloads: `OldScreenshots` lists its screenshots (same age),
+    /// so this item leaves them out, and keeps the top-level folder holding them.
+    static func skips(olderThan days: Int, screenshotFolder: String? = nil, now: Date = .now) -> @Sendable (URL) -> Bool {
         let cutoff = now.addingTimeInterval(-Double(days) * 86_400)
-        return { skips($0, cutoff: cutoff) }
+        let prefix = folder.lowercased() + "/"
+        let shots = screenshotFolder.map { $0.lowercased() }
+        let inDownloads = shots == folder.lowercased()
+        let holder = shots.flatMap { $0.hasPrefix(prefix) ? $0.dropFirst(prefix.count).split(separator: "/").first.map(String.init) : nil }
+        return { url in
+            skips(url, cutoff: cutoff) || inDownloads && OldScreenshots.isScreenshot(url)
+                || holder == url.lastPathComponent.lowercased()
+        }
     }
 
     /// Whether `url` is kept: hidden (`.DS_Store`, `.localized`), a download in progress or next to one, touched at

@@ -1209,6 +1209,16 @@
         }
       }
     },
+    "Old screenshots" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh chụp màn hình cũ"
+          }
+        }
+      }
+    },
     "Ollama: downloaded models" : {
       "localizations" : {
         "vi" : {
@@ -1315,6 +1325,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quét ngay"
+          }
+        }
+      }
+    },
+    "Screenshots and screen recordings not modified or opened for %lld days. Moved to the Trash" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Screenshots and screen recordings not modified or opened for %lld day. Moved to the Trash"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Screenshots and screen recordings not modified or opened for %lld days. Moved to the Trash"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh chụp và bản quay màn hình không sửa hay mở trong %lld ngày. Chuyển vào Thùng rác"
           }
         }
       }
