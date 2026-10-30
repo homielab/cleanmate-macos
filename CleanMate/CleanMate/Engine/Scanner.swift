@@ -195,7 +195,18 @@ nonisolated enum Scanner {
                 group.addTask {
                     if Task.isCancelled { return nil } // no walk or sqlite3 run for what the caller discards
                     guard let database = item.database, database.applies(to: url) else {
-                        guard var found = await entry(at: url, olderThan: cutoff, splitDepth: split) else { return nil }
+                        // Read before measuring: a change during the walk makes the next scan measure again.
+                        let fingerprint = item.entrySizes != nil && cutoff == nil ? FolderSizeCache.Fingerprint(url) : nil
+                        var found: ScanEntry
+                        if let fingerprint, let known = item.entrySizes?.size(of: url, fingerprint) {
+                            found = ScanEntry(url: url, size: known.size, partlyUnreadable: known.partlyUnreadable)
+                        } else {
+                            guard let measured = await entry(at: url, olderThan: cutoff, splitDepth: split) else { return nil }
+                            found = measured
+                            if let fingerprint {
+                                item.entrySizes?.remember(url, fingerprint, size: found.size, partlyUnreadable: found.partlyUnreadable)
+                            }
+                        }
                         if let files = item.entryFiles?(url) {
                             found.size += files.filter(policy.allows).reduce(0) { $0 + fileSize($1) }
                         }
@@ -208,6 +219,7 @@ nonisolated enum Scanner {
             for await found in group { if let found { all.append(found) } }
             return all
         }
+        item.entrySizes?.save()
         if let label = item.entryLabel {
             for i in result.entries.indices {
                 let found = label(result.entries[i].url)

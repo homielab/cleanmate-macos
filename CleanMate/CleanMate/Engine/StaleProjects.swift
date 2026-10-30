@@ -70,7 +70,7 @@ nonisolated enum StaleProjects {
             let now = ContinuousClock.now
             walks = walks.filter { $0.value.started.duration(to: now) < reuseTime }
             if let walk = walks[key]?.walk { return walk }
-            let walk = Task { find(in: roots, skipping: skipping) }
+            let walk = Task { await find(in: roots, skipping: skipping) }
             walks[key] = (now, walk)
             return walk
         }
@@ -79,38 +79,64 @@ nonisolated enum StaleProjects {
 
     /// Project folders (`projectFolders`) in `roots` and up to `depth` folder levels below them, by path.
     /// Never follows a symlink, never enters a hidden folder, one of `unwalked`, a bundle, a folder of `skipping` or
-    /// another volume; stops after `folderLimit` folders.
+    /// another volume; stops after `folderLimit` folders, shared by all roots, or when cancelled.
+    /// Each root is walked by its own task, and the folders of each level are read in parallel.
     static func find(in roots: [URL], skipping: Set<String> = [], depth: Int = depth,
-                     folderLimit: Int = folderLimit) -> [URL] {
-        var found: [URL] = []
-        var read = 0
-        for root in roots {
-            let rootPath = root.standardizedFileURL.path
-            var info = stat()
-            guard lstat(rootPath, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { continue }
-            let device = info.st_dev
-            var level = [rootPath]
-            for current in 0...depth {
-                var next: [String] = []
-                for folder in level {
-                    guard read < folderLimit, !Task.isCancelled else { return found.sorted { $0.path < $1.path } }
-                    read += 1
-                    let children = entries(of: folder)
-                    for name in projectFolders(in: folder, children: children) {
-                        found.append(URL(fileURLWithPath: folder + "/" + name, isDirectory: true))
-                    }
-                    guard current < depth else { continue }
-                    for (name, type) in children where type == UInt8(DT_DIR) && !name.hasPrefix(".") && !unwalked.contains(name)
-                        && !bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
-                        let path = folder + "/" + name
-                        guard !skipping.contains(path), lstat(path, &info) == 0, info.st_dev == device else { continue }
-                        next.append(path)
-                    }
-                }
-                level = next.sorted()
-            }
+                     folderLimit: Int = folderLimit) async -> [URL] {
+        let budget = Locked(folderLimit)
+        let found = await withTaskGroup(of: [URL].self) { group in
+            for root in roots { group.addTask { await walk(root, skipping: skipping, depth: depth, budget: budget) } }
+            return await group.reduce(into: []) { $0 += $1 }
         }
         return found.sorted { $0.path < $1.path }
+    }
+
+    /// `find` in one root, taking the folders it reads from `budget`; a level's folders are read in path order, so
+    /// the ones left out when the budget runs out are the last ones.
+    private static func walk(_ root: URL, skipping: Set<String>, depth: Int, budget: Locked<Int>) async -> [URL] {
+        let rootPath = root.standardizedFileURL.path
+        var info = stat()
+        guard lstat(rootPath, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return [] }
+        let device = info.st_dev
+        var found: [URL] = []
+        var level = [rootPath]
+        for current in 0...depth where !level.isEmpty && !Task.isCancelled {
+            let taken = budget.withLock { left in
+                let taken = min(left, level.count)
+                left -= taken
+                return taken
+            }
+            let folders = Array(level.prefix(taken))
+            // A few slices per core: a level holds from one folder to thousands.
+            let slice = max(1, (folders.count + 4 * ProcessInfo.processInfo.activeProcessorCount - 1)
+                            / (4 * ProcessInfo.processInfo.activeProcessorCount))
+            let read = await withTaskGroup(of: (found: [URL], next: [String]).self) { group in
+                for start in stride(from: 0, to: folders.count, by: slice) {
+                    group.addTask {
+                        var found: [URL] = [], next: [String] = []
+                        for folder in folders[start..<min(start + slice, folders.count)] {
+                            let children = entries(of: folder)
+                            for name in projectFolders(in: folder, children: children) {
+                                found.append(URL(fileURLWithPath: folder + "/" + name, isDirectory: true))
+                            }
+                            guard current < depth else { continue }
+                            var info = stat()
+                            for (name, type) in children where type == UInt8(DT_DIR) && !name.hasPrefix(".")
+                                && !unwalked.contains(name) && !bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
+                                let path = folder + "/" + name
+                                guard !skipping.contains(path), lstat(path, &info) == 0, info.st_dev == device else { continue }
+                                next.append(path)
+                            }
+                        }
+                        return (found, next)
+                    }
+                }
+                return await group.reduce(into: (found: [URL](), next: [String]())) { $0.found += $1.found; $0.next += $1.next }
+            }
+            found += read.found
+            level = taken < level.count ? [] : read.next.sorted()
+        }
+        return found
     }
 
     /// Names in `folder` with their `readdir` type (`DT_DIR`, `DT_REG`, `DT_LNK`…): no stat per entry.

@@ -103,10 +103,13 @@ struct ScanBenchmark {
     /// machine full of old projects. Only scans, like the rest of this suite.
     @Test func staleNodeModulesWorstCase() async {
         let later: @Sendable () -> Date = { .now.addingTimeInterval(3650 * 86_400) }
-        let all = [StaleNodeModules.item(running: { [] }, now: later), StaleBuildFolders.item(running: { [] }, now: later)]
+        let all = [StaleNodeModules.item(running: { [] }, now: later, sizes: FolderSizeCache(file: nil)),
+                   StaleBuildFolders.item(running: { [] }, now: later, sizes: FolderSizeCache(file: nil))]
         for item in all {
-            let (scan, seconds) = await timed { await Scanner.scan(item, policy: policy) }
-            report("\(item.id) all (\(scan.entries.count))", seconds, scan.size)
+            for run in 1...2 { // the second one with the sizes the first measured
+                let (scan, seconds) = await timed { await Scanner.scan(item, policy: policy) }
+                report("\(item.id) all \(run) (\(scan.entries.count))", seconds, scan.size)
+            }
         }
         await scanItems("smart-all-stale", CleanerGroup.smartScan.map { group in
             CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage,
@@ -121,16 +124,50 @@ struct ScanBenchmark {
         var alone: [Double] = [], both: [Double] = []
         for _ in 0..<runs {
             try? await Task.sleep(for: StaleProjects.reuseTime) // no walk reused from the previous run
-            alone.append(await timed { await Scanner.scan(StaleNodeModules.item(), policy: policy) }.1)
+            // Sizes measured, never taken from an earlier run.
+            alone.append(await timed { await Scanner.scan(StaleNodeModules.item(sizes: FolderSizeCache(file: nil)), policy: policy) }.1)
             try? await Task.sleep(for: StaleProjects.reuseTime)
             both.append(await timed {
-                async let modules = Scanner.scan(StaleNodeModules.item(), policy: policy)
-                async let builds = Scanner.scan(StaleBuildFolders.item(), policy: policy)
+                async let modules = Scanner.scan(StaleNodeModules.item(sizes: FolderSizeCache(file: nil)), policy: policy)
+                async let builds = Scanner.scan(StaleBuildFolders.item(sizes: FolderSizeCache(file: nil)), policy: policy)
                 return await (modules.size, builds.size)
             }.1)
         }
         report("stale node_modules alone (median)", alone.sorted()[runs / 2], 0)
         report("stale node_modules + build (median)", both.sorted()[runs / 2], 0)
+    }
+
+    /// Stale node_modules on a made-up home (temp folder, never the real one): 30 old projects of 5 000 files each,
+    /// scanned twice with sizes kept in memory (`FolderSizeCache`), then once without that cache: what the first scan
+    /// costs and what the second one saves.
+    @Test func staleProjectsFixture() async throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appending(path: "CleanMateBenchProjects-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let home = base.appending(path: "home"), old = Date.now.addingTimeInterval(-200 * 86_400)
+        let file = Data(repeating: 1, count: 1_000)
+        for project in 1...30 {
+            let folder = home.appending(path: "Developer/project-\(project)")
+            for package in 0..<50 {
+                let dir = folder.appending(path: "node_modules/package-\(package)/lib")
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                for index in 0..<100 { try file.write(to: dir.appending(path: "file-\(index).js")) }
+            }
+            for name in ["package.json", "package-lock.json"] { try file.write(to: folder.appending(path: name)) }
+            for path in ["package.json", "package-lock.json", "node_modules"] {
+                try fm.setAttributes([.modificationDate: old], ofItemAtPath: folder.appending(path: path).path)
+            }
+        }
+        let policy = SafetyPolicy(home: home, temp: base.appending(path: "tmp"))
+        let item = StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] }, sizes: FolderSizeCache(file: nil))
+        for run in 1...2 {
+            let (scan, seconds) = await timed { await Scanner.scan(item, policy: policy) }
+            report("stale fixture run \(run) (\(scan.entries.count))", seconds, scan.size)
+        }
+        var uncached = item
+        uncached.entrySizes = nil
+        let (scan, seconds) = await timed { await Scanner.scan(uncached, policy: policy) }
+        report("stale fixture no cache (\(scan.entries.count))", seconds, scan.size)
     }
 
     /// Entry label review: every real DerivedData / DeviceSupport folder and every `~/.claude/projects` folder,

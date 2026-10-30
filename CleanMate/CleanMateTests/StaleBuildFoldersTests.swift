@@ -141,7 +141,7 @@ struct StaleBuildFoldersTests {
         // A second walk of the same folders right after reuses the first one's result.
         try fm.removeItem(at: developer.appending(path: "both/target"))
         #expect(await StaleProjects.shared(in: [developer], skipping: []).count == 2)
-        #expect(StaleProjects.find(in: [developer]).count == 1)
+        #expect(await StaleProjects.find(in: [developer]).count == 1)
     }
 
     @Test func policyAllowsOnlyBuildFoldersNextToTheirProjectFile() throws {

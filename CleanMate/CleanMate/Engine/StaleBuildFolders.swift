@@ -15,12 +15,12 @@ nonisolated enum StaleBuildFolders {
     /// Tools whose processes keep a project in use while they run in it (`pod` runs as `ruby`).
     static let tools: Set = ["cargo", "rustc", "uv", "pod", "ruby"]
 
-    /// The Smart Scan item. `home`, `hasFullDiskAccess`, `running` (`RunningProcesses.folders`) and `now` are injected
-    /// by tests.
+    /// The Smart Scan item. `home`, `hasFullDiskAccess`, `running` (`RunningProcesses.folders`), `now` and `sizes`
+    /// (sizes kept between scans) are injected by tests.
     static func item(home: URL = URL(fileURLWithPath: NSHomeDirectory()),
                      hasFullDiskAccess: @escaping @Sendable () -> Bool = { FullDiskAccess.isGranted },
                      running: @escaping @Sendable () -> [String] = { RunningProcesses.folders(ofProcessesNamed: isTool) },
-                     now: @escaping @Sendable () -> Date = { .now }) -> CleanerItem {
+                     now: @escaping @Sendable () -> Date = { .now }, sizes: FolderSizeCache = .shared) -> CleanerItem {
         CleanerItem(id: "stale-build-dirs", title: "Stale build folders",
                     note: "Cargo target, Python virtual environment and CocoaPods Pods folders of projects whose files and Git index were not modified for 90 days. Moved to the Trash; cargo build, uv or pip, and pod install make them again",
                     paths: StaleProjects.folders, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
@@ -32,7 +32,8 @@ nonisolated enum StaleBuildFolders {
                         await StaleProjects.find(in: roots, policy: policy, hasFullDiskAccess: hasFullDiskAccess())
                             .filter { folderNames.contains($0.lastPathComponent) }
                     },
-                    allowsEntry: { $0.allowsBuildFolder($1) })
+                    allowsEntry: { $0.allowsBuildFolder($1) },
+                    entrySizes: sizes)
     }
 
     /// `cargo`, `rustc`, `uv`, `pod`, `python3.12`…

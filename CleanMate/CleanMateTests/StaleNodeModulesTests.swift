@@ -173,14 +173,14 @@ struct StaleNodeModulesTests {
     }
 
     /// The folder walk stops at its depth and its folder budget.
-    @Test func findStopsAtDepthAndLimit() throws {
+    @Test func findStopsAtDepthAndLimit() async throws {
         defer { try? fm.removeItem(at: root) }
         try project("x")
         try project("y/z")
-        #expect(StaleProjects.find(in: [developer], depth: 1).map(\.lastPathComponent) == ["node_modules"])
-        #expect(StaleProjects.find(in: [developer]).count == 2)
-        #expect(StaleProjects.find(in: [developer], folderLimit: 1).isEmpty) // only the root itself was read
-        #expect(StaleProjects.find(in: [developer], skipping: [developer.appending(path: "y").path]).count == 1)
+        #expect(await StaleProjects.find(in: [developer], depth: 1).map(\.lastPathComponent) == ["node_modules"])
+        #expect(await StaleProjects.find(in: [developer]).count == 2)
+        #expect(await StaleProjects.find(in: [developer], folderLimit: 1).isEmpty) // only the root itself was read
+        #expect(await StaleProjects.find(in: [developer], skipping: [developer.appending(path: "y").path]).count == 1)
     }
 
     /// A worktree's `.git` file leads to its own index in the main repository.

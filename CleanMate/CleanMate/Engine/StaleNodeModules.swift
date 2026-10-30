@@ -14,12 +14,12 @@ nonisolated enum StaleNodeModules {
     /// Tools whose processes keep a project in use while they run in it (pnpm, npm and Yarn run as `node`).
     static let tools: Set = ["node", "bun", "pnpm", "npm", "npx", "yarn", "deno"]
 
-    /// The Smart Scan item. `home`, `hasFullDiskAccess`, `running` (`RunningProcesses.folders`) and `now` are injected
-    /// by tests.
+    /// The Smart Scan item. `home`, `hasFullDiskAccess`, `running` (`RunningProcesses.folders`), `now` and `sizes`
+    /// (sizes kept between scans) are injected by tests.
     static func item(home: URL = URL(fileURLWithPath: NSHomeDirectory()),
                      hasFullDiskAccess: @escaping @Sendable () -> Bool = { FullDiskAccess.isGranted },
                      running: @escaping @Sendable () -> [String] = { RunningProcesses.folders(ofProcessesNamed: isTool) },
-                     now: @escaping @Sendable () -> Date = { .now }) -> CleanerItem {
+                     now: @escaping @Sendable () -> Date = { .now }, sizes: FolderSizeCache = .shared) -> CleanerItem {
         CleanerItem(id: "stale-node-modules", title: "Stale node_modules",
                     note: "Projects whose package.json, lockfile and Git index were not modified for 90 days. Moved to the Trash; npm install brings them back",
                     paths: StaleProjects.folders, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
@@ -33,7 +33,8 @@ nonisolated enum StaleNodeModules {
                         await StaleProjects.find(in: roots, policy: policy, hasFullDiskAccess: hasFullDiskAccess())
                             .filter { $0.lastPathComponent == folderName }
                     },
-                    allowsEntry: { $0.allowsNodeModules($1) })
+                    allowsEntry: { $0.allowsNodeModules($1) },
+                    entrySizes: sizes)
     }
 
     /// `node`, `node22`, `bun`, `pnpm`…
