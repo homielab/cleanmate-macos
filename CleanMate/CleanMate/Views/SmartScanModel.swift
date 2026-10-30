@@ -70,8 +70,10 @@ final class SmartScanModel: ObservableObject {
     @Published private(set) var offGroups: Set<String> = []
     /// Item id → seconds from the last finished scan, read when a scan starts.
     private var estimates: [String: Double] = [:]
-    /// Called when a scan finishes; the real Smart Scan moves the scan reminder one period away.
-    var scanFinished: () -> Void = {}
+    /// Called when a scan finishes; the real Smart Scan records it for the menu bar item and moves the scan reminder.
+    var scanFinished: (SmartScanModel) -> Void = { _ in }
+    /// Called when a clean finishes; the real Smart Scan adds what it freed to the menu bar item's last scan.
+    var cleanFinished: (CleanReport) -> Void = { _ in }
 
     /// `catalog` defaults to the module's own (Privacy or Smart Scan).
     init(module: Module, catalog: (() -> [CleanerGroup])? = nil) {
@@ -81,7 +83,11 @@ final class SmartScanModel: ObservableObject {
         let realSmartScan = catalog == nil && module == .smartScan
         if realSmartScan {
             disabledGroups = { Preferences.disabledGroups() }
-            scanFinished = { Task { await ScanReminderScheduler.shared.postpone() } }
+            scanFinished = { model in
+                LastScan(date: .now, size: model.selectedSize).save()
+                Task { await ScanReminderScheduler.shared.postpone() }
+            }
+            cleanFinished = { LastScan.recordClean(freed: $0.freed) }
         }
         groups = []
         groups = enabledGroups()
@@ -382,7 +388,7 @@ final class SmartScanModel: ObservableObject {
         if let durationsKey { Preferences.update(durationsKey) { (all: inout [String: Double]) in all.merge(durations) { $1 } } }
         phase = .results
         Attention.finished()
-        scanFinished()
+        scanFinished(self)
     }
 
     /// Entries removed, for the activity log. A run command (e.g. `docker image prune`) succeeds or fails as a
@@ -434,5 +440,6 @@ final class SmartScanModel: ObservableObject {
         freeSpaceChange = freeBefore.flatMap { before in freeSpace().map { FreeSpaceChange(before: before, after: $0) } }
         phase = .done(report)
         Attention.finished()
+        cleanFinished(report)
     }
 }

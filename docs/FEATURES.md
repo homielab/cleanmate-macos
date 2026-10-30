@@ -23,7 +23,10 @@ For a short overview, see the [README](../README.md). CleanMate requires macOS 1
 
 ## Settings, shortcuts and Undo
 
-**Settings** (⌘,): optional menu bar item showing free space and the space freed in the last 30 days (off by default), Full Disk Access status, age thresholds (old logs, temporary files, AI sessions), remembered
+**Settings** (⌘,): optional menu bar item (off by default) showing free space out of the disk's size (as in Finder),
+the last Smart Scan (its date and what it found to clean, or what cleaning it freed) and the space freed in the last
+30 days, with **Scan Now** (opens Smart Scan and starts a scan; disabled, like ⌘R, while a confirmation is open or
+something is being cleaned), **Open CleanMate** and **Quit**; Full Disk Access status, age thresholds (old logs, temporary files, AI sessions), remembered
 choices, scan reminder, updates (see [Privacy](#privacy)), excluded folders, and the activity log.
 **Remind me to scan** (Settings › General, Off by default): Weekly or Monthly posts a local notification at 10:00
 about a week or a month after you last opened CleanMate or finished a Smart Scan (each launch and each finished

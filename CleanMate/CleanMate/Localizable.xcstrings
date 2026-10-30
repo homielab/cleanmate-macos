@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ free of %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Còn trống %1$@ / %2$@"
+          }
+        }
+      }
+    },
     "%@: on-device AI model" : {
       "localizations" : {
         "vi" : {
@@ -421,6 +431,36 @@
         }
       }
     },
+    "Last scan %@: %@ to clean" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lần quét gần nhất %1$@: có thể dọn %2$@"
+          }
+        }
+      }
+    },
+    "Last scan %@: cleaned %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lần quét gần nhất %1$@: đã dọn %2$@"
+          }
+        }
+      }
+    },
+    "Last scan %@: nothing to clean" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lần quét gần nhất %@: không có gì để dọn"
+          }
+        }
+      }
+    },
     "Last used %@" : {
       "localizations" : {
         "vi" : {
@@ -607,6 +647,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở Loại trừ…"
+          }
+        }
+      }
+    },
+    "Scan Now" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét ngay"
           }
         }
       }
@@ -1040,16 +1090,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Còn trống %1$@ / %2$@"
-          }
-        }
-      }
-    },
-    "%@ free" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Còn trống %@"
           }
         }
       }
@@ -3109,16 +3149,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở Cài đặt…"
-          }
-        }
-      }
-    },
-    "Open Smart Scan" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mở Quét thông minh"
           }
         }
       }

@@ -149,13 +149,19 @@ private struct MenuBarContent: View {
 
     var body: some View {
         let volume = SpaceLensModel.Volume.read(SafetyPolicy.current.homeURL)
-        Label("\(volume.available, format: .fileSize) free", systemImage: volume.level == .normal ? "internaldrive" : "exclamationmark.triangle.fill")
+        // Available for important use, the figure Finder shows.
+        Label("\(volume.available, format: .fileSize) free of \(volume.total, format: .fileSize)",
+              systemImage: volume.level == .normal ? "internaldrive" : "exclamationmark.triangle.fill")
             .foregroundStyle(volume.level == .critical ? Color.red : volume.level == .low ? Color.orange : Color.primary)
+        if let last = LastScan.read() {
+            Text(SmartScanView.lastScanLine(last))
+        }
         if let freed = SmartScanView.freedLine(FreedCache.shared.bytes()) {
             Text(freed)
         }
         Divider()
-        Button("Open Smart Scan") { ModuleRouter.shared.show(.smartScan, openWindow: openWindow) }
+        Button("Scan Now") { ModuleRouter.shared.scanNow(openWindow: openWindow) }
+            .disabled(!ModuleRouter.shared.canScanNow)
         Button("Open CleanMate") { ModuleRouter.shared.show(nil, openWindow: openWindow) }
         Divider()
         Button("Quit CleanMate") { NSApplication.shared.terminate(nil) }

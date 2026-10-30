@@ -23,6 +23,21 @@ struct SmartScanView: View {
         bytes > 0 ? String(localized: "Freed \(bytes, format: .fileSize) in the last 30 days") : nil
     }
 
+    /// Menu bar item: the last finished Smart Scan and what it found, or what cleaning it freed.
+    nonisolated static func lastScanLine(_ last: LastScan, locale: Locale = .current) -> String {
+        let date = last.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale))
+        let size = { (bytes: Int64) in bytes.formatted(.fileSize.locale(locale)) }
+        var resource: LocalizedStringResource = if let cleaned = last.cleaned {
+            "Last scan \(date): cleaned \(size(cleaned))"
+        } else if last.size > 0 {
+            "Last scan \(date): \(size(last.size)) to clean"
+        } else {
+            "Last scan \(date): nothing to clean"
+        }
+        resource.locale = locale
+        return String(localized: resource)
+    }
+
     /// Bytes deleted in the last 30 days (Smart Scan overview and menu bar extra).
     static var freedLast30Days: Int64 { ActivityLog.freed(after: .now.addingTimeInterval(-30 * 86_400)).deleted }
 

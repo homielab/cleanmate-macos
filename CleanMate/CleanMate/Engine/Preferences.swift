@@ -31,6 +31,8 @@ nonisolated enum Preferences {
 
     /// String: ids of Smart Scan groups turned off in Settings › Smart Scan, one per line; never scanned nor shown.
     static let disabledScanGroups = "disabledScanGroups"
+    /// [String: Any]: the last finished Smart Scan (`LastScan`), shown in the menu bar item.
+    static let lastSmartScan = "lastSmartScan"
     /// String (`ScanReminder.Frequency` raw value): Settings › General › Remind me to scan, off by default.
     static let scanReminder = "scanReminder"
     /// Settings tab shown when the window opens.
@@ -118,6 +120,34 @@ nonisolated enum Preferences {
         var all: [String: V] = dictionary(key, defaults: defaults)
         change(&all)
         defaults.set(all, forKey: key)
+    }
+}
+
+/// The last finished Smart Scan, for the menu bar item: when, what its ticked items would free, and, once cleaned,
+/// what the clean freed (the same bytes the activity log records).
+nonisolated struct LastScan: Equatable, Sendable {
+    var date: Date
+    var size: Int64
+    var cleaned: Int64?
+
+    static func read(defaults: UserDefaults = .standard) -> LastScan? {
+        let stored: [String: Any] = Preferences.dictionary(Preferences.lastSmartScan, defaults: defaults)
+        guard let seconds = stored["date"] as? Double, let size = (stored["size"] as? NSNumber)?.int64Value else { return nil }
+        return LastScan(date: Date(timeIntervalSince1970: seconds), size: size,
+                        cleaned: (stored["cleaned"] as? NSNumber)?.int64Value)
+    }
+
+    func save(defaults: UserDefaults = .standard) {
+        var stored: [String: Any] = ["date": date.timeIntervalSince1970, "size": NSNumber(value: size)]
+        if let cleaned { stored["cleaned"] = NSNumber(value: cleaned) }
+        defaults.set(stored, forKey: Preferences.lastSmartScan)
+    }
+
+    /// A clean of the last scan's results: keeps its date, adds what was freed.
+    static func recordClean(freed: Int64, defaults: UserDefaults = .standard) {
+        guard var last = read(defaults: defaults) else { return }
+        last.cleaned = (last.cleaned ?? 0) + freed
+        last.save(defaults: defaults)
     }
 }
 

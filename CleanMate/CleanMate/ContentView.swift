@@ -54,12 +54,29 @@ final class ModuleRouter: ObservableObject {
     @Published var requested: Module?
     /// "Show in Space Lens": Space Lens opens this item's folder with the item selected.
     @Published var spaceLensItem: URL?
+    /// Menu bar "Scan Now": ContentView switches to Smart Scan and starts a scan, also on first appearance.
+    @Published var scanRequested = false
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
     var openMainWindow: OpenWindowAction?
 
+    /// Menu bar "Scan Now" is disabled, like ⌘R, while a confirmation (a sheet on the main window) is open, and while
+    /// something is being cleaned or moved to the Trash.
+    static func canScanNow(sheetOpen: Bool, busy: Bool) -> Bool { !sheetOpen && !busy }
+
+    static var mainWindow: NSWindow? { NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) }
+
+    var canScanNow: Bool { Self.canScanNow(sheetOpen: Self.mainWindow?.attachedSheet != nil, busy: AppDelegate.isBusy) }
+
+    /// Opens the main window on Smart Scan and starts a scan.
+    func scanNow(openWindow: OpenWindowAction? = nil) {
+        guard canScanNow else { return }
+        scanRequested = true
+        show(.smartScan, openWindow: openWindow)
+    }
+
     /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
     func show(_ module: Module?, openWindow: OpenWindowAction? = nil) {
-        let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })
+        let window = Self.mainWindow
         // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘6: only bring the window front.
         requested = window?.attachedSheet == nil ? module : nil
         NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
@@ -122,6 +139,12 @@ struct ContentView: View {
         }
         .onAppearAndChange(of: router.requested) { _ in
             if let module = router.requested { selection = module; router.requested = nil }
+        }
+        .onAppearAndChange(of: router.scanRequested) { _ in
+            guard router.scanRequested else { return }
+            router.scanRequested = false
+            selection = .smartScan
+            scanAction(smartScan)?() // nil while it already scans or cleans
         }
         .onAppearAndChange(of: router.spaceLensItem) { _ in
             if let url = router.spaceLensItem { spaceLens.reveal(url); selection = .spaceLens; router.spaceLensItem = nil }
