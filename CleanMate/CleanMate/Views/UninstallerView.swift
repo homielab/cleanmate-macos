@@ -39,7 +39,7 @@ struct UninstallerView: View {
                 }
                 .pickerStyle(.inline)
             }
-            .help("Show apps not used for a while (apps never seen opened count too)")
+            .help("Show apps not used for a while (apps with no last-opened date are left out)")
             Button("Refresh", systemImage: "arrow.clockwise") { model.refresh() }
                 .disabled(model.loadingApps || model.working)
         }
@@ -120,8 +120,14 @@ struct UninstallerView: View {
                             Text(app.name).lineLimit(1)
                             Group {
                                 sizeText(app).lineLimit(1)
-                                if let lastUsed = app.lastUsed {
+                                if let lastUsed = app.lastUsed, app.lastUsedIsEstimate {
+                                    Text("Last used ≈ \(lastUsed, format: .relative(presentation: .named))").lineLimit(1)
+                                        .help("Estimated from when the app's settings, cache or support files last changed")
+                                } else if let lastUsed = app.lastUsed {
                                     Text("Last used \(lastUsed, format: Date.FormatStyle(date: .abbreviated, time: .omitted))").lineLimit(1)
+                                } else {
+                                    Text("Last used: Unknown").lineLimit(1)
+                                        .help("macOS has no record of when this app was last opened")
                                 }
                             }
                             .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
@@ -130,6 +136,13 @@ struct UninstallerView: View {
                     .padding(.vertical, 2)
                     .accessibilityElement(children: .combine) // name + app size + data size + last used as one element
                     .tag(UninstallerModel.Selection.app(app.url))
+                }
+                if model.hiddenUndatedCount > 0 {
+                    HStack {
+                        Text("\(model.hiddenUndatedCount) apps with no last-opened date are hidden")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                        Button("Show") { model.showUndated = true }.controlSize(.small)
+                    }
                 }
                 if let fixes = UninstallerModel.noMatchFixes(appCount: model.apps.count, shownCount: model.filteredApps.count,
                                                              search: model.search, unused: unused) {

@@ -698,13 +698,13 @@ struct UninstallerTests {
         #expect(UninstallerModel.sorted(installed, by: sort, sizes: sizes).map(\.name) == expected)
     }
 
-    /// "Not used for" filter: older than the cutoff or no date (never seen opened) is listed; combines with search.
+    /// "Not used for" filter: older than the cutoff is listed, no date (unknown) is not; combines with search.
     @Test(arguments: [
         (UninstallerModel.UnusedFilter.all, "", ["Fresh", "Old", "Ancient", "Unknown"]),
-        (.months3, "", ["Old", "Ancient", "Unknown"]),
-        (.months6, "", ["Old", "Ancient", "Unknown"]),
-        (.year1, "", ["Ancient", "Unknown"]),
-        (.months3, "an", ["Ancient"]),       // search narrows the filtered list ("Unknown" has no "an")
+        (.months3, "", ["Old", "Ancient"]),
+        (.months6, "", ["Old", "Ancient"]),
+        (.year1, "", ["Ancient"]),
+        (.months3, "an", ["Ancient"]),       // search narrows the filtered list
         (.all, "x.fresh", ["Fresh"]),        // bundle id search still works
     ])
     func filtersUnusedApps(unused: UninstallerModel.UnusedFilter, search: String, expected: [String]) {
@@ -717,11 +717,60 @@ struct UninstallerTests {
         #expect(UninstallerModel.filtered(apps, search: search, unused: unused, now: now).map(\.name) == expected)
     }
 
+    /// No Spotlight date: an open app is used today; else the newest prefs/caches/support change is an estimate; else nil.
+    @Test func lastUsedFallsBackToRunningThenFileDates() {
+        let now = Date(timeIntervalSince1970: 1_000 * 86_400)
+        let spotlight = now.addingTimeInterval(-50 * 86_400), prefs = now.addingTimeInterval(-3 * 86_400)
+        let older = now.addingTimeInterval(-9 * 86_400)
+        #expect(Uninstaller.lastUsed(spotlight: spotlight, running: true, modified: [prefs], now: now) == (spotlight, false))
+        #expect(Uninstaller.lastUsed(spotlight: nil, running: true, modified: [prefs], now: now) == (now, false))
+        #expect(Uninstaller.lastUsed(spotlight: nil, running: false, modified: [older, nil, prefs], now: now) == (prefs, true))
+        #expect(Uninstaller.lastUsed(spotlight: nil, running: false, modified: [nil, nil], now: now) == (nil, false))
+    }
+
+    /// The traces are only the app's own prefs plist, Caches folder and Application Support folder, read from disk.
+    @Test func usageTracesReadModificationDates() throws {
+        let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let traces = Uninstaller.usageTraces(bundleID: "com.foo.Bar", name: "Bar", home: home)
+        #expect(traces.map { $0.path.replacingOccurrences(of: home.path, with: "~") }
+                    == ["~/Library/Preferences/com.foo.Bar.plist", "~/Library/Caches/com.foo.Bar", "~/Library/Application Support/Bar"])
+        try FileManager.default.createDirectory(at: traces[0].deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: traces[0])
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: traces[0].path)
+        #expect(traces.map(Uninstaller.modificationDate) == [date, nil, nil])
+    }
+
+    /// Prefs changed 3 days ago → estimated, not in the 6-month filter; no date at all → hidden until shown.
+    @MainActor @Test func undatedAppsHiddenFromUnusedFilterUntilShown() {
+        let now = Date.now
+        let estimated = InstalledApp(url: URL(filePath: "/Applications/Est.app"), name: "Est", bundleID: "x.est", version: nil,
+                                     lastUsed: now.addingTimeInterval(-3 * 86_400), lastUsedIsEstimate: true)
+        let unknown = InstalledApp(url: URL(filePath: "/Applications/Unk.app"), name: "Unk", bundleID: "x.unk", version: nil, lastUsed: nil)
+        let old = InstalledApp(url: URL(filePath: "/Applications/Old.app"), name: "Old", bundleID: "x.old", version: nil,
+                               lastUsed: now.addingTimeInterval(-400 * 86_400))
+        let model = searchModel()
+        model.apps = [estimated, unknown, old]
+        model.unused = .months6
+        #expect(model.filteredApps.map(\.name) == ["Old"])
+        #expect(model.hiddenUndatedCount == 1)
+        model.showUndated = true
+        #expect(model.filteredApps.map(\.name) == ["Unk", "Old"])
+        #expect(model.hiddenUndatedCount == 0)
+        model.unused = .year1 // a new filter hides them again
+        #expect(!model.showUndated && model.hiddenUndatedCount == 1)
+        #expect(UninstallerModel.sorted(model.apps, by: .lastUsed, sizes: [:]).last?.name == "Unk") // unknown sorts last
+    }
+
     /// The selected app hidden by the filter is deselected, like the search does.
     @MainActor @Test func unusedFilterDeselectsHiddenApp() {
         let model = searchModel()
+        let old = Date.now.addingTimeInterval(-400 * 86_400)
+        model.apps = model.apps.map {
+            InstalledApp(url: $0.url, name: $0.name, bundleID: $0.bundleID, version: nil, lastUsed: $0.name == "Zed" ? .now : old)
+        }
         let zed = model.apps[2]
-        model.apps[2] = InstalledApp(url: zed.url, name: zed.name, bundleID: zed.bundleID, version: nil, lastUsed: .now)
         model.selection = .app(zed.url)
         model.unused = .months3
         #expect(model.selection == nil)

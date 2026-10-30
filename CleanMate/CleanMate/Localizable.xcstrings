@@ -1073,12 +1073,12 @@
         }
       }
     },
-    "Show apps not used for a while (apps never seen opened count too)" : {
+    "Show apps not used for a while (apps with no last-opened date are left out)" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hiện các ứng dụng lâu không dùng (kể cả ứng dụng chưa từng thấy mở)"
+            "value" : "Hiện app lâu không dùng (app không có ngày mở được bỏ qua)"
           }
         }
       }
@@ -4998,6 +4998,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Máy chủ và công cụ ZCode cài lên máy từ xa, sẽ được tải lại khi kết nối tới máy đó"
+          }
+        }
+      }
+    },
+    "Last used ≈ %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng lần cuối ≈ %@"
+          }
+        }
+      }
+    },
+    "Estimated from when the app's settings, cache or support files last changed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ước lượng theo lần cuối tệp cài đặt, bộ nhớ đệm hoặc dữ liệu hỗ trợ của app thay đổi"
+          }
+        }
+      }
+    },
+    "Last used: Unknown" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng lần cuối: Không rõ"
+          }
+        }
+      }
+    },
+    "macOS has no record of when this app was last opened" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không ghi lại lần cuối app này được mở"
+          }
+        }
+      }
+    },
+    "%lld apps with no last-opened date are hidden" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld app with no last-opened date is hidden"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld apps with no last-opened date are hidden"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld app không có ngày mở đang bị ẩn"
           }
         }
       }

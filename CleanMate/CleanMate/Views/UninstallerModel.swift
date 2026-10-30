@@ -33,7 +33,7 @@ final class UninstallerModel: ObservableObject {
     /// An app hidden by the search is deselected, so the detail, Uninstall and Return never act on an app not in the list.
     @Published var search = "" { didSet { deselectUnlistedApp() } }
     /// Set by the view from `@AppStorage`; an app it hides is deselected like the search does.
-    @Published var unused = UnusedFilter.all { didSet { if unused != oldValue { deselectUnlistedApp() } } }
+    @Published var unused = UnusedFilter.all { didSet { if unused != oldValue { showUndated = false; deselectUnlistedApp() } } }
     /// A new selection drops the old one's rows at once (and any load still finishing for it): Uninstall must never
     /// send one app with another's ticked data before `loadEntries` runs.
     @Published var selection: Selection? {
@@ -124,16 +124,26 @@ final class UninstallerModel: ObservableObject {
         }
     }
 
-    var filteredApps: [InstalledApp] { Self.filtered(apps, search: search, unused: unused) }
+    /// The "not used for" filter also lists apps with no last-used date (off by default: not knowing is not "unused").
+    @Published var showUndated = false { didSet { if showUndated != oldValue { deselectUnlistedApp() } } }
 
-    /// Search (name or bundle id) and "not used for" filter. An app with no last-used date (Spotlight never saw it
-    /// opened) counts as unused for long: it is the likeliest to be forgotten.
-    nonisolated static func filtered(_ apps: [InstalledApp], search: String, unused: UnusedFilter, now: Date = .now) -> [InstalledApp] {
+    var filteredApps: [InstalledApp] { Self.filtered(apps, search: search, unused: unused, includeUndated: showUndated) }
+
+    /// Apps the "not used for" filter leaves out for having no last-used date (0 with no filter or `showUndated`).
+    var hiddenUndatedCount: Int {
+        guard unused != .all, !showUndated else { return 0 }
+        return Self.filtered(apps, search: search, unused: .all).count { $0.lastUsed == nil }
+    }
+
+    /// Search (name or bundle id) and "not used for" filter. An app with no last-used date (`InstalledApp.lastUsed`)
+    /// passes the filter only with `includeUndated`: it may well be in use.
+    nonisolated static func filtered(_ apps: [InstalledApp], search: String, unused: UnusedFilter, includeUndated: Bool = false,
+                                     now: Date = .now) -> [InstalledApp] {
         let months = switch unused { case .all: 0; case .months3: 3; case .months6: 6; case .year1: 12 }
         let cutoff = months == 0 ? nil : Calendar.current.date(byAdding: .month, value: -months, to: now)
         return apps.filter { app in
             (search.isEmpty || app.name.localizedStandardContains(search) || app.bundleID.localizedStandardContains(search))
-                && (cutoff.map { cutoff in app.lastUsed.map { $0 < cutoff } ?? true } ?? true)
+                && (cutoff.map { cutoff in app.lastUsed.map { $0 < cutoff } ?? includeUndated } ?? true)
         }
     }
 
@@ -150,7 +160,7 @@ final class UninstallerModel: ObservableObject {
         appSizes.merging(appDataSizes) { $0 + $1 }.filter { appSizes[$0.key] != nil }
     }
 
-    /// Size: largest first; last used: oldest first. Apps whose size/date is not known yet go last; ties by name.
+    /// Size: largest first; last used: oldest first. Apps whose size/date is not known go last; ties by name.
     nonisolated static func sorted(_ apps: [InstalledApp], by sort: AppSort, sizes: [URL: Int64]) -> [InstalledApp] {
         apps.sorted { a, b in
             switch sort {

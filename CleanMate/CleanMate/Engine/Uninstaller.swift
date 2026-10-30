@@ -9,8 +9,10 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     let name: String
     let bundleID: String
     let version: String?
-    /// Spotlight's last-used date, when known.
+    /// Spotlight's last-used date; else today when the app is open, else the newest change of its Preferences plist,
+    /// Caches folder or Application Support folder (`lastUsedIsEstimate`); nil when nothing tells.
     let lastUsed: Date?
+    var lastUsedIsEstimate = false
     /// `CFBundleName` and `CFBundleExecutable`: folders are often named after these (`Code` for Visual Studio Code).
     var bundleName: String? = nil
     var executableName: String? = nil
@@ -244,14 +246,38 @@ nonisolated enum Uninstaller {
             for url in appURLs(in: folder) where policy.allowsApp(url) {
                 guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { continue }
                 let info = bundle.infoDictionary
+                let name = url.deletingPathExtension().lastPathComponent
+                let used = lastUsed(spotlight: NSMetadataItem(url: url)?.value(forAttribute: "kMDItemLastUsedDate") as? Date,
+                                    running: isRunning(url),
+                                    modified: usageTraces(bundleID: id, name: name, home: policy.homeURL).map(modificationDate))
                 apps.append(InstalledApp(
-                    url: url, name: url.deletingPathExtension().lastPathComponent, bundleID: id,
+                    url: url, name: name, bundleID: id,
                     version: info?["CFBundleShortVersionString"] as? String,
-                    lastUsed: NSMetadataItem(url: url)?.value(forAttribute: "kMDItemLastUsedDate") as? Date,
+                    lastUsed: used.date, lastUsedIsEstimate: used.isEstimate,
                     bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String))
             }
         }
         return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// Spotlight's date wins; an open app was used today; else the newest of `modified` is an estimate; else unknown.
+    static func lastUsed(spotlight: Date?, running: Bool, modified: [Date?], now: Date = .now) -> (date: Date?, isEstimate: Bool) {
+        if let spotlight { return (spotlight, false) }
+        if running { return (now, false) }
+        let newest = modified.compactMap { $0 }.max()
+        return (newest, newest != nil)
+    }
+
+    /// Files an app touches when used: `~/Library/Preferences/<id>.plist`, `~/Library/Caches/<id>`,
+    /// `~/Library/Application Support/<name>` (only their own dates are read, nothing inside).
+    static func usageTraces(bundleID: String, name: String, home: URL) -> [URL] {
+        let library = home.appending(path: "Library", directoryHint: .isDirectory)
+        return [library.appending(path: "Preferences/\(bundleID).plist"), library.appending(path: "Caches/\(bundleID)"),
+                library.appending(path: "Application Support/\(name)")]
+    }
+
+    static func modificationDate(_ url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
     }
 
     /// Allocated size of a file or folder (symlinks not followed).

@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   10 times a second.
 
 ### Fixed
+- **Uninstaller**: apps macOS has no last-opened date for are no longer treated as never used: they show an estimate from their settings and cache files, or **Unknown**, and the "Not used for" filter leaves unknown ones out unless you choose **Show**.
 - **Uninstaller**: Leftovers of Removed Apps no longer lists a config folder of an installed Homebrew formula or cask as orphaned.
 - **Smart Scan** and **Privacy**: "Freed" is now the size of what was removed or moved to the Trash, never the noisy
   change in free disk space (it could show less than was removed). The part moved to the Trash is shown apart, and the
