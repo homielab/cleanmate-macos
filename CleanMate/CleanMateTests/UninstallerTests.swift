@@ -3,8 +3,9 @@ import Testing
 @testable import CleanMate
 
 /// Uninstaller runs against a throwaway fake home; nothing is ever moved to the real Trash or uninstalled.
-struct UninstallerTests {
-    let root = FileManager.default.temporaryDirectory.appending(path: "CleanMateUninstaller-\(UUID().uuidString)")
+final class UninstallerTests {
+    let root = TestTemp.url("CleanMateUninstaller")
+    deinit { try? FileManager.default.removeItem(at: root) }
     var home: URL { root.appending(path: "home") }
     var policy: SafetyPolicy { SafetyPolicy(home: home, temp: root.appending(path: "tmp")) }
 
@@ -210,8 +211,8 @@ struct UninstallerTests {
         try make("bin/mytool")
         let tools = Uninstaller.toolPaths(home: home, folders: [bin.path])
         let config = { (app: InstalledApp, others: Set<String>) async in
-            await Uninstaller.data(of: app, otherBundleIDs: [], otherAppNames: others, tools: tools, policy: policy)
-                .filter { $0.kind == .config }.map { ($0.url.path as NSString).replacingOccurrences(of: home.path, with: "~") }
+            await Uninstaller.data(of: app, otherBundleIDs: [], otherAppNames: others, tools: tools, policy: self.policy)
+                .filter { $0.kind == .config }.map { ($0.url.path as NSString).replacingOccurrences(of: self.home.path, with: "~") }
         }
         let cursor = InstalledApp(url: cursorApp, name: "Cursor", bundleID: "com.todesktop.cursor", version: nil, lastUsed: nil)
         #expect(Set(await config(cursor, [])) == ["~/.cursor", "~/.cursor-tutor", "~/.config/cursor", "~/.local/share/cursor", "~/.local/state/cursor"])
@@ -478,7 +479,7 @@ struct UninstallerTests {
     /// A Finder-locked app: `trashItem` and `recycle` both refuse it, so nothing is tried or touched and the
     /// model reports it as locked. Fake Trash and fake recycle only.
     @MainActor @Test func reportsLockedApp() async throws {
-        defer { chflags(root.appending(path: "Applications/Locked.app").path, 0); try? FileManager.default.removeItem(at: root) }
+        defer { chflags(home.appending(path: "Applications/Locked.app").path, 0); try? FileManager.default.removeItem(at: root) }
         let appURL = try app("Applications/Locked.app", bundleID: "com.foo.Locked")
         let cache = try make("Library/Caches/com.foo.Locked")
         #expect(chflags(appURL.path, UInt32(UF_IMMUTABLE)) == 0)
@@ -730,7 +731,7 @@ struct UninstallerTests {
 
     /// The traces are only the app's own prefs plist, Caches folder and Application Support folder, read from disk.
     @Test func usageTracesReadModificationDates() throws {
-        let home = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let home = TestTemp.url("CleanMateUninstaller")
         defer { try? FileManager.default.removeItem(at: home) }
         let traces = Uninstaller.usageTraces(bundleID: "com.foo.Bar", name: "Bar", home: home)
         #expect(traces.map { $0.path.replacingOccurrences(of: home.path, with: "~") }

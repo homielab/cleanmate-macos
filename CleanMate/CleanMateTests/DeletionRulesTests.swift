@@ -4,8 +4,9 @@ import Testing
 
 /// Unit tests for the small rules that decide what gets deleted: `Uninstaller.agentIsActive`,
 /// `CleanerGroup.containerBundleID`, `CleanerGroup.skipsSandboxCache` and `CleanerGroup.skipsGroupCache`. Everything lives in a throwaway folder.
-struct DeletionRulesTests {
-    let root = FileManager.default.temporaryDirectory.appending(path: "CleanMateRules-\(UUID().uuidString)")
+final class DeletionRulesTests {
+    let root = TestTemp.url("CleanMateRules")
+    deinit { try? FileManager.default.removeItem(at: root) }
 
     func write(_ plist: Any, to path: String) throws -> URL {
         let url = root.appending(path: path)
