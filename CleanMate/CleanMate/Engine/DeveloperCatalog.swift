@@ -94,6 +94,19 @@ extension CleanerGroup {
         // walk: unticked, one entry per folder, to the Trash (building them again takes long).
         StaleBuildFolders.item(),
         dev("pip-cache", "pip cache", ["~/Library/Caches/pip"], processes: ["pip", "pip3"]),
+        // Unticked: archives and the index cache in conda's `pkgs` folders only (`conda clean --tarballs --index-cache`);
+        // unpacked package folders and `envs/` are never listed. Environments may need a download when a package is
+        // reinstalled. Locked while conda, mamba or micromamba runs (`conda install` runs as `python …/conda`).
+        dev("conda-cache", "conda package archives",
+            note: "Downloaded package archives and the index cache in conda's pkgs folders (conda clean --tarballs); downloaded again when a package is installed",
+            CondaPackages.paths, included: CondaPackages.included, selected: false, processes: CondaPackages.processNames,
+            openFiles: true, config: ConfigFolders(read: CondaPackages.configuredFolders(home:))),
+        // Unticked: only `hosted` (downloaded packages) and `git/cache` (bare clones); `pub get` fetches them again.
+        // `credentials.json`, `bin/` and the checked-out `git/<name>-<hash>` folders are never touched.
+        dev("pub-cache", "Dart and Flutter pub cache",
+            note: "Packages downloaded by pub; projects need flutter pub get or dart pub get again",
+            ["~/.pub-cache/hosted", "~/.pub-cache/git/cache"], shell: ["PUB_CACHE": ["hosted", "git/cache"]], selected: false,
+            processes: ["dart", "flutter"], openFiles: true),
         dev("uv-cache", "uv cache", note: clonedNote, ["~/.cache/uv"],
             command: ShellCommand(executable: "uv", arguments: ["cache", "clean"], timeout: .seconds(120)),
             locate: lookup("uv", ["cache", "dir"]), upperBound: true),

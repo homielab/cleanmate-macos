@@ -8,7 +8,7 @@ nonisolated enum ShellEnvironment {
     /// so it would leave the extra folder shown (no GOPATH for that reason).
     static let variables: Set<String> = [
         "NVM_DIR", "RUSTUP_HOME", "CARGO_HOME", "GRADLE_USER_HOME", "HF_HOME", "HF_HUB_CACHE",
-        "ANDROID_AVD_HOME", "ANDROID_EMULATOR_HOME", "OLLAMA_MODELS", "FIREBASE_EMULATORS_PATH", "FIREBASE_DEBUG_PATH",
+        "ANDROID_AVD_HOME", "ANDROID_EMULATOR_HOME", "OLLAMA_MODELS", "FIREBASE_EMULATORS_PATH", "FIREBASE_DEBUG_PATH", "PUB_CACHE",
     ]
     /// zsh's load order (later wins); the bash files only fill variables no zsh file sets.
     /// shortcut: ZDOTDIR, `source`d files, /etc/zshenv and .zlogin are not read; add them if users ask.

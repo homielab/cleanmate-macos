@@ -5385,6 +5385,46 @@
           }
         }
       }
+    },
+    "conda package archives" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói đã tải của conda"
+          }
+        }
+      }
+    },
+    "Downloaded package archives and the index cache in conda's pkgs folders (conda clean --tarballs); downloaded again when a package is installed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói nén đã tải và bộ nhớ đệm chỉ mục trong thư mục pkgs của conda (conda clean --tarballs); tải lại khi cài một gói"
+          }
+        }
+      }
+    },
+    "Dart and Flutter pub cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm pub của Dart và Flutter"
+          }
+        }
+      }
+    },
+    "Packages downloaded by pub; projects need flutter pub get or dart pub get again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói do pub tải về; dự án cần chạy lại flutter pub get hoặc dart pub get"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
