@@ -221,8 +221,9 @@ nonisolated enum Cleaner {
                 continue
             }
             // Read before the entry goes (an Ollama manifest names its blobs), removed after it: a failure in
-            // between leaves unused files, never an entry missing its files.
-            let files = item.entryFiles?(entry.url) ?? []
+            // between leaves unused files, never an entry missing its files. Only what no entry still on disk uses:
+            // a shared blob goes with the last of its models removed here, and is kept while an unticked one uses it.
+            let files = item.entryFiles?(entry.url).own ?? []
             func remove(_ url: URL, size: Int64) throws {
                 switch item.mode {
                 case .delete: try FileManager.default.removeItem(at: url)
@@ -233,21 +234,23 @@ nonisolated enum Cleaner {
                 }
             }
             do {
-                try remove(entry.url, size: entry.size)
-                report.freed += entry.size
+                try remove(entry.url, size: entry.size - entry.filesSize)
+                report.freed += entry.size - entry.filesSize
             } catch {
                 report.skipped += 1 // permission / SIP / in use: leave it
                 continue
             }
+            // Each file counts as it is now: one shared at scan and removed with the last of its models counts too.
             for file in files {
                 var info = stat()
                 guard lstat(file.path, &info) == 0 else { continue } // already gone
+                let size = Int64(info.st_blocks) * 512
                 guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file), !Scanner.isLocked(file),
-                      (try? remove(file, size: Int64(info.st_blocks) * 512)) != nil else {
-                    report.skipped += 1 // kept: counted in the entry's size, so not freed
-                    report.freed = max(0, report.freed - Int64(info.st_blocks) * 512)
+                      (try? remove(file, size: size)) != nil else {
+                    report.skipped += 1 // kept, so not freed
                     continue
                 }
+                report.freed += size
             }
         }
         return report

@@ -96,6 +96,94 @@ struct OllamaModelsTests {
         #expect([hf, box.blob(5), box.blob(6), key, orphan, partial].allSatisfy(box.exists))
     }
 
+    /// The scan's entries of the models named (the folder above the tag), as `selectedScan` would leave them.
+    private func only(_ names: Set<String>, of scan: ItemScan) -> ItemScan {
+        var picked = scan
+        picked.entries = scan.entries.filter { names.contains($0.url.deletingLastPathComponent().lastPathComponent) }
+        return picked
+    }
+
+    /// Two models sharing a blob: it counts in neither entry's size and once in the total when both are ticked.
+    /// Removing one keeps it (the other still uses it); removing both takes it, and what was freed says so.
+    @Test func sharedBlobCountsOnceEveryModelUsingItIsTicked() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let item = try item
+        let a = try box.model("registry.ollama.ai/library/a/latest", config: 1, layers: [2, 3])
+        let b = try box.model("registry.ollama.ai/library/b/latest", config: 4, layers: [3])
+        try box.model("registry.ollama.ai/library/c/latest", config: 5, layers: [6])
+        let scan = await Scanner.scan(item, policy: box.policy)
+        let blobSize = Scanner.fileSize(box.blob(3))
+        let entryA = try #require(only(["a"], of: scan).entries.first), entryB = try #require(only(["b"], of: scan).entries.first)
+        #expect(entryA.size == Scanner.fileSize(a) + 2 * blobSize && entryA.filesSize == 2 * blobSize)
+        #expect(entryA.shared.map(\.url.standardizedFileURL.path) == [box.blob(3).standardizedFileURL.path])
+        #expect(entryA.shared.first?.size == blobSize
+            && entryA.shared.first?.users == [entryA.url.path, entryB.url.path])
+        #expect(entryB.size == Scanner.fileSize(b) + blobSize && entryB.shared == entryA.shared)
+        #expect(only(["a"], of: scan).size == entryA.size && only(["a", "c"], of: scan).sharedSize == 0)
+        #expect(only(["a", "b"], of: scan).size == entryA.size + entryB.size + blobSize)
+        #expect(scan.size == scan.entries.reduce(0) { $0 + $1.size } + blobSize) // counted once, not per model
+        let en = Locale(identifier: "en")
+        let tip = CleanerItemRow.sharedText(entry: entryA, in: scan.entries, label: item.entryLabel, locale: en)
+        #expect(tip == "+\(blobSize.formatted(.fileSize.locale(en))) shared with b:latest")
+        #expect(CleanerItemRow.sharedText(entry: only(["c"], of: scan).entries[0], in: scan.entries, label: nil) == nil)
+        // Not listed (left out of the scan): still named, by its label.
+        #expect(CleanerItemRow.sharedText(entry: entryA, in: [entryA], label: item.entryLabel, locale: en)?
+            .hasSuffix("shared with b:latest") == true)
+
+        let first = await Cleaner.clean(item, scan: only(["a"], of: scan), policy: box.policy)
+        #expect(first.skipped == 0 && first.freed == only(["a"], of: scan).size)
+        #expect(!box.exists(a) && !box.exists(box.blob(1)) && !box.exists(box.blob(2)))
+        #expect(box.exists(b) && box.exists(box.blob(3)))
+
+        let both = try Home()
+        defer { both.remove() }
+        try both.model("registry.ollama.ai/library/a/latest", config: 1, layers: [2, 3])
+        try both.model("registry.ollama.ai/library/b/latest", config: 4, layers: [3])
+        let c = try both.model("registry.ollama.ai/library/c/latest", config: 5, layers: [6])
+        let picked = only(["a", "b"], of: await Scanner.scan(item, policy: both.policy))
+        let selected = picked.size // before the clean: removed files must not change what the scan counts
+        #expect(selected == picked.entries.reduce(0) { $0 + $1.size } + Scanner.fileSize(both.blob(3)))
+        let report = await Cleaner.clean(item, scan: picked, policy: both.policy)
+        #expect(report.skipped == 0 && report.freed == selected && picked.size == selected)
+        #expect(![1, 2, 3, 4].contains { both.exists(both.blob($0)) })
+        #expect([c, both.blob(5), both.blob(6)].allSatisfy(both.exists))
+    }
+
+    /// Smart Scan's "Selected" total and the done screen's freed space follow the ticks: a shared blob counts once both
+    /// of its models are ticked, and the space freed matches what was selected.
+    @MainActor @Test func selectedTotalAndFreedCountSharedBlob() async throws {
+        let box = try Home()
+        defer { box.remove() }
+        let item = try item
+        let a = try box.model("registry.ollama.ai/library/a/latest", config: 1, layers: [2])
+        let b = try box.model("registry.ollama.ai/library/b/latest", config: 3, layers: [2])
+        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let policy = box.policy
+        model.logHome = box.home
+        model.appBundleIDs = { [] } // Ollama may run on this Mac
+        model.processNames = { [] }
+        model.blockedByExclusion = { _ in false }
+        model.freeSpace = { nil }
+        model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
+        model.cleanItem = { item, scan, _ in await Cleaner.clean(item, scan: scan, policy: policy) }
+        await model.scan()
+        let scan = try #require(model.scans["ollama-models"])
+        let blobSize = Scanner.fileSize(box.blob(2))
+        let sizeA = Scanner.fileSize(a) + Scanner.fileSize(box.blob(1)), sizeB = Scanner.fileSize(b) + Scanner.fileSize(box.blob(3))
+        let urlA = try #require(only(["a"], of: scan).entries.first?.url), urlB = try #require(only(["b"], of: scan).entries.first?.url)
+        #expect(model.selectedSize == 0) // unticked by default
+        model.setEntry(item, urlA, true)
+        #expect(model.selectedSize == sizeA && model.partialSelectedSize(item) == sizeA)
+        model.setEntry(item, urlB, true)
+        #expect(model.selectedSize == sizeA + sizeB + blobSize && model.selectedSize == scan.size)
+        await model.clean()
+        guard case .done(let report) = model.phase else { Issue.record("not done"); return }
+        #expect(report.freed == sizeA + sizeB + blobSize && report.skipped == 0)
+        #expect(model.cleanedGroups.first?.freed == report.freed)
+        #expect(![a, b, box.blob(1), box.blob(2), box.blob(3)].contains(where: box.exists))
+    }
+
     /// Another manifest that can't be read may use any blob: every blob is kept, only the manifest goes.
     /// Digests that are not `sha256:<64 hex>` (a path, another algorithm) never name a file.
     @Test func keepsBlobsWhenUnsure() async throws {

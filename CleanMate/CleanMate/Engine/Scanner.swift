@@ -14,7 +14,21 @@ nonisolated struct ScanEntry: Identifiable, Hashable, Sendable {
     var date: Date? = nil
     /// A folder inside could not be read: `size` leaves it out, so the real size may be larger.
     var partlyUnreadable = false
+    /// Bytes of `size` that are the entry's own `CleanerItem.entryFiles` (blobs only this Ollama model uses).
+    var filesSize: Int64 = 0
+    /// Entry files it shares with other entries (a blob two Ollama models use): in no entry's `size`, counted once in
+    /// `ItemScan.size` when every entry using it is in the scan.
+    var shared: [SharedFile] = []
     var id: URL { url }
+}
+
+/// A file several entries use (see `CleanerItem.entryFiles`).
+nonisolated struct SharedFile: Hashable, Sendable {
+    let url: URL
+    let size: Int64
+    /// Every entry using it, as `url.path` (compared as written: `standardizedFileURL` depends on the file existing);
+    /// one not listed (excluded, skipped) keeps it.
+    let users: Set<String>
 }
 
 nonisolated struct ItemScan: Sendable {
@@ -23,7 +37,15 @@ nonisolated struct ItemScan: Sendable {
     var permissionDenied = false
     /// Size reported by a `SizeProbe` (no entries then).
     var measuredSize: Int64? = nil
-    var size: Int64 { measuredSize ?? entries.reduce(0) { $0 + $1.size } }
+    var size: Int64 { measuredSize ?? (entries.reduce(0) { $0 + $1.size } + sharedSize) }
+    /// Shared files whose every user is among `entries`, each once: removing those entries frees them too.
+    var sharedFiles: [SharedFile] {
+        guard entries.contains(where: { !$0.shared.isEmpty }) else { return [] }
+        let listed = Set(entries.map(\.url.path))
+        var seen = Set<URL>()
+        return entries.flatMap(\.shared).filter { $0.users.isSubset(of: listed) && seen.insert($0.url).inserted }
+    }
+    var sharedSize: Int64 { sharedFiles.reduce(0) { $0 + $1.size } }
     /// Records counted in database entries; nil when the item has none.
     var records: Int? {
         let databases = entries.filter(\.isDatabase)
@@ -209,7 +231,13 @@ nonisolated enum Scanner {
                             }
                         }
                         if let files = item.entryFiles?(url) {
-                            found.size += files.filter(policy.allows).reduce(0) { $0 + fileSize($1) }
+                            found.filesSize = files.own.filter(policy.allows).reduce(0) { $0 + fileSize($1) }
+                            found.size += found.filesSize
+                            found.shared = files.shared.compactMap { file, users in
+                                let size = policy.allows(file) ? fileSize(file) : 0
+                                return size > 0 ? SharedFile(url: file, size: size,
+                                                             users: Set(users.map(\.path))) : nil
+                            }.sorted { $0.url.path < $1.url.path }
                         }
                         return found
                     }

@@ -154,6 +154,14 @@ nonisolated struct DatabaseErase: Sendable {
     static let sqlite = "/usr/bin/sqlite3"
 }
 
+/// See `CleanerItem.entryFiles`.
+nonisolated struct EntryFiles: Sendable, Equatable {
+    /// Used by this entry alone.
+    var own: [URL] = []
+    /// Used by other entries too: each file with every entry using it (this one included).
+    var shared: [URL: Set<URL>] = [:]
+}
+
 nonisolated struct CleanerItem: Identifiable, Sendable {
     let id: String
     let title: LocalizedStringResource
@@ -214,10 +222,12 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Removes one entry with a command instead of deleting a path (Docker's untagged images: `docker rmi <id>`);
     /// nil for an entry it does not recognise, which is then skipped. The item's own `command` is not run.
     var entryCommand: (@Sendable (URL) -> ShellCommand?)? = nil
-    /// Files outside `paths` that belong to one entry alone and go with it (an Ollama model's blobs that no other
-    /// model uses). Asked at scan, where they count in the entry's size, and again right before removal; each one
-    /// is removed after its entry, through `SafetyPolicy.allows`, and only when it is a regular file.
-    var entryFiles: (@Sendable (URL) -> [URL])? = nil
+    /// Files outside `paths` that go with an entry (an Ollama model's blobs). Asked at scan, where `own` counts in the
+    /// entry's size and `shared` counts once in the item's size when every entry using it is in the scan (ticked), and
+    /// again right before removal: only `own` (the files no other entry left on disk uses) is removed, after its
+    /// entry, through `SafetyPolicy.allows`, and only when it is a regular file. Removing the last entry using a
+    /// shared file therefore removes it.
+    var entryFiles: (@Sendable (URL) -> EntryFiles)? = nil
     /// Lists, instead of `paths`, the user's Trash on each external drive (`ExternalTrash`): one entry per drive, named
     /// after it, checked with `SafetyPolicy.allowsExternalTrash` instead of `allows`, and emptied (the folder stays).
     var externalTrash = false

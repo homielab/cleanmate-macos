@@ -4,7 +4,8 @@ import Foundation
 /// layers of one model; the layers themselves are `<models>/blobs/sha256-<hex>`, shared by every model that uses them
 /// (two tags of one model, a model made with `ollama create FROM` another). One entry per manifest; removing it also
 /// removes the blobs no other manifest names (`ownBlobs`), which is what `ollama rm` does without needing the server.
-/// shortcut: a blob shared by several models counts in none of their sizes, so removing all of them frees a bit more.
+/// A blob several models use counts once in the selected size when all of them are ticked (`blobs(of:)`), and goes
+/// with the last of them removed.
 nonisolated enum OllamaModels {
     /// One level per manifest path component under `manifests`: registry, namespace, model; the entries are tags.
     static let manifestFolders = "~/.ollama/models/manifests/*/*/*"
@@ -42,19 +43,26 @@ nonisolated enum OllamaModels {
 
     /// Blobs of `manifest` that no other manifest of the same models folder names. Empty when `manifest` is not a
     /// readable manifest, or when another manifest can't be read (what it uses is unknown, so every blob is kept).
-    @Sendable static func ownBlobs(of manifest: URL) -> [URL] {
-        guard let manifests = manifestsFolder(of: manifest), let own = digests(in: manifest), !own.isEmpty,
+    @Sendable static func ownBlobs(of manifest: URL) -> [URL] { blobs(of: manifest).own }
+
+    /// `own`: as `ownBlobs`; `shared`: its other blobs, each with every manifest naming it (this one included).
+    /// Both empty when `manifest` or another manifest can't be read.
+    @Sendable static func blobs(of manifest: URL) -> EntryFiles {
+        guard let manifests = manifestsFolder(of: manifest), let mine = digests(in: manifest), !mine.isEmpty,
               let others = FileManager.default.enumerator(at: manifests, includingPropertiesForKeys: [.isRegularFileKey],
-                                                          options: [.skipsHiddenFiles]) else { return [] }
+                                                          options: [.skipsHiddenFiles]) else { return EntryFiles() }
         let path = manifest.standardizedFileURL.path
-        var used = Set<String>()
+        var users: [String: Set<URL>] = [:]
         for case let url as URL in others where url.standardizedFileURL.path != path {
             guard (try? url.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true else { continue }
-            guard let names = digests(in: url) else { return [] }
-            used.formUnion(names)
+            guard let names = digests(in: url) else { return EntryFiles() }
+            // Named below `manifests` as the scan names its entries (the enumerator may resolve `/var` to `/private/var`).
+            let user = url.pathComponents.suffix(others.level).reduce(manifests) { $0.appending(path: $1) }
+            for name in names.intersection(mine) { users[name, default: [manifest]].insert(user) }
         }
         let blobs = manifests.deletingLastPathComponent().appending(path: "blobs")
-        return own.subtracting(used).sorted().map { blobs.appending(path: $0) }
+        return EntryFiles(own: mine.subtracting(users.keys).sorted().map { blobs.appending(path: $0) },
+                          shared: Dictionary(uniqueKeysWithValues: users.map { (blobs.appending(path: $0.key), $0.value) }))
     }
 
     /// Blob file names (`sha256-<64 hex>`) of a manifest's config and layers; nil when it is not a regular file

@@ -403,11 +403,30 @@ struct CleanerItemRow: View {
          sizeText(item: item, scan: scan, selectedSize: selectedSize, locale: locale)].compactMap { $0 }.joined(separator: ", ")
     }
 
-    /// An entry's checkbox reads "label or file name, date, size": never the long path.
-    static func accessibilityLabel(entry: ScanEntry, locale: Locale = .current) -> String {
+    /// An entry's checkbox reads "label or file name, date, size" (and `shared`, see `sharedText`): never the long path.
+    static func accessibilityLabel(entry: ScanEntry, shared: String? = nil, locale: Locale = .current) -> String {
         [entry.title ?? entry.url.lastPathComponent,
          entry.date?.formatted(.dateTime.year().month().day().locale(locale)),
-         entry.size.formatted(.fileSize.locale(locale))].compactMap { $0 }.joined(separator: ", ")
+         entry.size.formatted(.fileSize.locale(locale)), shared].compactMap { $0 }.joined(separator: ", ")
+    }
+
+    /// "+2 GB shared with llama3.2:1b": files the entry shares with other entries (Ollama blobs), in none of their
+    /// sizes; counted in the item's once all of them are ticked. nil when it shares none. A user not listed (excluded,
+    /// skipped) is named by `label`, else its file name.
+    nonisolated static func sharedText(entry: ScanEntry, in entries: [ScanEntry], label: CleanerItem.EntryLabel?,
+                           locale: Locale = .current) -> String? {
+        guard !entry.shared.isEmpty else { return nil }
+        let titles = Dictionary(entries.map { ($0.url.path, $0.title ?? $0.url.lastPathComponent) },
+                                uniquingKeysWith: { first, _ in first })
+        let others = Set(entry.shared.flatMap(\.users)).subtracting([entry.url.path])
+        let names = others.map { path in
+            let url = URL(fileURLWithPath: path)
+            return titles[path] ?? label?(url)?.title ?? url.lastPathComponent
+        }.sorted()
+        let size = entry.shared.reduce(0) { $0 + $1.size }.formatted(.fileSize.locale(locale))
+        var text: LocalizedStringResource = "+\(size) shared with \(names.formatted(.list(type: .and).locale(locale)))"
+        text.locale = locale
+        return String(localized: text)
     }
 
     /// A row with no checkbox and no file (a Docker image) has no control in it, so VoiceOver reads it as one
@@ -423,12 +442,13 @@ struct CleanerItemRow: View {
             let shown = entryOn == nil ? Array(entries.prefix(shownLimit)) : entries
             ForEach(shown) { entry in
                 let on = entryOn?(entry.url)
+                let shared = Self.sharedText(entry: entry, in: entries, label: item.entryLabel, locale: locale)
                 HStack {
                     if let on {
                         Toggle(isOn: on) { EmptyView() }
                             .toggleStyle(SelectionCheckboxStyle())
                             .disabled(isLocked)
-                            .accessibilityLabel(Self.accessibilityLabel(entry: entry, locale: locale))
+                            .accessibilityLabel(Self.accessibilityLabel(entry: entry, shared: shared, locale: locale))
                     }
                     VStack(alignment: .leading, spacing: 1) {
                         if let title = entry.title { // e.g. an iPhone backup's device and date
@@ -468,6 +488,7 @@ struct CleanerItemRow: View {
                     }
                     .sizeColumnStyle(emphasized: false)
                     .frame(minWidth: 72, alignment: .trailing) // fixed width keeps the magnifier column straight
+                    .help(shared ?? "")
                     .accessibilityHidden(entryOn != nil) // the checkbox already reads the size
                     Color.clear.frame(width: 48, height: 1).accessibilityHidden(true) // the item's SizeBar column: sizes line up
                 }

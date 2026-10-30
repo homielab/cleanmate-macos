@@ -117,14 +117,15 @@ extension CleanerGroup {
         // Ollama: logs, never its id_ed25519 key.
         app("ollama", "Ollama", bundle: ["com.electron.ollama"], ["~/.ollama/logs"]),
         // Ollama models: GBs each, unticked, each one ticked on its own: one entry per tag (its manifest) plus the
-        // blobs no other model uses (`OllamaModels`). Deleted like the Chrome model (the Trash would free nothing).
+        // blobs no other model uses, a shared blob counting once all its models are ticked (`OllamaModels`).
+        // Deleted like the Chrome model (the Trash would free nothing).
         // Skipped while Ollama runs: its server reads them, and an app quit leaves `ollama serve` running.
         CleanerItem(id: "ollama-models", title: "Ollama: downloaded models",
                     note: "Downloaded again with ollama pull; a model made with ollama create must be made again",
                     paths: [OllamaModels.manifestFolders], selectedByDefault: false, shellFolders: OllamaModels.shellFolders,
                     showsWhenEmpty: false, runningAppBundleIDs: ["com.electron.ollama"], runningProcessNames: ["ollama"],
                     skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } }, entryLabel: OllamaModels.label(of:),
-                    selectableEntries: true, entryFiles: OllamaModels.ownBlobs(of:)),
+                    selectableEntries: true, entryFiles: OllamaModels.blobs(of:)),
         // Interrupted `ollama pull`s: one unticked row, deleted (regenerable); never a finished blob or a manifest.
         // Skipped while Ollama runs: a pull in progress writes to them.
         CleanerItem(id: "ollama-partial", title: "Ollama: incomplete downloads",
