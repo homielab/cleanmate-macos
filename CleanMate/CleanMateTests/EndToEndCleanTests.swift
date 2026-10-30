@@ -88,6 +88,11 @@ struct EndToEndCleanTests {
         ".android/avd/Pixel.avd/userdata-qemu.img", ".android/avd/Pixel.avd/userdata-qemu.img.qcow2",
         ".android/avd/Pixel.avd/sdcard.img", ".android/avd/Pixel.avd/config.ini",
         ".android/avd/Pixel.avd/hardware-qemu.ini", ".android/avd/Pixel.ini",
+        // The Android SDK next to system images no AVD uses: the image an AVD uses and the other SDK packages
+        "Library/Android/sdk/system-images/android-35/google_apis/arm64-v8a/package.xml",
+        "Library/Android/sdk/system-images/android-35/google_apis/arm64-v8a/system.img",
+        "Library/Android/sdk/platforms/android-35/android.jar", "Library/Android/sdk/build-tools/35.0.0/aapt2",
+        "Library/Android/sdk/ndk/27.1.12297006/source.properties", "Library/Android/sdk/emulator/emulator",
         // A user project, tool settings and app settings in their usual places
         "Developer/app/.git/config", "Developer/app/src/main.swift", "Developer/app/node_modules/x/index.js",
         "Developer/app/build/out.o", "Developer/app/.venv/bin/python", "Developer/app/target/debug/app",
@@ -104,6 +109,8 @@ struct EndToEndCleanTests {
         "Developer/tools/ANDROID_EMULATOR_HOME/avd/Pixel.avd/config.ini",
         "Developer/tools/OLLAMA_MODELS/blobs/sha256-" + String(repeating: "b", count: 64),
     ]
+    /// The image the bait AVDs use (bait itself, in the default SDK).
+    static let avdConfig = Data("\nimage.sysdir.1=system-images/android-35/google_apis/arm64-v8a/\n".utf8)
     /// Every shell folder variable is set in the fake `.zprofile` to `~/Developer/tools/<NAME>`.
     static let shellTools = "~/Developer/tools/"
 
@@ -197,6 +204,11 @@ struct EndToEndCleanTests {
                     }
                     continue
                 }
+                if item.id == AndroidSystemImages.id { // an installed image no AVD uses
+                    try write(folder.appending(path: "junk-\(item.id)/package.xml"), Data("<package/>".utf8))
+                    try write(folder.appending(path: "junk-\(item.id)/system.img"), Data(repeating: 1, count: 4096))
+                    continue
+                }
                 if item.id == "vscode-stale-workspaces" { // workspace data of a project folder that is gone
                     let gone = URL(fileURLWithPath: home.appending(path: "gone-project").path).absoluteString
                     try write(folder.appending(path: "junk-\(item.id)/workspace.json"), Data(#"{"folder":"\#(gone)"}"#.utf8))
@@ -238,8 +250,19 @@ struct EndToEndCleanTests {
         }
         var baitData: [String: Data] = [:]
         for path in Self.bait {
-            baitData[path] = Data("bait \(path)".utf8)
+            // An AVD's settings name the image it uses: an AVD that can't be read would keep every system image.
+            baitData[path] = Data("bait \(path)".utf8) + (path.hasSuffix(".avd/config.ini") ? Self.avdConfig : Data())
             try write(home.appending(path: path), baitData[path]!)
+        }
+        // AVD folders made for the snapshots item get their settings too, kept like bait.
+        let tools = String(Self.shellTools.dropFirst(2))
+        for avds in [".android/avd", tools + "ANDROID_AVD_HOME", tools + "ANDROID_EMULATOR_HOME/avd"] {
+            for name in try fm.contentsOfDirectory(atPath: home.appending(path: avds).path) where name.hasSuffix(".avd") {
+                let path = avds + "/" + name + "/config.ini"
+                guard baitData[path] == nil else { continue }
+                baitData[path] = Self.avdConfig
+                try write(home.appending(path: path), Self.avdConfig)
+            }
         }
         let profile = ShellEnvironment.variables.sorted().map { "export \($0)=\(Self.shellTools)\($0)\n" }.joined()
         baitData[".zprofile"] = Data(profile.utf8)

@@ -159,6 +159,16 @@
         }
       }
     },
+    "Android system images without a device" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System image Android không thiết bị nào dùng"
+          }
+        }
+      }
+    },
     "Anyone with your Mac can read its disk without your password. Turn FileVault on in Privacy & Security." : {
       "localizations" : {
         "vi" : {
@@ -523,6 +533,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Edge tải lại khi dùng tính năng AI"
+          }
+        }
+      }
+    },
+    "Emulator images no virtual device uses; downloaded again with Android Studio's SDK Manager" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image trình giả lập mà không thiết bị ảo nào dùng; tải lại bằng SDK Manager của Android Studio"
           }
         }
       }

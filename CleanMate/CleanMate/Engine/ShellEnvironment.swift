@@ -9,6 +9,8 @@ nonisolated enum ShellEnvironment {
     static let variables: Set<String> = [
         "NVM_DIR", "RUSTUP_HOME", "CARGO_HOME", "GRADLE_USER_HOME", "HF_HOME", "HF_HUB_CACHE",
         "ANDROID_AVD_HOME", "ANDROID_EMULATOR_HOME", "OLLAMA_MODELS", "FIREBASE_EMULATORS_PATH", "FIREBASE_DEBUG_PATH", "PUB_CACHE",
+        // Android SDK folders (scanned for system images) and where AVDs are kept (only read: which images they use).
+        "ANDROID_HOME", "ANDROID_SDK_ROOT", "ANDROID_USER_HOME", "ANDROID_SDK_HOME", "ANDROID_PREFS_ROOT",
     ]
     /// zsh's load order (later wins); the bash files only fill variables no zsh file sets.
     /// shortcut: ZDOTDIR, `source`d files, /etc/zshenv and .zlogin are not read; add them if users ask.
@@ -100,6 +102,19 @@ nonisolated enum ShellEnvironment {
             }
         }
         return values(zshFiles).merging(values(bashFiles)) { zsh, _ in zsh }
+    }
+
+    /// Names any line of the profile files assigns (`NAME=`), readable or not: a name here but not in `read` is set in
+    /// a way only a real shell knows. Comment lines don't count.
+    static func assigned(home: URL) -> Set<String> {
+        var names = Set<String>()
+        for name in zshFiles + bashFiles {
+            guard let text = try? String(contentsOf: home.appending(path: name), encoding: .utf8) else { continue }
+            for line in text.split(whereSeparator: \.isNewline) where !line.trimmingCharacters(in: .whitespaces).hasPrefix("#") {
+                for set in line.matches(of: /(?:^|[\s;&|(])([A-Za-z_][A-Za-z0-9_]*)=/) { names.insert(String(set.1)) }
+            }
+        }
+        return names
     }
 
     /// `read`, reused while the files' dates and sizes stay the same: a scan asks once per item.

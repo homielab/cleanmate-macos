@@ -152,6 +152,9 @@ extension CleanerGroup {
             processes: ["emulator", "qemu-system-aarch64", "qemu-system-aarch64-headless",
                         "qemu-system-x86_64", "qemu-system-x86_64-headless"],
             selectableEntries: true),
+        // Unticked, deleted: emulator system images no AVD uses, one entry per image (`AndroidSystemImages`).
+        // Locked while Android Studio, the emulator, sdkmanager or avdmanager runs.
+        AndroidSystemImages.item(),
         // Unticked, to the Trash: each JetBrains IDE / Android Studio version keeps its own settings, plugins,
         // caches and logs folder (`GoLand2025.3`, `AndroidStudio2026.1.1`), left behind by upgrades. Only versions older
         // than the newest of the same product found in these folders are listed (their settings were migrated);

@@ -104,6 +104,9 @@ nonisolated enum RunningProcesses {
         if strings.contains("org.gradle.launcher.daemon.bootstrap.GradleDaemon") { names.insert("GradleDaemon") }
         // The Kotlin compile daemon is `java … org.jetbrains.kotlin.daemon.KotlinCompileDaemon …`.
         if strings.contains("org.jetbrains.kotlin.daemon.KotlinCompileDaemon") { names.insert("KotlinCompileDaemon") }
+        // sdkmanager and avdmanager are scripts that run `java … com.android.sdklib.tool.…Cli`.
+        if strings.contains("com.android.sdklib.tool.sdkmanager.SdkManagerCli") { names.insert("sdkmanager") }
+        if strings.contains("com.android.sdklib.tool.AvdManagerCli") { names.insert("avdmanager") }
         return names
     }
 }
