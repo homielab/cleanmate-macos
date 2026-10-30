@@ -1,8 +1,8 @@
 import Charts
 import SwiftUI
 
-/// First module: drives, free space over time, what CleanMate freed and the largest folders in the home folder.
-/// Nothing here removes files.
+/// First module: drives, free space over time, what CleanMate freed, the largest folders in the home folder and
+/// whether macOS's protections are on. Nothing here removes files or changes a setting.
 struct OverviewView: View {
     @ObservedObject var model: OverviewModel
 
@@ -14,6 +14,7 @@ struct OverviewView: View {
             historySection
             freedSection
             foldersSection
+            securitySection
         }
         .formStyle(.grouped)
         .navigationTitle(Text(Module.overview.title))
@@ -93,6 +94,80 @@ struct OverviewView: View {
             if !model.folders.isEmpty {
                 Text("Click a folder to explore it in Space Lens.").font(.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private var securitySection: some View {
+        Section {
+            if let security = model.security {
+                ForEach(security.checks) { SecurityRow(check: $0, xprotect: security.xprotect) }
+            } else {
+                Text("Checking…").foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("System protection")
+        } footer: {
+            Text("Read from macOS. CleanMate does not change these settings.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// A protection: green when on, orange when off (with what that means and where to turn it on), grey when unknown.
+private struct SecurityRow: View {
+    let check: SecurityStatus.Check
+    let xprotect: SecurityStatus.XProtect?
+
+    private var symbol: (name: String, color: Color) {
+        switch check.state {
+        case .on: ("checkmark.shield.fill", .green)
+        case .off: ("exclamationmark.shield.fill", .orange)
+        case .unknown: ("questionmark.circle", .secondary)
+        }
+    }
+
+    private var value: Text {
+        if check.kind == .xprotect, let xprotect {
+            guard let date = xprotect.date else { return Text("Version \(xprotect.version)") }
+            return Text("Version \(xprotect.version), \(date, format: .dateTime.day().month().year())")
+        }
+        switch check.state {
+        case .on: return Text("On")
+        case .off: return Text("Off")
+        case .unknown: return Text("Unknown")
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: symbol.name).foregroundStyle(symbol.color).frame(width: 20)
+                    .accessibilityHidden(true)
+                Text(check.kind.title)
+                Spacer()
+                value.foregroundStyle(check.state == .off ? Color.orange : Color.secondary).monospacedDigit()
+            }
+            .help(Text(check.kind.help))
+            .accessibilityElement(children: .combine)
+            if let reminder = check.reminder {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(reminder).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                    if let url = check.settingsURL {
+                        Button("Open System Settings…") { SecurityRow.open(url) }.controlSize(.small)
+                    }
+                }
+                .padding(.leading, 28)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// The pane, else System Settings itself (an older macOS that doesn't know the pane).
+    private static func open(_ url: URL) {
+        if !NSWorkspace.shared.open(url) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
         }
     }
 }

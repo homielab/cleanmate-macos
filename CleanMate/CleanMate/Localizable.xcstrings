@@ -159,6 +159,36 @@
         }
       }
     },
+    "Anyone with your Mac can read its disk without your password. Turn FileVault on in Privacy & Security." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ai cầm máy Mac của bạn cũng đọc được ổ đĩa mà không cần mật khẩu. Bật FileVault trong Quyền riêng tư & Bảo mật."
+          }
+        }
+      }
+    },
+    "Apps from anywhere open without a check. Turn Gatekeeper back on in Privacy & Security." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng từ bất kỳ nguồn nào cũng mở được mà không bị kiểm tra. Bật lại Gatekeeper trong Quyền riêng tư & Bảo mật."
+          }
+        }
+      }
+    },
+    "Apps with admin rights can change macOS system files. Turn it back on from macOS Recovery with “csrutil enable”." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng có quyền quản trị có thể sửa tệp hệ thống của macOS. Bật lại từ macOS Recovery bằng lệnh “csrutil enable”."
+          }
+        }
+      }
+    },
     "At this rate the disk is full in about %lld weeks." : {
       "localizations" : {
         "en" : {
@@ -217,6 +247,16 @@
         }
       }
     },
+    "Blocks unwanted incoming connections to apps on this Mac." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chặn kết nối đến không mong muốn tới các ứng dụng trên máy Mac này."
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "localizations" : {
         "vi" : {
@@ -233,6 +273,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kiểm tra cập nhật là kết nối mạng duy nhất của CleanMate: hỏi GitHub xem đã có phiên bản mới chưa. Không gửi gì về bạn hay máy Mac của bạn."
+          }
+        }
+      }
+    },
+    "Checking…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang kiểm tra…"
+          }
+        }
+      }
+    },
+    "Checks that apps you open come from the App Store or identified developers." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kiểm tra ứng dụng bạn mở đến từ App Store hoặc nhà phát triển đã xác minh."
           }
         }
       }
@@ -467,6 +527,16 @@
         }
       }
     },
+    "Encrypts the startup disk so it can't be read without your password." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mã hoá ổ khởi động để không ai đọc được nếu không có mật khẩu của bạn."
+          }
+        }
+      }
+    },
     "Engine binaries of Prisma versions, downloaded again when needed" : {
       "localizations" : {
         "vi" : {
@@ -553,6 +623,16 @@
         }
       }
     },
+    "FileVault" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FileVault"
+          }
+        }
+      }
+    },
     "Filtered. The totals above still count every entry." : {
       "localizations" : {
         "vi" : {
@@ -569,6 +649,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đang tìm tệp trùng lặp…"
+          }
+        }
+      }
+    },
+    "Firewall" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tường lửa"
           }
         }
       }
@@ -619,6 +709,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tăng khoảng %@ mỗi tuần."
+          }
+        }
+      }
+    },
+    "Gatekeeper" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gatekeeper"
           }
         }
       }
@@ -679,6 +779,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tổng cộng"
+          }
+        }
+      }
+    },
+    "Incoming connections to apps on this Mac are not filtered. Turn the firewall on in Network settings." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kết nối đến các ứng dụng trên máy Mac này không được lọc. Bật tường lửa trong phần Mạng."
           }
         }
       }
@@ -1039,6 +1149,16 @@
         }
       }
     },
+    "On" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật"
+          }
+        }
+      }
+    },
     "Open Exclusions…" : {
       "localizations" : {
         "vi" : {
@@ -1059,12 +1179,32 @@
         }
       }
     },
+    "Open System Settings…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở Cài đặt hệ thống…"
+          }
+        }
+      }
+    },
     "Overview" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tổng quan"
+          }
+        }
+      }
+    },
+    "Read from macOS. CleanMate does not change these settings." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đọc từ macOS. CleanMate không thay đổi các cài đặt này."
           }
         }
       }
@@ -1147,6 +1287,36 @@
         }
       }
     },
+    "Stops any app, even with admin rights, from changing macOS system files." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ngăn mọi ứng dụng, kể cả khi có quyền quản trị, sửa tệp hệ thống của macOS."
+          }
+        }
+      }
+    },
+    "System Integrity Protection" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bảo vệ toàn vẹn hệ thống (SIP)"
+          }
+        }
+      }
+    },
+    "System protection" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bảo vệ hệ thống"
+          }
+        }
+      }
+    },
     "Temporary files: %lld days" : {
       "localizations" : {
         "en" : {
@@ -1171,6 +1341,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp tạm: %lld ngày"
+          }
+        }
+      }
+    },
+    "The malware definitions macOS checks apps against, updated automatically." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhận diện mã độc macOS dùng để kiểm tra ứng dụng, tự động cập nhật."
           }
         }
       }
@@ -1475,6 +1655,16 @@
         }
       }
     },
+    "Unknown" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không rõ"
+          }
+        }
+      }
+    },
     "Update packages already installed; downloaded again if needed" : {
       "localizations" : {
         "vi" : {
@@ -1491,6 +1681,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cập nhật"
+          }
+        }
+      }
+    },
+    "Version %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản %@"
+          }
+        }
+      }
+    },
+    "Version %@, %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản %1$@, %2$@"
           }
         }
       }
@@ -1541,6 +1751,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Do Firebase CLI và máy chủ MCP của nó ghi; nhật ký còn đang mở được giữ lại"
+          }
+        }
+      }
+    },
+    "XProtect" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "XProtect"
           }
         }
       }

@@ -8,6 +8,9 @@ nonisolated struct ShellCommand: Sendable {
     var timeout: Duration = .seconds(60)
     /// Arguments decided at run time, put before `arguments`; nil = don't run (e.g. no local Docker socket).
     var leadingArguments: @Sendable () -> [String]? = { [] }
+    /// false: `output()` also returns what a tool printed before exiting with a non-zero code (`spctl --status`
+    /// exits 1 when assessments are disabled). Missing, killed or timed-out tools still give nil.
+    var requiresSuccess = true
 
     static let searchPaths = [
         "/opt/homebrew/bin", "/usr/local/bin", "~/.docker/bin", "~/.local/bin", "~/.cargo/bin", "~/.bun/bin",
@@ -101,7 +104,8 @@ nonisolated struct ShellCommand: Sendable {
             nap = min(nap * 2, .milliseconds(50))  // capped: long tools (brew, docker) poll thousands of times
             try? await Task.sleep(for: min(nap, exitedAt == nil ? .milliseconds(50) : .milliseconds(20)))
         }
-        guard status == 0 else { return nil }  // 0 = exited normally with code 0
+        // 0 = exited normally with code 0; low 7 bits 0 = exited normally (not killed by a signal).
+        guard status == 0 || (!requiresSuccess && status & 0x7f == 0) else { return nil }
         return capture ? String(decoding: data, as: UTF8.self) : ""
     }
 

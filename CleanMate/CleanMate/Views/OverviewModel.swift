@@ -1,9 +1,9 @@
 import Combine
 import Foundation
 
-/// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, and the largest
-/// folders in the home folder.
-/// Read-only. Drives and freed space are read at once; folder sizes are measured in the background.
+/// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, the largest
+/// folders in the home folder and whether macOS's protections are on.
+/// Read-only. Drives and freed space are read at once; folder sizes and protections are read in the background.
 final class OverviewModel: ObservableObject {
     nonisolated struct Disk: Identifiable, Equatable, Sendable {
         let url: URL
@@ -37,6 +37,8 @@ final class OverviewModel: ObservableObject {
     @Published private(set) var measured = false
     /// Folders macOS protects were left out (no Full Disk Access): the view shows a note.
     @Published private(set) var skippedProtected = false
+    /// Gatekeeper, firewall, SIP, FileVault, XProtect; nil until first read.
+    @Published private(set) var security: SecurityStatus?
 
     /// Injectable for tests: the folder measured and the activity log read.
     var home = SafetyPolicy.current.homeURL
@@ -50,10 +52,15 @@ final class OverviewModel: ObservableObject {
     var measure: @Sendable (URL, SpaceLens.HardLinks, Set<String>) async throws -> (size: Int64, folders: [String: Int64]) = {
         try await SpaceLens.measure($0, links: $1, skipping: $2)
     }
+    /// Tests pass their own; running under tests without one reads nothing (all unknown), so no command runs.
+    var readSecurity: @Sendable () async -> SecurityStatus = {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? await SecurityStatus.read() : SecurityStatus()
+    }
     /// Space Lens takes the sizes measured here, so opening a folder from the list is instant.
     weak var spaceLens: SpaceLensModel?
 
     private var task: Task<Void, Never>?
+    private var securityTask: Task<Void, Never>?
     private var started = false
     /// Something was removed since the last measure: measure again next time the Overview is shown.
     private var stale = false
@@ -67,9 +74,10 @@ final class OverviewModel: ObservableObject {
         }
     }
 
-    /// When the Overview is shown: everything the first time or after a removal, else drives and freed space only.
+    /// When the Overview is shown: everything the first time or after a removal, else drives, freed space and
+    /// protections only (a setting may have changed in System Settings meanwhile).
     func startIfNeeded() {
-        if !started || stale { refresh() } else { readQuick() }
+        if !started || stale { refresh() } else { readQuick(); readSecurityStatus() }
     }
 
     /// "Refresh" and ⌘R: reads everything again.
@@ -77,6 +85,7 @@ final class OverviewModel: ObservableObject {
         started = true
         stale = false
         readQuick()
+        readSecurityStatus()
         measureFolders()
     }
 
@@ -91,6 +100,17 @@ final class OverviewModel: ObservableObject {
         disks = readDisks()
         cleanups = ActivityLog.cleanups(now: now(), home: home)
         history = diskHistory.recent(now: now())
+    }
+
+    /// Runs alongside the folder measure; ⌘. does not stop it (each command times out within seconds).
+    private func readSecurityStatus() {
+        securityTask?.cancel()
+        let read = readSecurity
+        securityTask = Task {
+            let status = await read()
+            guard !Task.isCancelled else { return }
+            security = status
+        }
     }
 
     private func measureFolders() {

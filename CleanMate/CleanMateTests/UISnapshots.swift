@@ -516,9 +516,17 @@ struct UISnapshots {
              OverviewModel.Disk(url: URL(fileURLWithPath: "/Volumes"),
                                 volume: .init(name: "Backup Drive", total: 1_000_000_000_000, available: 62_000_000_000))]
         }
+        // The firewall off shows its reminder; SIP unknown is grey.
+        let security = SecurityStatus(gatekeeper: .on, firewall: .off, sip: .unknown, fileVault: .on,
+                                      xprotect: .init(version: "5368", date: Self.today.addingTimeInterval(-3 * 86_400)))
+        model.readSecurity = { security }
         model.refresh()
-        while model.measuring { try await Task.sleep(for: .milliseconds(50)) }
+        while model.measuring || model.security == nil { try await Task.sleep(for: .milliseconds(50)) }
         try await snapshot("overview") { OverviewView(model: model) }
+        // Tall enough for the whole form, down to "System protection" at the bottom.
+        try await snapshot("overview-protection", size: CGSize(width: Self.detailSize.width, height: 1_500)) {
+            OverviewView(model: model)
+        }
     }
 
     /// The Uninstaller's result alert does not render offscreen (the window only dims), so the locked-app texts
