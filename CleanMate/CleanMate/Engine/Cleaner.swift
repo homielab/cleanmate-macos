@@ -94,9 +94,11 @@ nonisolated enum TrashUndo {
     /// swapped for a symlink since) on the same volume (no drive mounted on it or above it since;
     /// `device` is injected by tests). The safety policy is not asked again: the old place is where the module's
     /// own policy allowed the item to be taken from a moment ago. Each one put back is logged as
-    /// "restored", which `ActivityLog.freed` takes off the trashed total.
+    /// "restored", which `ActivityLog.freed` takes off the trashed total. `logName` is the log's item column: the path,
+    /// or the name the move was logged under (Smart Scan logs one line per catalog item, not per file).
     @concurrent static func restore(_ items: [TrashedItem], module: LocalizedStringResource,
                                     home: URL = SafetyPolicy.current.homeURL,
+                                    logName: @Sendable (URL) -> String = { $0.path },
                                     device: SafetyPolicy.DeviceID = SafetyPolicy.deviceID) async -> Result {
         var result = Result()
         for item in items {
@@ -111,7 +113,7 @@ nonisolated enum TrashUndo {
                 // moveItem never replaces an existing item, so a file appearing meanwhile is not overwritten.
                 try FileManager.default.moveItem(at: item.inTrash, to: item.original)
                 result.restored += 1
-                ActivityLog.recordRestored(module: module, item: item.original.path, size: item.size, home: home)
+                ActivityLog.recordRestored(module: module, item: logName(item.original), size: item.size, home: home)
             } catch {
                 result.skipped += 1
             }
@@ -125,10 +127,11 @@ nonisolated enum TrashUndo {
 nonisolated enum Cleaner {
     /// Removes what `scan` found for `item`. Every path is re-checked against `policy` right before removal, and
     /// against `minAge` (nothing inside modified since the cutoff, measured again now).
-    /// `trash` moves a `.trash` entry to the Trash; tests pass a fake one so the real Trash is never touched.
+    /// `trash` moves a `.trash` entry to the Trash and returns where it went (`report.trashed`, for Undo); tests pass
+    /// a fake one so the real Trash is never touched.
     /// `openPaths` reads the open-file table under a folder (`skipsOpenFiles`); tests pass one that counts calls.
     @concurrent static func clean(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy = .current,
-                                  trash: @Sendable (URL) throws -> Void = { _ = try CleanReport.moveToTrash($0) },
+                                  trash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash,
                                   openPaths: @Sendable (String) -> Set<String> = { RunningProcesses.openPaths(under: $0) }
     ) async -> CleanReport {
         var report = await remove(item, scan: scan, policy: policy, trash: trash, openPaths: openPaths)
@@ -153,7 +156,7 @@ nonisolated enum Cleaner {
     }
 
     private static func remove(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy,
-                               trash: @Sendable (URL) throws -> Void,
+                               trash: @Sendable (URL) throws -> URL?,
                                openPaths: @Sendable (String) -> Set<String>) async -> CleanReport {
         if item.probe?.precondition() == false { return CleanReport(skipped: 1) } // e.g. Docker stopped since the scan
         if item.externalTrash { return await ExternalTrash.empty(item, scan: scan, policy: policy, openPaths: openPaths) }
@@ -222,14 +225,17 @@ nonisolated enum Cleaner {
             // Read before the entry goes (an Ollama manifest names its blobs), removed after it: a failure in
             // between leaves unused files, never an entry missing its files.
             let files = item.entryFiles?(entry.url) ?? []
-            func remove(_ url: URL) throws {
+            func remove(_ url: URL, size: Int64) throws {
                 switch item.mode {
                 case .delete: try FileManager.default.removeItem(at: url)
-                case .trash: try trash(url)
+                case .trash:
+                    if let inTrash = try trash(url) {
+                        report.trashed.append(TrashedItem(original: url, inTrash: inTrash, size: size))
+                    }
                 }
             }
             do {
-                try remove(entry.url)
+                try remove(entry.url, size: entry.size)
                 report.freed += entry.size
             } catch {
                 report.skipped += 1 // permission / SIP / in use: leave it
@@ -239,7 +245,7 @@ nonisolated enum Cleaner {
                 var info = stat()
                 guard lstat(file.path, &info) == 0 else { continue } // already gone
                 guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file), !Scanner.isLocked(file),
-                      (try? remove(file)) != nil else {
+                      (try? remove(file, size: Int64(info.st_blocks) * 512)) != nil else {
                     report.skipped += 1 // kept: counted in the entry's size, so not freed
                     report.freed = max(0, report.freed - Int64(info.st_blocks) * 512)
                     continue

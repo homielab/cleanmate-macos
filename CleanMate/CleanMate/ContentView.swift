@@ -199,7 +199,7 @@ struct ContentView: View {
     /// nil = that model is gone (window closed, nothing running in it).
     static func isChanging(_ smartScan: SmartScanModel?, _ privacy: SmartScanModel?, _ largeFiles: LargeFilesModel?,
                            _ uninstaller: UninstallerModel?, _ spaceLens: SpaceLensModel?, _ loginItems: LaunchAgentsModel?) -> Bool {
-        let cleaning = [smartScan, privacy].contains { if case .cleaning? = $0?.phase { true } else { false } }
+        let cleaning = [smartScan, privacy].contains { if case .cleaning? = $0?.phase { true } else { $0?.undoing == true } }
         let trashingFiles = if case .trashing? = largeFiles?.phase { true } else { false }
         // Uninstaller `working` and Space Lens `trashing` also cover their Undo.
         return cleaning || trashingFiles || largeFiles?.undoing == true || uninstaller?.working == true
@@ -219,7 +219,7 @@ struct ContentView: View {
     private func scanAction(_ model: SmartScanModel) -> (() -> Void)? {
         switch model.phase {
         case .scanning, .cleaning: nil
-        default: { model.startScan() } // cancellable, so ⌘. can stop it
+        default: model.undoing ? nil : { model.startScan() } // cancellable, so ⌘. can stop it
         }
     }
 

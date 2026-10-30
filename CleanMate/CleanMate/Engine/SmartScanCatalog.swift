@@ -62,6 +62,14 @@ extension CleanerGroup {
                         runningProcessNames: MobileBackups.processNames,
                         skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } },
                         entryLabel: MobileBackups.label(of:), selectableEntries: true),
+            // Installers left in Downloads (`OldInstallers`): user files, so unticked, one checkbox each, to the Trash.
+            // Only with Full Disk Access: reading ~/Downloads without it makes macOS ask (`ProtectedFolders`).
+            // Top-level regular files only, old ones, never open (a mounted image) nor still downloading.
+            CleanerItem(id: "old-installers", title: "Old installers",
+                        note: "Disk images, packages and zipped apps in Downloads older than \(ages.logs) days. Moved to the Trash",
+                        paths: [OldInstallers.folder], minAge: Double(ages.logs) * 86_400,
+                        included: OldInstallers.patterns, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
+                        skipsOpenFiles: true, skipsEntry: { OldInstallers.skips }, selectableEntries: true),
         ] : []) + [
             // Downloaded iOS/iPadOS updates: only `*.ipsw`, one entry each, unticked (slow to download again),
             // to the Trash, never while Finder or Apple Configurator updates a device. Configurator's cache is a

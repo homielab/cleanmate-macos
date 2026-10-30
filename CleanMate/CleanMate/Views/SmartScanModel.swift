@@ -41,6 +41,17 @@ final class SmartScanModel: ObservableObject {
     /// Home whose activity log records each clean; tests pass a throwaway folder.
     var logHome = SafetyPolicy.current.homeURL
     var cleanItem: @Sendable (CleanerItem, ItemScan) async -> CleanReport = { await Cleaner.clean($0, scan: $1) }
+    /// Puts back what the last clean moved to the Trash; `logName` names each file's catalog item as the clean logged
+    /// it. Tests inject a throwaway log home.
+    var restore: ([TrashedItem], _ logName: @escaping @Sendable (URL) -> String) async -> TrashUndo.Result = { items, logName in
+        await TrashUndo.restore(items, module: "Smart Scan", logName: logName)
+    }
+    /// Edit › Undo for the last clean's moves to the Trash (see `trashUndo`).
+    weak var undoManager: UndoManager?
+    /// "Undo" is putting files back: Scan Again waits.
+    @Published private(set) var undoing = false
+    /// Original path of each file the last clean moved to the Trash → its item's English title (the log's item column).
+    private var trashedItemNames: [URL: String] = [:]
     /// Free bytes on the home volume, read before and after a clean; tests inject fixed values.
     var freeSpace: () -> Int64? = { Cleaner.freeSpace(SafetyPolicy.current.homeURL.path) }
     /// The volume's free space before and after the last clean, shown for reference next to what was freed.
@@ -340,10 +351,12 @@ final class SmartScanModel: ObservableObject {
     /// When cancelled, nothing is kept: the previous phase, groups, results and selection come back.
     func scan() async {
         if case .cleaning = phase { return }
+        if undoing { return } // files coming back from the Trash would be missed
         let newGroups = enabledGroups()
         guard !newGroups.isEmpty else { return } // every group off in Settings: nothing to scan
         generation += 1
         let current = generation
+        undoManager?.removeAllActions(withTarget: self) // the done screen and its Undo are gone
         if case .scanning = phase {} else { beforeScan = (phase, groups, scans, selected, excludedEntries, blocked) }
         groups = newGroups
         scans = [:]
@@ -416,6 +429,8 @@ final class SmartScanModel: ObservableObject {
         totalItems = todo.count
         var byGroup = groups.map { CleanedGroup(id: $0.id, title: $0.title, systemImage: $0.systemImage) }
         let freeBefore = freeSpace()
+        undoManager?.removeAllActions(withTarget: self)
+        trashedItemNames = [:]
         for item in todo {
             guard let scan = selectedScan(item) else { continue } // only the ticked entries
             cleaningItem = item.title
@@ -427,6 +442,7 @@ final class SmartScanModel: ObservableObject {
                 byGroup[index].freed += result.freed
                 if item.mode == .trash { byGroup[index].trashed += result.freed }
             }
+            for moved in result.trashed { trashedItemNames[moved.original] = ActivityLog.english(item.title) }
             let removed = SmartScanModel.removedCount(item, scan, result)
             if result.freed > 0 || removed > 0 {
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
@@ -439,7 +455,28 @@ final class SmartScanModel: ObservableObject {
         cleanedGroups = byGroup.filter { $0.freed > 0 }
         freeSpaceChange = freeBefore.flatMap { before in freeSpace().map { FreeSpaceChange(before: before, after: $0) } }
         phase = .done(report)
+        if !report.trashed.isEmpty {
+            undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash() }
+        }
         Attention.finished()
         cleanFinished(report)
     }
+
+    /// "Undo" on the done screen: puts back what the clean moved to the Trash (deleted items stay deleted). Once only.
+    func undoTrash() async {
+        guard case .done(var report) = phase, report.undo == nil, !report.trashed.isEmpty else { return }
+        undoManager?.removeAllActions(withTarget: self) // the button ran it, or ⌘Z did
+        let items = report.trashed
+        report.trashed = []
+        phase = .done(report)
+        undoing = true
+        let names = trashedItemNames
+        let result = await restore(items) { names[$0] ?? $0.path }
+        undoing = false
+        guard case .done = phase else { return } // a new scan started meanwhile
+        report.undo = result
+        phase = .done(report)
+    }
 }
+
+extension SmartScanModel: TrashUndoing {}

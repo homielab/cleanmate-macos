@@ -327,6 +327,29 @@ struct RaceTests {
         #expect(!model.undoing && report.undo == TrashUndo.Result(restored: 1, skipped: 0))
     }
 
+    /// Smart Scan's Undo: Scan Again / ⌘R while files come back is ignored, and quitting asks first.
+    @Test func smartScanNoScanWhileUndoing() async throws {
+        let gates = Gates()
+        let junk = CleanerItem(id: "race.junk", title: "Junk", paths: ["~/nonexistent"])
+        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [junk])] }
+        model.scanItem = { _ in ItemScan() }
+        model.blockedByExclusion = { _ in false }
+        model.processNames = { [] }
+        model.restore = { items, _ in _ = await gates.enter(); return TrashUndo.Result(restored: items.count, skipped: 0) }
+        let item = TrashedItem(original: URL(fileURLWithPath: "/nonexistent/x"), inTrash: URL(fileURLWithPath: "/nonexistent/y"), size: 1)
+        model.phase = .done(CleanReport(freed: 1, trashed: [item]))
+        let undo = Task { await model.undoTrash() }
+        try await until { gates.calls == 1 }
+        #expect(ContentView.isChanging(model, nil, nil, nil, nil, nil))
+        await model.scan()
+        guard case .done = model.phase else { Issue.record("phase \(model.phase)"); gates.open(1); return }
+        gates.open(1)
+        await undo.value
+        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(!model.undoing && report.undo == TrashUndo.Result(restored: 1, skipped: 0) && report.trashed.isEmpty)
+        #expect(!ContentView.isChanging(model, nil, nil, nil, nil, nil))
+    }
+
     /// Quit asks first while something is being changed: a clean, a move/put back, a launchctl change.
     @Test func quitAsksWhileChanging() async throws {
         let smartScan = SmartScanModel(module: .smartScan), privacy = SmartScanModel(module: .privacy)

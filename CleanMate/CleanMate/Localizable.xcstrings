@@ -1809,6 +1809,34 @@
         }
       }
     },
+    "Disk images, packages and zipped apps in Downloads older than %lld days. Moved to the Trash" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Disk images, packages and zipped apps in Downloads older than %lld day. Moved to the Trash"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Disk images, packages and zipped apps in Downloads older than %lld days. Moved to the Trash"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh đĩa, gói cài đặt và app nén trong Tải về cũ hơn %lld ngày. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
     "Docker: build cache" : {
       "localizations" : {
         "vi" : {
@@ -3021,6 +3049,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
+          }
+        }
+      }
+    },
+    "Old installers" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ cài cũ"
           }
         }
       }

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Developer Junk**: **Unused Homebrew dependencies** lists the formulae `brew autoremove` would remove, each with its size, and removes them with that command (not ticked by default).
 - **Smart Scan**: **Trash on external drives** lists the Trash of each mounted external drive by name and size, so you can empty it from the same place as your own Trash (needs Full Disk Access; none are ticked by default).
 - **Menu bar item**: shows free space out of the disk's size, the last Smart Scan with what it found or what cleaning it freed, and a **Scan Now** button that opens Smart Scan and starts a scan (replaces Open Smart Scan).
+- **Smart Scan**: **Old installers** lists disk images, packages and zipped apps in Downloads older than the old-logs age, one by one; none are ticked, and they go to the Trash (needs Full Disk Access).
+- **Smart Scan**: **Undo** (and ⌘Z) after a clean puts back what it moved to the Trash.
 - **Settings › General › Remind me to scan**: an optional weekly or monthly notification (off by default) when CleanMate has gone unused that long; clicking it opens Smart Scan. It is local and uses no network.
 
 ### Changed

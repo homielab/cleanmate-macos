@@ -241,8 +241,10 @@ struct EndToEndCleanTests {
                 #expect(scan.entries.contains { $0.url.path.contains("/Developer/tools/") }, "\(item.id): shell folder not scanned")
             }
         }
-        let moveToFakeTrash: @Sendable (URL) throws -> Void = { url in
-            try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
+        let moveToFakeTrash: @Sendable (URL) throws -> URL? = { url in
+            let target = trash.appending(path: UUID().uuidString)
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
         }
         for item in items {
             let scan = scans[item.id]!
@@ -312,7 +314,9 @@ struct EndToEndCleanTests {
         model.scanItem = { await Scanner.scan($0, policy: policy) }
         model.cleanItem = { item, scan in
             await Cleaner.clean(item, scan: scan, policy: policy, trash: { url in
-                try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
+                let target = trash.appending(path: UUID().uuidString)
+                try FileManager.default.moveItem(at: url, to: target)
+                return target
             })
         }
         model.logHome = home
@@ -369,7 +373,9 @@ struct EndToEndCleanTests {
         let trash = root.appending(path: "Trash")
         try fm.createDirectory(at: trash, withIntermediateDirectories: true)
         #expect(await Cleaner.clean(item, scan: scan, policy: policy, trash: { url in
-            try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
+            let target = trash.appending(path: UUID().uuidString)
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
         }, openPaths: Self.ownOpenPaths).skipped == 0)
         #expect(try fm.contentsOfDirectory(atPath: trash.path).count == 2)
         #expect(await Scanner.scan(item, policy: policy, openPaths: Self.ownOpenPaths).entries.isEmpty)
@@ -417,7 +423,9 @@ struct EndToEndCleanTests {
         let trash = root.appending(path: "Trash")
         try fm.createDirectory(at: trash, withIntermediateDirectories: true)
         #expect(await Cleaner.clean(item, scan: scan, policy: policy, trash: { url in
-            try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
+            let target = trash.appending(path: UUID().uuidString)
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
         }, openPaths: Self.ownOpenPaths).skipped == 0)
         #expect(try fm.contentsOfDirectory(atPath: trash.path).count == 1)
         #expect(try Set(fm.contentsOfDirectory(atPath: backups.path)) == ["00008110-NOW", ".DS_Store"])
@@ -470,7 +478,9 @@ struct EndToEndCleanTests {
         let trash = root.appending(path: "Trash")
         try fm.createDirectory(at: trash, withIntermediateDirectories: true)
         #expect(await Cleaner.clean(item, scan: scan, policy: policy, trash: { url in
-            try FileManager.default.moveItem(at: url, to: trash.appending(path: UUID().uuidString))
+            let target = trash.appending(path: UUID().uuidString)
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
         }, openPaths: Self.ownOpenPaths).skipped == 0)
         #expect(try Set(fm.contentsOfDirectory(atPath: iphone.path)) == ["notes.txt", ".DS_Store"])
         #expect(try fm.contentsOfDirectory(atPath: configurator.path) == ["x.ipsw.download"])

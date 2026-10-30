@@ -86,7 +86,9 @@ struct SmartScanView: View {
                         Text("The selected traces were erased.")
                     }
                     let trashed = model.cleanedGroups.reduce(Int64(0)) { $0 + $1.trashed }
-                    if trashed > 0 {
+                    if let result = report.undo {
+                        UndoTrashResult(result: result)
+                    } else if trashed > 0 {
                         Text("\(trashed, format: .fileSize) of it is in the Trash: empty the Trash to free that space.")
                     }
                     if report.upTo > 0 {
@@ -105,12 +107,17 @@ struct SmartScanView: View {
                             .padding(.top, 4)
                     }
                 } actions: {
-                    scanButton("Scan Again")
+                    scanButton("Scan Again").disabled(model.undoing)
                     if model.cleanedGroups.contains(where: { $0.trashed > 0 }) { OpenTrashButton() }
+                    if report.undo == nil && !report.trashed.isEmpty {
+                        Button("Undo") { Task { await model.undoTrash() } }
+                            .help("Put the items just moved to the Trash back where they were.")
+                    }
                 }
             }
         }
         .navigationTitle(Text(module.title))
+        .trashUndo(model)
         .onAppear {
             hasFullDiskAccess = FullDiskAccess.isGranted
             if module == .smartScan { overview = readOverview() }

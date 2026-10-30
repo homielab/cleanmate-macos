@@ -2044,7 +2044,11 @@ struct AppCatalogTests {
         model.logHome = box.home // not the real ~/Library/Logs/CleanMate/activity.log
         model.scanItem = { await Scanner.scan($0, policy: policy) }
         model.cleanItem = { item, scan in
-            await Cleaner.clean(item, scan: scan, policy: policy) { try FileManager.default.moveItem(at: $0, to: trash.appending(path: $0.lastPathComponent)) }
+            await Cleaner.clean(item, scan: scan, policy: policy) {
+                let target = trash.appending(path: $0.lastPathComponent)
+                try FileManager.default.moveItem(at: $0, to: target)
+                return target
+            }
         }
         await model.scan()
         let entries = try #require(model.scans["t219.backups"]?.entries) // largest first: B, then A
