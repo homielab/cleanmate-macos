@@ -15,8 +15,20 @@ enum FullDiskAccess {
     }
 }
 
+extension ScanReminder {
+    /// System Settings › Notifications › CleanMate.
+    static func openNotificationSettings() {
+        let id = Bundle.main.bundleIdentifier ?? ""
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=\(id)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+}
+
 struct SettingsView: View {
     static let exclusionsTab = "exclusions"
+    /// The tallest tab (General) fits without scrolling in EN/VI (`GeneralSettingsLayoutTests`).
+    static let size = CGSize(width: 520, height: 780)
     /// Remembered, and set by a blocked Smart Scan row to open on Exclusions.
     @AppStorage(Preferences.settingsTab) private var tab = "general"
 
@@ -27,7 +39,7 @@ struct SettingsView: View {
             ExclusionSettings().tabItem { Label("Exclusions", systemImage: "nosign") }.tag(Self.exclusionsTab)
             ActivitySettings().tabItem { Label("Activity", systemImage: "list.bullet.rectangle") }.tag("activity")
         }
-        .frame(width: 520, height: 780)  // tallest tab (General) fits without scrolling in EN/VI
+        .frame(width: Self.size.width, height: Self.size.height)
     }
 }
 
@@ -37,9 +49,19 @@ struct GeneralSettings: View {
     @AppStorage(Preferences.tempFilesDays) private var tempDays = CleanupAges.default.temp
     @AppStorage(Preferences.sessionDays) private var sessionDays = CleanupAges.default.sessions
     @AppStorage(Preferences.showMenuBarExtra) private var showMenuBarExtra = false
+    @AppStorage(Preferences.scanReminder) private var reminder = ScanReminder.Frequency.off
+    /// Reminders are on but CleanMate may not post notifications: shows how to allow them.
+    @State private var reminderDenied: Bool
+    private let reminders: ScanReminderScheduler
     @State private var confirmingReset = false
     /// The pressed button disappears when the inline confirmation swaps in: keyboard focus follows it.
     @FocusState private var resetFocus: Bool?
+
+    /// Tests pass a scheduler with a fake notification center, and `reminderDenied` to measure the tallest layout.
+    init(reminders: ScanReminderScheduler = .shared, reminderDenied: Bool = false) {
+        self.reminders = reminders
+        _reminderDenied = State(initialValue: reminderDenied)
+    }
 
     var body: some View {
         Form {
@@ -51,10 +73,13 @@ struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
             Section {
+                // One row with its button: General has no height to spare (`SettingsView.size`).
                 LabeledContent("Full Disk Access") {
-                    granted ? Text("Granted") : Text("Not granted")
+                    HStack {
+                        granted ? Text("Granted") : Text("Not granted")
+                        Button("Open Privacy Settings…") { FullDiskAccess.openSettings() }
+                    }
                 }
-                Button("Open Privacy Settings…") { FullDiskAccess.openSettings() }
             } footer: {
                 Text("Needed to empty the Trash and read Safari data. CleanMate only cleans inside your user account.")
                     .font(.caption)
@@ -85,6 +110,24 @@ struct GeneralSettings: View {
                             .focused($resetFocus, equals: false)
                     }
                 }
+                LabeledContent("Remind me to scan") {
+                    HStack {
+                        // In the same row, not one more: General has no height to spare.
+                        if reminderDenied {
+                            Button { ScanReminder.openNotificationSettings() } label: {
+                                Label("Turn On Notifications…", systemImage: "exclamationmark.triangle.fill")
+                            }
+                            .help("Notifications from CleanMate are turned off in System Settings.")
+                        }
+                        Picker("Remind me to scan", selection: $reminder) {
+                            Text("Off").tag(ScanReminder.Frequency.off)
+                            Text("Weekly").tag(ScanReminder.Frequency.weekly)
+                            Text("Monthly").tag(ScanReminder.Frequency.monthly)
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
             }
             UpdateSettings(updater: .shared)
             Section {
@@ -96,10 +139,18 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { granted = FullDiskAccess.isGranted }
+        .onAppear {
+            granted = FullDiskAccess.isGranted
+            Task { reminderDenied = !(await reminders.refresh()) }
+        }
         // Granting access happens in System Settings: refresh when the user comes back.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             granted = FullDiskAccess.isGranted
+            Task { reminderDenied = !(await reminders.refresh()) }
+        }
+        // The first time a reminder is turned on, macOS asks whether CleanMate may post notifications.
+        .onChange(of: reminder) { _ in
+            Task { reminderDenied = !(await reminders.update()) }
         }
     }
 }

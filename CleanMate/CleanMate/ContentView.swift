@@ -48,12 +48,27 @@ enum Module: String, CaseIterable, Identifiable {
     }
 }
 
-/// Module requested from outside the window (menu bar item); ContentView consumes it, also on first appearance.
+/// Module requested from outside the window (menu bar item, scan reminder); ContentView consumes it, also on first appearance.
 final class ModuleRouter: ObservableObject {
     static let shared = ModuleRouter()
     @Published var requested: Module?
     /// "Show in Space Lens": Space Lens opens this item's folder with the item selected.
     @Published var spaceLensItem: URL?
+    /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
+    var openMainWindow: OpenWindowAction?
+
+    /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
+    func show(_ module: Module?, openWindow: OpenWindowAction? = nil) {
+        let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })
+        // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘6: only bring the window front.
+        requested = window?.attachedSheet == nil ? module : nil
+        NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
+        if let window {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            (openWindow ?? openMainWindow)?(id: "main")
+        }
+    }
 }
 
 struct ContentView: View {
@@ -67,6 +82,7 @@ struct ContentView: View {
     @StateObject private var loginItems = LaunchAgentsModel()
     @AppStorage(Preferences.fullDiskAccessPrompted) private var fullDiskAccessPrompted = false
     @State private var showsFullDiskAccess = false
+    @Environment(\.openWindow) private var openWindow
 
     init() {}
 
@@ -115,6 +131,7 @@ struct ContentView: View {
             if !fullDiskAccessPrompted && !FullDiskAccess.isGranted { showsFullDiskAccess = true }
             fullDiskAccessPrompted = true
             AppUpdater.shared.start()  // after the window: see `start`
+            router.openMainWindow = openWindow
         }
         .sheet(isPresented: $showsFullDiskAccess) { FullDiskAccessSheet() }
     }

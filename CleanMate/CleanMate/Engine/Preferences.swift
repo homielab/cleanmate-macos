@@ -31,6 +31,8 @@ nonisolated enum Preferences {
 
     /// String: ids of Smart Scan groups turned off in Settings › Smart Scan, one per line; never scanned nor shown.
     static let disabledScanGroups = "disabledScanGroups"
+    /// String (`ScanReminder.Frequency` raw value): Settings › General › Remind me to scan, off by default.
+    static let scanReminder = "scanReminder"
     /// Settings tab shown when the window opens.
     static let settingsTab = "settingsTab"
 

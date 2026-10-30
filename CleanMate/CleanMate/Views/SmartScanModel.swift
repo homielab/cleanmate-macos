@@ -70,6 +70,8 @@ final class SmartScanModel: ObservableObject {
     @Published private(set) var offGroups: Set<String> = []
     /// Item id → seconds from the last finished scan, read when a scan starts.
     private var estimates: [String: Double] = [:]
+    /// Called when a scan finishes; the real Smart Scan moves the scan reminder one period away.
+    var scanFinished: () -> Void = {}
 
     /// `catalog` defaults to the module's own (Privacy or Smart Scan).
     init(module: Module, catalog: (() -> [CleanerGroup])? = nil) {
@@ -77,7 +79,10 @@ final class SmartScanModel: ObservableObject {
         durationsKey = catalog == nil ? Preferences.smartScanLastDurations : nil
         self.catalog = catalog ?? (module == .privacy ? { CleanerGroup.privacy } : { CleanerGroup.smartScan })
         let realSmartScan = catalog == nil && module == .smartScan
-        if realSmartScan { disabledGroups = { Preferences.disabledGroups() } }
+        if realSmartScan {
+            disabledGroups = { Preferences.disabledGroups() }
+            scanFinished = { Task { await ScanReminderScheduler.shared.postpone() } }
+        }
         groups = []
         groups = enabledGroups()
         if realSmartScan {
@@ -377,6 +382,7 @@ final class SmartScanModel: ObservableObject {
         if let durationsKey { Preferences.update(durationsKey) { (all: inout [String: Double]) in all.merge(durations) { $1 } } }
         phase = .results
         Attention.finished()
+        scanFinished()
     }
 
     /// Entries removed, for the activity log. A run command (e.g. `docker image prune`) succeeds or fails as a

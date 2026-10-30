@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct CleanMateApp: App {
@@ -28,8 +29,31 @@ struct CleanMateApp: App {
 
 /// A lone SwiftUI `Window` scene quits the app when it closes; keep running like a normal Mac app,
 /// the Dock icon / `open` brings the window back.
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    /// Not under tests: they must never reach the real notification center.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        // Set at launch: a click on the reminder that launched CleanMate is delivered right after.
+        UNUserNotificationCenter.current().delegate = self
+        Task { await ScanReminderScheduler.shared.postpone() } // CleanMate was used: next reminder one period from now
+    }
+
+    /// The reminder arrives while CleanMate is the active app: not shown, the user is already here.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                            withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([])
+    }
+
+    /// A click on the reminder opens Smart Scan; it does not start a scan.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                            withCompletionHandler completionHandler: @escaping () -> Void) {
+        let isReminder = response.notification.request.identifier == ScanReminder.requestID
+        completionHandler()
+        guard isReminder else { return }
+        Task { @MainActor in ModuleRouter.shared.show(.smartScan) }
+    }
 
     /// Registered by ContentView (`isChanging`): a clean, move to the Trash, put back or launchctl change is running.
     /// One entry per set of models, keyed by its Smart Scan model, so reopening the window replaces instead of piling up.
@@ -131,22 +155,10 @@ private struct MenuBarContent: View {
             Text(freed)
         }
         Divider()
-        Button("Open Smart Scan") { show(.smartScan) }
-        Button("Open CleanMate") { show(nil) }
+        Button("Open Smart Scan") { ModuleRouter.shared.show(.smartScan, openWindow: openWindow) }
+        Button("Open CleanMate") { ModuleRouter.shared.show(nil, openWindow: openWindow) }
         Divider()
         Button("Quit CleanMate") { NSApplication.shared.terminate(nil) }
-    }
-
-    private func show(_ module: Module?) {
-        let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })
-        // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘6: only bring the window front.
-        ModuleRouter.shared.requested = window?.attachedSheet == nil ? module : nil
-        NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
-        if let window {
-            window.makeKeyAndOrderFront(nil)
-        } else {
-            openWindow(id: "main")
-        }
     }
 }
 

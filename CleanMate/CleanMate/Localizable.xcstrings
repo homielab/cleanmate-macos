@@ -461,6 +461,16 @@
         }
       }
     },
+    "Monthly" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hàng tháng"
+          }
+        }
+      }
+    },
     "No Duplicate Files" : {
       "localizations" : {
         "vi" : {
@@ -551,6 +561,26 @@
         }
       }
     },
+    "Notifications from CleanMate are turned off in System Settings." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thông báo của CleanMate đang bị tắt trong Cài đặt hệ thống."
+          }
+        }
+      }
+    },
+    "Off" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tắt"
+          }
+        }
+      }
+    },
     "Ollama: downloaded models" : {
       "localizations" : {
         "vi" : {
@@ -581,6 +611,16 @@
         }
       }
     },
+    "Turn On Notifications…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật thông báo…"
+          }
+        }
+      }
+    },
     "Prisma engines" : {
       "localizations" : {
         "vi" : {
@@ -601,6 +641,16 @@
         }
       }
     },
+    "Remind me to scan" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhắc tôi quét"
+          }
+        }
+      }
+    },
     "Scan Groups" : {
       "localizations" : {
         "vi" : {
@@ -617,6 +667,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quét các nhóm này"
+          }
+        }
+      }
+    },
+    "Scan your Mac to see how much space you can free up." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét máy Mac để xem có thể giải phóng bao nhiêu dung lượng."
           }
         }
       }
@@ -811,6 +871,16 @@
         }
       }
     },
+    "Time for a Smart Scan" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đến lúc Quét thông minh"
+          }
+        }
+      }
+    },
     "Toolchain downloads, downloaded again by rustup when needed" : {
       "localizations" : {
         "vi" : {
@@ -847,6 +917,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cập nhật"
+          }
+        }
+      }
+    },
+    "Weekly" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hàng tuần"
           }
         }
       }
