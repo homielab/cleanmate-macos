@@ -166,21 +166,66 @@ nonisolated struct SafetyPolicy: Sendable {
         return values?.isRegularFile == true && values?.isSymbolicLink != true
     }
 
+    /// The subset of `urls` that `allowsSpaceLensItem` accepts, with one policy for the whole batch.
+    func allowedSpaceLensItems(_ urls: Set<URL>) -> Set<URL> { urls.filter { allowsSpaceLensItem($0) } }
+
     /// Space Lens rule for an item the user picked by hand, only ever moved to the Trash: same places as
     /// `allowsUserFile`, but folders are allowed too — except the top-level folders of the home itself
     /// (Documents, Desktop, Downloads, Developer…), whose contents may be trashed but not the folder.
-    /// The subset of `urls` that `allowsSpaceLensItem` accepts, with one policy for the whole batch.
-    func allowedSpaceLensItems(_ urls: Set<URL>) -> Set<URL> { urls.filter(allowsSpaceLensItem) }
-
-    func allowsSpaceLensItem(_ url: URL) -> Bool {
-        guard let path = userLocation(url) else { return false }
+    /// On an external drive (`externalLocation` of a local, writable, browsable drive that is not a Time Machine disk:
+    /// the drive's own Trash takes it) a file follows `allowsUserFile`; a folder (not a package) only when everything
+    /// in it would too (`externalFolderHoldsOnlyUserFiles`), which `deep: false` skips (a cheap first check for menus).
+    func allowsSpaceLensItem(_ url: URL, deep: Bool = true) -> Bool {
+        if let path = userLocation(url) {
+            let values = try? URL(fileURLWithPath: path).resourceValues(
+                forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey])
+            guard values?.isSymbolicLink != true else { return false }
+            if values?.isDirectory == true {
+                return (path as NSString).deletingLastPathComponent != allowedRoots[0]
+            }
+            return values?.isRegularFile == true
+        }
+        guard let path = externalLocation(url), let volume = externalVolume(path), holdsUserTrash(volume) else { return false }
         let values = try? URL(fileURLWithPath: path).resourceValues(
-            forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey])
+            forKeys: [.isRegularFileKey, .isDirectoryKey, .isSymbolicLinkKey, .isPackageKey])
         guard values?.isSymbolicLink != true else { return false }
         if values?.isDirectory == true {
-            return (path as NSString).deletingLastPathComponent != allowedRoots[0]
+            return values?.isPackage != true && (!deep || externalFolderHoldsOnlyUserFiles(path, device: device(volume)))
         }
         return values?.isRegularFile == true
+    }
+
+    /// Finder's own metadata, which sits hidden next to the user's files: `.DS_Store` and AppleDouble `._name` files
+    /// (written for every file copied to an exFAT/FAT drive). Moved along with the folder holding them.
+    private static func isFinderMetadata(_ name: String) -> Bool { name == ".DS_Store" || name.hasPrefix("._") }
+
+    /// Everything below the external folder `path` is what `allowsUserFile` accepts: regular files and plain folders,
+    /// none hidden (besides `isFinderMetadata` files), no package, symlink or other volume, all readable. One `fts`
+    /// walk, stopping at the first refusal. Exclusions inside and mount points below are refused before (`externalLocation`).
+    private func externalFolderHoldsOnlyUserFiles(_ path: String, device volumeDevice: dev_t?) -> Bool {
+        guard let volumeDevice, let stream = path.withCString({ path -> UnsafeMutablePointer<FTS>? in
+            var paths: [UnsafeMutablePointer<CChar>?] = [UnsafeMutablePointer(mutating: path), nil]
+            return fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nil)
+        }) else { return false }
+        defer { fts_close(stream) }
+        while true {
+            errno = 0
+            guard let entry = fts_read(stream) else { return errno == 0 } // end of the walk, or a read error
+            guard entry.pointee.fts_level > 0 else { continue } // the folder itself: checked by the caller
+            let name = String(cString: entry.pointee.fts_path).split(separator: "/").last.map(String.init) ?? ""
+            guard let info = entry.pointee.fts_statp?.pointee, info.st_dev == volumeDevice else { return false }
+            switch Int32(entry.pointee.fts_info) {
+            case FTS_D:
+                let url = URL(fileURLWithPath: String(cString: entry.pointee.fts_path))
+                if name.hasPrefix(".") || (try? url.resourceValues(forKeys: [.isPackageKey]))?.isPackage != false { return false }
+            case FTS_DP:
+                continue
+            case FTS_F:
+                if name.hasPrefix("."), !Self.isFinderMetadata(name) { return false }
+            default: // symlink, unreadable folder, error, cycle, device or socket
+                return false
+            }
+        }
     }
 
     /// Smart Scan rule for a stale project's dependencies (`StaleNodeModules`), only ever moved to the Trash: a real
@@ -297,7 +342,8 @@ nonisolated struct SafetyPolicy: Sendable {
     }
 
     /// A mount point directly in `volumesFolder` (never `.timemachine` snapshots below it) of a local, writable,
-    /// browsable volume that is not the startup disk nor a Time Machine backup disk.
+    /// browsable volume that is not the startup disk nor a Time Machine backup disk: a drive whose own Trash
+    /// (`.Trashes/<uid>`) takes what is deleted from it.
     private func holdsUserTrash(_ volume: String) -> Bool {
         guard volume.hasPrefix(volumesFolder + "/"), !volume.dropFirst(volumesFolder.count + 1).contains("/"),
               !volume.dropFirst(volumesFolder.count + 1).hasPrefix("."), let flags = flags(volume) else { return false }

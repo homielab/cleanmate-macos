@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan**: **Old installers** lists disk images, packages and zipped apps in Downloads older than the old-logs age, one by one; none are ticked, and they go to the Trash (needs Full Disk Access).
 - **Developer Junk**: **Stale node_modules** lists the `node_modules` of each JavaScript project in your usual project folders that nobody changed for 90 days, one by one; none are ticked, and they go to the Trash so Undo can put them back.
 - **Smart Scan**: **Undo** (and ⌘Z) after a clean puts back what it moved to the Trash.
+- **Space Lens**: on a writable external drive, files and folders can be moved to that drive's Trash and put back with Undo; a folder opened on a drive shows the path from the drive. Read-only, network and Time Machine drives stay view-only.
 - **Settings › General › Remind me to scan**: an optional weekly or monthly notification (off by default) when CleanMate has gone unused that long; clicking it opens Smart Scan. It is local and uses no network.
 
 ### Changed

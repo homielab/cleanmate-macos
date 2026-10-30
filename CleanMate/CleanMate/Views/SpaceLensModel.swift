@@ -26,6 +26,11 @@ final class SpaceLensModel: ObservableObject {
 
     /// Injectable for tests: folders inside it open with the full breadcrumb from it.
     var home = SafetyPolicy.current.homeURL
+    /// Mount point of the external drive holding a folder (`SafetyPolicy.externalVolume`): folders on it open with the
+    /// breadcrumb from the drive. Injectable for tests, which can't mount a drive.
+    var externalVolume: (URL) -> URL? = { url in
+        SafetyPolicy.current.externalVolume(SafetyPolicy.normalize(url)).map { URL(fileURLWithPath: $0) }
+    }
     /// Where browsing started (home, a volume or a chosen folder); `path` holds the folders opened below it.
     @Published private(set) var root = SafetyPolicy.current.homeURL
     @Published private(set) var path: [URL] = []
@@ -135,11 +140,15 @@ final class SpaceLensModel: ObservableObject {
         load()
     }
 
-    /// A folder inside home opens as home + each folder down to it, so the breadcrumb can go up. Outside home,
-    /// or with a locked folder (no Full Disk Access) on the way, it opens alone as before: never list a locked parent,
-    /// and climbing to a disk root would measure system folders the user did not ask for.
+    /// A folder inside home opens as home + each folder down to it, so the breadcrumb can go up; one on an external
+    /// drive, as the drive + each folder down to it. Elsewhere, or with a locked folder (no Full Disk Access) on the
+    /// way, it opens alone as before: never list a locked parent, and climbing to a disk root would measure system
+    /// folders the user did not ask for.
     private func trail(to url: URL) -> (URL, [URL]) {
-        let base = home.standardizedFileURL, target = url.standardizedFileURL
+        var base = home.standardizedFileURL, target = url.standardizedFileURL
+        if !target.pathComponents.starts(with: base.pathComponents), let volume = externalVolume(url) {
+            (base, target) = (volume, URL(fileURLWithPath: SafetyPolicy.normalize(url)))
+        }
         guard target.pathComponents.starts(with: base.pathComponents) else { return (url, []) }
         var folder = base
         let path = target.pathComponents.dropFirst(base.pathComponents.count).map { folder = folder.appending(path: $0); return folder }

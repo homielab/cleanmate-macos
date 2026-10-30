@@ -235,9 +235,16 @@ nonisolated enum SpaceLens {
         return (total, folders, linked[0])
     }
 
-    /// Moves items to the Trash (never deletes), re-checking the Space Lens policy right before each one.
-    @concurrent static func trash(_ items: [SpaceItem], policy: SafetyPolicy = .current) async -> CleanReport {
+    /// Moves items to the Trash (never deletes), re-checking the Space Lens policy right before each one. An item on
+    /// an external drive goes to that drive's Trash. `trash`: tests pass a fake one so no real Trash is touched.
+    @concurrent static func trash(_ items: [SpaceItem], policy: SafetyPolicy = .current,
+                                  trash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash) async -> CleanReport {
         CleanReport.trashing(items.map { ($0.url, $0.size ?? 0) }, module: "Space Lens", home: policy.homeURL,
-                             allows: policy.allowsSpaceLensItem)
+                             allows: { policy.allowsSpaceLensItem($0) }, trash: trash)
+    }
+
+    /// `SafetyPolicy.allowedSpaceLensItems` off the main thread: a folder on an external drive is walked to the end.
+    @concurrent static func allowed(_ urls: Set<URL>, policy: SafetyPolicy = .current) async -> Set<URL> {
+        policy.allowedSpaceLensItems(urls)
     }
 }

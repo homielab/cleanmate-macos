@@ -8,7 +8,8 @@ struct SpaceLensView: View {
     @ObservedObject var model: SpaceLensModel
     @State private var sortOrder = [KeyPathComparator(\SpaceItem.sortSize, order: .reverse)]
     @State private var selection: Set<URL> = []
-    /// Selected URLs the policy allows, checked once per selection change, not per render; `model.trash` re-checks each item.
+    /// Selected URLs the policy allows, checked off the main thread once per selection change (a folder on an external
+    /// drive is walked), not per render; `model.trash` re-checks each item.
     @State private var allowed: Set<URL> = []
     @State private var choosingFolder = false
     /// Folders chosen with "Choose Folder…", newest first, one path per line.
@@ -43,7 +44,11 @@ struct SpaceLensView: View {
         }
         .onChange(of: model.search) { _ in selection = model.pruned(selection) }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Items"))
-        .onChange(of: selection) { allowed = SafetyPolicy.current.allowedSpaceLensItems($0) }
+        .task(id: selection) {
+            allowed.formIntersection(selection) // until checked, nothing newly picked is movable
+            let checked = await SpaceLens.allowed(selection)
+            if !Task.isCancelled { allowed = checked }
+        }
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button { model.go(to: model.path.count - 1) } label: { Label("Back", systemImage: "chevron.left") }
@@ -276,8 +281,12 @@ struct SpaceLensView: View {
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(Array(urls)) }
             Button("Move to Trash…") {
                 selection = urls
-                allowed = SafetyPolicy.current.allowedSpaceLensItems(urls)
-                confirming = !allowed.isEmpty
+                Task {
+                    let checked = await SpaceLens.allowed(urls)
+                    guard selection == urls else { return } // picked something else meanwhile
+                    allowed = checked
+                    confirming = !checked.isEmpty
+                }
             }
             .disabled(!canTrash(urls) || model.trashing || model.measuring)
             if urls.contains(where: Preferences.canExclude) {
@@ -285,7 +294,11 @@ struct SpaceLensView: View {
                 // Stays listed, but Move to Trash now refuses it like any excluded item.
                 Button("Never Clean This") {
                     if model.neverClean(urls) {
-                        allowed = SafetyPolicy.current.allowedSpaceLensItems(selection)
+                        let picked = selection
+                        Task {
+                            let checked = await SpaceLens.allowed(picked)
+                            if selection == picked { allowed = checked }
+                        }
                         excludedCount += 1
                     }
                 }
@@ -357,7 +370,7 @@ struct SpaceLensView: View {
             Button("Move to Trash…") { confirming = !allowed.isEmpty }
                 .fixedSize()
                 .disabled(allowed.isEmpty || model.trashing || model.measuring) // same as ⌘⌫
-                .help("Only items inside your home folder can be moved to the Trash — not ~/Library, hidden items or the top-level folders themselves.")
+                .help("Only items inside your home folder or on a writable external drive can be moved to the Trash — not ~/Library, hidden items or the home's top-level folders. On an external drive, a folder moves only when it holds no hidden items, packages or links.")
         }
         .padding()
         .background(.bar)
@@ -370,13 +383,14 @@ struct SpaceLensView: View {
 
     /// Selected items the Space Lens policy lets the user move to the Trash (no disk reads: uses `allowed`).
     private func trashable(in items: [SpaceItem]) -> [SpaceItem] {
-        items.filter { allowed.contains($0.url) }
+        items.filter { allowed.contains($0.url) && selection.contains($0.url) }
     }
 
-    /// Context menu rows: the selection uses the cache; a right-clicked unselected row is one check, stopping at the first allowed.
+    /// Context menu rows: the selection uses the cache; a right-clicked unselected row is one check, stopping at the
+    /// first allowed, without walking an external folder (the menu item checks it fully before confirming).
     private func canTrash(_ urls: Set<URL>) -> Bool {
         if urls == selection { return !allowed.isEmpty }
         let policy = SafetyPolicy.current
-        return urls.contains(where: policy.allowsSpaceLensItem)
+        return urls.contains { policy.allowsSpaceLensItem($0, deep: false) }
     }
 }

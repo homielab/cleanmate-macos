@@ -3141,12 +3141,12 @@
         }
       }
     },
-    "Only items inside your home folder can be moved to the Trash — not ~/Library, hidden items or the top-level folders themselves." : {
+    "Only items inside your home folder or on a writable external drive can be moved to the Trash — not ~/Library, hidden items or the home's top-level folders. On an external drive, a folder moves only when it holds no hidden items, packages or links." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chỉ mục nằm trong thư mục người dùng mới chuyển được vào Thùng rác — không gồm ~/Library, mục ẩn hay chính các thư mục cấp cao nhất."
+            "value" : "Chỉ mục trong thư mục người dùng hoặc trên ổ ngoài ghi được mới chuyển được vào Thùng rác — không gồm ~/Library, mục ẩn hay các thư mục cấp cao nhất của thư mục người dùng. Trên ổ ngoài, thư mục chỉ chuyển được khi không chứa mục ẩn, gói hay liên kết."
           }
         }
       }
