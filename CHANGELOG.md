@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Settings › General › Language**: choose Same as your Mac, English or Tiếng Việt for CleanMate only, with a Restart button.
 - Homebrew cask definition (`packaging/Casks/cleanmate.rb`); the release script keeps its version and checksum current.
 - **Uninstaller**: an app's `~/.local/state/<name>` is listed with its other config, and **Leftovers of Removed Apps** also shows
   `~/.config`, `~/.local/share` and `~/.local/state` folders that no installed app or command-line tool is named after (never ticked).

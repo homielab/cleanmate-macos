@@ -52,6 +52,7 @@ struct GeneralSettings: View {
     @AppStorage(Preferences.scanReminder) private var reminder = ScanReminder.Frequency.off
     /// Reminders are on but CleanMate may not post notifications: shows how to allow them.
     @State private var reminderDenied: Bool
+    @State private var language = AppLanguage.current()
     private let reminders: ScanReminderScheduler
     @State private var confirmingReset = false
     /// The pressed button disappears when the inline confirmation swaps in: keyboard focus follows it.
@@ -131,11 +132,27 @@ struct GeneralSettings: View {
             }
             UpdateSettings(updater: .shared)
             Section {
-                LabeledContent("Language") { Text("Same as your Mac") }
+                LabeledContent("Language") {
+                    HStack {
+                        // In the same row, not one more: General has no height to spare.
+                        if language != AppLanguage.atLaunch {
+                            Button("Restart") { AppLanguage.relaunch() }
+                        }
+                        Picker("Language", selection: $language) {
+                            Text("Same as your Mac").tag(AppLanguage.system)
+                            Text(verbatim: "English").tag(AppLanguage.english)
+                            Text(verbatim: "Tiếng Việt").tag(AppLanguage.vietnamese)
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
             } footer: {
-                Text("To use another language for CleanMate only, open System Settings > General > Language & Region > Applications and add CleanMate.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if language != AppLanguage.atLaunch {
+                    Text("Restart CleanMate to use the new language. Your Mac's language does not change.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
@@ -151,6 +168,27 @@ struct GeneralSettings: View {
         // The first time a reminder is turned on, macOS asks whether CleanMate may post notifications.
         .onChange(of: reminder) { _ in
             Task { reminderDenied = !(await reminders.update()) }
+        }
+        .onChange(of: language) { AppLanguage.set($0) }
+    }
+}
+
+extension AppLanguage {
+    /// Opens a new CleanMate, then quits this one: the language is read only at launch.
+    /// Busy → asks first, as Quit does, so a Cancel never leaves two instances; a failed open says why and keeps this one.
+    static func relaunch() {
+        if AppDelegate.isBusy, AppDelegate.quitAlert().runModal() != .alertSecondButtonReturn { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, error in
+            Task { @MainActor in
+                if let error {
+                    NSAlert(error: error).runModal()
+                    return
+                }
+                AppDelegate.relaunching = true
+                NSApp.terminate(nil)
+            }
         }
     }
 }

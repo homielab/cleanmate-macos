@@ -140,5 +140,5 @@ Settings are stored in the app's own preferences on your Mac.
 
 ## Languages
 
-English (default) and Vietnamese, following your system language. To use another language for CleanMate only:
-System Settings › General › Language & Region › Applications.
+English (default) and Vietnamese, following your system language. To use another language for CleanMate only, pick it in
+Settings › General › Language (Same as your Mac / English / Tiếng Việt) and click **Restart**; your Mac's language does not change.

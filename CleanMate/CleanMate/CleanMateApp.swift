@@ -65,11 +65,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         busyChecks[id] = check
     }
 
+    /// A new instance is already open (language Restart, confirmed): quit without asking again.
+    static var relaunching = false
+
     static var isBusy: Bool { busyChecks.values.contains { $0() == true } }
 
     /// ⌘Q or the menu bar's Quit during that asks first: quitting stops it partway, with no report and no Undo.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard Self.isBusy else { return .terminateNow }
+        guard Self.isBusy, !Self.relaunching else { return .terminateNow }
         let alert = Self.quitAlert()
         // A button holds one key: Return is Cancel's key equivalent, Esc is caught here.
         let escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in

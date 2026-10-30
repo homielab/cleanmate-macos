@@ -651,6 +651,26 @@
         }
       }
     },
+    "Restart" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại"
+          }
+        }
+      }
+    },
+    "Restart CleanMate to use the new language. Your Mac's language does not change." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại CleanMate để dùng ngôn ngữ mới. Ngôn ngữ của máy Mac không đổi."
+          }
+        }
+      }
+    },
     "Scan Now" : {
       "localizations" : {
         "vi" : {
@@ -3634,7 +3654,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Giống ngôn ngữ của máy Mac"
+            "value" : "Theo hệ thống"
           }
         }
       }
@@ -4241,16 +4261,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Muốn đặt lại ứng dụng thay vì gỡ, hãy bỏ đánh dấu chính ứng dụng: chỉ dữ liệu của nó vào Thùng rác, ứng dụng được giữ lại. Tệp còn sót của các ứng dụng đã gỡ nằm ở mục “Dữ liệu sót của ứng dụng đã gỡ” bên trái."
-          }
-        }
-      }
-    },
-    "To use another language for CleanMate only, open System Settings > General > Language & Region > Applications and add CleanMate." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Để dùng ngôn ngữ khác chỉ cho CleanMate, mở Cài đặt hệ thống > Cài đặt chung > Ngôn ngữ & Vùng > Ứng dụng và thêm CleanMate."
           }
         }
       }
