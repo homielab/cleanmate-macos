@@ -82,6 +82,7 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 
 **Apps**
 - Caches of browsers (including the Beta/Dev/Canary channels of Chrome and Edge and Brave Beta/Nightly, each skipped while that channel runs), VS Code, Slack, Discord, Zoom, Spotify, Notion, Figma and more.
+- **Code editors: data of deleted projects**: the per-project folders VS Code, VS Code Insiders, VSCodium, Cursor and Windsurf keep in `User/workspaceStorage` (extension state, indexes, Copilot or Cursor chats), listed only when the project folder or `.code-workspace` file they were opened for no longer exists. Each one is listed as `<project> — <editor>` with its date and size; none are ticked, and they go to the Trash so Undo can put them back. Kept: windows with no folder, remote and virtual workspaces (`vscode-remote://`, `vscode-vfs://`), projects on a drive that is not connected, and, without Full Disk Access, projects in Documents, Desktop, Downloads or iCloud Drive. Skipped while any of these editors runs; `globalStorage`, `History` and settings are never touched.
 - On-device AI models of Chrome (`OptGuideOnDeviceModel`) and Edge (`EdgeLLMOnDeviceModel`), every channel; unticked, the browser downloads it again when an AI feature is used; skipped while that channel runs.
 - Google Updater's downloaded update packages (`GoogleUpdater/crx_cache`; skipped while the updater runs; the updater itself, its settings and logs are never touched).
 

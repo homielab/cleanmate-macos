@@ -1303,6 +1303,26 @@
         }
       }
     },
+    "Code editors: data of deleted projects" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trình soạn mã: dữ liệu của dự án đã xoá"
+          }
+        }
+      }
+    },
+    "VS Code, Cursor, Windsurf and VSCodium data for project folders that no longer exist. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dữ liệu VS Code, Cursor, Windsurf và VSCodium của các thư mục dự án không còn tồn tại. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
     "Windsurf: downloaded browsers" : {
       "localizations" : {
         "vi" : {

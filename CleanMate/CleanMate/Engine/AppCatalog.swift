@@ -196,6 +196,8 @@ extension CleanerGroup {
 
         app("vscode", "Visual Studio Code", bundle: ["com.microsoft.VSCode"],
             vscode("Code") + ["~/Library/Caches/com.microsoft.VSCode"]),
+        // Per-project state of VS Code and its forks for project folders since deleted (`EditorWorkspaces`).
+        EditorWorkspaces.item(),
         app("slack", "Slack", bundle: ["com.tinyspeck.slackmacgap"],
             chromium("~/Library/Application Support/Slack") + ["~/Library/Caches/com.tinyspeck.slackmacgap"]),
         app("discord", "Discord", bundle: ["com.hnc.Discord"],

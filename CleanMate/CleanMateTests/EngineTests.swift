@@ -1809,6 +1809,8 @@ struct AppCatalogTests {
             "Library/Application Support/Claude/claude_desktop_config.json", "Library/Application Support/Claude/Cookies",
             "Library/Application Support/Claude/Local Storage/leveldb/1.ldb",
             "Library/Application Support/Code/User/settings.json", "Library/Application Support/Cursor/User/settings.json",
+            "Library/Application Support/Code/User/globalStorage/state.vscdb",
+            "Library/Application Support/Code/User/History/1a/entries.json",
             "Library/Application Support/Google/Chrome/Default/Cookies", "Library/Application Support/Google/Chrome/Default/History",
             "Library/Application Support/Google/Chrome/Default/Login Data",
             "Library/Application Support/Google/Chrome/Default/Local Storage/leveldb/1.ldb",

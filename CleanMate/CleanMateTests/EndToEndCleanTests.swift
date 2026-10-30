@@ -162,7 +162,8 @@ struct EndToEndCleanTests {
                 var item = Self.ownOpenFiles(item.id == "stale-node-modules"
                     ? StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] })
                     : item.id == "stale-build-dirs"
-                    ? StaleBuildFolders.item(home: home, hasFullDiskAccess: { true }, running: { [] }) : item)
+                    ? StaleBuildFolders.item(home: home, hasFullDiskAccess: { true }, running: { [] })
+                    : item.id == "vscode-stale-workspaces" ? EditorWorkspaces.item(home: home, hasFullDiskAccess: { true }) : item)
                 item.command = nil
                 if item.probe != nil {
                     let junk = "junk-" + item.id
@@ -194,6 +195,12 @@ struct EndToEndCleanTests {
                     for url in [project.appending(path: built + "/dep"), project.appending(path: built)] {
                         try fm.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
                     }
+                    continue
+                }
+                if item.id == "vscode-stale-workspaces" { // workspace data of a project folder that is gone
+                    let gone = URL(fileURLWithPath: home.appending(path: "gone-project").path).absoluteString
+                    try write(folder.appending(path: "junk-\(item.id)/workspace.json"), Data(#"{"folder":"\#(gone)"}"#.utf8))
+                    try write(folder.appending(path: "junk-\(item.id)/state.vscdb"), Data(repeating: 1, count: 4096))
                     continue
                 }
                 guard let included = item.included else {
