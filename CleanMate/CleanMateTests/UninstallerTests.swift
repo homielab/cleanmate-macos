@@ -170,6 +170,27 @@ struct UninstallerTests {
         #expect(Uninstaller.brewPackageNames(prefixes: [root.appending(path: "home/brew").path]) == ["helix", "fishcask"])
     }
 
+    /// A tool only on the shell profile's `PATH` (a Finder-opened app doesn't get it) keeps its config out of orphans;
+    /// profile folders outside home, missing or symlinked are not looked in.
+    @Test func orphanConfigSkipsToolsOnTheProfilePath() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for path in [".config/mycli/x", ".config/other/x", ".config/linked/x", "dev/bin/mycli", "real/linked"] {
+            try make(path)
+        }
+        try FileManager.default.createSymbolicLink(at: home.appending(path: "dev/link"), withDestinationURL: home.appending(path: "real"))
+        try Data("""
+        export PATH="$HOME/dev/bin:$PATH"
+        export PATH=~/dev/link:/usr/local/other:~/missing:$PATH
+        export PATH="$(brew --prefix)/bin:$PATH"
+
+        """.utf8).write(to: home.appending(path: ".zshrc"))
+        let folders = ShellEnvironment.pathFolders(home: home)
+        #expect(folders == [home.appending(path: "dev/bin").standardizedFileURL.path])
+        let leftovers = await Uninstaller.leftovers(installedBundleIDs: [], tools: [], appNames: [], toolFolders: folders,
+                                                    brewPrefixes: [], isRegistered: { _ in false }, policy: policy)
+        #expect(Set(leftovers.map(\.url.lastPathComponent)) == ["other", "linked"])
+    }
+
     @MainActor @Test func listsAppConfigUntickedAndNeverToolOrProtectedFolders() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let cursorApp = try app("Applications/Cursor.app", bundleID: "com.todesktop.cursor")

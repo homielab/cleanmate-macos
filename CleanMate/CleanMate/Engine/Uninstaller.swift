@@ -321,10 +321,11 @@ nonisolated enum Uninstaller {
             .filter { policy.allowsAppConfig($0.url) }
     }
 
-    /// Every command folder the config rule checks: `toolFolders`, the process `PATH` and macOS's own bin folders.
+    /// Every command folder the config rule checks: `toolFolders`, the process `PATH`, the shell profile's `PATH` and
+    /// macOS's own bin folders.
     static var configToolFolders: [String] {
         toolFolders + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
-            + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+            + profilePathFolders + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
     }
 
     /// Command-line tools in `folders` (`~` is the policy's home): lowercased name → paths. A config item named like
@@ -427,11 +428,15 @@ nonisolated enum Uninstaller {
     static let systemToolFolders = ["/usr/bin", "/bin", "/usr/sbin", "/sbin", "/usr/libexec", "/System", "/Library/Apple",
                                     "/var/run/com.apple.security.cryptexd", "/private/var/run/com.apple.security.cryptexd"]
 
-    /// `toolFolders` + the process `PATH`, minus `systemToolFolders`: what the leftovers rule matches tool names against.
+    /// `toolFolders` + the process and shell profile `PATH`, minus `systemToolFolders`: what the leftovers rule matches
+    /// tool names against.
     static var userToolFolders: [String] {
-        (toolFolders + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init))
-            .filter { !isSystemToolFolder($0) }
+        (toolFolders + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map(String.init)
+            + profilePathFolders).filter { !isSystemToolFolder($0) }
     }
+
+    /// Folders the user's shell profile adds to `PATH` (an app opened from Finder doesn't get them).
+    static var profilePathFolders: [String] { ShellEnvironment.pathFolders(home: URL(fileURLWithPath: NSHomeDirectory())) }
 
     /// Homebrew installs (Apple silicon, Intel).
     static let brewPrefixes = ["/opt/homebrew", "/usr/local"]

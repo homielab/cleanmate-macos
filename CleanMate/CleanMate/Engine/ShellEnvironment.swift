@@ -2,7 +2,7 @@ import Foundation
 
 /// Folder variables users set in their shell profile (`export CARGO_HOME=~/dev/cargo`). An app opened from Finder
 /// doesn't get the shell's environment, so the profile files are READ, never run or sourced. Only simple
-/// top-level `[export ]NAME=value` lines for `variables` are taken; any other line (and its content) is ignored.
+/// top-level `[export ]NAME=value` lines for `variables` and `PATH` are taken; any other line (and its content) is ignored.
 nonisolated enum ShellEnvironment {
     /// Only for items cleaned by removing files: a cleaning command (`go clean -modcache`) wouldn't see the variable,
     /// so it would leave the extra folder shown (no GOPATH for that reason).
@@ -26,10 +26,13 @@ nonisolated enum ShellEnvironment {
     /// `if`/`case`/loop/function block (it may not run). Such a skipped line also makes its names unknown for later
     /// lines, so a reference never falls back to an older or default value the shell may not have.
     /// shortcut: that only holds within one file (a later file sees the earlier files' last readable values).
+    /// `PATH` follows the same rules, except that `$PATH` starts empty (the folders earlier lines added) and a skipped
+    /// line keeps it: it only adds folders to look tools up in, so an unreadable line just leaves its own folders out.
     static func parse(_ text: String, home: String, known: [String: String] = [:]) -> [String: String] {
         var found: [String: String] = [:]
         var env = xdgDefaults.mapValues { home + "/" + $0 }.merging(known) { $1 }
         env["HOME"] = home
+        env["PATH"] = env["PATH"] ?? ""
         var depth = 0
         for raw in text.split(whereSeparator: \.isNewline) {
             let line = raw.trimmingCharacters(in: .whitespaces)
@@ -42,12 +45,12 @@ nonisolated enum ShellEnvironment {
             }
             let match = line.wholeMatch(of: /(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)/)
             let name = match.map { String($0.1) } ?? ""
-            if depth == 0, raw.first?.isWhitespace == false, let match, variables.contains(name) || xdgDefaults[name] != nil,
+            if depth == 0, raw.first?.isWhitespace == false, let match, variables.contains(name) || xdgDefaults[name] != nil || name == "PATH",
                let value = value(String(match.2), home: home, env: env) {
                 env[name] = value
                 found[name] = value
             } else {
-                for set in line.matches(of: /(?:^|[\s;&|(])([A-Za-z_][A-Za-z0-9_]*)=/) where String(set.1) != "HOME" {
+                for set in line.matches(of: /(?:^|[\s;&|(])([A-Za-z_][A-Za-z0-9_]*)=/) where !["HOME", "PATH"].contains(String(set.1)) {
                     env[String(set.1)] = nil
                 }
             }
@@ -113,6 +116,22 @@ nonisolated enum ShellEnvironment {
         }
     }
     private static let cache = Locked<(stamp: [String], values: [String: String])?>(nil)
+
+    /// Folders the profile adds to `PATH`: absolute, strictly inside `home`, existing folders, neither a symlink nor
+    /// reached through one below `home`. Where tools installed for the shell only (`~/.cargo/bin`, nvm, pnpm) live.
+    static func pathFolders(home: URL) -> [String] {
+        let base = home.standardizedFileURL.path
+        return (cached(home: home)["PATH"] ?? "").split(separator: ":").map { URL(fileURLWithPath: String($0)).standardizedFileURL.path }
+            .filter { path in
+                guard path.hasPrefix(base + "/") else { return false }
+                var current = base, info = stat()
+                for part in path.dropFirst(base.count).split(separator: "/") {
+                    current += "/" + part
+                    guard lstat(current, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return false }
+                }
+                return true
+            }
+    }
 
     /// The folder `name` points to, only when it is absolute, strictly inside home, an existing folder, allowed by
     /// `policy` itself and not reached through a symlink (same rules as `PathLookup`).

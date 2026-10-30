@@ -755,6 +755,24 @@ struct ProbeAndCommandTests {
                 == ["NVM_DIR": "/d/nvm"])
     }
 
+    /// `PATH` lines: several parts, `$PATH` anywhere (the folders found so far, empty at first), `~`/`$HOME`; a line that
+    /// needs a shell or sits in a block is skipped without dropping what earlier lines added. Across files too.
+    @Test func shellProfilePath() {
+        let home = "/Users/me"
+        let text = """
+        export PATH="$HOME/.cargo/bin:$PATH"
+        PATH=~/dev/bin:$PATH:/opt/x/bin
+        export PATH="$(brew --prefix)/bin:$PATH"
+        if [ -d ~/y ]; then export PATH=~/y:$PATH; fi
+        export PATH=$PNPM_HOME:$PATH
+        export PATH="${PATH}:$XDG_DATA_HOME/pnpm"
+        """
+        #expect(ShellEnvironment.parse(text, home: home)["PATH"]
+                == "/Users/me/dev/bin:/Users/me/.cargo/bin::/opt/x/bin:/Users/me/.local/share/pnpm")
+        #expect(ShellEnvironment.parse("export PATH=$PATH\n", home: home)["PATH"] == nil)
+        #expect(ShellEnvironment.parse("export PATH=/b:$PATH\n", home: home, known: ["PATH": "/a"])["PATH"] == "/b:/a")
+    }
+
     /// An item cleaned by a command never shows profile folders the command (without that env) wouldn't clean.
     @Test func shellFoldersOnlyOnFileRemovalItems() {
         let items = [CleanerGroup.developer].flatMap(\.items)
