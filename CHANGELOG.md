@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Overview**: CleanMate now opens on an overview of free space on each drive (orange past 90 % used), what it freed in the last 30 days and in total, and the 12 largest folders in your home; click a folder to open it in Space Lens. ⌘1 shows it, the other modules moved to ⌘2–⌘7.
 - **Developer Junk › Firebase CLI**: emulators and debug logs moved with `FIREBASE_EMULATORS_PATH` or `FIREBASE_DEBUG_PATH` in your shell profile are listed too.
 - **Settings › General**: set how long installers stay in Downloads before **Old installers** lists them (default 30 days, was the 7-day log age).
 - **Developer Junk**: **Stale build folders** lists Cargo `target`, Python `.venv`/`venv` and CocoaPods `Pods` folders of projects nobody changed for 90 days, one by one with the project's path; none are ticked, and they go to the Trash so Undo can put them back.

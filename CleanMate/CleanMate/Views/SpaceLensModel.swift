@@ -3,17 +3,20 @@ import Combine
 
 /// Space Lens: children of the current folder with their sizes, measured in parallel and remembered for the session.
 final class SpaceLensModel: ObservableObject {
-    struct Volume {
+    nonisolated struct Volume: Equatable, Sendable {
         var name = ""
         var total: Int64 = 0
         var available: Int64 = 0
         var used: Int64 { max(total - available, 0) }
-        /// Reads the volume holding `url` (also used by the menu bar item).
+        /// Reads the volume holding `url` (also used by the menu bar item and the Overview). Free space for important
+        /// use, as Finder shows; plain free space on a volume that has no such figure.
         static func read(_ url: URL) -> Volume {
             let values = try? url.resourceValues(forKeys: [
-                .volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey])
+                .volumeNameKey, .volumeTotalCapacityKey, .volumeAvailableCapacityForImportantUsageKey,
+                .volumeAvailableCapacityKey])
             return Volume(name: values?.volumeName ?? "", total: Int64(values?.volumeTotalCapacity ?? 0),
-                          available: values?.volumeAvailableCapacityForImportantUsage ?? 0)
+                          available: values?.volumeAvailableCapacityForImportantUsage
+                              ?? values?.volumeAvailableCapacity.map(Int64.init) ?? 0)
         }
         /// Free-space warning level: orange under 10% free, red under 5%.
         enum Level { case normal, low, critical }
@@ -75,7 +78,7 @@ final class SpaceLensModel: ObservableObject {
     /// Another module removed files: remembered sizes may be wrong, measure again next time Space Lens is shown.
     private var stale = false
     /// Bumped by `invalidate`: a listing measured before another module's clean never refills the caches.
-    private var cacheEpoch = 0
+    private(set) var cacheEpoch = 0
     private var observer: (any NSObjectProtocol)?
 
     /// `center`: tests pass their own, so cleans recorded by tests running in parallel don't invalidate the cache.
@@ -265,6 +268,16 @@ final class SpaceLensModel: ObservableObject {
     /// and items hidden by the search must not be moved to the Trash unseen.
     func pruned(_ selection: Set<URL>) -> Set<URL> {
         selection.isEmpty ? selection : selection.intersection(shown.map(\.url))
+    }
+
+    /// Child folder sizes of `folder` measured elsewhere (the Overview's largest folders) the way `load` measures
+    /// them: one `HardLinks` shared by the listing, `skipping` left out. Kept as if Space Lens had listed `folder`,
+    /// so opening it or a folder inside is instant; dropped when something was cleaned since `epoch` (`cacheEpoch`).
+    func remember(listing: [String: Int64], folders: [String: Int64], of folder: URL, skipping: Set<String>, epoch: Int) {
+        guard epoch == cacheEpoch else { return }
+        if skipping != self.skipping { sizes = [:]; listings = [:]; self.skipping = skipping }
+        sizes.merge(folders) { $1 }
+        listings[folder.standardizedFileURL.path] = listing
     }
 
     private func loadVolume() { volume = Volume.read(root) }

@@ -56,7 +56,7 @@ struct SmartScanView: View {
                         Text("Find caches, old logs, crash reports, temporary files, developer junk, AI tool and app caches that are safe to remove.")
                     case .privacy:
                         Text("Erase browsing history, cookies and form data per browser, recent items and shell history. Passwords, bookmarks and extensions are never touched.")
-                    case .largeFiles, .uninstaller, .spaceLens, .loginItems:
+                    case .overview, .largeFiles, .uninstaller, .spaceLens, .loginItems:
                         EmptyView() // has its own view
                     }
                 } actions: {
@@ -226,7 +226,7 @@ struct SmartScanView: View {
                 Text("Selected items are deleted permanently, except those marked “Moved to the Trash”. Apps and tools recreate caches as needed.")
             case .privacy:
                 Text("Selected data is deleted permanently, not moved to the Trash, and cannot be recovered. Erasing cookies signs you out of websites.")
-            case .largeFiles, .uninstaller, .spaceLens, .loginItems:
+            case .overview, .largeFiles, .uninstaller, .spaceLens, .loginItems:
                 EmptyView()
             }
         }

@@ -11,6 +11,36 @@
         }
       }
     },
+    "%@ on %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ vào %2$@"
+          }
+        }
+      }
+    },
+    "%@ used of %@ · %@ available" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dùng %1$@ / %2$@ · còn trống %3$@"
+          }
+        }
+      }
+    },
+    "%@ used, %@ available of %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dùng %1$@, còn trống %2$@ / %3$@"
+          }
+        }
+      }
+    },
     "%@: on-device AI model" : {
       "localizations" : {
         "vi" : {
@@ -85,6 +115,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tất cả module"
+          }
+        }
+      }
+    },
+    "Almost full" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sắp đầy"
           }
         }
       }
@@ -209,12 +249,32 @@
         }
       }
     },
+    "Click a folder to explore it in Space Lens." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm vào một thư mục để xem chi tiết trong Space Lens."
+          }
+        }
+      }
+    },
     "Copies" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Số bản"
+          }
+        }
+      }
+    },
+    "Counts what was deleted; items moved to the Trash are not included." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ tính những gì đã xoá; mục chuyển vào Thùng rác không được tính."
           }
         }
       }
@@ -319,6 +379,16 @@
         }
       }
     },
+    "Drives" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ đĩa"
+          }
+        }
+      }
+    },
     "Duplicates" : {
       "localizations" : {
         "vi" : {
@@ -399,6 +469,16 @@
         }
       }
     },
+    "Freed by CleanMate" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate đã giải phóng"
+          }
+        }
+      }
+    },
     "Google Updater: downloaded updates" : {
       "localizations" : {
         "vi" : {
@@ -445,6 +525,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhớ đệm Hugging Face"
+          }
+        }
+      }
+    },
+    "In total" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tổng cộng"
           }
         }
       }
@@ -503,6 +593,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Giữ lại bản cũ nhất của mỗi tệp"
+          }
+        }
+      }
+    },
+    "Largest folders in your home" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục lớn nhất trong thư mục người dùng"
+          }
+        }
+      }
+    },
+    "Last 30 days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30 ngày qua"
+          }
+        }
+      }
+    },
+    "Last cleanup" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lần dọn gần nhất"
           }
         }
       }
@@ -765,6 +885,26 @@
         }
       }
     },
+    "Open in Space Lens" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở trong Space Lens"
+          }
+        }
+      }
+    },
+    "Overview" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tổng quan"
+          }
+        }
+      }
+    },
     "Restart" : {
       "localizations" : {
         "vi" : {
@@ -791,6 +931,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quét ngay"
+          }
+        }
+      }
+    },
+    "Shows here after your first cleanup." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sẽ hiện ở đây sau lần dọn đầu tiên."
           }
         }
       }
@@ -1179,6 +1329,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhớ đệm Yarn Berry"
+          }
+        }
+      }
+    },
+    "Your home folder is empty." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục người dùng đang trống."
           }
         }
       }

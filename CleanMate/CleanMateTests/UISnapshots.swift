@@ -486,6 +486,36 @@ struct UISnapshots {
         }
     }
 
+    @Test func overview() async throws {
+        // Empty sample folders with injected sizes, fixed drives and a sample activity log; removed afterwards.
+        let root = Self.folder.appending(path: "Overview Home")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sizes: [String: Int64] = ["Library": 48_200_000_000, "Developer": 36_900_000_000, "Movies": 21_400_000_000,
+                                      "Pictures": 12_800_000_000, "Downloads": 6_300_000_000, ".docker": 5_100_000_000,
+                                      "Documents": 3_700_000_000, "Music": 1_900_000_000, "Desktop": 420_000_000]
+        for name in sizes.keys {
+            try FileManager.default.createDirectory(at: root.appending(path: name), withIntermediateDirectories: true)
+        }
+        for (days, size) in [(40.0, 3_100_000_000), (12, 2_400_000_000), (2, 1_250_000_000)] as [(Double, Int64)] {
+            ActivityLog.record(module: "Smart Scan", item: "User caches", size: size, mode: .delete, home: root,
+                               date: Self.today.addingTimeInterval(-days * 86_400))
+        }
+        let model = OverviewModel(center: NotificationCenter())
+        model.home = root
+        model.hasFullDiskAccess = { true }
+        model.now = { Self.today }
+        model.measure = { url, _, _ in (sizes[url.lastPathComponent] ?? 0, [:]) }
+        model.readDisks = {
+            [OverviewModel.Disk(url: URL(fileURLWithPath: "/"),
+                                volume: .init(name: "Macintosh HD", total: 494_000_000_000, available: 182_000_000_000)),
+             OverviewModel.Disk(url: URL(fileURLWithPath: "/Volumes"),
+                                volume: .init(name: "Backup Drive", total: 1_000_000_000_000, available: 62_000_000_000))]
+        }
+        model.refresh()
+        while model.measuring { try await Task.sleep(for: .milliseconds(50)) }
+        try await snapshot("overview") { OverviewView(model: model) }
+    }
+
     /// The Uninstaller's result alert does not render offscreen (the window only dims), so the locked-app texts
     /// are drawn as plain text at about NSAlert's text width.
     @Test func uninstallerLockedAlert() async throws {

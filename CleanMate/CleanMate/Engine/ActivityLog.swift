@@ -165,6 +165,43 @@ nonisolated enum ActivityLog {
         return result
     }
 
+    /// Overview "Freed by CleanMate": bytes deleted (moved to the Trash doesn't count, as in `freed`).
+    struct Cleanups: Equatable {
+        /// Same figure as the menu bar: `freed(after: now − 30 days).deleted`.
+        var last30Days: Int64 = 0
+        var total: Int64 = 0
+        /// The latest cleanup: deleted lines at most `cleanupGap` apart, ending with the newest one.
+        var lastDate: Date?
+        var lastBytes: Int64 = 0
+    }
+
+    /// Lines further apart than this belong to different cleanups.
+    static let cleanupGap: TimeInterval = 5 * 60
+
+    /// `Cleanups` from both log files in one read; the "deleted" lines `freed` counts, no others.
+    static func cleanups(now: Date = .now, home: URL = SafetyPolicy.current.homeURL) -> Cleanups {
+        var result = Cleanups()
+        let cutoff = now.addingTimeInterval(-30 * 86_400)
+        var lines: [(date: Date, bytes: Int64)] = []
+        for line in readAll(home: home).split(separator: "\n") {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count == 7, fields[5] == "deleted", let bytes = Int64(fields[6]), bytes >= 0,
+                  let date = try? Date(String(fields[0]), strategy: .iso8601) else { continue }
+            result.total += bytes
+            if date >= cutoff { result.last30Days += bytes }
+            lines.append((date, bytes))
+        }
+        lines.sort { $0.date < $1.date }
+        guard var previous = lines.last?.date else { return result }
+        result.lastDate = previous
+        for line in lines.reversed() {
+            guard previous.timeIntervalSince(line.date) <= cleanupGap else { break }
+            result.lastBytes += line.bytes
+            previous = line.date
+        }
+        return result
+    }
+
     private static func append(_ line: String, to url: URL, rotateAt: Int) {
         lock.lock()
         defer { lock.unlock() }

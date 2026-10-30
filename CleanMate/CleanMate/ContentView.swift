@@ -3,6 +3,7 @@ import Combine
 
 /// Sidebar modules.
 enum Module: String, CaseIterable, Identifiable {
+    case overview
     case smartScan
     case privacy
     case largeFiles
@@ -14,6 +15,7 @@ enum Module: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringResource {
         switch self {
+        case .overview: "Overview"
         case .smartScan: "Smart Scan"
         case .privacy: "Privacy"
         case .largeFiles: "Large & Old Files"
@@ -25,6 +27,7 @@ enum Module: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .overview: "house"
         case .smartScan: "sparkles"
         case .privacy: "hand.raised"
         case .largeFiles: "doc.badge.clock"
@@ -43,7 +46,7 @@ enum Module: String, CaseIterable, Identifiable {
         switch self {
         case .smartScan, .privacy: return size > 0 ? .size(size) : nil // Privacy records have no size: no badge
         case .largeFiles: return files > 0 ? .files(files) : nil
-        case .uninstaller, .spaceLens, .loginItems: return nil
+        case .overview, .uninstaller, .spaceLens, .loginItems: return nil
         }
     }
 }
@@ -54,6 +57,8 @@ final class ModuleRouter: ObservableObject {
     @Published var requested: Module?
     /// "Show in Space Lens": Space Lens opens this item's folder with the item selected.
     @Published var spaceLensItem: URL?
+    /// Overview's largest folders: Space Lens opens this folder.
+    @Published var spaceLensFolder: URL?
     /// Menu bar "Scan Now": ContentView switches to Smart Scan and starts a scan, also on first appearance.
     @Published var scanRequested = false
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
@@ -77,7 +82,7 @@ final class ModuleRouter: ObservableObject {
     /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
     func show(_ module: Module?, openWindow: OpenWindowAction? = nil) {
         let window = Self.mainWindow
-        // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘6: only bring the window front.
+        // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘7: only bring the window front.
         requested = window?.attachedSheet == nil ? module : nil
         NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
         if let window {
@@ -90,7 +95,8 @@ final class ModuleRouter: ObservableObject {
 
 struct ContentView: View {
     @ObservedObject private var router = ModuleRouter.shared
-    @State private var selection: Module? = .smartScan
+    @State private var selection: Module? = .overview
+    @StateObject private var overview = OverviewModel()
     @StateObject private var smartScan = SmartScanModel(module: .smartScan)
     @StateObject private var privacy = SmartScanModel(module: .privacy)
     @StateObject private var largeFiles = LargeFilesModel()
@@ -118,7 +124,8 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
-            switch selection ?? .smartScan {
+            switch selection ?? .overview {
+            case .overview: OverviewView(model: overview)
             case .smartScan: SmartScanView(model: smartScan, module: .smartScan)
             case .privacy: SmartScanView(model: privacy, module: .privacy)
             case .largeFiles: LargeFilesView(model: largeFiles)
@@ -134,6 +141,7 @@ struct ContentView: View {
         .onAppear {
             // Read from the models at quit time, not mirrored by this view: closing the window mid-clean left
             // a mirrored flag stuck. Weak: a model a still-running task keeps alive after the window closed counts too.
+            overview.spaceLens = spaceLens
             AppDelegate.registerBusyCheck(ObjectIdentifier(smartScan),
                                           Self.busyCheck(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems))
         }
@@ -148,6 +156,9 @@ struct ContentView: View {
         }
         .onAppearAndChange(of: router.spaceLensItem) { _ in
             if let url = router.spaceLensItem { spaceLens.reveal(url); selection = .spaceLens; router.spaceLensItem = nil }
+        }
+        .onAppearAndChange(of: router.spaceLensFolder) { _ in
+            if let url = router.spaceLensFolder { spaceLens.start(at: url); selection = .spaceLens; router.spaceLensFolder = nil }
         }
         .onAppear {
             // Once, and only when missing; remembered even if the user picks Not Now.
@@ -166,7 +177,7 @@ struct ContentView: View {
         case .privacy: hasResults(privacy) ? module.badge(hasResults: true, size: privacy.selectedSize) : nil
         case .largeFiles:
             if case .results = largeFiles.phase { module.badge(hasResults: true, files: largeFiles.visibleFiles.count) } else { nil }
-        case .uninstaller, .spaceLens, .loginItems: nil
+        case .overview, .uninstaller, .spaceLens, .loginItems: nil
         }
         return switch badge {
         case .size(let size): Text(size, format: .fileSize)
@@ -181,7 +192,8 @@ struct ContentView: View {
 
     /// ⌘R: scans the visible module again; nil (menu item disabled) while it is busy.
     private var scanAgain: (() -> Void)? {
-        switch selection ?? .smartScan {
+        switch selection ?? .overview {
+        case .overview: { overview.refresh() }
         case .smartScan: scanAction(smartScan)
         case .privacy: scanAction(privacy)
         case .largeFiles:
@@ -227,7 +239,10 @@ struct ContentView: View {
     private var stopScan: (() -> Void)? {
         let running: Bool
         let stop: () -> Void
-        switch selection ?? .smartScan {
+        switch selection ?? .overview {
+        case .overview:
+            running = overview.measuring
+            stop = { overview.cancel() }
         case .smartScan:
             if case .scanning = smartScan.phase { running = true } else { running = false }
             stop = { smartScan.cancelScan() }
@@ -273,13 +288,13 @@ extension FocusedValues {
         set { self[MoveToTrashKey.self] = newValue }
     }
 
-    /// The visible module shows a delete/Trash/remove confirmation: Scan, Move to Trash and ⌘1…⌘6 wait for it.
+    /// The visible module shows a delete/Trash/remove confirmation: Scan, Move to Trash and ⌘1…⌘7 wait for it.
     var confirming: Bool? {
         get { self[ConfirmingKey.self] }
         set { self[ConfirmingKey.self] = newValue }
     }
 
-    /// The sidebar selection, for View > module (⌘1…⌘6).
+    /// The sidebar selection, for View > module (⌘1…⌘7).
     var module: Binding<Module?>? {
         get { self[ModuleKey.self] }
         set { self[ModuleKey.self] = newValue }

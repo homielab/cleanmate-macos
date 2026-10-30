@@ -214,6 +214,7 @@ struct SizeBar: View {
     let largest: Int64
     var tint: Color = .accentColor
     var height: CGFloat = 6
+    var width: CGFloat = 48
 
     private var fraction: Double { largest > 0 ? Double(size) / Double(largest) : 0 }
 
@@ -224,7 +225,7 @@ struct SizeBar: View {
                     Capsule().fill(tint).frame(width: bar.size.width * min(max(fraction, 0), 1))
                 }
             }
-            .frame(width: 48, height: height)
+            .frame(width: width, height: height)
             .accessibilityHidden(true)
     }
 }

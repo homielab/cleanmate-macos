@@ -14,6 +14,7 @@ no account, no telemetry; its only network connection is the update check, which
 
 ## Features
 
+- **Overview** — free space on each drive, what CleanMate freed, and the largest folders in your home.
 - **Smart Scan** — system junk, developer junk (Xcode, simulators, package caches, Docker, Homebrew…), AI tool data
   and app caches in one scan, using each tool's own cleanup command when it is installed.
 - **Privacy** — browsing history, download history, cookies and autofill per browser, plus recent items, QuickLook
