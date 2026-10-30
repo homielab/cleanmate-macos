@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Overview**: **Free space over time** charts the startup disk's free space over the last 30 days, recorded once a day when CleanMate starts and after Smart Scan scans or cleans; hover a day to see its free space, and a sentence says whether the disk is filling up (and when it would be full at that rate), freeing up or stable.
 - **Apps**: **Code editors: data of deleted projects** lists what VS Code, Cursor, Windsurf and VSCodium keep for project folders you have since deleted, one by one with the project name, editor and size; none are ticked, they go to the Trash so Undo can put them back, and the row is locked while one of these editors runs.
 - **Overview**: CleanMate now opens on an overview of free space on each drive (orange past 90 % used), what it freed in the last 30 days and in total, and the 12 largest folders in your home; click a folder to open it in Space Lens. ⌘1 shows it, the other modules moved to ⌘2–⌘7.
 - **Developer Junk › Firebase CLI**: emulators and debug logs moved with `FIREBASE_EMULATORS_PATH` or `FIREBASE_DEBUG_PATH` in your shell profile are listed too.

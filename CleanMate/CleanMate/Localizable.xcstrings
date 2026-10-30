@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@ free on %@ → %@ on %@." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trống %1$@ ngày %2$@ → %3$@ ngày %4$@."
+          }
+        }
+      }
+    },
     "%@ on %@" : {
       "localizations" : {
         "vi" : {
@@ -37,6 +47,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã dùng %1$@, còn trống %2$@ / %3$@"
+          }
+        }
+      }
+    },
+    "%@: %@ free" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: trống %2$@"
           }
         }
       }
@@ -135,6 +155,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Snapshot trình giả lập Android"
+          }
+        }
+      }
+    },
+    "At this rate the disk is full in about %lld weeks." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "At this rate the disk is full in about %lld week."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "At this rate the disk is full in about %lld weeks."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Với tốc độ này, ổ sẽ đầy sau khoảng %lld tuần."
           }
         }
       }
@@ -469,12 +517,52 @@
         }
       }
     },
+    "Free space" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng trống"
+          }
+        }
+      }
+    },
+    "Free space on the startup disk, recorded once a day while you use CleanMate." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng trống của ổ khởi động, ghi mỗi ngày một lần khi bạn dùng CleanMate."
+          }
+        }
+      }
+    },
+    "Free space over time" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ trống theo thời gian"
+          }
+        }
+      }
+    },
     "Freed by CleanMate" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate đã giải phóng"
+          }
+        }
+      }
+    },
+    "Gaining about %@ a week." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tăng khoảng %@ mỗi tuần."
           }
         }
       }
@@ -715,6 +803,16 @@
         }
       }
     },
+    "Losing about %@ a week." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giảm khoảng %@ mỗi tuần."
+          }
+        }
+      }
+    },
     "Module" : {
       "localizations" : {
         "vi" : {
@@ -935,12 +1033,50 @@
         }
       }
     },
+    "Shows here after a few days of use." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sẽ hiện ở đây sau vài ngày dùng."
+          }
+        }
+      }
+    },
     "Shows here after your first cleanup." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sẽ hiện ở đây sau lần dọn đầu tiên."
+          }
+        }
+      }
+    },
+    "Stable over the last %lld days." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Stable over the last %lld day."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Stable over the last %lld days."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổn định trong %lld ngày qua."
           }
         }
       }

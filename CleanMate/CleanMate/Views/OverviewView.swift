@@ -1,6 +1,8 @@
+import Charts
 import SwiftUI
 
-/// First module: drives, what CleanMate freed and the largest folders in the home folder. Nothing here removes files.
+/// First module: drives, free space over time, what CleanMate freed and the largest folders in the home folder.
+/// Nothing here removes files.
 struct OverviewView: View {
     @ObservedObject var model: OverviewModel
 
@@ -9,6 +11,7 @@ struct OverviewView: View {
             Section("Drives") {
                 ForEach(model.disks) { DiskRow(disk: $0) }
             }
+            historySection
             freedSection
             foldersSection
         }
@@ -19,6 +22,23 @@ struct OverviewView: View {
             ToolbarItem {
                 Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
             }
+        }
+    }
+
+    private var historySection: some View {
+        Section {
+            let points = model.history
+            if points.count < 2 {
+                Text("Shows here after a few days of use.").foregroundStyle(.secondary)
+            } else {
+                HistoryTrend(points: points)
+                FreeSpaceChart(points: points)
+            }
+        } header: {
+            Text("Free space over time")
+        } footer: {
+            Text("Free space on the startup disk, recorded once a day while you use CleanMate.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -142,5 +162,124 @@ private struct FolderRow: View {
         .buttonStyle(.plain)
         .help("Open in Space Lens")
         .accessibilityHint(Text("Open in Space Lens"))
+    }
+}
+
+/// The free-space history in words, like the Linux app: where it went and how fast.
+private struct HistoryTrend: View {
+    let points: [DiskHistory.Point]
+
+    var body: some View {
+        let first = points[0], last = points[points.count - 1]
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(first.available, format: .fileSize) free on \(first.date, format: .dateTime.day().month()) → \(last.available, format: .fileSize) on \(last.date, format: .dateTime.day().month()).")
+                .monospacedDigit()
+            switch DiskHistory.trend(points) {
+            case .losing(let perWeek, let weeksLeft)?:
+                Text("Losing about \(perWeek, format: .fileSize) a week.").foregroundColor(.orange)
+                    + Text(verbatim: " ")
+                    + Text("At this rate the disk is full in about \(weeksLeft) weeks.").foregroundColor(.secondary)
+            case .gaining(let perWeek)?:
+                Text("Gaining about \(perWeek, format: .fileSize) a week.").foregroundStyle(.secondary)
+            case .stable(let days)?:
+                Text("Stable over the last \(days) days.").foregroundStyle(.secondary)
+            case nil:
+                EmptyView()
+            }
+        }
+    }
+}
+
+/// Free space per day as a line in the accent color; hovering shows the nearest day's date and free space.
+private struct FreeSpaceChart: View {
+    let points: [DiskHistory.Point]
+    @State private var hovered: DiskHistory.Point?
+    /// Where the hovered reading is drawn, and the chart's width: the label sits beside it, inside the chart.
+    @State private var hoveredX: CGFloat = 0
+    @State private var width: CGFloat = 0
+
+    /// Lowest and highest value of the y axis: 10 % above and below the readings, a flat line in the middle.
+    private var domain: ClosedRange<Double> {
+        let values = points.map { Double($0.available) }
+        let low = values.min() ?? 0, high = values.max() ?? 0
+        let margin = high > low ? (high - low) * 0.1 : max(high * 0.05, 1)
+        return max(low - margin, 0)...(high + margin)
+    }
+
+    var body: some View {
+        let domain = domain
+        VStack(alignment: .leading, spacing: 4) {
+            hoverLabel(hovered ?? points[points.count - 1]).opacity(hovered == nil ? 0 : 1)
+            Chart {
+                ForEach(points) { point in
+                    AreaMark(x: .value("Date", point.date), yStart: .value("Free space", domain.lowerBound),
+                             yEnd: .value("Free space", Double(point.available)))
+                        .foregroundStyle(Color.accentColor.opacity(0.15))
+                        .interpolationMethod(.monotone)
+                    LineMark(x: .value("Date", point.date), y: .value("Free space", Double(point.available)))
+                        .foregroundStyle(Color.accentColor)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .interpolationMethod(.monotone)
+                        .accessibilityLabel(Text(point.date, format: .dateTime.day().month()))
+                        .accessibilityValue(Text(point.available, format: .fileSize))
+                }
+                if let point = hovered ?? points.last {
+                    PointMark(x: .value("Date", point.date), y: .value("Free space", Double(point.available)))
+                        .foregroundStyle(Color.accentColor)
+                        .symbolSize(40)
+                }
+                if let hovered {
+                    RuleMark(x: .value("Date", hovered.date)).foregroundStyle(Color.secondary.opacity(0.5))
+                }
+            }
+            .chartYScale(domain: domain)
+            .chartYAxis {
+                AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let bytes = value.as(Double.self) { Text(Int64(bytes), format: .fileSize) }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                    AxisGridLine()
+                    // A Text, not `format:`, so the dates follow the app language, not the system's.
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) { Text(date, format: .dateTime.day().month(.abbreviated)) }
+                    }
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .onContinuousHover { phase in
+                            guard case .active(let location) = phase else { hovered = nil; return }
+                            let plot = geometry[proxy.plotAreaFrame]
+                            guard let date: Date = proxy.value(atX: location.x - plot.minX),
+                                  let nearest = points.min(by: {
+                                      abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date))
+                                  }) else { hovered = nil; return }
+                            hovered = nearest
+                            hoveredX = plot.minX + (proxy.position(forX: nearest.date) ?? 0)
+                            width = geometry.size.width
+                        }
+                }
+            }
+            .frame(height: 130)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// "12 Oct: 182 GB free", starting at the hovered reading on the left half, ending at it on the right half.
+    private func hoverLabel(_ point: DiskHistory.Point) -> some View {
+        let leftHalf = hoveredX < width / 2
+        return Text("\(point.date, format: .dateTime.day().month().year()): \(point.available, format: .fileSize) free")
+            .font(.caption).monospacedDigit()
+            .lineLimit(1)
+            .padding(.leading, leftHalf ? max(hoveredX - 6, 0) : 0)
+            .padding(.trailing, leftHalf ? 0 : max(width - hoveredX - 6, 0))
+            .frame(maxWidth: .infinity, alignment: leftHalf ? .leading : .trailing)
+            .accessibilityHidden(true)
     }
 }

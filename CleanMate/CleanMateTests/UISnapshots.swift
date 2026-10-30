@@ -504,6 +504,11 @@ struct UISnapshots {
         model.home = root
         model.hasFullDiskAccess = { true }
         model.now = { Self.today }
+        // A month of daily readings, slowly filling up with a clean on day 12.
+        model.diskHistory = DiskHistory(file: nil, points: (0..<30).map { day in
+            let free = 200_000_000_000 - Int64(day) * 1_100_000_000 + (day >= 12 ? 9_000_000_000 : 0)
+            return .init(date: Self.today.addingTimeInterval(Double(day - 29) * 86_400), available: free, total: 494_000_000_000)
+        })
         model.measure = { url, _, _ in (sizes[url.lastPathComponent] ?? 0, [:]) }
         model.readDisks = {
             [OverviewModel.Disk(url: URL(fileURLWithPath: "/"),

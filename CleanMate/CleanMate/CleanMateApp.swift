@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Set at launch: a click on the reminder that launched CleanMate is delivered right after.
         UNUserNotificationCenter.current().delegate = self
         Task { await ScanReminderScheduler.shared.postpone() } // CleanMate was used: next reminder one period from now
+        DiskHistory.shared.recordNow() // today's free space for the Overview chart
     }
 
     /// The reminder arrives while CleanMate is the active app: not shown, the user is already here.

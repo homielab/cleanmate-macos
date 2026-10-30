@@ -1,7 +1,8 @@
 import Combine
 import Foundation
 
-/// Overview: drives and their free space, what CleanMate freed, and the largest folders in the home folder.
+/// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, and the largest
+/// folders in the home folder.
 /// Read-only. Drives and freed space are read at once; folder sizes are measured in the background.
 final class OverviewModel: ObservableObject {
     nonisolated struct Disk: Identifiable, Equatable, Sendable {
@@ -27,6 +28,8 @@ final class OverviewModel: ObservableObject {
 
     @Published private(set) var disks: [Disk] = []
     @Published private(set) var cleanups = ActivityLog.Cleanups()
+    /// Free space on the startup disk over the last `DiskHistory.chartDays` days, oldest first.
+    @Published private(set) var history: [DiskHistory.Point] = []
     /// Largest first, at most `folderLimit`; filled when measuring ends.
     @Published private(set) var folders: [SpaceItem] = []
     @Published private(set) var measuring = false
@@ -38,8 +41,10 @@ final class OverviewModel: ObservableObject {
     /// Injectable for tests: the folder measured and the activity log read.
     var home = SafetyPolicy.current.homeURL
     var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
-    /// The end of "Last 30 days"; snapshots pin it.
+    /// The end of "Last 30 days" and of the free-space chart; snapshots pin it.
     var now: () -> Date = { .now }
+    /// Tests and snapshots pass one in memory.
+    var diskHistory = DiskHistory.shared
     /// The startup drive first, then external drives; tests pass their own.
     var readDisks: () -> [Disk] = { OverviewModel.mountedDisks() }
     var measure: @Sendable (URL, SpaceLens.HardLinks, Set<String>) async throws -> (size: Int64, folders: [String: Int64]) = {
@@ -85,6 +90,7 @@ final class OverviewModel: ObservableObject {
     private func readQuick() {
         disks = readDisks()
         cleanups = ActivityLog.cleanups(now: now(), home: home)
+        history = diskHistory.recent(now: now())
     }
 
     private func measureFolders() {
