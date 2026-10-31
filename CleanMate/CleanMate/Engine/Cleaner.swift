@@ -289,9 +289,31 @@ nonisolated enum Cleaner {
         var prefix = ""
         for part in relative.split(separator: "/") {
             prefix += prefix.isEmpty ? part : "/" + part
-            if excluded.contains(prefix) { return true }
+            if isExcluded(prefix, excluded: excluded) { return true }
         }
-        return excluded.contains { $0.hasPrefix(relative + "/") }
+        return holdsExclusion(url, relative: relative, excluded: excluded)
+    }
+
+    /// Whether `relative` (a path under an item's root) is one of `excluded`: the same path, or a pattern whose `*`
+    /// components match any name (`*/org.sparkle-project.Sparkle`: that folder in every top-level folder).
+    static func isExcluded(_ relative: String, excluded: Set<String>) -> Bool {
+        excluded.contains(relative) || excluded.contains { $0.contains("*") && fnmatch($0, relative, FNM_PATHNAME) == 0 }
+    }
+
+    /// Whether the folder `url`, at `relative` under its root, holds one of `excluded`. For a pattern, the components
+    /// below `relative` must exist inside `url` (not following symlinks); a `*` among them counts as held.
+    static func holdsExclusion(_ url: URL, relative: String, excluded: Set<String>) -> Bool {
+        excluded.contains { pattern in
+            if pattern.hasPrefix(relative + "/") { return true }
+            guard pattern.contains("*") else { return false }
+            let parts = pattern.split(separator: "/"), depth = relative.split(separator: "/").count
+            guard parts.count > depth,
+                  fnmatch(parts.prefix(depth).joined(separator: "/"), relative, FNM_PATHNAME) == 0 else { return false }
+            let rest = parts.dropFirst(depth)
+            if rest.contains(where: { $0.contains("*") }) { return true }
+            var info = stat()
+            return lstat(url.appending(path: rest.joined(separator: "/")).path, &info) == 0
+        }
     }
 
     private static func erase(_ database: DatabaseErase, in url: URL) async -> CleanReport {

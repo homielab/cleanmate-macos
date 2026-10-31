@@ -172,7 +172,10 @@ extension CleanerGroup {
 
     /// `hasFullDiskAccess`: OneDrive's folders (other apps' containers) and Dropbox folders in privacy-protected places
     /// are only read with it.
-    nonisolated static func applications(hasFullDiskAccess: Bool = false) -> CleanerGroup {
+    /// `runningApps` and `isUpdating`: see `SparkleDownloads.item`.
+    nonisolated static func applications(hasFullDiskAccess: Bool = false,
+                                         runningApps: @escaping @Sendable () -> Set<String> = { [] },
+                                         isUpdating: @escaping @Sendable () -> Bool = { false }) -> CleanerGroup {
         CleanerGroup(id: "applications", title: "Applications", systemImage: "macwindow", items: [
         // Browsers: ~/Library/Caches/<browser> is all cache; Application Support only for the cache folders.
         app("safari", "Safari", bundle: ["com.apple.Safari"], ["~/Library/Caches/com.apple.Safari"]),
@@ -205,6 +208,23 @@ extension CleanerGroup {
                     note: "Update packages already installed; downloaded again if needed",
                     paths: ["~/Library/Application Support/Google/GoogleUpdater/crx_cache"], showsWhenEmpty: false,
                     runningProcessNames: ["GoogleUpdater"]),
+        // Zoom's own updater keeps the installers it downloaded (one per version, often hundreds of MB); Zoom
+        // downloads the next one when it updates. Skipped while Zoom runs or an installer is open.
+        CleanerItem(id: "zoom-updates", title: "Zoom: downloaded updates",
+                    note: "Installers Zoom downloaded to update itself; downloaded again if needed",
+                    paths: ["~/Library/Application Support/zoom.us/AutoUpdater"], showsWhenEmpty: false,
+                    runningAppBundleIDs: ["us.zoom.xos"], skipsOpenFiles: true),
+        // Microsoft AutoUpdate (Office, Edge, Teams…): update downloads and update info it caches per user; the
+        // packages it installs from live in /Library (root's, never touched). Skipped while it or its daemon runs.
+        CleanerItem(id: "microsoft-autoupdate", title: "Microsoft AutoUpdate cache",
+                    note: "Update downloads and update information; downloaded again if needed",
+                    paths: ["~/Library/Caches/com.microsoft.autoupdate2", "~/Library/Caches/com.microsoft.autoupdate.fba"],
+                    showsWhenEmpty: false, runningAppBundleIDs: ["com.microsoft.autoupdate2", "com.microsoft.autoupdate*"],
+                    runningProcessNames: ["Microsoft AutoUpdate", "Microsoft AU Daemon", "Microsoft Update Assistant",
+                                          "msupdate"],
+                    skipsOpenFiles: true),
+        // Updates apps downloaded with Sparkle, one entry per app (`SparkleDownloads`).
+        SparkleDownloads.item(runningApps: runningApps, isUpdating: isUpdating),
 
         app("vscode", "Visual Studio Code", bundle: ["com.microsoft.VSCode"],
             vscode("Code") + ["~/Library/Caches/com.microsoft.VSCode"]),

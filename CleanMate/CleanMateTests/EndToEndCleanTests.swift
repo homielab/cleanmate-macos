@@ -212,6 +212,11 @@ struct EndToEndCleanTests {
                               Data(repeating: 1, count: 4096))
                     continue
                 }
+                if item.id == SparkleDownloads.id { // an app's downloaded update: only its Sparkle folder goes
+                    try write(folder.appending(path: "junk-\(item.id)/\(SparkleDownloads.folderName)/PersistentDownloads/u.zip"),
+                              Data(repeating: 1, count: 4096))
+                    continue
+                }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes
                     let project = folder.appending(path: "junk-\(item.id)")
                     let (manifest, built) = item.id == "stale-build-dirs" ? ("Cargo.toml", "target") : ("package.json", "node_modules")

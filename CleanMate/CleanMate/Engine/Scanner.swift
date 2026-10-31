@@ -172,13 +172,13 @@ nonisolated enum Scanner {
         func listed(_ urls: [URL], under prefix: String) -> [URL] {
             urls.flatMap { url -> [URL] in
                 let name = prefix + url.lastPathComponent
-                let holdsExclusion = item.excluded.contains(where: { $0.hasPrefix(name + "/") })
+                let holdsExclusion = Cleaner.holdsExclusion(url, relative: name, excluded: item.excluded)
                 // Changed after the cutoff: `entry` drops it anyway, so skip the costlier checks below (
                 // ~19 k `$TMPDIR` children, mostly new, took 3 s). Values were read with the listing.
                 if let cutoff, item.database == nil, !holdsExclusion,
                    let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileResourceTypeKey]),
                    modified(values) >= cutoff { return [] }
-                guard !item.excluded.contains(name), item.allowsEntry?(policy, url) ?? policy.allows(url),
+                guard !Cleaner.isExcluded(name, excluded: item.excluded), item.allowsEntry?(policy, url) ?? policy.allows(url),
                       skips?(url) != true, !isLocked(url),
                       open.isEmpty || !holdsOpenFile(url, of: item, openPaths: open) else { return [] }
                 if prefix.isEmpty, only?.contains(name) == false

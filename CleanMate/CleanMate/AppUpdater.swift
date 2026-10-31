@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import Sparkle
+import os
 
 /// Sparkle updates: CleanMate's only network connection. It downloads the appcast from GitHub Releases
 /// (`SUFeedURL` in Info.plist) and, when the user asks or allows it, the signed update itself.
@@ -16,6 +17,11 @@ final class AppUpdater: ObservableObject {
     /// Stays false under tests: they must never reach the network, nor show Sparkle's permission prompt.
     private(set) var isStarted = false
     @Published private(set) var canCheckForUpdates = false
+
+    /// An update of CleanMate was found in this run: it is being downloaded, installed, or waits to be installed, so
+    /// its files in CleanMate's Sparkle cache folder must stay (`SparkleDownloads`). Readable from any thread.
+    nonisolated static var isUpdating: Bool { updating.withLock { $0 } }
+    nonisolated private static let updating = OSAllocatedUnfairLock(initialState: false)
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
         self.environment = environment
@@ -64,6 +70,11 @@ final class AppUpdater: ObservableObject {
     final class Delegate: NSObject, SPUUpdaterDelegate {
         /// Nothing about the Mac is added to the appcast request, even if system profiling were turned on.
         func allowedSystemProfileKeys(for updater: SPUUpdater) -> [String]? { [] }
+
+        /// Called before the update is shown or downloaded. Not reset in this run: a postponed update stays in the cache.
+        func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+            AppUpdater.updating.withLock { $0 = true }
+        }
     }
 }
 

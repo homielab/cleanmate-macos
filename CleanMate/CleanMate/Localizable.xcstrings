@@ -497,6 +497,16 @@
         }
       }
     },
+    "Downloaded app updates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản cập nhật ứng dụng đã tải"
+          }
+        }
+      }
+    },
     "Downloaded models and datasets, downloaded again when a program loads them" : {
       "localizations" : {
         "vi" : {
@@ -883,6 +893,16 @@
         }
       }
     },
+    "Installers Zoom downloaded to update itself; downloaded again if needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản cài Zoom tự tải về để cập nhật; sẽ được tải lại khi cần"
+          }
+        }
+      }
+    },
     "Installers in Downloads: %lld days" : {
       "localizations" : {
         "en" : {
@@ -1065,6 +1085,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Giảm khoảng %@ mỗi tuần."
+          }
+        }
+      }
+    },
+    "Microsoft AutoUpdate cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Microsoft AutoUpdate"
           }
         }
       }
@@ -1689,6 +1719,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hiện tất cả ứng dụng"
+          }
+        }
+      }
+    },
+    "Update downloads and update information; downloaded again if needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản cập nhật đã tải và thông tin cập nhật; sẽ được tải lại khi cần"
+          }
+        }
+      }
+    },
+    "Updates apps downloaded to install themselves; downloaded again if needed. Skips apps that are open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản cập nhật các ứng dụng tự tải về để cài; sẽ được tải lại khi cần. Bỏ qua ứng dụng đang mở"
+          }
+        }
+      }
+    },
+    "Zoom: downloaded updates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom: bản cài cập nhật đã tải"
           }
         }
       }

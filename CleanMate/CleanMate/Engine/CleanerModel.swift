@@ -175,7 +175,8 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// nil = every top-level entry.
     var minAge: TimeInterval? = nil
     /// Names inside `paths` that are never touched: a top-level name (`keep`) or a nested path (`Google/Chrome`).
-    /// A folder holding a nested one is listed child by child instead of whole, so it is never removed.
+    /// A folder holding a nested one is listed child by child instead of whole, so it is never removed. A `*` component
+    /// matches any name (`*/org.sparkle-project.Sparkle`); only folders where the rest exists are then listed child by child.
     var excluded: Set<String> = []
     /// When set, only top-level entries matching one of these fnmatch patterns (hidden names included), e.g.
     /// single files at the home root (`.zsh_history`) or `Cookies` in a browser profile. The folder itself is kept.

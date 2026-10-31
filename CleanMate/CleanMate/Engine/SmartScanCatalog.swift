@@ -9,7 +9,7 @@ extension CleanerGroup {
             Set(NSWorkspace.shared.runningApplications.flatMap { app in
                 [app.localizedName, app.bundleURL?.deletingPathExtension().lastPathComponent].compactMap { $0 }
             })
-        }, runningAppTeams: CodeSignature.runningAppTeams) {
+        }, runningAppTeams: CodeSignature.runningAppTeams, isUpdating: { AppUpdater.isUpdating }) {
             Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         }
     }
@@ -21,16 +21,20 @@ extension CleanerGroup {
     /// user caches only: sandboxed and group caches are named by bundle/group id, never by app name.
     /// `runningAppTeams` (bundle id → signing Team ID, `CodeSignature.runningAppTeams`) is read with it for group caches only.
     /// `screenshotFolder`: where screenshots are saved (`OldScreenshots.folder`), Desktop unless given.
+    /// `isUpdating`: CleanMate is downloading or installing an update of itself (`SparkleDownloads`).
     nonisolated static func smartScan(ages: CleanupAges, hasFullDiskAccess: Bool = false,
                                       screenshotFolder: String? = OldScreenshots.defaultFolder,
                                       runningAppNames: @escaping @Sendable () -> Set<String> = { [] },
                                       runningAppTeams: @escaping @Sendable () -> [String: String] = { [:] },
+                                      isUpdating: @escaping @Sendable () -> Bool = { false },
                                       runningApps: @escaping @Sendable () -> Set<String> = { [] }) -> [CleanerGroup] { [
         CleanerGroup(id: "system-junk", title: "System Junk", systemImage: "internaldrive", items: [
             // A running app's cache folder (by bundle id, helpers `<id>.*` included; or by app name) is kept,
-            // and so is one holding a file any process has open (a CLI daemon, a helper).
+            // and so is one holding a file any process has open (a CLI daemon, a helper). Updates apps downloaded
+            // with Sparkle have their own item (`SparkleDownloads`).
             CleanerItem(id: "user-caches", title: "User caches", note: "Skips caches of apps that are open",
-                        paths: ["~/Library/Caches"], excluded: keptCaches.union(ownedCachePaths).union(notCaches),
+                        paths: ["~/Library/Caches"], excluded: keptCaches.union(ownedCachePaths).union(notCaches)
+                            .union([SparkleDownloads.cachePattern]),
                         skipsOpenFiles: true, skipsEntry: {
                             let apps = runningApps()
                             let names = Set(runningAppNames().filter(AppMatcher.isDistinctive).map { $0.lowercased() })
@@ -126,7 +130,7 @@ extension CleanerGroup {
         ]),
         developer,
         aiTools(sessionDays: ages.sessions),
-        applications(hasFullDiskAccess: hasFullDiskAccess),
+        applications(hasFullDiskAccess: hasFullDiskAccess, runningApps: runningApps, isUpdating: isUpdating),
         CleanerGroup(id: "trash", title: "Trash", systemImage: "trash", items: [
             // Unticked by default: emptying the Trash cannot be undone.
             CleanerItem(id: "empty-trash", title: "Empty Trash", note: "Permanently deletes everything in the Trash",
