@@ -6728,6 +6728,46 @@
         }
       }
     },
+    "Apple Podcasts: downloaded episodes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Podcasts: tập đã tải"
+          }
+        }
+      }
+    },
+    "Episodes are downloaded again when you play them; your subscriptions and library are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tập được tải lại khi bạn nghe; kênh đã đăng ký và thư viện được giữ"
+          }
+        }
+      }
+    },
+    "Apple Podcasts cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Apple Podcasts"
+          }
+        }
+      }
+    },
+    "Artwork and audio cached while streaming; downloaded again when needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh bìa và âm thanh lưu khi nghe trực tuyến; được tải lại khi cần"
+          }
+        }
+      }
+    },
     "Dropbox cache" : {
       "localizations" : {
         "vi" : {

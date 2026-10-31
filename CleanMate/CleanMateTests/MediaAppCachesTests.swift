@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import CleanMate
 
-/// Media caches of Telegram and Spotify: only the media and cache folders are listed and deleted, never Telegram's
-/// database, keys or sign-in. Everything happens in a throwaway fake home.
+/// Media caches of Telegram, Spotify and Apple Podcasts: only the media and cache folders are listed and deleted, never
+/// Telegram's database, keys or sign-in, nor Podcasts' library. Everything happens in a throwaway fake home.
 final class MediaAppCachesTests {
     private let fm = FileManager.default
     private let root = TestTemp.url("CleanMateMediaApps")
@@ -36,13 +36,16 @@ final class MediaAppCachesTests {
 
     @Test func itemsAreUntickedDeletedAndHiddenWhenEmpty() throws {
         let items = CleanerGroup.applications(hasFullDiskAccess: true).items
-        for id in ["telegram-media-cache", "spotify-storage"] {
+        for id in ["telegram-media-cache", "spotify-storage", "podcasts-episodes", "podcasts-cache"] {
             let item = try #require(items.first { $0.id == id }, "\(id)")
             #expect(!item.selectedByDefault && item.mode == .delete && !item.showsWhenEmpty && item.note != nil, "\(id)")
             #expect(item.skipsOpenFiles && item.command == nil, "\(id)")
         }
         // Telegram's folder is another app's group container: macOS asks without Full Disk Access.
-        #expect(!CleanerGroup.applications().items.contains { $0.id == "telegram-media-cache" })
+        // Podcasts' too (an Apple group container is guarded the same way).
+        for id in ["telegram-media-cache", "podcasts-episodes", "podcasts-cache"] {
+            #expect(!CleanerGroup.applications().items.contains { $0.id == id }, "\(id)")
+        }
         #expect(CleanerGroup.applications().items.contains { $0.id == "spotify-storage" })
     }
 
@@ -76,11 +79,40 @@ final class MediaAppCachesTests {
         for path in kept { #expect(exists(path), "\(path)") }
     }
 
+    /// Episode files directly in `Library/Cache` go with "downloaded episodes", its other entries with "cache"; neither
+    /// lists the other's, and the library database, settings and downloads in progress (`Library/Caches`) stay.
+    @Test func podcastsSplitsEpisodesFromCache() async throws {
+        let cache = "Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Library/Cache"
+        let group = "Library/Group Containers/243LU875E5.groups.com.apple.podcasts"
+        let episodes = [cache + "/0A1B2C3D-0000-4000-8000-000000000001.mp3", cache + "/0A1B2C3D-0000-4000-8000-000000000002.M4A",
+                        cache + "/0A1B2C3D-0000-4000-8000-000000000003.mp4"]
+        let cached = [cache + "/Assets/Artwork/Show-1-600x600-bb.heic", cache + "/Assets/StreamedMedia/s1",
+                      cache + "/JSStoreDataProvider/ListenNowFooter.json"]
+        let kept = [group + "/Documents/MTLibrary.sqlite", group + "/Documents/MTLibrary.sqlite-wal",
+                    group + "/Library/Preferences/243LU875E5.groups.com.apple.podcasts.plist",
+                    group + "/Library/Caches/com.apple.nsurlsessiond/Downloads/com.apple.podcasts/d.tmp",
+                    group + "/PodcastContentService/SyncToAppChangeSets/c"]
+        for path in episodes + cached + kept { try file(path) }
+
+        let cacheListed = await scanAndClean(MediaAppCaches.podcastsPlaybackCache)
+        #expect(cacheListed == [cache + "/Assets", cache + "/JSStoreDataProvider"])
+        for path in episodes + kept { #expect(exists(path), "\(path)") }
+        for path in cached { #expect(!exists(path), "\(path)") }
+
+        let episodesListed = await scanAndClean(MediaAppCaches.podcastEpisodes)
+        #expect(episodesListed == episodes.sorted())
+        for path in episodes { #expect(!exists(path), "\(path)") }
+        for path in kept { #expect(exists(path), "\(path)") }
+        #expect(exists(cache), "the folder itself stays")
+    }
+
     @MainActor @Test func lockedWhileTheAppRuns() {
         let model = SmartScanModel(module: .smartScan) { [] }
         let cases: [(CleanerItem, apps: [String], processes: [String])] = [
             (MediaAppCaches.telegram, ["ru.keepcoder.Telegram", "org.telegram.desktop"], ["Telegram"]),
             (MediaAppCaches.spotify, ["com.spotify.client"], ["Spotify"]),
+            (MediaAppCaches.podcastEpisodes, ["com.apple.podcasts", "com.apple.podcasts.widget"], ["Podcasts", "podcastsd"]),
+            (MediaAppCaches.podcastsPlaybackCache, ["com.apple.podcasts"], ["Podcasts", "podcastsd"]),
         ]
         for (item, apps, processes) in cases {
             model.runningApps = ["com.google.Chrome", "com.apple.finder"]
