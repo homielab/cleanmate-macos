@@ -475,6 +475,16 @@
         }
       }
     },
+    "Copies of simulators Xcode makes to run tests in parallel, made again by the next parallel test run" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao simulator Xcode tạo để chạy test song song, được tạo lại ở lần chạy test song song tiếp theo"
+          }
+        }
+      }
+    },
     "Counts what was deleted; items moved to the Trash are not included." : {
       "localizations" : {
         "vi" : {
@@ -721,6 +731,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Môi trường của ứng dụng chạy bằng pipx run; sẽ được tạo lại ở lần chạy sau"
+          }
+        }
+      }
+    },
+    "Erases the apps and data of each ticked simulator (simctl erase); the simulators stay, empty as new" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá ứng dụng và dữ liệu của từng simulator được chọn (simctl erase); simulator vẫn còn, trống như mới"
           }
         }
       }
@@ -1755,6 +1775,16 @@
         }
       }
     },
+    "Simulator data" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dữ liệu simulator"
+          }
+        }
+      }
+    },
     "Stable over the last %lld days." : {
       "localizations" : {
         "en" : {
@@ -1841,6 +1871,16 @@
         }
       }
     },
+    "Test device clones" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao thiết bị test"
+          }
+        }
+      }
+    },
     "The app is open. Quit it before uninstalling or resetting it." : {
       "localizations" : {
         "vi" : {
@@ -1857,6 +1897,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhận diện mã độc macOS dùng để kiểm tra ứng dụng, tự động cập nhật."
+          }
+        }
+      }
+    },
+    "This simulator is running. Shut it down and scan again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Simulator này đang chạy. Hãy tắt rồi quét lại"
           }
         }
       }
@@ -3643,16 +3693,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xoá…"
-          }
-        }
-      }
-    },
-    "Erases every app and its data in all simulators (simctl erase all)" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xoá mọi ứng dụng và dữ liệu trong tất cả simulator (simctl erase all)"
           }
         }
       }
@@ -5505,16 +5545,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhớ đệm simulator"
-          }
-        }
-      }
-    },
-    "Simulator content" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dữ liệu simulator"
           }
         }
       }

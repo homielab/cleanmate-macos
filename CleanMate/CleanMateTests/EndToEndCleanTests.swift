@@ -21,6 +21,8 @@ struct EndToEndCleanTests {
         ".vscode/extensions/junk.ext-2.0.0/package.json", ".vscode-insiders/extensions/junk.ext-2.0.0/package.json",
         ".vscode-oss/extensions/junk.ext-2.0.0/package.json", ".cursor/extensions/junk.ext-2.0.0/package.json",
         ".windsurf/extensions/junk.ext-2.0.0/package.json", ".vscode/extensions/extensions.json",
+        // The simulator sets' own lists next to the simulators and test device clones
+        "Library/Developer/CoreSimulator/Devices/device_set.plist", "Library/Developer/XCTestDevices/device_set.plist",
         // Browser bookmarks, passwords, extensions
         "Library/Safari/Bookmarks.plist",
         "Library/Application Support/Google/Chrome/Default/Bookmarks",
@@ -199,6 +201,7 @@ struct EndToEndCleanTests {
                     ? StaleBuildFolders.item(home: home, hasFullDiskAccess: { true }, running: { [] })
                     : item.id == "vscode-stale-workspaces" ? EditorWorkspaces.item(home: home, hasFullDiskAccess: { true }) : item)
                 item.command = nil
+                item.entryCommand = nil // a simulator's entry is removed as a folder here, not erased with simctl
                 if item.probe != nil {
                     let junk = "junk-" + item.id
                     item.probe = SizeProbe(command: ShellCommand(executable: "/usr/bin/true"), parse: { _ in .only([junk]) })

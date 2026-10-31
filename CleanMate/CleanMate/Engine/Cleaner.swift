@@ -171,11 +171,20 @@ nonisolated enum Cleaner {
         if item.probe?.precondition() == false { return CleanReport(skipped: 1) } // e.g. Docker stopped since the scan
         if item.externalTrash { return await ExternalTrash.empty(item, scan: scan, policy: policy, openPaths: openPaths) }
         if let entryCommand = item.entryCommand {
-            guard item.command?.resolvedPath != nil, !(await blockedByExclusion(item, policy: policy)) else {
-                return CleanReport(skipped: 1)
+            // A tool the item names must be installed (`docker`); an item without one runs only its entries' commands.
+            if let command = item.command {
+                guard command.resolvedPath != nil else { return CleanReport(skipped: 1) }
+                if await blockedByExclusion(item, policy: policy) { return CleanReport(skipped: 1) }
             }
             var report = CleanReport()
             for entry in scan.entries {
+                // An entry in the item's folders (a simulator's) is checked again like a file before its command runs:
+                // the policy (Settings › Exclusions), and a fresh skip and lock (a simulator booted since the scan).
+                guard item.paths.isEmpty || policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
+                      item.locksEntry?()(entry.url) == nil else {
+                    report.skipped += 1
+                    continue
+                }
                 if let command = entryCommand(entry.url), await command.run() {
                     report.freed += entry.size
                 } else {

@@ -224,7 +224,9 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// per session only (never remembered), and every entry is listed (no 200-entry cap), so none is cleaned unseen.
     var selectableEntries = false
     /// Removes one entry with a command instead of deleting a path (Docker's untagged images: `docker rmi <id>`);
-    /// nil for an entry it does not recognise, which is then skipped. The item's own `command` is not run.
+    /// nil for an entry it does not recognise, which is then skipped. The item's own `command` is not run: when set, it
+    /// only has to be installed. An entry in `paths` (a simulator: `simctl erase <udid>`) is checked again right before
+    /// its command like a removed one: `SafetyPolicy.allows`, `skipsEntry`, `locksEntry`.
     var entryCommand: (@Sendable (URL) -> ShellCommand?)? = nil
     /// Files outside `paths` that go with an entry (an Ollama model's blobs). Asked at scan, where `own` counts in the
     /// entry's size and `shared` counts once in the item's size when every entry using it is in the scan (ticked), and

@@ -44,13 +44,9 @@ extension CleanerGroup {
                                  return stale.map { SizeProbe.Result.bytes($0.bytes) }
                              }),
             selected: false, apps: ["com.apple.dt.Xcode", "com.apple.iphonesimulator"]),
-        dev("simulator-data", "Simulator content",
-            note: "Erases every app and its data in all simulators (simctl erase all)",
-            [simulatorDevices],
-            command: ShellCommand(executable: "/bin/sh",
-                                  arguments: ["-c", "xcrun simctl shutdown all; xcrun simctl erase all"],
-                                  timeout: .seconds(300)),
-            probe: simulators(available: true), selected: false, apps: ["com.apple.iphonesimulator"]),
+        // One entry per available simulator, erased one by one; then the clones parallel testing leaves behind.
+        SimulatorDevices.dataItem(),
+        SimulatorDevices.clonesItem(),
         // Simulators SwiftUI Previews creates on its own; Xcode makes them again on the next preview.
         dev("xcode-previews", "Xcode Previews simulators", note: "Created again the next time a preview runs",
             ["~/Library/Developer/Xcode/UserData/Previews"],
