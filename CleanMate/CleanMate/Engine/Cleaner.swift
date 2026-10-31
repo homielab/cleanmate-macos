@@ -243,9 +243,11 @@ nonisolated enum Cleaner {
                 }
             }
             // The entry stays (a video library): only its parts go, each listed again now and measured as it is.
+            // A part holding an open file is kept.
             if let parts = item.entryParts {
                 for part in parts(policy, entry.url) {
-                    guard !Scanner.isLocked(part), let size = await Scanner.entry(at: part, olderThan: nil)?.size,
+                    guard !Scanner.isLocked(part), open.isEmpty || !RunningProcesses.holdsOpenFile(part, openPaths: open),
+                          let size = await Scanner.entry(at: part, olderThan: nil)?.size,
                           (try? remove(part, size: size)) != nil else { report.skipped += 1; continue }
                     report.freed += size
                 }

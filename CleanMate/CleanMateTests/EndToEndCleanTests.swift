@@ -17,6 +17,10 @@ struct EndToEndCleanTests {
         "Movies/junk-video-render-files.fcpbundle/Event/CurrentVersion.fcpevent",
         "Movies/junk-video-render-files.fcpbundle/Event/Original Media/clip.mov",
         "Movies/junk-video-render-files.fcpbundle/Event/Transcoded Media/clip.mov",
+        // The version in use of an editor extension next to its old one, and the editor's list of installed extensions
+        ".vscode/extensions/junk.ext-2.0.0/package.json", ".vscode-insiders/extensions/junk.ext-2.0.0/package.json",
+        ".vscode-oss/extensions/junk.ext-2.0.0/package.json", ".cursor/extensions/junk.ext-2.0.0/package.json",
+        ".windsurf/extensions/junk.ext-2.0.0/package.json", ".vscode/extensions/extensions.json",
         // Browser bookmarks, passwords, extensions
         "Library/Safari/Bookmarks.plist",
         "Library/Application Support/Google/Chrome/Default/Bookmarks",
@@ -229,6 +233,10 @@ struct EndToEndCleanTests {
                 if item.id == SparkleDownloads.id { // an app's downloaded update: only its Sparkle folder goes
                     try write(folder.appending(path: "junk-\(item.id)/\(SparkleDownloads.folderName)/PersistentDownloads/u.zip"),
                               Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if item.id == EditorExtensions.id { // a version replaced by the bait version 2.0.0 of the same extension
+                    try write(folder.appending(path: "junk.ext-1.0.0/package.json"), Data(repeating: 1, count: 4096))
                     continue
                 }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes

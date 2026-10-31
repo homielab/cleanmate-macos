@@ -168,6 +168,9 @@ extension CleanerGroup {
         OldRuntimes.rubyItem(),
         OldRuntimes.rustItem(),
         OldRuntimes.goItem(),
+        // Unticked, deleted: versions of VS Code, Cursor, Windsurf and VSCodium extensions replaced by an update, one
+        // entry per extension; the version in use is never listed (`EditorExtensions`).
+        EditorExtensions.item(),
         // Build caches of native toolchains: rebuilt by the next build, which is slower once. Unticked. A cache folder
         // set in the shell profile is listed by tool-specific names only, so a mistaken value lists nothing else.
         dev("zig-cache", "Zig cache", note: "Build outputs and fetched packages, made again by the next build",

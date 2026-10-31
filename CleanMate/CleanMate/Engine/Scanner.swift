@@ -166,7 +166,7 @@ nonisolated enum Scanner {
             let open = item.skipsOpenFiles && !found.isEmpty ? await openPaths(policy.homeURL.path) : []
             // One level deeper in parallel: pnpm keeps every package under one `.pnpm` folder (~100 k files).
             return await measure(found.filter { !RunningProcesses.holdsOpenFile($0, openPaths: open) }, of: item,
-                                 into: result, policy: policy, cutoff: cutoff, split: 1)
+                                 into: result, policy: policy, cutoff: cutoff, split: 1, openPaths: open)
         }
         let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: roots, read: openPaths) : []
         func listed(_ urls: [URL], under prefix: String) -> [URL] {
@@ -210,18 +210,22 @@ nonisolated enum Scanner {
         // An item filtered by its probe starts walking only once the tool answered, ~1–3 s into a Smart Scan whose other
         // walks fill the thread pool: one thread per entry left a simulator's 66 k-file `data` as the scan's tail.
         return await measure(candidates, of: item, into: result, policy: policy, cutoff: cutoff,
-                             split: only != nil ? splitDepth : 0)
+                             split: only != nil ? splitDepth : 0, openPaths: open)
     }
 
     /// `result` with `candidates` measured at once (or their database records counted), labelled, largest first.
+    /// `openPaths`: files open under the item's folders, which keep an entry's part (`CleanerItem.entryParts`) out.
     private static func measure(_ candidates: [URL], of item: CleanerItem, into result: ItemScan, policy: SafetyPolicy,
-                                cutoff: Date?, split: Int) async -> ItemScan {
+                                cutoff: Date?, split: Int, openPaths open: Set<String> = []) async -> ItemScan {
         var result = result
         result.entries = await withTaskGroup(of: ScanEntry?.self) { group in
             for url in candidates {
                 group.addTask {
                     if Task.isCancelled { return nil } // no walk or sqlite3 run for what the caller discards
-                    if let parts = item.entryParts { return await measureParts(parts(policy, url), of: url, cutoff: cutoff) }
+                    if let parts = item.entryParts {
+                        let kept = parts(policy, url).filter { !RunningProcesses.holdsOpenFile($0, openPaths: open) }
+                        return await measureParts(kept, of: url, cutoff: cutoff)
+                    }
                     guard let database = item.database, database.applies(to: url) else {
                         // Read before measuring: a change during the walk makes the next scan measure again.
                         let fingerprint = item.entrySizes != nil && cutoff == nil ? FolderSizeCache.Fingerprint(url) : nil

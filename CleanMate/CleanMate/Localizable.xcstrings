@@ -81,6 +81,34 @@
         }
       }
     },
+    "%lld old versions" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld old version"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld old versions"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld bản cũ"
+          }
+        }
+      }
+    },
     "A notification when the startup disk runs low, checked when CleanMate opens, after Smart Scan and every hour while it runs; at most one a day." : {
       "localizations" : {
         "vi" : {
@@ -1499,6 +1527,16 @@
         }
       }
     },
+    "Old versions of code editor extensions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản cũ của extension trình soạn mã"
+          }
+        }
+      }
+    },
     "Ollama: downloaded models" : {
       "localizations" : {
         "vi" : {
@@ -1939,6 +1977,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản cập nhật các ứng dụng tự tải về để cài; sẽ được tải lại khi cần. Bỏ qua ứng dụng đang mở"
+          }
+        }
+      }
+    },
+    "Versions left behind by extension updates in VS Code, Cursor, Windsurf and VSCodium; the version in use is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản cũ còn lại sau khi cập nhật extension trong VS Code, Cursor, Windsurf và VSCodium; bản đang dùng được giữ"
           }
         }
       }

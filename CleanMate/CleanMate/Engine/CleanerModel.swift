@@ -257,7 +257,8 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     var removesEmptyParents = 0
     /// Folders inside an entry cleaned instead of the entry itself (the render files of a video library): the entry is
     /// one row measured as their total and is never removed. Returns only folders the policy allows; asked at scan and
-    /// again right before removal, where each one is checked (locked) and removed on its own.
+    /// again right before removal, where each one is checked (locked; with `skipsOpenFiles`, holding an open file) and
+    /// removed on its own.
     var entryParts: (@Sendable (SafetyPolicy, URL) -> [URL])? = nil
 }
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan › Developer Junk**: **Old versions of code editor extensions**, the versions VS Code, VS Code Insiders, VSCodium, Cursor and Windsurf leave behind when an extension updates (often 0.5–3 GB in all), one row per extension. Unticked and deleted; the version in use is never listed, and the item is skipped while one of these editors runs.
 - **Smart Scan › Apps**: **Apple Podcasts: downloaded episodes** and **Apple Podcasts cache** (artwork and audio cached while streaming), with Full Disk Access. Episodes often take several GB; Podcasts downloads one again when you play it. Both are unticked and skipped while Podcasts runs; your subscriptions and library are never touched.
 - **Maintenance**: **Update and Clean Homebrew** runs `brew update`, `brew upgrade --formula` and `brew cleanup --prune=all` with brew's output shown live, then says how many formulae were upgraded and how much space was freed. Formulae only (casks are left alone), no password; shown only when Homebrew is installed and locked while another `brew` command runs.
 - **Uninstaller**: **Reset…** next to **Uninstall…** moves an app's own data (caches, preferences, Application Support, containers, saved state, logs, web data) to the Trash and keeps the app, so it starts fresh without reinstalling. The sheet lists each item with its size, all ticked; open apps can't be reset, and Undo (⌘Z) puts everything back.
