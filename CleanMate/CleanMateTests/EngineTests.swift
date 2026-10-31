@@ -2446,6 +2446,9 @@ struct AppCatalogTests {
             "\(firefox)/extensions/x@y.xpi", "\(firefox)/prefs.js", "\(firefox)/favicons.sqlite",
             "Library/Safari/Bookmarks.plist", "Library/Safari/PasswordBreachStore.plist", "Library/Safari/TopSites.plist",
             "Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.FavoriteItems.sfl4",
+            "Library/Preferences/com.apple.Terminal.plist", "Library/Preferences/com.googlecode.iterm2.plist",
+            "Library/Application Support/iTerm2/DynamicProfiles/profiles.json",
+            "Library/Application Support/iTerm2/default.itermarrangement",
             ".ssh/known_hosts", ".zshrc", ".vimrc", "Library/Keychains/login.keychain-db",
         ]
         let erased = [
@@ -2458,6 +2461,9 @@ struct AppCatalogTests {
             "Library/Safari/Form Values", "Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies",
             "Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.RecentDocuments.sfl4",
             "Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/a.sfl3",
+            "Library/Saved Application State/com.apple.Terminal.savedState/windows.plist",
+            "Library/Application Support/iTerm2/SavedState/session1.data",
+            "Library/Saved Application State/com.googlecode.iterm2.savedState/windows.plist",
             ".zsh_history", ".zsh_sessions/x.session", ".local/share/fish/fish_history", ".python_history", ".viminfo",
         ]
         let history = box.home.appending(path: "\(chrome)/Default/History")
@@ -2786,6 +2792,102 @@ struct AppCatalogTests {
             bank.example search.example note.example
             """)
         #expect(await Scanner.scan(item, policy: box.policy).hasData == false)
+    }
+
+    /// Terminal and iTerm2 saved session state: cleans session contents (windows.plist, data.data)
+    /// while keeping the folder, preferences, profiles, arrangements and scripts intact; skipped while the app runs.
+    @Test func terminalAndITerm2SavedStateCleaning() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let fm = FileManager.default
+
+        // Baited preferences, dynamic profiles and arrangements
+        let bait = [
+            "Library/Preferences/com.apple.Terminal.plist",
+            "Library/Preferences/com.googlecode.iterm2.plist",
+            "Library/Application Support/iTerm2/DynamicProfiles/profiles.json",
+            "Library/Application Support/iTerm2/default.itermarrangement",
+            "Library/Application Support/iTerm2/Scripts/AutoLaunch.py",
+        ]
+        for path in bait { try box.file(path) }
+
+        // Junk for Terminal
+        let terminalJunk = [
+            "Library/Saved Application State/com.apple.Terminal.savedState/windows.plist",
+            "Library/Saved Application State/com.apple.Terminal.savedState/data.data",
+            "Library/Saved Application State/com.apple.Terminal.savedState/window_1.data",
+        ]
+        for path in terminalJunk { try box.file(path) }
+
+        // Junk for iTerm2
+        let iterm2Junk = [
+            "Library/Application Support/iTerm2/SavedState/session1.data",
+            "Library/Application Support/iTerm2/SavedState/session2.data",
+            "Library/Saved Application State/com.googlecode.iterm2.savedState/windows.plist",
+            "Library/Saved Application State/com.googlecode.iterm2.savedState/data.data",
+        ]
+        for path in iterm2Junk { try box.file(path) }
+
+        let items = CleanerGroup.privacy.flatMap(\.items)
+        let termItem = try #require(items.first { $0.id == "terminal-saved-state" })
+        let itermItem = try #require(items.first { $0.id == "iterm2-saved-state" })
+
+        for item in [termItem, itermItem] {
+            #expect(!item.selectedByDefault, "\(item.id)")
+            #expect(!item.showsWhenEmpty, "\(item.id)")
+            #expect(item.mode == .delete, "\(item.id)")
+            #expect(item.skipsOpenFiles, "\(item.id)")
+        }
+        #expect(termItem.runningAppBundleIDs == ["com.apple.Terminal"])
+        #expect(itermItem.runningAppBundleIDs == ["com.googlecode.iterm2"])
+
+        // App running check: matches runningAppBundleIDs
+        #expect(SmartScanModel.bundleID("com.apple.Terminal", matches: termItem.runningAppBundleIDs[0]))
+        #expect(SmartScanModel.bundleID("com.googlecode.iterm2", matches: itermItem.runningAppBundleIDs[0]))
+
+        // Scans measure non-zero size and list all entries
+        let termScan = await Scanner.scan(termItem, policy: box.policy)
+        #expect(termScan.hasData)
+        #expect(termScan.entries.count == 3)
+        #expect(termScan.size > 0)
+
+        let itermScan = await Scanner.scan(itermItem, policy: box.policy)
+        #expect(itermScan.hasData)
+        #expect(itermScan.entries.count == 4)
+        #expect(itermScan.size > 0)
+
+        // Cleaning empties the saved state folders
+        let termReport = await Cleaner.clean(termItem, scan: termScan, policy: box.policy)
+        #expect(termReport.skipped == 0)
+        #expect(termReport.freed == termScan.size)
+
+        let itermReport = await Cleaner.clean(itermItem, scan: itermScan, policy: box.policy)
+        #expect(itermReport.skipped == 0)
+        #expect(itermReport.freed == itermScan.size)
+
+        // The folders still exist, but their contents are gone
+        let termFolder = box.home.appending(path: "Library/Saved Application State/com.apple.Terminal.savedState")
+        #expect(fm.fileExists(atPath: termFolder.path))
+        #expect(try fm.contentsOfDirectory(atPath: termFolder.path).isEmpty)
+
+        let itermSupportFolder = box.home.appending(path: "Library/Application Support/iTerm2/SavedState")
+        #expect(fm.fileExists(atPath: itermSupportFolder.path))
+        #expect(try fm.contentsOfDirectory(atPath: itermSupportFolder.path).isEmpty)
+
+        let itermSavedStateFolder = box.home.appending(path: "Library/Saved Application State/com.googlecode.iterm2.savedState")
+        #expect(fm.fileExists(atPath: itermSavedStateFolder.path))
+        #expect(try fm.contentsOfDirectory(atPath: itermSavedStateFolder.path).isEmpty)
+
+        // Preferences, profiles, arrangements and scripts are kept
+        for path in bait {
+            #expect(fm.fileExists(atPath: box.home.appending(path: path).path), "\(path)")
+        }
+
+        // Rescanning now finds nothing; with showsWhenEmpty: false both are hidden
+        let termEmptyScan = await Scanner.scan(termItem, policy: box.policy)
+        #expect(!termEmptyScan.hasData && termEmptyScan.entries.isEmpty)
+        let itermEmptyScan = await Scanner.scan(itermItem, policy: box.policy)
+        #expect(!itermEmptyScan.hasData && itermEmptyScan.entries.isEmpty)
     }
 }
 

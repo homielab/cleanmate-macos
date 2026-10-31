@@ -121,6 +121,9 @@ struct EndToEndCleanTests {
         ".config/sometool/config", "Library/Application Support/ExampleApp/settings.json",
         "Library/Preferences/com.example.app.plist", ".zshrc", ".gitconfig", ".npmrc", ".cargo/config.toml",
         ".gradle/gradle.properties",
+        "Library/Preferences/com.apple.Terminal.plist", "Library/Preferences/com.googlecode.iterm2.plist",
+        "Library/Application Support/iTerm2/DynamicProfiles/profiles.json",
+        "Library/Application Support/iTerm2/default.itermarrangement",
         // Tool data next to the junk in folders set by shell variables (`shellTools`)
         "Developer/tools/NVM_DIR/versions/node/v22.0.0/bin/node",
         "Developer/tools/RUSTUP_HOME/toolchains/stable-aarch64-apple-darwin/bin/rustc",

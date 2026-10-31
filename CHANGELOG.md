@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Privacy › System**: **Terminal saved state** and **iTerm2 saved state**, which keep previous session window text and scrollback on disk. Unticked and permanently deleted; skipped while Terminal or iTerm2 is running, and iTerm2 is hidden when not installed or empty. Profiles and preferences are kept untouched.
 - **Smart Scan › Developer Junk**: **Test device clones**, the copies of simulators Xcode makes in `~/Library/Developer/XCTestDevices` to run tests in parallel (often 5–20 GB), one row per clone. Unticked and deleted; Xcode makes them again on the next parallel test run.
 - **Smart Scan › System Junk**: **macOS installers** lists the `Install macOS` apps left in Applications after an upgrade or after making a USB installer (12–15 GB each), one by one with their version. None are ticked, they go to the Trash so Undo can put them back, and only installers you can move without a password are listed; skipped while an installer runs.
 - **Smart Scan › Developer Junk**: **Old versions of code editor extensions**, the versions VS Code, VS Code Insiders, VSCodium, Cursor and Windsurf leave behind when an extension updates (often 0.5–3 GB in all), one row per extension. Unticked and deleted; the version in use is never listed, and the item is skipped while one of these editors runs.

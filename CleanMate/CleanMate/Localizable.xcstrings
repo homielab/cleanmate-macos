@@ -7547,6 +7547,36 @@
           }
         }
       }
+    },
+    "Previous windows will not be restored on next launch; profiles and settings are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lần mở sau không khôi phục cửa sổ cũ; profile và cài đặt giữ nguyên"
+          }
+        }
+      }
+    },
+    "Terminal saved state" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trạng thái Terminal đã lưu"
+          }
+        }
+      }
+    },
+    "iTerm2 saved state" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trạng thái iTerm2 đã lưu"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -42,6 +42,17 @@ extension CleanerGroup {
                   ["~"], [".python_history", ".node_repl_history", ".psql_history", ".mysql_history", ".sqlite_history"]),
             trace("pager-editor-history", "less and Vim history", note: "Vim also forgets marks and registers",
                   ["~"], [".lesshst", ".viminfo"]),
+            CleanerItem(id: "terminal-saved-state", title: "Terminal saved state",
+                        note: terminalSavedStateNote,
+                        paths: ["~/Library/Saved Application State/com.apple.Terminal.savedState"],
+                        selectedByDefault: false, showsWhenEmpty: false,
+                        runningAppBundleIDs: ["com.apple.Terminal"], skipsOpenFiles: true),
+            CleanerItem(id: "iterm2-saved-state", title: "iTerm2 saved state",
+                        note: terminalSavedStateNote,
+                        paths: ["~/Library/Application Support/iTerm2/SavedState",
+                                "~/Library/Saved Application State/com.googlecode.iterm2.savedState"],
+                        selectedByDefault: false, showsWhenEmpty: false,
+                        runningAppBundleIDs: ["com.googlecode.iterm2"], skipsOpenFiles: true),
         ]),
     ]
 
@@ -66,6 +77,8 @@ extension CleanerGroup {
     nonisolated private static let cookiesNote: LocalizedStringResource = "Signs you out of websites"
     nonisolated private static let autofillNote: LocalizedStringResource =
         "Text saved from web forms; passwords, addresses and cards are kept"
+    nonisolated private static let terminalSavedStateNote: LocalizedStringResource =
+        "Previous windows will not be restored on next launch; profiles and settings are kept"
 
     /// Chromium profiles: the data folder itself (Opera) and its profiles (Default, Profile 1…).
     nonisolated private static func chromium(_ id: String, _ name: String, support: String, bundle: String) -> CleanerGroup {
