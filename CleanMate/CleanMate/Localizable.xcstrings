@@ -277,6 +277,16 @@
         }
       }
     },
+    "Bazel cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Bazel"
+          }
+        }
+      }
+    },
     "Blocked by a folder in Exclusions" : {
       "localizations" : {
         "vi" : {
@@ -293,6 +303,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chặn kết nối đến không mong muốn tới các ứng dụng trên máy Mac này."
+          }
+        }
+      }
+    },
+    "Build outputs and fetched packages, made again by the next build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kết quả build và gói đã tải; lần build sau sẽ tạo lại"
+          }
+        }
+      }
+    },
+    "Cached compiler outputs, made again by the next build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kết quả biên dịch đã lưu; lần build sau sẽ tạo lại"
           }
         }
       }
@@ -457,6 +487,16 @@
         }
       }
     },
+    "Deno cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Deno"
+          }
+        }
+      }
+    },
     "Downloaded again with npx cypress install" : {
       "localizations" : {
         "vi" : {
@@ -507,12 +547,52 @@
         }
       }
     },
+    "Downloaded dependencies and Bazel's unpacked install, made again by the next build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phụ thuộc đã tải và bản cài đã giải nén của Bazel; lần build sau sẽ tạo lại"
+          }
+        }
+      }
+    },
     "Downloaded models and datasets, downloaded again when a program loads them" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mô hình và bộ dữ liệu đã tải, sẽ được tải lại khi chương trình dùng đến"
+          }
+        }
+      }
+    },
+    "Downloaded modules and npm packages, downloaded again on the next run" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Module và gói npm đã tải; sẽ được tải lại ở lần chạy sau"
+          }
+        }
+      }
+    },
+    "Downloaded package metadata and packages, downloaded again by the next restore" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thông tin gói và gói đã tải; lần restore sau sẽ tải lại"
+          }
+        }
+      }
+    },
+    "Downloaded packages, downloaded again by poetry install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói đã tải; poetry install sẽ tải lại"
           }
         }
       }
@@ -603,6 +683,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Engine của các phiên bản Prisma, sẽ được tải lại khi cần"
+          }
+        }
+      }
+    },
+    "Environments of apps run with pipx run, made again on the next run" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Môi trường của ứng dụng chạy bằng pipx run; sẽ được tạo lại ở lần chạy sau"
           }
         }
       }
@@ -859,6 +949,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Liên kết cứng — chuyển đi không giải phóng chỗ"
+          }
+        }
+      }
+    },
+    "Hook environments, installed again on the next commit" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Môi trường hook; sẽ được cài lại ở lần commit sau"
           }
         }
       }
@@ -1239,6 +1339,16 @@
         }
       }
     },
+    "NuGet cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm NuGet"
+          }
+        }
+      }
+    },
     "Off" : {
       "localizations" : {
         "vi" : {
@@ -1405,6 +1515,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tổng quan"
+          }
+        }
+      }
+    },
+    "Poetry cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Poetry"
           }
         }
       }
@@ -1743,12 +1863,32 @@
         }
       }
     },
+    "Zig cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Zig"
+          }
+        }
+      }
+    },
     "Zoom: downloaded updates" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zoom: bản cài cập nhật đã tải"
+          }
+        }
+      }
+    },
+    "ccache cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm ccache"
           }
         }
       }
@@ -1869,6 +2009,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã có runtime mới hơn cùng nền tảng và không dùng trong 30 ngày; tải lại được trong Xcode Settings › Components"
+          }
+        }
+      }
+    },
+    "pipx run cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm pipx run"
+          }
+        }
+      }
+    },
+    "pre-commit cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm pre-commit"
           }
         }
       }
@@ -2129,6 +2289,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thư mục người dùng đang trống."
+          }
+        }
+      }
+    },
+    "sccache cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm sccache"
           }
         }
       }

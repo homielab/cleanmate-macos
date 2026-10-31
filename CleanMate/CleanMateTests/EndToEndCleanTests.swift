@@ -121,6 +121,12 @@ struct EndToEndCleanTests {
         "Developer/tools/ANDROID_AVD_HOME/Pixel.avd/userdata-qemu.img",
         "Developer/tools/ANDROID_EMULATOR_HOME/avd/Pixel.avd/config.ini",
         "Developer/tools/OLLAMA_MODELS/blobs/sha256-" + String(repeating: "b", count: 64),
+        // Build tools' installed packages, settings and project outputs next to their caches
+        "Library/Caches/deno/location_data/abc/local_storage", "Developer/tools/DENO_DIR/location_data/abc/local_storage",
+        "Library/Caches/pypoetry/virtualenvs/app-py3.12/bin/python", ".local/pipx/venvs/black/bin/black",
+        ".local/pipx/py/cpython-3.12/bin/python3", ".ccache/ccache.conf", "Developer/tools/CCACHE_DIR/ccache.conf",
+        ".cache/bazel/_bazel_me/8f3a/execroot/app/bazel-out/x", ".nuget/packages/newtonsoft.json/13.0.3/lib.dll",
+        "Developer/tools/PIPX_HOME/venvs/black/bin/black",
     ]
     /// The image the bait AVDs use (bait itself, in the default SDK).
     static let avdConfig = Data("\nimage.sysdir.1=system-images/android-35/google_apis/arm64-v8a/\n".utf8)

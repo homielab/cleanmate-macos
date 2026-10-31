@@ -87,6 +87,13 @@ extension CleanerGroup {
         // bun (clonefile) and uv (link-mode clone) install by cloning from their cache on APFS: blocks a project still
         // uses are counted in the cache's size but not freed by removing it. No cheap API gives a clone's private size.
         dev("bun-cache", "Bun cache", note: clonedNote, ["~/.bun/install/cache"], processes: ["bun"], upperBound: true),
+        // Deno's DENO_DIR: downloaded modules and npm packages, compiled code and analysis caches. Never `location_data`
+        // (localStorage and cache storage of scripts run with --location). A DENO_DIR set in the profile: only its
+        // cache folders, so a mistaken value lists nothing else.
+        dev("deno-cache", "Deno cache", note: "Downloaded modules and npm packages, downloaded again on the next run",
+            ["~/Library/Caches/deno"], excluded: ["location_data"],
+            shell: ["DENO_DIR": ["remote", "npm", "gen", "registries", "dl", "deps"]], selected: false,
+            processes: ["deno"], openFiles: true),
         // Projects' own dependencies, when nobody worked on the project for 90 days: unticked, one entry per project, to
         // the Trash (installing again needs the network). Never while node, Bun, pnpm… run in the project.
         StaleNodeModules.item(),
@@ -94,6 +101,21 @@ extension CleanerGroup {
         // walk: unticked, one entry per folder, to the Trash (building them again takes long).
         StaleBuildFolders.item(),
         dev("pip-cache", "pip cache", ["~/Library/Caches/pip"], processes: ["pip", "pip3"]),
+        // Only Poetry's download caches; `virtualenvs` (one per project) is never listed.
+        dev("poetry-cache", "Poetry cache", note: "Downloaded packages, downloaded again by poetry install",
+            ["~/Library/Caches/pypoetry/cache", "~/Library/Caches/pypoetry/artifacts"],
+            shell: ["POETRY_CACHE_DIR": ["cache", "artifacts"]], selected: false, processes: ["poetry"], openFiles: true),
+        // Environments `pipx run` made (macOS, older `~/.local/pipx` and XDG locations); apps installed with
+        // `pipx install` (`venvs`) and its Python builds (`py`) are never listed.
+        dev("pipx-cache", "pipx run cache", note: "Environments of apps run with pipx run, made again on the next run",
+            ["~/Library/Caches/pipx", "~/.local/pipx/.cache", "~/.cache/pipx"],
+            shell: ["PIPX_HOME": [".cache"], "XDG_CACHE_HOME": ["pipx"]], selected: false, processes: ["pipx"],
+            openFiles: true),
+        // Hook repositories and their environments, installed again on the next commit (slower once).
+        dev("pre-commit-cache", "pre-commit cache", note: "Hook environments, installed again on the next commit",
+            ["~/.cache/pre-commit"], included: ["repo*", "patch*", "db.db", "README", ".lock"],
+            shell: ["PRE_COMMIT_HOME": [""], "XDG_CACHE_HOME": ["pre-commit"]], selected: false,
+            processes: ["pre-commit"], openFiles: true),
         // Unticked: archives and the index cache in conda's `pkgs` folders only (`conda clean --tarballs --index-cache`);
         // unpacked package folders and `envs/` are never listed. Environments may need a download when a package is
         // reinstalled. Locked while conda, mamba or micromamba runs (`conda install` runs as `python …/conda`).
@@ -133,6 +155,27 @@ extension CleanerGroup {
         OldRuntimes.rubyItem(),
         OldRuntimes.rustItem(),
         OldRuntimes.goItem(),
+        // Build caches of native toolchains: rebuilt by the next build, which is slower once. Unticked. A cache folder
+        // set in the shell profile is listed by tool-specific names only, so a mistaken value lists nothing else.
+        dev("zig-cache", "Zig cache", note: "Build outputs and fetched packages, made again by the next build",
+            ["~/.cache/zig"], shell: ["ZIG_GLOBAL_CACHE_DIR": ["o", "h", "z", "p", "tmp"], "XDG_CACHE_HOME": ["zig"]],
+            selected: false, processes: ["zig", "zls"], openFiles: true),
+        // Only Bazel's repository cache and unpacked install folders; the output bases of workspaces (one folder per
+        // workspace next to them) are never listed. Bazel's default on macOS (/private/var/tmp) is outside the home.
+        dev("bazel-cache", "Bazel cache", note: "Downloaded dependencies and Bazel's unpacked install, made again by the next build",
+            ["~/.cache/bazel/_bazel_*/cache", "~/.cache/bazel/_bazel_*/install"], selected: false,
+            processes: ["bazel*", "bazelisk"], openFiles: true),
+        // ccache and sccache keep their results in folders `0`–`f`; settings (`ccache.conf`) are never listed.
+        dev("ccache-cache", "ccache cache", note: "Cached compiler outputs, made again by the next build",
+            ["~/Library/Caches/ccache", "~/.ccache", "~/.cache/ccache"], included: compilerCacheNames + ["tmp"],
+            shell: ["CCACHE_DIR": [""], "XDG_CACHE_HOME": ["ccache"]], selected: false, processes: ["ccache"], openFiles: true),
+        dev("sccache-cache", "sccache cache", note: "Cached compiler outputs, made again by the next build",
+            ["~/Library/Caches/Mozilla.sccache"], included: compilerCacheNames, shell: ["SCCACHE_DIR": [""]], selected: false,
+            processes: ["sccache"], openFiles: true),
+        // NuGet's HTTP caches only; `~/.nuget/packages` (the packages projects build from) is never listed.
+        dev("nuget-cache", "NuGet cache", note: "Downloaded package metadata and packages, downloaded again by the next restore",
+            ["~/.local/share/NuGet/v3-cache", "~/.local/share/NuGet/http-cache", "~/.nuget/v3-cache"], selected: false,
+            processes: ["dotnet", "nuget"], openFiles: true),
         // Unticked: models can be many GB to download again. One entry per `models--org--name` folder (blobs plus
         // snapshot symlinks into them): always removed whole, never inside. ~/.cache/huggingface/token and
         // stored_tokens sit next to these folders and are never listed. Only hub repo folders (`included`, checked at
@@ -284,6 +327,9 @@ extension CleanerGroup {
                   parse: { DeveloperTools.simulatorIDs(in: $0, available: available).map(SizeProbe.Result.only) })
     }
 
+    /// Top-level folders of a ccache or sccache cache.
+    nonisolated private static let compilerCacheNames = (0..<16).map { String($0, radix: 16) }
+
     /// Asks the installed tool where its cache is (config files it reads, e.g. `go env -w`, `~/.npmrc`).
     /// Folder variables set only in a shell profile are read by `ShellEnvironment` instead (`shell:`).
     nonisolated private static func lookup(_ tool: String, _ arguments: [String], subpath: String = "") -> PathLookup {
@@ -292,12 +338,14 @@ extension CleanerGroup {
 
     nonisolated private static func dev(
         _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource? = nil, _ paths: [String],
-        minAge: TimeInterval? = nil, included: [String]? = nil, mode: RemovalMode = .delete, command: ShellCommand? = nil,
+        minAge: TimeInterval? = nil, excluded: Set<String> = [], included: [String]? = nil, mode: RemovalMode = .delete,
+        command: ShellCommand? = nil,
         probe: SizeProbe? = nil, locate: PathLookup? = nil, shell: [String: [String]] = [:], selected: Bool = true, apps: [String] = [],
         processes: [String] = [], upperBound: Bool = false, openFiles: Bool = false,
         entryLabel: CleanerItem.EntryLabel? = nil, selectableEntries: Bool = false, config: ConfigFolders? = nil
     ) -> CleanerItem {
-        CleanerItem(id: id, title: title, note: note, paths: paths, minAge: minAge, included: included, mode: mode,
+        CleanerItem(id: id, title: title, note: note, paths: paths, minAge: minAge, excluded: excluded, included: included,
+                    mode: mode,
                     selectedByDefault: selected, command: command, probe: probe, locate: locate, shellFolders: shell,
                     configFolders: config,
                     sizeIsUpperBound: upperBound,
