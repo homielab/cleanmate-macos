@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4] - 2026-10-31
+
 ### Added
 - **Maintenance** (⌘8): a new module with three fixes that need no administrator password, each with a **Run** button, its result and the tools' output: **Rebuild Launch Services** removes duplicate and outdated apps from **Open With** menus, **Reset Quick Look** fixes blank or wrong previews and clears the thumbnail cache, and **Restart Finder and Dock** (asks first) fixes a Finder or Dock that hangs. Each run is recorded in **Settings › Activity**.
 - **Smart Scan**: **Abandoned downloads** lists unfinished downloads left in Downloads for 7 days without being touched — Chrome, Edge and Brave `.crdownload`, Firefox `.part`, Safari `.download`, aria2 `.aria2` and qBittorrent `.!qB` — often several GB, one by one with the file of the real name Firefox and aria2 keep next to them; none are ticked, they go to the Trash so Undo can put them back, and a download still in progress is kept (needs Full Disk Access). Old installers and Old downloads now also leave aria2 and qBittorrent downloads alone.
