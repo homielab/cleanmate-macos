@@ -475,11 +475,9 @@ struct UninstallerView: View {
     private var extensionList: some View {
         List(model.extensionItems ?? [], selection: $model.highlighted) { item in
             HStack {
-                Toggle(isOn: checked(item.url)) {
-                    Text(verbatim: "\(item.name), \(model.extensionSizes[item.url]?.formatted(.fileSize.locale(locale)) ?? "…")")
-                }
-                .labelsHidden()
+                Toggle(isOn: checked(item.url)) { EmptyView() }
                 .toggleStyle(SelectionCheckboxStyle())
+                .accessibilityLabel(Text(verbatim: "\(item.name), \(model.extensionSizes[item.url]?.formatted(.fileSize.locale(locale)) ?? "…")"))
                 .disabled(!item.trashable || model.isInUse(item) || model.working)
                 AppIcon(url: item.url, size: 20)
                 VStack(alignment: .leading, spacing: 2) {
@@ -596,16 +594,14 @@ struct UninstallerView: View {
             : entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
     }
 
-    /// The checkbox's (hidden) label is item name + size, so VoiceOver reads both on the checkbox.
+    /// The checkbox's accessibility label is item name + size, so VoiceOver reads both on the checkbox.
     /// A click anywhere on the row ticks it, like Smart Scan.
     private func row(url: URL, folder: Text, size: Int64?, checked: Bool, largest: Int64,
                      isOn: Binding<Bool>, enabled: Bool = true) -> some View {
         HStack {
-            Toggle(isOn: isOn) {
-                Text(verbatim: "\(url.lastPathComponent), \(size?.formatted(.fileSize.locale(locale)) ?? "…")")
-            }
-            .labelsHidden()
+            Toggle(isOn: isOn) { EmptyView() }
             .toggleStyle(SelectionCheckboxStyle())
+            .accessibilityLabel(Text(verbatim: "\(url.lastPathComponent), \(size?.formatted(.fileSize.locale(locale)) ?? "…")"))
             .disabled(!enabled)
             AppIcon(url: url, size: 20)
             VStack(alignment: .leading, spacing: 2) {

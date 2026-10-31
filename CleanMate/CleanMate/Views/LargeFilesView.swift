@@ -159,9 +159,9 @@ struct LargeFilesView: View {
         let largest = files.lazy.map(\.size).max() ?? 0
         return Table(files, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("" as String) { file in // a Text title needs macOS 13.5
-                Toggle(isOn: checked(file.url)) { Text(file.name) }
-                    .labelsHidden()
+                Toggle(isOn: checked(file.url)) { EmptyView() }
                     .toggleStyle(SelectionCheckboxStyle())
+                    .accessibilityLabel(Text(verbatim: file.name))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(model.checked.contains(file.url) ? Color.accentColor.opacity(0.08) : .clear,
                                 in: .rect(cornerRadius: 6))
