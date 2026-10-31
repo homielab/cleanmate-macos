@@ -3947,6 +3947,26 @@
         }
       }
     },
+    "Install macOS apps in Applications, downloaded again from the App Store when needed. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng Install macOS trong Applications, tải lại từ App Store khi cần. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "macOS installers" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ cài macOS"
+          }
+        }
+      }
+    },
     "iPhone & iPad backups" : {
       "localizations" : {
         "vi" : {

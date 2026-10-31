@@ -112,6 +112,9 @@ extension CleanerGroup {
                         runningAppBundleIDs: [DeviceFirmware.configuratorBundleID],
                         runningProcessNames: DeviceFirmware.processNames, skipsOpenFiles: true, // a download in progress
                         entryLabel: DeviceFirmware.label(of:), selectableEntries: true),
+            // macOS installer apps in /Applications and ~/Applications (`MacOSInstallers`): unticked, one checkbox each,
+            // to the Trash, only those the user can move without a password, never while an installer runs.
+            MacOSInstallers.item(),
             // "CleanMate": our own activity log (`ActivityLog`) is never cleaned.
             CleanerItem(id: "old-logs", title: "Old logs", note: "Not modified for \(ages.logs) days",
                         paths: ["~/Library/Logs"], minAge: Double(ages.logs) * 86_400,

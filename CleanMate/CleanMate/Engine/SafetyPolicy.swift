@@ -478,6 +478,35 @@ nonisolated struct SafetyPolicy: Sendable {
         return !Self.isApple(id) && id != Bundle.main.bundleIdentifier
     }
 
+    /// Owner (uid) of a path, without following a last-component symlink; nil when it does not exist.
+    typealias OwnerID = @Sendable (String) -> uid_t?
+    static let ownerID: OwnerID = { path in
+        var info = stat()
+        return lstat(path, &info) == 0 ? info.st_uid : nil
+    }
+
+    /// Smart Scan rule for a macOS installer app (`MacOSInstallers`), only ever moved to the Trash: a real (not
+    /// symlinked) `Install macOS *.app` / `Install OS X *.app` folder directly in /Applications or ~/Applications, whose
+    /// `Contents/Info.plist` names Apple's installer bundle id (`com.apple.InstallAssistant…`) — a deliberate exception
+    /// to "never Apple's" for this one kind of app. The user must be able to move it without a password: not owned by
+    /// root (`owner`, injected by tests), the app and its folder writable. On the home folder's volume, no other volume
+    /// mounted inside, not excluded.
+    func allowsMacOSInstaller(_ url: URL, owner: OwnerID = SafetyPolicy.ownerID) -> Bool {
+        let path = Self.normalize(url)
+        let parent = (path as NSString).deletingLastPathComponent
+        guard applicationFolders.contains(where: { $0.path == parent }),
+              MacOSInstallers.isInstallerName((path as NSString).lastPathComponent),
+              !isExcluded(path), !holdsMount(path) else { return false }
+        var info = stat()
+        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              let home = rootDevices[0], device(path) == home,
+              let uid = owner(path), uid != 0, access(parent, W_OK) == 0, access(path, W_OK) == 0 else { return false }
+        let plist = path + "/Contents/Info.plist"
+        guard lstat(plist, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+              let id = NSDictionary(contentsOfFile: plist)?["CFBundleIdentifier"] as? String else { return false }
+        return id.hasPrefix(MacOSInstallers.bundleIDPrefix)
+    }
+
     /// Uninstaller rule for an app's data, only ever moved to the Trash: one entry directly inside one of
     /// `appDataFolders` of ~/Library (never the folder itself), not hidden, not Apple's, and allowed by `allows`.
     func allowsAppData(_ url: URL) -> Bool {
