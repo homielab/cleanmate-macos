@@ -181,13 +181,27 @@ nonisolated enum ActivityLog {
         /// The latest cleanup: deleted lines at most `cleanupGap` apart, ending with the newest one.
         var lastDate: Date?
         var lastBytes: Int64 = 0
+        /// Bytes deleted on each of the last `chartDays` calendar days, oldest first, today last; 0 on a day with no
+        /// cleanup. Empty when nothing was ever deleted.
+        var byDay: [Day] = []
+
+        struct Day: Equatable, Identifiable {
+            /// Start of the day.
+            var date: Date
+            var bytes: Int64 = 0
+            var id: Date { date }
+        }
     }
+
+    /// Days in `Cleanups.byDay`, as many as the free-space chart.
+    static let chartDays = 30
 
     /// Lines further apart than this belong to different cleanups.
     static let cleanupGap: TimeInterval = 5 * 60
 
     /// `Cleanups` from both log files in one read; the "deleted" lines `freed` counts, no others.
-    static func cleanups(now: Date = .now, home: URL = SafetyPolicy.current.homeURL) -> Cleanups {
+    static func cleanups(now: Date = .now, home: URL = SafetyPolicy.current.homeURL,
+                         calendar: Calendar = .current) -> Cleanups {
         var result = Cleanups()
         let cutoff = now.addingTimeInterval(-30 * 86_400)
         var lines: [(date: Date, bytes: Int64)] = []
@@ -201,6 +215,7 @@ nonisolated enum ActivityLog {
         }
         lines.sort { $0.date < $1.date }
         guard var previous = lines.last?.date else { return result }
+        result.byDay = byDay(lines, now: now, calendar: calendar)
         result.lastDate = previous
         for line in lines.reversed() {
             guard previous.timeIntervalSince(line.date) <= cleanupGap else { break }
@@ -208,6 +223,20 @@ nonisolated enum ActivityLog {
             previous = line.date
         }
         return result
+    }
+
+    /// `lines` summed per calendar day over the `chartDays` days ending today; later lines are left out.
+    private static func byDay(_ lines: [(date: Date, bytes: Int64)], now: Date, calendar: Calendar) -> [Cleanups.Day] {
+        let today = calendar.startOfDay(for: now)
+        var days = (0..<chartDays).reversed().compactMap { back in
+            calendar.date(byAdding: .day, value: -back, to: today).map { Cleanups.Day(date: $0) }
+        }
+        guard let first = days.first?.date else { return [] }
+        for line in lines where line.date >= first {
+            let day = calendar.startOfDay(for: line.date)
+            if let index = days.firstIndex(where: { $0.date == day }) { days[index].bytes += line.bytes }
+        }
+        return days
     }
 
     private static func append(_ line: String, to url: URL, rotateAt: Int) {

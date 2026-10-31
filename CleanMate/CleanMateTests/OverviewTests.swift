@@ -48,6 +48,41 @@ struct OverviewTests {
         #expect(abs(lastDate.timeIntervalSince(Self.now.addingTimeInterval(-86_400 + 8 * 60))) < 1)
     }
 
+    /// The bar chart's days: the 30 calendar days ending today, oldest first, deleted lines summed per day, 0 on the
+    /// others; trashed lines and older days left out. The model hands them on as `freedByDay`.
+    @MainActor @Test func freedByDaySumsDeletedLinesPerCalendarDay() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = try #require(TimeZone(identifier: "UTC"))
+        func record(_ size: Int64, _ mode: RemovalMode = .delete, at date: Date) {
+            ActivityLog.record(module: "Smart Scan", item: "c", size: size, mode: mode, home: home, date: date)
+        }
+        let today = utc.startOfDay(for: Self.now)                          // 2026-01-15 00:00 UTC
+        record(9_000, at: today.addingTimeInterval(-31 * 86_400))          // before the first day
+        record(1_000, at: today.addingTimeInterval(-29 * 86_400 + 60))     // the first day
+        record(200, at: today.addingTimeInterval(-3 * 86_400 + 600))
+        record(300, at: today.addingTimeInterval(-3 * 86_400 + 86_000))    // same day, 23:53
+        record(70_000, .trash, at: today.addingTimeInterval(-2 * 86_400))
+        record(40, at: today.addingTimeInterval(60))                       // today
+
+        let days = ActivityLog.cleanups(now: Self.now, home: home, calendar: utc).byDay
+        #expect(days.count == ActivityLog.chartDays)
+        #expect(days.first?.date == today.addingTimeInterval(-29 * 86_400) && days.last?.date == today)
+        #expect(zip(days, days.dropFirst()).allSatisfy { $1.date.timeIntervalSince($0.date) == 86_400 })
+        #expect(days.map(\.bytes).reduce(0, +) == 1_540)
+        #expect(days[0].bytes == 1_000 && days[26].bytes == 500 && days[27].bytes == 0 && days[29].bytes == 40)
+
+        let model = OverviewModel(center: NotificationCenter())
+        model.home = home
+        model.readDisks = { [] }
+        model.measure = { _, _, _ in (0, [:]) }
+        model.now = { Self.now }
+        model.calendar = utc
+        model.startIfNeeded()
+        model.cancel()
+        #expect(model.freedByDay == days)
+    }
+
     @Test func drivesAreTheStartupDiskThenLocalWritableExternalOnes() {
         func info(_ name: String, local: Bool = true, readOnly: Bool = false, backup: Bool = false) -> OverviewModel.MountInfo {
             OverviewModel.MountInfo(volume: .init(name: name, total: 1_000, available: 400), isLocal: local,

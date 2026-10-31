@@ -541,6 +541,7 @@ struct UISnapshots {
         let snapshots = LocalSnapshots(count: 4, oldest: Self.today.addingTimeInterval(-86_400),
                                        newest: Self.today.addingTimeInterval(-3_600))
         model.readSnapshots = { snapshots }
+        model.introduced = Set(OverviewModel.Intro.allCases) // still, final values: no count-up or growing bars
         model.refresh()
         while model.measuring || model.security == nil || model.snapshots == nil {
             try await Task.sleep(for: .milliseconds(50))

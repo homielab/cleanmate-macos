@@ -21,16 +21,6 @@
         }
       }
     },
-    "%@ on %@" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ vào %2$@"
-          }
-        }
-      }
-    },
     "%@ used of %@ · %@ available" : {
       "localizations" : {
         "vi" : {
@@ -57,6 +47,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@: trống %2$@"
+          }
+        }
+      }
+    },
+    "%@: %@ freed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: đã giải phóng %2$@"
           }
         }
       }
@@ -853,12 +853,32 @@
         }
       }
     },
+    "Freed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã giải phóng"
+          }
+        }
+      }
+    },
     "Freed by CleanMate" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate đã giải phóng"
+          }
+        }
+      }
+    },
+    "Freed per day, last 30 days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã giải phóng theo ngày, 30 ngày qua"
           }
         }
       }
@@ -1315,6 +1335,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không dùng hơn 1 năm"
+          }
+        }
+      }
+    },
+    "Nothing was cleaned in the last 30 days." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có lần dọn nào trong 30 ngày qua."
           }
         }
       }

@@ -413,6 +413,36 @@ struct CountingBytes: View {
     }
 }
 
+/// Draws `content(grown)` with `grown` false on its first frame and true right after, animated (ease-out,
+/// `duration`): bars and charts grow from 0. Only when `animates`; with Reduce Motion `grown` is true from the start
+/// and the content fades in instead.
+struct GrowsIn<Content: View>: View {
+    private let duration: Double
+    private let content: (Bool) -> Content
+    @State private var grown: Bool
+    @State private var visible: Bool
+
+    init(animates: Bool, duration: Double = 0.6, @ViewBuilder content: @escaping (Bool) -> Content) {
+        self.duration = duration
+        self.content = content
+        let still = reducesMotion
+        _grown = State(initialValue: !animates || still)
+        _visible = State(initialValue: !(animates && still))
+    }
+
+    var body: some View {
+        content(grown)
+            .opacity(visible ? 1 : 0)
+            .onAppear {
+                guard !grown || !visible else { return }
+                withAnimation(.easeOut(duration: duration)) {
+                    grown = true
+                    visible = true
+                }
+            }
+    }
+}
+
 /// Redraws the number on every animation frame of `shown`.
 private struct CountUp: ViewModifier, Animatable {
     var shown: Double

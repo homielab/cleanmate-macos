@@ -31,6 +31,13 @@ final class OverviewModel: ObservableObject {
 
     @Published private(set) var disks: [Disk] = []
     @Published private(set) var cleanups = ActivityLog.Cleanups()
+    /// Bytes deleted per day over the last 30 days, oldest first; empty before the first cleanup.
+    var freedByDay: [ActivityLog.Cleanups.Day] { cleanups.byDay }
+    /// Parts of the Overview that animate in the first time they show in a session (the numbers count up, bars and
+    /// charts grow), then stay still when the Overview is shown again.
+    enum Intro: CaseIterable { case drives, history, freed }
+    /// Parts already shown; snapshots fill it so they render the still state.
+    var introduced: Set<Intro> = []
     /// Free space on the startup disk over the last `DiskHistory.chartDays` days, oldest first.
     @Published private(set) var history: [DiskHistory.Point] = []
     /// Largest first, at most `folderLimit`; filled when measuring ends.
@@ -52,6 +59,8 @@ final class OverviewModel: ObservableObject {
     var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
     /// The end of "Last 30 days" and of the free-space chart; snapshots pin it.
     var now: () -> Date = { .now }
+    /// Days of the history and freed-per-day charts; tests pin the time zone.
+    var calendar = Calendar.current
     /// Tests and snapshots pass one in memory.
     var diskHistory = DiskHistory.shared
     /// The startup drive first, then external drives; tests pass their own.
@@ -111,8 +120,8 @@ final class OverviewModel: ObservableObject {
 
     private func readQuick() {
         disks = readDisks()
-        cleanups = ActivityLog.cleanups(now: now(), home: home)
-        history = diskHistory.recent(now: now())
+        cleanups = ActivityLog.cleanups(now: now(), home: home, calendar: calendar)
+        history = diskHistory.recent(now: now(), calendar: calendar)
     }
 
     /// Runs alongside the folder measure; ⌘. does not stop it (each command times out within seconds).

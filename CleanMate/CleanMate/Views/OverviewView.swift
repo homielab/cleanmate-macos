@@ -9,7 +9,11 @@ struct OverviewView: View {
     var body: some View {
         Form {
             Section("Drives") {
-                ForEach(model.disks) { DiskRow(disk: $0) }
+                let animates = !model.introduced.contains(.drives)
+                ForEach(model.disks) { disk in
+                    DiskRow(disk: disk, animates: animates)
+                        .onAppear { model.introduced.insert(.drives) }
+                }
             }
             historySection
             freedSection
@@ -34,7 +38,8 @@ struct OverviewView: View {
                 Text("Shows here after a few days of use.").foregroundStyle(.secondary)
             } else {
                 HistoryTrend(points: points)
-                FreeSpaceChart(points: points)
+                GrowsIn(animates: !model.introduced.contains(.history)) { FreeSpaceChart(points: points, grown: $0) }
+                    .onAppear { model.introduced.insert(.history) }
             }
         } header: {
             Text("Free space over time")
@@ -48,11 +53,24 @@ struct OverviewView: View {
         Section {
             let cleanups = model.cleanups
             if let date = cleanups.lastDate {
-                LabeledContent("Last 30 days") { Text(cleanups.last30Days, format: .fileSize).monospacedDigit() }
-                LabeledContent("In total") { Text(cleanups.total, format: .fileSize).monospacedDigit() }
-                LabeledContent("Last cleanup") {
-                    Text("\(cleanups.lastBytes, format: .fileSize) on \(date, format: Date.FormatStyle(date: .abbreviated, time: .shortened))")
-                        .monospacedDigit()
+                // Counts up the first time it shows in a session; Refresh then rolls the digits.
+                let animates = !model.introduced.contains(.freed)
+                HStack(alignment: .top, spacing: 10) {
+                    FreedCard(symbol: "calendar", title: Text("Last 30 days"), bytes: cleanups.last30Days,
+                              countsUp: animates)
+                    FreedCard(symbol: "sum", title: Text("In total"), bytes: cleanups.total, countsUp: animates)
+                    FreedCard(symbol: "sparkles", title: Text("Last cleanup"), bytes: cleanups.lastBytes,
+                              countsUp: animates,
+                              detail: Text(date, format: Date.FormatStyle(date: .abbreviated, time: .shortened)))
+                }
+                .fixedSize(horizontal: false, vertical: true) // same height for all three
+                .padding(.vertical, 4)
+                .onAppear { model.introduced.insert(.freed) }
+                let days = model.freedByDay
+                if days.contains(where: { $0.bytes > 0 }) {
+                    GrowsIn(animates: animates) { FreedByDayChart(days: days, grown: $0) }
+                } else {
+                    Text("Nothing was cleaned in the last 30 days.").foregroundStyle(.secondary)
                 }
             } else {
                 Text("Shows here after your first cleanup.").foregroundStyle(.secondary)
@@ -284,6 +302,8 @@ private struct SnapshotsRow: View {
 /// A drive: name, used / total / available, and a capacity bar tinted like `VolumeGauge` (orange past 90 % used).
 private struct DiskRow: View {
     let disk: OverviewModel.Disk
+    /// The bar fills from 0 when the row first shows.
+    var animates = false
 
     private var tint: Color {
         switch disk.volume.level {
@@ -309,9 +329,13 @@ private struct DiskRow: View {
                 }
                 Text("\(volume.used, format: .fileSize) used of \(volume.total, format: .fileSize) · \(volume.available, format: .fileSize) available")
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    .contentTransition(.numericText()) // Refresh rolls the digits
+                    .animation(.default, value: volume.available)
             }
             Spacer()
-            SizeBar(size: volume.used, largest: volume.total, tint: tint, height: 8, width: 160)
+            GrowsIn(animates: animates) { grown in
+                SizeBar(size: grown ? volume.used : 0, largest: volume.total, tint: tint, height: 8, width: 160)
+            }
             Text(disk.usedFraction, format: .percent.precision(.fractionLength(0)))
                 .monospacedDigit()
                 .frame(width: 44, alignment: .trailing)
@@ -375,8 +399,10 @@ private struct HistoryTrend: View {
 }
 
 /// Free space per day as a line in the accent color; hovering shows the nearest day's date and free space.
+/// `grown` false: drawn along the bottom of the chart, so it rises into place when it turns true.
 private struct FreeSpaceChart: View {
     let points: [DiskHistory.Point]
+    var grown = true
     @State private var hovered: DiskHistory.Point?
     /// Where the hovered reading is drawn, and the chart's width: the label sits beside it, inside the chart.
     @State private var hoveredX: CGFloat = 0
@@ -392,15 +418,17 @@ private struct FreeSpaceChart: View {
 
     var body: some View {
         let domain = domain
+        let y = { (point: DiskHistory.Point) in grown ? Double(point.available) : domain.lowerBound }
         VStack(alignment: .leading, spacing: 4) {
-            hoverLabel(hovered ?? points[points.count - 1]).opacity(hovered == nil ? 0 : 1)
+            ChartHoverLabel(text: hoverText(hovered ?? points[points.count - 1]), x: hoveredX, width: width)
+                .opacity(hovered == nil ? 0 : 1)
             Chart {
                 ForEach(points) { point in
                     AreaMark(x: .value("Date", point.date), yStart: .value("Free space", domain.lowerBound),
-                             yEnd: .value("Free space", Double(point.available)))
+                             yEnd: .value("Free space", y(point)))
                         .foregroundStyle(Color.accentColor.opacity(0.15))
                         .interpolationMethod(.monotone)
-                    LineMark(x: .value("Date", point.date), y: .value("Free space", Double(point.available)))
+                    LineMark(x: .value("Date", point.date), y: .value("Free space", y(point)))
                         .foregroundStyle(Color.accentColor)
                         .lineStyle(StrokeStyle(lineWidth: 2))
                         .interpolationMethod(.monotone)
@@ -408,7 +436,7 @@ private struct FreeSpaceChart: View {
                         .accessibilityValue(Text(point.available, format: .fileSize))
                 }
                 if let point = hovered ?? points.last {
-                    PointMark(x: .value("Date", point.date), y: .value("Free space", Double(point.available)))
+                    PointMark(x: .value("Date", point.date), y: .value("Free space", y(point)))
                         .foregroundStyle(Color.accentColor)
                         .symbolSize(40)
                 }
@@ -455,15 +483,133 @@ private struct FreeSpaceChart: View {
         .padding(.vertical, 4)
     }
 
-    /// "12 Oct: 182 GB free", starting at the hovered reading on the left half, ending at it on the right half.
-    private func hoverLabel(_ point: DiskHistory.Point) -> some View {
-        let leftHalf = hoveredX < width / 2
-        return Text("\(point.date, format: .dateTime.day().month().year()): \(point.available, format: .fileSize) free")
+    /// "12 Oct 2026: 182 GB free".
+    private func hoverText(_ point: DiskHistory.Point) -> Text {
+        Text("\(point.date, format: .dateTime.day().month().year()): \(point.available, format: .fileSize) free")
+    }
+}
+
+/// Above a chart: the hovered value, starting at `x` (where it is drawn) on the left half of the chart's `width`,
+/// ending at it on the right half.
+private struct ChartHoverLabel: View {
+    let text: Text
+    let x: CGFloat
+    let width: CGFloat
+
+    var body: some View {
+        let leftHalf = x < width / 2
+        text
             .font(.caption).monospacedDigit()
             .lineLimit(1)
-            .padding(.leading, leftHalf ? max(hoveredX - 6, 0) : 0)
-            .padding(.trailing, leftHalf ? 0 : max(width - hoveredX - 6, 0))
+            .padding(.leading, leftHalf ? max(x - 6, 0) : 0)
+            .padding(.trailing, leftHalf ? 0 : max(width - x - 6, 0))
             .frame(maxWidth: .infinity, alignment: leftHalf ? .leading : .trailing)
             .accessibilityHidden(true)
+    }
+}
+
+/// "Freed by CleanMate": a large number with its icon and name, and a line under it (the last cleanup's date).
+private struct FreedCard: View {
+    let symbol: String
+    let title: Text
+    let bytes: Int64
+    let countsUp: Bool
+    var detail: Text?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label { title } icon: { Image(systemName: symbol) }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            CountingBytes(bytes, countsUp: countsUp, duration: 0.6)
+                .font(.title.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6) // a narrow window shrinks the number instead of cutting it
+            if let detail {
+                detail.font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Bytes deleted per day over the last 30 days as accent bars; hovering shows the day's date and size.
+/// `grown` false: every bar at 0, so they grow when it turns true.
+private struct FreedByDayChart: View {
+    let days: [ActivityLog.Cleanups.Day]
+    var grown = true
+    @State private var hovered: ActivityLog.Cleanups.Day?
+    @State private var hoveredX: CGFloat = 0
+    @State private var width: CGFloat = 0
+
+    var body: some View {
+        // Fixed from the real sizes, so the axis stays put while the bars grow.
+        let top = Double(max(days.map(\.bytes).max() ?? 0, 1))
+        VStack(alignment: .leading, spacing: 4) {
+            ZStack {
+                Text("Freed per day, last 30 days")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(hovered == nil ? 1 : 0)
+                ChartHoverLabel(text: hoverText(hovered ?? days[days.count - 1]), x: hoveredX, width: width)
+                    .opacity(hovered == nil ? 0 : 1)
+            }
+            Chart(days) { day in
+                BarMark(x: .value("Date", day.date, unit: .day), y: .value("Freed", grown ? Double(day.bytes) : 0))
+                    .foregroundStyle(hovered == nil || hovered == day ? Color.accentColor : Color.accentColor.opacity(0.4))
+                    .accessibilityLabel(Text(day.date, format: .dateTime.day().month()))
+                    .accessibilityValue(Text(day.bytes, format: .fileSize))
+            }
+            .chartYScale(domain: 0...top)
+            .chartYAxis {
+                AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        // No label on the baseline: "Zero KB" says nothing the bars don't.
+                        if let bytes = value.as(Double.self), bytes > 0 { Text(Int64(bytes), format: .fileSize) }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                    AxisGridLine()
+                    // A Text, not `format:`, so the dates follow the app language, not the system's.
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) { Text(date, format: .dateTime.day().month(.abbreviated)) }
+                    }
+                }
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .onContinuousHover { phase in
+                            guard case .active(let location) = phase else { hovered = nil; return }
+                            let plot = geometry[proxy.plotAreaFrame]
+                            // A bar spans its whole day: the nearest is the one whose middle is closest.
+                            guard let date: Date = proxy.value(atX: location.x - plot.minX),
+                                  let nearest = days.min(by: {
+                                      abs(Self.middle($0).timeIntervalSince(date)) < abs(Self.middle($1).timeIntervalSince(date))
+                                  }) else { hovered = nil; return }
+                            hovered = nearest
+                            hoveredX = plot.minX + (proxy.position(forX: Self.middle(nearest)) ?? 0)
+                            width = geometry.size.width
+                        }
+                }
+            }
+            .frame(height: 110)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private static func middle(_ day: ActivityLog.Cleanups.Day) -> Date { day.date.addingTimeInterval(43_200) }
+
+    /// "12 Oct 2026: 1.2 GB freed".
+    private func hoverText(_ day: ActivityLog.Cleanups.Day) -> Text {
+        Text("\(day.date, format: .dateTime.day().month().year()): \(day.bytes, format: .fileSize) freed")
     }
 }
