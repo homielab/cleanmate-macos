@@ -33,7 +33,7 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 ## Install
 
 1. Download the latest `CleanMate-<version>.dmg` from
-   [GitHub Releases](https://github.com/homielab/cleanmate/releases/latest).
+   [GitHub Releases](https://github.com/homielab/cleanmate-macos/releases/latest).
    It is signed with a Developer ID and notarized by Apple; a `.sha256` checksum is published next to it.
 2. Open the disk image and drag **CleanMate** to **Applications**.
 3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks

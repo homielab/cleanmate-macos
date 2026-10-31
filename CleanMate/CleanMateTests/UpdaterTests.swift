@@ -17,7 +17,7 @@ struct UpdaterTests {
     }
 
     @Test func feedIsTheLatestGitHubRelease() {
-        #expect(info["SUFeedURL"] as? String == "https://github.com/homielab/cleanmate/releases/latest/download/appcast.xml")
+        #expect(info["SUFeedURL"] as? String == "https://github.com/homielab/cleanmate-macos/releases/latest/download/appcast.xml")
     }
 
     @Test func updatesAreVerifiedWithAnEdDSAKey() throws {

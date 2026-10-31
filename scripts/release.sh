@@ -17,7 +17,7 @@ DERIVED="$ROOT/build/DerivedData"
 SPARKLE_BIN="${SPARKLE_BIN:-$DERIVED/SourcePackages/artifacts/sparkle/Sparkle/bin}"
 # Keychain account of CleanMate's own EdDSA key (Sparkle's default account, ed25519, is not used).
 SPARKLE_ACCOUNT="${SPARKLE_ACCOUNT:-cleanmate}"
-REPO_URL="https://github.com/homielab/cleanmate"
+REPO_URL="https://github.com/homielab/cleanmate-macos"
 
 usage() {
   cat <<EOF

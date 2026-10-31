@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>SUFeedURL</key>
-	<string>https://github.com/homielab/cleanmate/releases/latest/download/appcast.xml</string>
+	<string>https://github.com/homielab/cleanmate-macos/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>aCtRQ2Pnm0Hy3YKZ3GFtYGnX3sZjxN4wRGq59jFcbJc=</string>
 	<key>SUEnableSystemProfiling</key>
