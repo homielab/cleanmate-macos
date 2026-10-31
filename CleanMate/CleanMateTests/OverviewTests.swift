@@ -17,7 +17,8 @@ struct OverviewTests {
 
     @Test func overviewIsTheFirstModule() {
         #expect(Module.allCases.first == .overview)
-        #expect(Module.allCases.count == 7) // ⌘1…⌘7
+        #expect(Module.allCases.count == 8) // ⌘1…⌘8
+        #expect(Module.allCases.last == .maintenance)
         #expect(Module.overview.badge(hasResults: true, size: 5, files: 5) == nil)
     }
 

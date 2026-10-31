@@ -580,6 +580,22 @@ struct UISnapshots {
         }
     }
 
+    @Test func maintenance() async throws {
+        try await snapshot("maintenance-idle") { MaintenanceView(model: MaintenanceModel()) }
+        let model = MaintenanceModel()
+        model.now = { Self.today }
+        model.record = { _, _ in }
+        model.runCommand = { command in
+            switch command.arguments {
+            case ["-r"]: .init(succeeded: true, output: "qlmanage: resetting quicklookd\n")
+            case ["Finder"]: .init(succeeded: false, output: "No matching processes belonging to you were found\n")
+            default: .init(succeeded: true, output: "")
+            }
+        }
+        for task in MaintenanceTask.allCases { await model.run(task) }
+        try await snapshot("maintenance-results") { MaintenanceView(model: model) }
+    }
+
     /// General tab only (the default one); it shows this Mac's real settings, nothing is scanned.
     @Test func settings() async throws {
         try await snapshot("settings", size: CGSize(width: 520, height: 590)) { SettingsView() }

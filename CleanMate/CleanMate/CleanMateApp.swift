@@ -131,7 +131,7 @@ private struct AppCommands: Commands {
             }
             CheckForUpdatesButton(updater: .shared)
         }
-        // View menu: ⌘1…⌘7 pick a sidebar module.
+        // View menu: ⌘1…⌘8 pick a sidebar module.
         CommandGroup(before: .sidebar) {
             ForEach(Array(Module.allCases.enumerated()), id: \.element) { index, item in
                 Button { module = item } label: { Text(item.title) }

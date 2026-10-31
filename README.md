@@ -24,6 +24,8 @@ no account, no telemetry; its only network connection is the update check, which
   extensions.
 - **Space Lens** — browse any folder sorted by size, with a donut chart of its contents.
 - **Login Items** — disable, enable or remove your launch agents.
+- **Maintenance** — rebuild Launch Services (duplicate "Open With" apps), reset Quick Look, restart Finder and Dock;
+  no administrator password.
 
 Undo (⌘Z) puts back what a module just moved to the Trash, and an activity log records every removal.
 See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and shortcut in detail.

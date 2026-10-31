@@ -6297,6 +6297,186 @@
           }
         }
       }
+    },
+    "Maintenance" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bảo trì"
+          }
+        }
+      }
+    },
+    "Rebuild Launch Services" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dựng lại Launch Services"
+          }
+        }
+      }
+    },
+    "Reset Quick Look" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại Quick Look"
+          }
+        }
+      }
+    },
+    "Restart Finder and Dock" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại Finder và Dock"
+          }
+        }
+      }
+    },
+    "Removes duplicate and outdated apps from “Open With” menus by registering the apps on this Mac again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ ứng dụng trùng lặp và đã cũ khỏi menu “Mở bằng” bằng cách đăng ký lại các ứng dụng trên máy Mac này."
+          }
+        }
+      }
+    },
+    "Restarts Quick Look and clears its thumbnail cache, for previews that are blank, wrong or slow." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại Quick Look và xoá bộ nhớ đệm hình thu nhỏ, khi bản xem trước bị trống, sai hoặc chậm."
+          }
+        }
+      }
+    },
+    "Fixes a Finder or Dock that hangs or shows old icons. Finder windows close and open again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa Finder hoặc Dock bị treo hay hiện icon cũ. Cửa sổ Finder đóng rồi mở lại."
+          }
+        }
+      }
+    },
+    "These tasks need no administrator password and remove none of your files. Each run is recorded in Settings › Activity." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các tác vụ này không cần mật khẩu quản trị và không xoá tệp nào của bạn. Mỗi lần chạy được ghi trong Cài đặt › Hoạt động."
+          }
+        }
+      }
+    },
+    "Restart Finder and Dock?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại Finder và Dock?"
+          }
+        }
+      }
+    },
+    "Finder windows close and open again, and the Dock disappears for a moment. A copy in progress in Finder stops." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cửa sổ Finder đóng rồi mở lại, Dock biến mất trong giây lát. Việc sao chép đang chạy trong Finder sẽ dừng."
+          }
+        }
+      }
+    },
+    "Run" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chạy"
+          }
+        }
+      }
+    },
+    "Output" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đầu ra"
+          }
+        }
+      }
+    },
+    "Running…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chạy…"
+          }
+        }
+      }
+    },
+    "Done at %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xong lúc %@"
+          }
+        }
+      }
+    },
+    "Failed at %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lỗi lúc %@"
+          }
+        }
+      }
+    },
+    "Ran" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chạy"
+          }
+        }
+      }
+    },
+    "Failed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lỗi"
+          }
+        }
+      }
+    },
+    "%@ is missing or took too long and was stopped." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có %@, hoặc chạy quá lâu nên đã bị dừng."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

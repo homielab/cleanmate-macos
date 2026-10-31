@@ -2,6 +2,7 @@ import Foundation
 
 /// Plain-text record of everything CleanMate removed: one tab-separated line per removed item
 /// (date, module, item, entries, size, deleted/trashed/restored, size in bytes) in ~/Library/Logs/CleanMate/activity.log.
+/// Maintenance tasks add a ran/failed line with size 0; only deleted/trashed/restored lines count in `freed`.
 /// Kept out of Smart Scan's "Old logs". Rotated to activity.1.log past `maxSize`.
 /// Module and Smart Scan item names are stored in English (= their String Catalog key) and translated
 /// by `display` when shown, so switching the app language translates old entries too.
@@ -33,6 +34,13 @@ nonisolated enum ActivityLog {
     static func recordRestored(module: LocalizedStringResource, item: String, size: Int64,
                                home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
         log(module: module, item: item, count: 1, size: size, action: "restored", home: home, date: date, rotateAt: maxSize)
+    }
+
+    /// A Maintenance task that was run: "ran" when every step succeeded, else "failed". Removes nothing, so size 0.
+    static func recordTask(module: LocalizedStringResource, item: String, succeeded: Bool,
+                           home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
+        log(module: module, item: item, count: 1, size: 0, action: succeeded ? "ran" : "failed", home: home, date: date,
+            rotateAt: maxSize)
     }
 
     private static func log(module: LocalizedStringResource, item: String, count: Int, size: Int64, action: String,
@@ -102,7 +110,7 @@ nonisolated enum ActivityLog {
         /// Size as written (in the language of that time); `bytes` when the line has the raw column.
         var size = ""
         var bytes: Int64?
-        /// "deleted", "trashed" or "restored".
+        /// "deleted", "trashed" or "restored"; "ran" or "failed" for a Maintenance task.
         var kind = ""
     }
 

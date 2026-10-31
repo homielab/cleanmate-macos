@@ -27,19 +27,35 @@ nonisolated struct ShellCommand: Sendable {
 
     /// Runs the command; false when missing, failing or timed out (it is then terminated).
     @concurrent func run() async -> Bool {
-        await execute(capture: false) != nil
+        await execute(capture: false).map { succeeded($0.status) } == true
     }
 
     /// Standard output of a successful run; nil when missing, failing or timed out.
     @concurrent func output() async -> String? {
-        await execute(capture: true)
+        guard let result = await execute(capture: true), succeeded(result.status) else { return nil }
+        return result.output
     }
+
+    /// A finished run as shown to the user: exit code 0, and standard output and error interleaved as printed.
+    struct Outcome: Sendable, Equatable {
+        var succeeded: Bool
+        var output: String
+    }
+
+    /// Exit result and everything the tool printed; nil when missing, timed out or cancelled. `requiresSuccess` is not used.
+    @concurrent func outcome() async -> Outcome? {
+        await execute(capture: true, includeErrors: true).map { Outcome(succeeded: $0.status == 0, output: $0.output) }
+    }
+
+    /// 0 = exited normally with code 0; low 7 bits 0 = exited normally (not killed by a signal).
+    private func succeeded(_ status: Int32) -> Bool { status == 0 || (!requiresSuccess && status & 0x7f == 0) }
 
     /// How long output is still read after the tool exits: a background child it left behind may hold the
     /// pipe open forever.
     static let drainGrace: Duration = .milliseconds(300)
 
-    private func execute(capture: Bool) async -> String? {
+    /// Wait status and captured output ("" without `capture`); nil when missing, timed out or cancelled.
+    private func execute(capture: Bool, includeErrors: Bool = false) async -> (status: Int32, output: String)? {
         guard let path = resolvedPath, let leading = leadingArguments() else { return nil }
         var environment = ProcessInfo.processInfo.environment
         // Script tools (`#!/usr/bin/env node`, brew) need their siblings on PATH.
@@ -58,7 +74,8 @@ nonisolated struct ShellCommand: Sendable {
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
         if capture { posix_spawn_file_actions_adddup2(&actions, fds[1], 1) }
         else { posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0) }
-        posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
+        if includeErrors { posix_spawn_file_actions_adddup2(&actions, fds[1], 2) }
+        else { posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0) }
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
         defer { posix_spawnattr_destroy(&attributes) }
@@ -104,9 +121,7 @@ nonisolated struct ShellCommand: Sendable {
             nap = min(nap * 2, .milliseconds(50))  // capped: long tools (brew, docker) poll thousands of times
             try? await Task.sleep(for: min(nap, exitedAt == nil ? .milliseconds(50) : .milliseconds(20)))
         }
-        // 0 = exited normally with code 0; low 7 bits 0 = exited normally (not killed by a signal).
-        guard status == 0 || (!requiresSuccess && status & 0x7f == 0) else { return nil }
-        return capture ? String(decoding: data, as: UTF8.self) : ""
+        return (status, capture ? String(decoding: data, as: UTF8.self) : "")
     }
 
     /// How long a timed-out or cancelled tool group gets after SIGTERM to stop cleanly before SIGKILL.

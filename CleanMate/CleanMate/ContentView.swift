@@ -10,6 +10,7 @@ enum Module: String, CaseIterable, Identifiable {
     case uninstaller
     case spaceLens
     case loginItems
+    case maintenance
 
     var id: Self { self }
 
@@ -22,6 +23,7 @@ enum Module: String, CaseIterable, Identifiable {
         case .uninstaller: "Uninstaller"
         case .spaceLens: "Space Lens"
         case .loginItems: "Login Items"
+        case .maintenance: "Maintenance"
         }
     }
 
@@ -34,6 +36,7 @@ enum Module: String, CaseIterable, Identifiable {
         case .uninstaller: "xmark.app"
         case .spaceLens: "chart.pie"
         case .loginItems: "power"
+        case .maintenance: "wrench.and.screwdriver"
         }
     }
 
@@ -46,7 +49,7 @@ enum Module: String, CaseIterable, Identifiable {
         switch self {
         case .smartScan, .privacy: return size > 0 ? .size(size) : nil // Privacy records have no size: no badge
         case .largeFiles: return files > 0 ? .files(files) : nil
-        case .overview, .uninstaller, .spaceLens, .loginItems: return nil
+        case .overview, .uninstaller, .spaceLens, .loginItems, .maintenance: return nil
         }
     }
 }
@@ -82,7 +85,7 @@ final class ModuleRouter: ObservableObject {
     /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
     func show(_ module: Module?, openWindow: OpenWindowAction? = nil) {
         let window = Self.mainWindow
-        // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘7: only bring the window front.
+        // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘8: only bring the window front.
         requested = window?.attachedSheet == nil ? module : nil
         NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
         if let window {
@@ -103,6 +106,7 @@ struct ContentView: View {
     @StateObject private var uninstaller = UninstallerModel()
     @StateObject private var spaceLens = SpaceLensModel()
     @StateObject private var loginItems = LaunchAgentsModel()
+    @StateObject private var maintenance = MaintenanceModel()
     @AppStorage(Preferences.fullDiskAccessPrompted) private var fullDiskAccessPrompted = false
     @State private var showsFullDiskAccess = false
     @Environment(\.openWindow) private var openWindow
@@ -132,6 +136,7 @@ struct ContentView: View {
             case .uninstaller: UninstallerView(model: uninstaller)
             case .spaceLens: SpaceLensView(model: spaceLens)
             case .loginItems: LaunchAgentsView(model: loginItems)
+            case .maintenance: MaintenanceView(model: maintenance)
             }
         }
         .frame(minWidth: 720, minHeight: 460)
@@ -177,7 +182,7 @@ struct ContentView: View {
         case .privacy: hasResults(privacy) ? module.badge(hasResults: true, size: privacy.selectedSize) : nil
         case .largeFiles:
             if case .results = largeFiles.phase { module.badge(hasResults: true, files: largeFiles.visibleFiles.count) } else { nil }
-        case .overview, .uninstaller, .spaceLens, .loginItems: nil
+        case .overview, .uninstaller, .spaceLens, .loginItems, .maintenance: nil
         }
         return switch badge {
         case .size(let size): Text(size, format: .fileSize)
@@ -204,6 +209,7 @@ struct ContentView: View {
         case .uninstaller: uninstaller.loadingApps || uninstaller.working ? nil : { uninstaller.refresh() }
         case .spaceLens: spaceLens.trashing ? nil : { spaceLens.rescan() }
         case .loginItems: loginItems.loading || loginItems.working ? nil : { Task { await loginItems.load() } }
+        case .maintenance: nil // nothing to scan
         }
     }
 
@@ -255,7 +261,7 @@ struct ContentView: View {
         case .spaceLens:
             running = spaceLens.measuring && !spaceLens.trashing
             stop = { spaceLens.cancel() }
-        case .uninstaller, .loginItems: // short loads with no stop button
+        case .uninstaller, .loginItems, .maintenance: // short loads or tasks with no stop button
             running = false
             stop = {}
         }
@@ -288,13 +294,13 @@ extension FocusedValues {
         set { self[MoveToTrashKey.self] = newValue }
     }
 
-    /// The visible module shows a delete/Trash/remove confirmation: Scan, Move to Trash and ⌘1…⌘7 wait for it.
+    /// The visible module shows a delete/Trash/remove confirmation: Scan, Move to Trash and ⌘1…⌘8 wait for it.
     var confirming: Bool? {
         get { self[ConfirmingKey.self] }
         set { self[ConfirmingKey.self] = newValue }
     }
 
-    /// The sidebar selection, for View > module (⌘1…⌘7).
+    /// The sidebar selection, for View > module (⌘1…⌘8).
     var module: Binding<Module?>? {
         get { self[ModuleKey.self] }
         set { self[ModuleKey.self] = newValue }

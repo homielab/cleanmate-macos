@@ -392,9 +392,14 @@ struct ActivitySettings: View {
         case "deleted": return (text("Deleted"), "xmark.circle")
         case "trashed": return (text("Trashed"), "trash")
         case "restored": return (text("Put back"), "arrow.uturn.backward")
+        case "ran": return (text("Ran"), "wrench.and.screwdriver")
+        case "failed": return (text("Failed"), "exclamationmark.triangle")
         default: return (kind, "questionmark")
         }
     }
+
+    /// A Maintenance task's line: it has no size.
+    static func isTask(_ kind: String) -> Bool { kind == "ran" || kind == "failed" }
 
     /// Rows matching the Module picker ("" = all) and the search text on the item name or path.
     static func filter(_ entries: [ActivityLog.Entry], module: String, search: String) -> [ActivityLog.Entry] {
@@ -461,7 +466,8 @@ struct ActivitySettings: View {
                 .width(min: 120)  // takes the rest
                 TableColumn("Size") { entry in
                     Group {
-                        if let bytes = entry.bytes { Text(bytes, format: .fileSize) } else { Text(entry.size) }
+                        if Self.isTask(entry.kind) { Text(verbatim: "") } // Maintenance: nothing removed
+                        else if let bytes = entry.bytes { Text(bytes, format: .fileSize) } else { Text(entry.size) }
                     }
                     .sizeColumnStyle(emphasized: entry.kind == "deleted")
                     .frame(maxWidth: .infinity, alignment: .trailing)
