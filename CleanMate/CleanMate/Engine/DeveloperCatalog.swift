@@ -62,6 +62,19 @@ extension CleanerGroup {
             ["~/Library/Developer/CoreSimulator/Caches"], apps: ["com.apple.dt.Xcode", "com.apple.iphonesimulator"]),
         dev("swiftpm-cache", "Swift Package Manager cache", ["~/Library/Caches/org.swift.swiftpm"]),
         dev("cocoapods-cache", "CocoaPods cache", ["~/Library/Caches/CocoaPods"]),
+        // Git clones of spec repos (`master` from CocoaPods before 1.8, ~1–3 GB). The `trunk` CDN repo is no git clone
+        // and is not listed. Unticked: a Podfile still naming the git source clones it again on the next `pod install`.
+        dev("cocoapods-spec-repos", "CocoaPods spec repo clones",
+            note: "Git copies of pod spec repos; CocoaPods uses its CDN, a Podfile naming the repo clones it again",
+            ["~/.cocoapods/repos"], selected: false, processes: ["pod"],
+            skipsEntry: { { !DeveloperTools.isGitSpecRepo($0) } }, selectableEntries: true),
+        // Documentation Xcode downloads and indexes; it fetches it again when the docs are opened.
+        dev("xcode-documentation-cache", "Xcode documentation cache", note: "Downloaded again when Xcode shows documentation",
+            ["~/Library/Developer/Xcode/DocumentationCache"], selected: false, apps: ["com.apple.dt.Xcode"]),
+        // Logs and crash reports copied from connected devices; the device still has its own until it rotates them.
+        dev("xcode-device-logs", "Xcode device logs", note: "Logs copied from connected iPhone, Apple Watch and Apple TV devices",
+            ["~/Library/Developer/Xcode/iOS Device Logs", "~/Library/Developer/Xcode/watchOS Device Logs",
+             "~/Library/Developer/Xcode/tvOS Device Logs"], selected: false, apps: ["com.apple.dt.Xcode"]),
 
         // Package managers
         dev("npm-cache", "npm cache", ["~/.npm/_cacache"],
@@ -342,6 +355,7 @@ extension CleanerGroup {
         command: ShellCommand? = nil,
         probe: SizeProbe? = nil, locate: PathLookup? = nil, shell: [String: [String]] = [:], selected: Bool = true, apps: [String] = [],
         processes: [String] = [], upperBound: Bool = false, openFiles: Bool = false,
+        skipsEntry: (@Sendable () -> @Sendable (URL) -> Bool)? = nil,
         entryLabel: CleanerItem.EntryLabel? = nil, selectableEntries: Bool = false, config: ConfigFolders? = nil
     ) -> CleanerItem {
         CleanerItem(id: id, title: title, note: note, paths: paths, minAge: minAge, excluded: excluded, included: included,
@@ -351,7 +365,7 @@ extension CleanerGroup {
                     sizeIsUpperBound: upperBound,
                     showsWhenEmpty: false,
                     runningAppBundleIDs: apps, runningProcessNames: processes, skipsOpenFiles: openFiles,
-                    entryLabel: entryLabel, selectableEntries: selectableEntries)
+                    skipsEntry: skipsEntry, entryLabel: entryLabel, selectableEntries: selectableEntries)
     }
 
     /// Untagged images (`dangling=true`), listed one by one and removed with `docker rmi <id>` for the ticked ones.
@@ -452,6 +466,13 @@ nonisolated enum DeveloperTools {
             }
         }.sorted { $0.identifier < $1.identifier }
         return stale.isEmpty ? nil : (stale.map(\.identifier), stale.reduce(0) { $0 + ($1.sizeBytes ?? 0) })
+    }
+
+    /// A spec repo CocoaPods cloned with git (`~/.cocoapods/repos/master`); `trunk` (the CDN) has no `.git`.
+    static func isGitSpecRepo(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.appending(path: ".git").path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
     }
 
     /// IDE folders (`GoLand2025.3`, `AndroidStudio2026.1.1`) that a newer version of the same product replaces; never

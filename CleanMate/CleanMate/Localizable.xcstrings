@@ -2931,6 +2931,66 @@
         }
       }
     },
+    "CocoaPods spec repo clones" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản clone kho spec CocoaPods"
+          }
+        }
+      }
+    },
+    "Git copies of pod spec repos; CocoaPods uses its CDN, a Podfile naming the repo clones it again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao git của kho spec pod; CocoaPods dùng CDN, Podfile nào ghi kho này sẽ clone lại"
+          }
+        }
+      }
+    },
+    "Xcode documentation cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm tài liệu Xcode"
+          }
+        }
+      }
+    },
+    "Downloaded again when Xcode shows documentation" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tải lại khi Xcode mở tài liệu"
+          }
+        }
+      }
+    },
+    "Xcode device logs" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhật ký thiết bị Xcode"
+          }
+        }
+      }
+    },
+    "Logs copied from connected iPhone, Apple Watch and Apple TV devices" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhật ký chép từ iPhone, Apple Watch và Apple TV đã kết nối"
+          }
+        }
+      }
+    },
     "Collapse %@" : {
       "localizations" : {
         "vi" : {
