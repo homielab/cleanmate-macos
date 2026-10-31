@@ -614,7 +614,7 @@ struct UISnapshots {
         let model = MaintenanceModel()
         model.now = { Self.today }
         model.record = { _, _ in }
-        model.runCommand = { command in
+        model.runCommand = { command, _ in
             switch command.arguments {
             case ["-r"]: .init(succeeded: true, output: "qlmanage: resetting quicklookd\n")
             case ["Finder"]: .init(succeeded: false, output: "No matching processes belonging to you were found\n")

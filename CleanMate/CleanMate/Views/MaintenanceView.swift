@@ -9,8 +9,10 @@ struct MaintenanceView: View {
     var body: some View {
         Form {
             Section {
-                ForEach(MaintenanceTask.allCases) { task in
-                    MaintenanceRow(task: task, result: model.results[task], canRun: !model.busy) {
+                ForEach(model.tasks) { task in
+                    let brewBusy = task == .homebrew && model.brewRunning && model.running != .homebrew
+                    MaintenanceRow(task: task, result: model.results[task], canRun: !model.busy && !brewBusy,
+                                   note: brewBusy ? Text("Homebrew is already running. This can run when it finishes.") : nil) {
                         if task.asksFirst { confirming = task } else { Task { await model.run(task) } }
                     }
                 }
@@ -23,6 +25,7 @@ struct MaintenanceView: View {
         .formStyle(.grouped)
         .navigationTitle(Text(Module.maintenance.title))
         .task { await model.loadSnapshots() }
+        .task { await model.watchBrew() }
         .focusedSceneValue(\.confirming, confirming != nil || model.pendingDeletion != nil)
         .confirmationDialog(
             Text(confirming == .iconCache ? LocalizedStringKey("Clear the icon cache and restart the Dock?") : "Restart Finder and Dock?"),
@@ -44,6 +47,8 @@ private struct MaintenanceRow: View {
     let task: MaintenanceTask
     let result: MaintenanceModel.Result?
     let canRun: Bool
+    /// Why Run is off (brew already running).
+    var note: Text?
     let run: () -> Void
 
     var body: some View {
@@ -57,12 +62,16 @@ private struct MaintenanceRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(task.title).font(.headline)
                     Text(task.summary).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    if let note {
+                        Label { note } icon: { Image(systemName: "lock.fill") }
+                            .font(.callout).foregroundStyle(.secondary).padding(.top, 2)
+                    }
                     MaintenanceStatus(status: result?.status).font(.callout).padding(.top, 2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Button("Run", action: run).disabled(!canRun)
             }
-            MaintenanceOutput(result: result).padding(.leading, 40)
+            MaintenanceOutput(result: result, live: task.streamsOutput).padding(.leading, 40)
         }
         .padding(.vertical, 4)
     }
@@ -91,20 +100,38 @@ private struct MaintenanceStatus: View {
     }
 }
 
-/// What the tools printed, folded; nothing while running or when they printed nothing.
+/// What the tools printed, folded; nothing when they printed nothing. `live`: shown while the task runs, unfolded
+/// and kept scrolled to the end in a box of fixed height; otherwise only once it ends.
 private struct MaintenanceOutput: View {
     let result: MaintenanceModel.Result?
+    var live = false
     @State private var showsOutput = false
 
     var body: some View {
-        if let output = result?.output, !output.isEmpty, result?.status != .running {
+        let running = result?.status == .running
+        if let output = result?.output, !output.isEmpty, live || !running {
             DisclosureGroup("Output", isExpanded: $showsOutput) {
-                Text(verbatim: output)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if live {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            text(output).id("end")
+                        }
+                        .frame(height: 180)
+                        .onChange(of: output) { _ in proxy.scrollTo("end", anchor: .bottom) }
+                    }
+                } else {
+                    text(output)
+                }
             }
+            .onAppearAndChange(of: running) { if $0 && live { showsOutput = true } }
         }
+    }
+
+    private func text(_ output: String) -> some View {
+        Text(verbatim: output)
+            .font(.system(.caption, design: .monospaced))
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

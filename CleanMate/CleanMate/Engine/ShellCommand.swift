@@ -49,6 +49,16 @@ nonisolated struct ShellCommand: Sendable {
         await execute(capture: true, includeErrors: true).map { Outcome(succeeded: $0.status == 0, output: $0.output) }
     }
 
+    /// Like `outcome()`, and hands what the tool prints to `onOutput` while it runs: whole lines, at most every
+    /// `outputInterval` (the rest when it exits), so a long tool (brew) shows its progress live.
+    @concurrent func outcome(onOutput: @escaping @Sendable (String) async -> Void) async -> Outcome? {
+        await execute(capture: true, includeErrors: true, onOutput: onOutput)
+            .map { Outcome(succeeded: $0.status == 0, output: $0.output) }
+    }
+
+    /// How often `outcome(onOutput:)` hands over new lines: about 10 times a second at most.
+    static let outputInterval: Duration = .milliseconds(100)
+
     /// 0 = exited normally with code 0; low 7 bits 0 = exited normally (not killed by a signal).
     private func succeeded(_ status: Int32) -> Bool { status == 0 || (!requiresSuccess && status & 0x7f == 0) }
 
@@ -57,7 +67,8 @@ nonisolated struct ShellCommand: Sendable {
     static let drainGrace: Duration = .milliseconds(300)
 
     /// Wait status and captured output ("" without `capture`); nil when missing, timed out or cancelled.
-    private func execute(capture: Bool, includeErrors: Bool = false) async -> (status: Int32, output: String)? {
+    private func execute(capture: Bool, includeErrors: Bool = false,
+                         onOutput: (@Sendable (String) async -> Void)? = nil) async -> (status: Int32, output: String)? {
         guard let path = resolvedPath, let leading = leadingArguments() else { return nil }
         var environment = ProcessInfo.processInfo.environment.merging(self.environment) { $1 }
         // Script tools (`#!/usr/bin/env node`, brew) need their siblings on PATH.
@@ -107,14 +118,25 @@ nonisolated struct ShellCommand: Sendable {
         let deadline = ContinuousClock.now + timeout
         // Poll from 1 ms, doubling up to 50 ms: most tools (sqlite3) exit in a few ms, a flat 50 ms nap made each run ≥ 50 ms.
         var nap = Duration.milliseconds(1)
+        // Bytes of `data` already handed to `onOutput`, and when.
+        var sent = 0, sentAt = ContinuousClock.now
         while true {
             // Read while running so a full pipe buffer can't block the tool.
             while !atEOF {
                 let count = read(reader, &buffer, buffer.count)
                 if count > 0 { data.append(buffer, count: count) } else { atEOF = count == 0 || (errno != EAGAIN && errno != EINTR); break }
             }
+            if let onOutput, ContinuousClock.now >= sentAt + Self.outputInterval,
+               let newline = data[sent...].lastIndex(of: UInt8(ascii: "\n")) {
+                await onOutput(String(decoding: data[sent...newline], as: UTF8.self))
+                sent = newline + 1
+                sentAt = .now
+            }
             if exitedAt == nil, waitpid(pid, &status, WNOHANG) == pid { exitedAt = .now }
-            if let exitedAt, atEOF || ContinuousClock.now >= exitedAt + Self.drainGrace { break }
+            if let exitedAt, atEOF || ContinuousClock.now >= exitedAt + Self.drainGrace {
+                if let onOutput, sent < data.count { await onOutput(String(decoding: data[sent...], as: UTF8.self)) }
+                break
+            }
             // A cancelled scan stops waiting for slow tools (docker, xcrun) right away.
             if ContinuousClock.now >= deadline || Task.isCancelled {
                 await Self.stop(group: pid, reaped: exitedAt != nil)

@@ -3091,6 +3091,46 @@
         }
       }
     },
+    "Update and Clean Homebrew" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cập nhật và dọn Homebrew"
+          }
+        }
+      }
+    },
+    "Updates Homebrew, upgrades your formulae and removes old versions and downloads (brew update, upgrade --formula, cleanup --prune=all). Apps installed as casks are not touched." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cập nhật Homebrew, nâng cấp các formula và xoá phiên bản cũ cùng tệp tải về (brew update, upgrade --formula, cleanup --prune=all). Không đụng đến app cài bằng cask."
+          }
+        }
+      }
+    },
+    "Formulae upgraded: %lld. Freed by cleanup: %@." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formula đã nâng cấp: %lld. Dọn được: %@."
+          }
+        }
+      }
+    },
+    "Homebrew is already running. This can run when it finishes." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Homebrew đang chạy. Có thể chạy tác vụ này khi nó xong."
+          }
+        }
+      }
+    },
     "Fixes text drawn in the wrong font or as boxes by clearing your font cache. Open apps may need a restart." : {
       "localizations" : {
         "vi" : {

@@ -8,6 +8,8 @@ nonisolated enum MaintenanceTask: String, CaseIterable, Identifiable, Sendable {
     case finderAndDock
     case fontCache
     case iconCache
+    /// Only listed when Homebrew is installed (`brewPath`).
+    case homebrew
 
     var id: Self { self }
 
@@ -52,7 +54,71 @@ nonisolated enum MaintenanceTask: String, CaseIterable, Identifiable, Sendable {
             ShellCommand(executable: "/bin/rm", arguments: ["-rf"] + Self.iconCachePaths(in: Self.userCacheDir)),
             ShellCommand(executable: "/usr/bin/killall", arguments: ["Dock"]),
         ] : [ShellCommand(executable: "/usr/bin/false")]
+        // Missing brew: the first step fails with "brew is missing".
+        case .homebrew: Self.homebrewCommands(brew: Self.brewPath ?? "/opt/homebrew/bin/brew")
         }
+    }
+
+    /// The `brew` CleanMate runs (`/opt/homebrew/bin` before `/usr/local/bin`, as for Homebrew's cleanup items);
+    /// nil when Homebrew is not installed.
+    static var brewPath: String? { ShellCommand(executable: "brew").resolvedPath }
+
+    /// Homebrew installed, and whether a `brew` command (bin/brew, brew.sh or brew.rb) runs now; read off the main thread.
+    struct BrewState: Equatable, Sendable {
+        var installed: Bool
+        var running: Bool
+    }
+
+    @concurrent static func brewState() async -> BrewState {
+        BrewState(installed: brewPath != nil, running: HomebrewCasks.isBrewRunning())
+    }
+
+    /// `brew update`, `brew upgrade --formula`, `brew cleanup --prune=all`, with the `brew` at `brew`. Formulae only:
+    /// a cask upgrade may ask for a password or replace an app that is open. stdin is /dev/null (`ShellCommand`), so a
+    /// step that would ask anything fails instead of waiting; no auto-update after the first step, no ask prompt.
+    static func homebrewCommands(brew: String) -> [ShellCommand] {
+        let quiet = ["HOMEBREW_NO_ENV_HINTS": "1"]
+        let after = quiet.merging(["HOMEBREW_NO_AUTO_UPDATE": "1"]) { $1 }
+        return [
+            ShellCommand(executable: brew, arguments: ["update"], timeout: homebrewTimeLimit, environment: quiet),
+            ShellCommand(executable: brew, arguments: ["upgrade", "--formula"], timeout: homebrewTimeLimit,
+                         environment: after.merging(["HOMEBREW_NO_ASK": "1"]) { $1 }),
+            ShellCommand(executable: brew, arguments: ["cleanup", "--prune=all"], timeout: homebrewTimeLimit, environment: after),
+        ]
+    }
+
+    /// The three Homebrew steps together are stopped after 15 minutes.
+    static let homebrewTimeLimit: Duration = .seconds(15 * 60)
+
+    /// Time for all of the task's steps together; nil = each step only has its own timeout.
+    var timeLimit: Duration? { self == .homebrew ? Self.homebrewTimeLimit : nil }
+
+    /// Shows the tools' output while they run (brew takes minutes).
+    var streamsOutput: Bool { self == .homebrew }
+
+    /// The line added after the output of a successful run; nil for tasks without one.
+    func closingLine(output: String) -> String? {
+        guard self == .homebrew else { return nil }
+        let summary = Self.homebrewSummary(output)
+        return String(localized: "Formulae upgraded: \(summary.upgraded). Freed by cleanup: \(summary.freed.formatted(.fileSize)).")
+    }
+
+    /// Formulae `brew upgrade` upgraded ("==> Upgrading 3 outdated packages:", else one "==> Upgrading <name>" per
+    /// formula) and the space every "freed approximately 1.2GB" line reports (brew's decimal units).
+    struct HomebrewSummary: Equatable, Sendable {
+        var upgraded: Int
+        var freed: Int64
+    }
+
+    static func homebrewSummary(_ output: String) -> HomebrewSummary {
+        let lines = output.split(whereSeparator: \.isNewline)
+        let upgraded = lines.lazy.compactMap { $0.firstMatch(of: /^==> Upgrading (\d+) outdated packages?:/).flatMap { Int($0.1) } }.first
+            ?? Set(lines.compactMap { $0.wholeMatch(of: /==> Upgrading (\S+)\s*/).map { String($0.1) } }).count
+        let freed = lines.compactMap { line -> Int64? in
+            guard let range = line.range(of: "freed approximately ") else { return nil }
+            return DeveloperTools.bytes(fromDockerSize: String(line[range.upperBound...].prefix { !$0.isWhitespace }))
+        }.reduce(0, +)
+        return HomebrewSummary(upgraded: upgraded, freed: freed)
     }
 
     static func iconCachePaths(in cacheDir: String) -> [String] {
@@ -67,6 +133,7 @@ nonisolated enum MaintenanceTask: String, CaseIterable, Identifiable, Sendable {
         case .finderAndDock: "Restart Finder and Dock"
         case .fontCache: "Reset Font Cache"
         case .iconCache: "Clear Icon Cache"
+        case .homebrew: "Update and Clean Homebrew"
         }
     }
 
@@ -77,6 +144,7 @@ nonisolated enum MaintenanceTask: String, CaseIterable, Identifiable, Sendable {
         case .finderAndDock: "Fixes a Finder or Dock that hangs or shows old icons. Finder windows close and open again."
         case .fontCache: "Fixes text drawn in the wrong font or as boxes by clearing your font cache. Open apps may need a restart."
         case .iconCache: "Fixes wrong or blank app icons in the Dock and Finder by clearing your icon cache, then restarts the Dock."
+        case .homebrew: "Updates Homebrew, upgrades your formulae and removes old versions and downloads (brew update, upgrade --formula, cleanup --prune=all). Apps installed as casks are not touched."
         }
     }
 
@@ -87,6 +155,7 @@ nonisolated enum MaintenanceTask: String, CaseIterable, Identifiable, Sendable {
         case .finderAndDock: "dock.rectangle"
         case .fontCache: "textformat"
         case .iconCache: "app.dashed"
+        case .homebrew: "mug"
         }
     }
 
