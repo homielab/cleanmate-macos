@@ -304,6 +304,7 @@ private struct DiskRow: View {
     let disk: OverviewModel.Disk
     /// The bar fills from 0 when the row first shows.
     var animates = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var tint: Color {
         switch disk.volume.level {
@@ -330,7 +331,7 @@ private struct DiskRow: View {
                 Text("\(volume.used, format: .fileSize) used of \(volume.total, format: .fileSize) · \(volume.available, format: .fileSize) available")
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     .contentTransition(.numericText()) // Refresh rolls the digits
-                    .animation(.default, value: volume.available)
+                    .animation(reduceMotion ? nil : .default, value: volume.available)
             }
             Spacer()
             GrowsIn(animates: animates) { grown in

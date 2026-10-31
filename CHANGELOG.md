@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan** and **Uninstaller**: app group containers (`<TEAMID>.<group>`) are matched by the team that signed the app instead of the vendor name. Smart Scan keeps an app group's caches while any app of that team runs, and stops keeping them just because an app of another team with a similar name runs; the Uninstaller lists such a container with the app it belongs to.
 
 ### Fixed
+- **Animations**: turning on **Reduce motion** in System Settings while a screen is open is now respected immediately: in-flight animations finish at once at their final state, and subsequent displays show still content that only fades in.
 - **Uninstaller** and **Large & Old Files**: the checkboxes of app data, Extensions and file rows no longer show a stray name (and size) next to the box; VoiceOver still reads them.
 
 ## [1.4] - 2026-10-31

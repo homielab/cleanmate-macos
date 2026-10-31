@@ -596,32 +596,43 @@ struct CleanerItemRow: View {
 /// The first time it shows a report (`SmartScanModel.revealsDone`) the number counts up, the tick springs in, the
 /// group rows come in one after another and the bars grow, all within a second; with Reduce Motion it is shown
 /// still, only faded in with the screen.
-private struct DoneScreen<Actions: View>: View {
+struct DoneScreen<Actions: View>: View {
     @ObservedObject var model: SmartScanModel
     let module: Module
     let report: CleanReport
     let actions: Actions
-    /// Read when the screen is created; later redraws pass the cleared flag, which `@State` ignores.
-    private let animates: Bool
-    @State private var revealed: Bool
+    var onRevealedChange: ((Bool) -> Void)?
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    /// Whether the model requested a reveal animation for this report.
+    let reveals: Bool
+    @State var revealed: Bool
 
     init(model: SmartScanModel, module: Module, report: CleanReport, @ViewBuilder actions: () -> Actions) {
+        self.init(model: model, module: module, report: report, onRevealedChange: nil, actions: actions)
+    }
+
+    init(model: SmartScanModel, module: Module, report: CleanReport, onRevealedChange: ((Bool) -> Void)?, @ViewBuilder actions: () -> Actions) {
         self.model = model
         self.module = module
         self.report = report
+        self.onRevealedChange = onRevealedChange
         self.actions = actions()
-        animates = model.revealsDone && !reducesMotion
-        _revealed = State(initialValue: !animates)
+        reveals = model.revealsDone
+        _revealed = State(initialValue: !model.revealsDone)
+    }
+
+    var isRevealed: Bool {
+        revealed || reduceMotion || !reveals
     }
 
     var body: some View {
         EmptyStateView {
             Image(systemName: "checkmark.circle")
-                .scaleEffect(revealed ? 1 : 0.6)
-                .opacity(revealed ? 1 : 0)
-                .animation(.spring(response: 0.35, dampingFraction: 0.75), value: revealed)
+                .scaleEffect(isRevealed ? 1 : 0.6)
+                .opacity(isRevealed ? 1 : 0)
+                .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.75), value: isRevealed)
         } title: {
-            CountingBytes(report.freed, countsUp: animates) { Text("Freed \($0)") }
+            CountingBytes(report.freed, countsUp: reveals && !reduceMotion) { Text("Freed \($0)") }
         } description: {
             if module == .privacy {
                 Text("The selected traces were erased.")
@@ -651,6 +662,16 @@ private struct DoneScreen<Actions: View>: View {
             model.revealsDone = false
             revealed = true
         }
+        .onChange(of: reduceMotion) { isReduce in
+            if isReduce {
+                revealed = true
+            }
+        }
+        .background(
+            Color.clear
+                .onAppear { onRevealedChange?(isRevealed) }
+                .onChange(of: isRevealed) { onRevealedChange?($0) }
+        )
     }
 
     /// What each group freed, largest bar = the group that freed most.
@@ -661,7 +682,7 @@ private struct DoneScreen<Actions: View>: View {
                 GridRow {
                     Label { Text(group.title) } icon: { Image(systemName: group.systemImage) }
                         .foregroundStyle(.primary) // not the description's faded grey
-                        .reveal(revealed, order: order)
+                        .reveal(isRevealed, order: order)
                     Group {
                         if group.trashed == 0 {
                             Text(group.freed, format: .fileSize)
@@ -674,9 +695,9 @@ private struct DoneScreen<Actions: View>: View {
                     .monospacedDigit()
                     .foregroundStyle(.primary) // same size as the title, not the description's faded grey
                     .gridColumnAlignment(.trailing)
-                    .reveal(revealed, order: order)
-                    SizeBar(size: revealed ? group.freed : 0, largest: largest)
-                        .reveal(revealed, order: order)
+                    .reveal(isRevealed, order: order)
+                    SizeBar(size: isRevealed ? group.freed : 0, largest: largest)
+                        .reveal(isRevealed, order: order)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -690,9 +711,9 @@ private struct DoneScreen<Actions: View>: View {
     private func freeSpace(_ change: SmartScanModel.FreeSpaceChange) -> some View {
         VStack(spacing: 6) {
             if change.total > 0 {
-                let free = revealed ? change.after : change.before
+                let free = isRevealed ? change.after : change.before
                 SizeBar(size: max(change.total - free, 0), largest: change.total, height: 8, width: 240)
-                    .animation(.easeInOut(duration: 0.6).delay(0.3), value: revealed)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.6).delay(0.3), value: isRevealed)
             }
             Text("Free space: \(change.before, format: .fileSize) → \(change.after, format: .fileSize)")
                 .font(.caption)

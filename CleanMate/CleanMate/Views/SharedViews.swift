@@ -230,13 +230,32 @@ struct SizeBar: View {
     }
 }
 
+/// Fades in and rises 6 pt when `shown` turns true, `order` × 60 ms after the first one (capped, so a long list
+/// is in within a second). With Reduce Motion, rising motion and delays are suppressed: it only fades in.
+private struct RevealModifier: ViewModifier {
+    let shown: Bool
+    let order: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown ? 1 : 0)
+            .offset(y: (shown || reduceMotion) ? 0 : 6)
+            .animation(
+                reduceMotion
+                    ? .easeOut(duration: 0.2)
+                    : .easeOut(duration: 0.3).delay(0.1 + Double(min(order, 8)) * 0.06),
+                value: shown
+            )
+    }
+}
+
 extension View {
     /// Fades in and rises 6 pt when `shown` turns true, `order` × 60 ms after the first one (capped, so a long list
     /// is in within a second). Other changes `shown` brings (a `SizeBar` growing) run on the same curve.
+    /// With Reduce Motion it only fades in without rising motion.
     func reveal(_ shown: Bool, order: Int) -> some View {
-        opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 6)
-            .animation(.easeOut(duration: 0.3).delay(0.1 + Double(min(order, 8)) * 0.06), value: shown)
+        modifier(RevealModifier(shown: shown, order: order))
     }
 }
 
@@ -350,48 +369,73 @@ extension EmptyStateView where Icon == Image, Title == Text, Description == Empt
     }
 }
 
-/// "Reduce motion" in System Settings › Accessibility › Display. Read when a view is created, so its first frame is
-/// already the still one (the environment value is not readable in an initializer).
-@MainActor var reducesMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
-
 /// A byte count in `.fileSize`, with aligned digits. `countsUp`: counts from 0 to `value` once when it appears
 /// (ease-out, `duration`), in `value`'s unit all the way so the unit never jumps; not with Reduce Motion. A later
 /// change of `value` (a refresh) rolls the digits instead. `label` wraps the number, e.g. `Text("Freed \($0)")`.
 /// The last frame is exactly `label(Text(value, format: .fileSize))`.
 struct CountingBytes: View {
     let value: Int64
+    private let countsUp: Bool
     private let duration: Double
     private let label: (Text) -> Text
+    var onCountingChange: ((Bool) -> Void)?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown: Double
     @State private var counting: Bool
 
     init(_ value: Int64, countsUp: Bool, duration: Double = 0.8, label: @escaping (Text) -> Text = { $0 }) {
+        self.init(value, countsUp: countsUp, duration: duration, onCountingChange: nil, label: label)
+    }
+
+    init(_ value: Int64, countsUp: Bool, duration: Double = 0.8, onCountingChange: ((Bool) -> Void)?, label: @escaping (Text) -> Text = { $0 }) {
         self.value = value
+        self.countsUp = countsUp
         self.duration = duration
+        self.onCountingChange = onCountingChange
         self.label = label
-        let counts = countsUp && value > 0 && !reducesMotion
+        let counts = countsUp && value > 0
         _shown = State(initialValue: counts ? 0 : Double(value))
         _counting = State(initialValue: counts)
     }
 
+    var isCounting: Bool {
+        counting && !reduceMotion
+    }
+
     var body: some View {
         Group {
-            if counting {
+            if isCounting {
                 Text(verbatim: "").modifier(CountUp(shown: shown, target: value, label: label))
             } else {
                 label(Text(value, format: .fileSize)).contentTransition(.numericText())
             }
         }
         .monospacedDigit()
-        .animation(.default, value: value)
+        .animation(reduceMotion ? nil : .default, value: value)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label(Text(value, format: .fileSize)))
-        .task {
+        .task(id: reduceMotion) {
+            if reduceMotion {
+                shown = Double(value)
+                counting = false
+                return
+            }
             guard counting else { return }
             withAnimation(.easeOut(duration: duration)) { shown = Double(value) }
             try? await Task.sleep(for: .seconds(duration))
             counting = false // same text as the last frame: nothing moves
         }
+        .onChange(of: reduceMotion) { isReduce in
+            if isReduce {
+                shown = Double(value)
+                counting = false
+            }
+        }
+        .background(
+            Color.clear
+                .onAppear { onCountingChange?(isCounting) }
+                .onChange(of: isCounting) { onCountingChange?($0) }
+        )
     }
 
     /// The text at `shown` bytes on the way to `target`: in `target`'s unit, then `target` in `.fileSize` once there.
@@ -417,29 +461,61 @@ struct CountingBytes: View {
 /// `duration`): bars and charts grow from 0. Only when `animates`; with Reduce Motion `grown` is true from the start
 /// and the content fades in instead.
 struct GrowsIn<Content: View>: View {
+    private let animates: Bool
     private let duration: Double
     private let content: (Bool) -> Content
+    var onGrownChange: ((Bool) -> Void)?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var grown: Bool
     @State private var visible: Bool
 
     init(animates: Bool, duration: Double = 0.6, @ViewBuilder content: @escaping (Bool) -> Content) {
+        self.init(animates: animates, duration: duration, onGrownChange: nil, content: content)
+    }
+
+    init(animates: Bool, duration: Double = 0.6, onGrownChange: ((Bool) -> Void)?, @ViewBuilder content: @escaping (Bool) -> Content) {
+        self.animates = animates
         self.duration = duration
+        self.onGrownChange = onGrownChange
         self.content = content
-        let still = reducesMotion
-        _grown = State(initialValue: !animates || still)
-        _visible = State(initialValue: !(animates && still))
+        _grown = State(initialValue: !animates)
+        _visible = State(initialValue: !animates)
+    }
+
+    var isGrown: Bool {
+        grown || reduceMotion || !animates
     }
 
     var body: some View {
-        content(grown)
+        content(isGrown)
             .opacity(visible ? 1 : 0)
             .onAppear {
+                if reduceMotion || !animates {
+                    grown = true
+                    withAnimation(animates ? .easeOut(duration: duration) : nil) {
+                        visible = true
+                    }
+                    return
+                }
                 guard !grown || !visible else { return }
                 withAnimation(.easeOut(duration: duration)) {
                     grown = true
                     visible = true
                 }
             }
+            .onChange(of: reduceMotion) { isReduce in
+                if isReduce {
+                    withAnimation(nil) {
+                        grown = true
+                        visible = true
+                    }
+                }
+            }
+            .background(
+                Color.clear
+                    .onAppear { onGrownChange?(isGrown) }
+                    .onChange(of: isGrown) { onGrownChange?($0) }
+            )
     }
 }
 
