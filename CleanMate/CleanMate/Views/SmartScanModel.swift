@@ -60,9 +60,15 @@ final class SmartScanModel: ObservableObject {
     private var trashedItemNames: [URL: String] = [:]
     /// Free bytes on the home volume, read before and after a clean; tests inject fixed values.
     var freeSpace: () -> Int64? = { Cleaner.freeSpace(SafetyPolicy.current.homeURL.path) }
-    /// The volume's free space before and after the last clean, shown for reference next to what was freed.
-    struct FreeSpaceChange: Equatable { var before: Int64; var after: Int64 }
+    /// Size of the home volume, read after a clean for the done screen's capacity bar; tests inject a fixed value.
+    var volumeSize: () -> Int64? = { Cleaner.volumeSize(SafetyPolicy.current.homeURL.path) }
+    /// The volume's free space before and after the last clean, shown for reference next to what was freed;
+    /// `total` 0 when unknown (no capacity bar).
+    struct FreeSpaceChange: Equatable { var before: Int64; var after: Int64; var total: Int64 = 0 }
     @Published var freeSpaceChange: FreeSpaceChange?
+    /// Set when a clean finishes: the done screen animates in the first time it shows that report, then clears it,
+    /// so coming back to the module shows it still.
+    var revealsDone = false
     /// Items scanned so far / items to scan, for the progress bar.
     @Published var scannedItems = 0
     @Published var totalItems = 0
@@ -490,7 +496,10 @@ final class SmartScanModel: ObservableObject {
         selected = []
         excludedEntries = [:]
         cleanedGroups = byGroup.filter { $0.freed > 0 }
-        freeSpaceChange = freeBefore.flatMap { before in freeSpace().map { FreeSpaceChange(before: before, after: $0) } }
+        freeSpaceChange = freeBefore.flatMap { before in
+            freeSpace().map { FreeSpaceChange(before: before, after: $0, total: volumeSize() ?? 0) }
+        }
+        revealsDone = true
         phase = .done(report)
         if !report.trashed.isEmpty {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash() }

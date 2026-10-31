@@ -230,6 +230,16 @@ struct SizeBar: View {
     }
 }
 
+extension View {
+    /// Fades in and rises 6 pt when `shown` turns true, `order` × 60 ms after the first one (capped, so a long list
+    /// is in within a second). Other changes `shown` brings (a `SizeBar` growing) run on the same curve.
+    func reveal(_ shown: Bool, order: Int) -> some View {
+        opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 6)
+            .animation(.easeOut(duration: 0.3).delay(0.1 + Double(min(order, 8)) * 0.06), value: shown)
+    }
+}
+
 /// Icons looked up once per key (file extension, bundle id) for the app's lifetime, not on every redraw of a long list.
 // shortcut: never evicted, so an app installed/removed later keeps its old answer until relaunch.
 @MainActor enum IconCache {
@@ -281,17 +291,17 @@ private struct ExclusionNotice: View {
 }
 
 /// Empty, idle and done screens: large icon, title, description and actions, centered, like the system's
-/// empty-state view (macOS 14+).
-struct EmptyStateView<Description: View, Actions: View>: View {
-    let title: Text
-    let systemImage: String
+/// empty-state view (macOS 14+). The icon and title can be any view (the done screens' animated ones).
+struct EmptyStateView<Icon: View, Title: View, Description: View, Actions: View>: View {
+    let icon: Icon
+    let title: Title
     let description: Description
     let actions: Actions
 
-    init(title: Text, systemImage: String, @ViewBuilder description: () -> Description,
+    init(@ViewBuilder icon: () -> Icon, @ViewBuilder title: () -> Title, @ViewBuilder description: () -> Description,
          @ViewBuilder actions: () -> Actions) {
-        self.title = title
-        self.systemImage = systemImage
+        self.icon = icon()
+        self.title = title()
         self.description = description()
         self.actions = actions()
     }
@@ -299,7 +309,7 @@ struct EmptyStateView<Description: View, Actions: View>: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 7) {
-                Image(systemName: systemImage)
+                icon
                     .font(.system(size: 34))
                     .padding(.bottom, 18)
                     .accessibilityHidden(true)
@@ -320,15 +330,103 @@ struct EmptyStateView<Description: View, Actions: View>: View {
     }
 }
 
-extension EmptyStateView where Actions == EmptyView {
+extension EmptyStateView where Icon == Image, Title == Text {
+    init(title: Text, systemImage: String, @ViewBuilder description: () -> Description,
+         @ViewBuilder actions: () -> Actions) {
+        self.init(icon: { Image(systemName: systemImage) }, title: { title }, description: description,
+                  actions: actions)
+    }
+}
+
+extension EmptyStateView where Icon == Image, Title == Text, Actions == EmptyView {
     init(title: Text, systemImage: String, @ViewBuilder description: () -> Description) {
         self.init(title: title, systemImage: systemImage, description: description) { EmptyView() }
     }
 }
 
-extension EmptyStateView where Description == EmptyView, Actions == EmptyView {
+extension EmptyStateView where Icon == Image, Title == Text, Description == EmptyView, Actions == EmptyView {
     init(title: Text, systemImage: String) {
         self.init(title: title, systemImage: systemImage) { EmptyView() }
+    }
+}
+
+/// "Reduce motion" in System Settings › Accessibility › Display. Read when a view is created, so its first frame is
+/// already the still one (the environment value is not readable in an initializer).
+@MainActor var reducesMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+/// A byte count in `.fileSize`, with aligned digits. `countsUp`: counts from 0 to `value` once when it appears
+/// (ease-out, `duration`), in `value`'s unit all the way so the unit never jumps; not with Reduce Motion. A later
+/// change of `value` (a refresh) rolls the digits instead. `label` wraps the number, e.g. `Text("Freed \($0)")`.
+/// The last frame is exactly `label(Text(value, format: .fileSize))`.
+struct CountingBytes: View {
+    let value: Int64
+    private let duration: Double
+    private let label: (Text) -> Text
+    @State private var shown: Double
+    @State private var counting: Bool
+
+    init(_ value: Int64, countsUp: Bool, duration: Double = 0.8, label: @escaping (Text) -> Text = { $0 }) {
+        self.value = value
+        self.duration = duration
+        self.label = label
+        let counts = countsUp && value > 0 && !reducesMotion
+        _shown = State(initialValue: counts ? 0 : Double(value))
+        _counting = State(initialValue: counts)
+    }
+
+    var body: some View {
+        Group {
+            if counting {
+                Text(verbatim: "").modifier(CountUp(shown: shown, target: value, label: label))
+            } else {
+                label(Text(value, format: .fileSize)).contentTransition(.numericText())
+            }
+        }
+        .monospacedDigit()
+        .animation(.default, value: value)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label(Text(value, format: .fileSize)))
+        .task {
+            guard counting else { return }
+            withAnimation(.easeOut(duration: duration)) { shown = Double(value) }
+            try? await Task.sleep(for: .seconds(duration))
+            counting = false // same text as the last frame: nothing moves
+        }
+    }
+
+    /// The text at `shown` bytes on the way to `target`: in `target`'s unit, then `target` in `.fileSize` once there.
+    nonisolated static func text(_ shown: Double, target: Int64, locale: Locale) -> String {
+        if shown >= Double(target) { return target.formatted(.fileSize.locale(locale)) }
+        return Int64(max(shown, 0)).formatted(
+            .byteCount(style: .file, allowedUnits: unit(of: target), spellsOutZero: false).locale(locale))
+    }
+
+    /// The unit `.fileSize` writes `bytes` in (decimal, like Finder).
+    nonisolated static func unit(of bytes: Int64) -> ByteCountFormatStyle.Units {
+        switch bytes {
+        case ..<1_000: .bytes
+        case ..<1_000_000: .kb
+        case ..<1_000_000_000: .mb
+        case ..<1_000_000_000_000: .gb
+        default: .tb
+        }
+    }
+}
+
+/// Redraws the number on every animation frame of `shown`.
+private struct CountUp: ViewModifier, Animatable {
+    var shown: Double
+    let target: Int64
+    let label: (Text) -> Text
+    @Environment(\.locale) private var locale
+
+    var animatableData: Double {
+        get { shown }
+        set { shown = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        label(Text(verbatim: CountingBytes.text(shown, target: target, locale: locale)))
     }
 }
 

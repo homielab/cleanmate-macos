@@ -159,6 +159,12 @@ nonisolated enum Cleaner {
         return statfs(path, &info) == 0 ? Int64(info.f_bavail) * Int64(info.f_bsize) : nil
     }
 
+    /// Capacity of the volume holding `path`, in bytes.
+    static func volumeSize(_ path: String) -> Int64? {
+        var info = statfs()
+        return statfs(path, &info) == 0 ? Int64(info.f_blocks) * Int64(info.f_bsize) : nil
+    }
+
     private static func remove(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy,
                                trash: @Sendable (URL) throws -> URL?,
                                openPaths: OpenPaths) async -> CleanReport {

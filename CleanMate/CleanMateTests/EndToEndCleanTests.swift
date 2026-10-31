@@ -447,6 +447,7 @@ struct EndToEndCleanTests {
         // Free space dropped during the clean (another app wrote more than was removed).
         var reads: [Int64] = [5_000_000_000, 4_999_000_000]
         model.freeSpace = { reads.isEmpty ? nil : reads.removeFirst() }
+        model.volumeSize = { 10_000_000_000 }
 
         await model.scan()
         #expect(model.selected == [deleted.id, trashed.id])
@@ -455,7 +456,8 @@ struct EndToEndCleanTests {
         #expect(report.freed == 139_264 && report.upTo == 0 && report.skipped == 0)
         #expect(model.cleanedGroups.map(\.freed) == [122_880, 16_384])
         #expect(model.cleanedGroups.map(\.trashed) == [0, 16_384])
-        #expect(model.freeSpaceChange == .init(before: 5_000_000_000, after: 4_999_000_000))
+        #expect(model.freeSpaceChange == .init(before: 5_000_000_000, after: 4_999_000_000, total: 10_000_000_000))
+        #expect(model.revealsDone) // the done screen animates in the first time it shows this report
         #expect(files.keys.allSatisfy { !fm.fileExists(atPath: home.appending(path: $0).path) })
         let logged = ActivityLog.freed(home: home)
         #expect(logged.deleted == 122_880 && logged.trashed == 16_384)

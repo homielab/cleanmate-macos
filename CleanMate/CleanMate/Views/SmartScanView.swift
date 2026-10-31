@@ -47,7 +47,8 @@ struct SmartScanView: View {
     }
 
     var body: some View {
-        Group {
+        // A ZStack, so the old and new screen cross-fade in place when the phase changes.
+        ZStack {
             switch model.phase {
             case .idle:
                 EmptyStateView(title: Text(module.title), systemImage: module.systemImage) {
@@ -71,6 +72,7 @@ struct SmartScanView: View {
                         }
                     }
                 }
+                .transition(.opacity)
             case .cleaning:
                 ProgressView(value: Double(model.scannedItems), total: Double(max(model.totalItems, 1))) {
                     Text("Cleaning…")
@@ -78,35 +80,11 @@ struct SmartScanView: View {
                     Text("Cleaning item \(min(model.scannedItems + 1, model.totalItems))/\(model.totalItems): \(model.cleaningItem.map { Text($0) } ?? Text(verbatim: ""))")
                 }
                 .frame(maxWidth: 360)
+                .transition(.opacity)
             case .scanning, .results:
-                results
+                results.transition(.opacity)
             case .done(let report):
-                EmptyStateView(title: Text("Freed \(report.freed, format: .fileSize)"), systemImage: "checkmark.circle") {
-                    if module == .privacy {
-                        Text("The selected traces were erased.")
-                    }
-                    let trashed = model.cleanedGroups.reduce(Int64(0)) { $0 + $1.trashed }
-                    if let result = report.undo {
-                        UndoTrashResult(result: result)
-                    } else if trashed > 0 {
-                        Text("\(trashed, format: .fileSize) of it is in the Trash: empty the Trash to free that space.")
-                    }
-                    if report.upTo > 0 {
-                        Text("\(report.upTo, format: .fileSize) of it came from caches that share files with your projects, so less space may be freed.")
-                    }
-                    if report.skipped > 0 {
-                        Text("Skipped (in use or not permitted): \(report.skipped)")
-                    }
-                    if !model.cleanedGroups.isEmpty {
-                        cleanedGroups
-                    }
-                    if let change = model.freeSpaceChange {
-                        // Reference only: other apps, Spotlight and snapshots change it too.
-                        Text("Free space: \(change.before, format: .fileSize) → \(change.after, format: .fileSize)")
-                            .font(.caption)
-                            .padding(.top, 4)
-                    }
-                } actions: {
+                DoneScreen(model: model, module: module, report: report) {
                     scanButton("Scan Again").disabled(model.undoing)
                     if model.cleanedGroups.contains(where: { $0.trashed > 0 }) { OpenTrashButton() }
                     if report.undo == nil && !report.trashed.isEmpty {
@@ -114,8 +92,10 @@ struct SmartScanView: View {
                             .help("Put the items just moved to the Trash back where they were.")
                     }
                 }
+                .transition(.opacity)
             }
         }
+        .animation(.default, value: phaseStep)
         .navigationTitle(Text(module.title))
         .trashUndo(model)
         .onAppear {
@@ -295,33 +275,6 @@ struct SmartScanView: View {
         }
     }
 
-    /// Done screen: what each group freed, and how much of it went to the Trash.
-    private var cleanedGroups: some View {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
-            ForEach(model.cleanedGroups) { group in
-                GridRow {
-                    Label { Text(group.title) } icon: { Image(systemName: group.systemImage) }
-                        .foregroundStyle(.primary) // not the description's faded grey
-                    Group {
-                        if group.trashed == 0 {
-                            Text(group.freed, format: .fileSize)
-                        } else if group.trashed == group.freed {
-                            Text("\(group.freed, format: .fileSize) moved to the Trash")
-                        } else {
-                            Text("\(group.freed, format: .fileSize) (\(group.trashed, format: .fileSize) moved to the Trash)")
-                        }
-                    }
-                    .monospacedDigit()
-                    .foregroundStyle(.primary) // same size as the title, not the description's faded grey
-                    .gridColumnAlignment(.trailing)
-                }
-                .accessibilityElement(children: .combine)
-            }
-        }
-        .fixedSize()
-        .padding(.top, 8)
-    }
-
     /// Smart Scan idle screen: free space on the home volume and what cleaning freed in the last 30 days.
     private func idleOverview(_ overview: Overview) -> some View {
         VStack(spacing: 8) {
@@ -336,6 +289,16 @@ struct SmartScanView: View {
 
     private func scanButton(_ title: LocalizedStringKey) -> some View {
         Button(title) { model.startScan() }.disabled(allGroupsOff)
+    }
+
+    /// Which screen the phase shows: a change cross-fades the screens; scanning → results stays on one.
+    private var phaseStep: Int {
+        switch model.phase {
+        case .idle: 0
+        case .scanning, .results: 1
+        case .cleaning: 2
+        case .done: 3
+        }
     }
 
     /// Smart Scan groups turned off in Settings; 0 for Privacy.
@@ -626,5 +589,114 @@ struct CleanerItemRow: View {
         } else {
             Image(systemName: groupImage).foregroundStyle(.secondary)
         }
+    }
+}
+
+/// Done screen: what was freed, per group (and how much of it went to the Trash), and the free space before → after.
+/// The first time it shows a report (`SmartScanModel.revealsDone`) the number counts up, the tick springs in, the
+/// group rows come in one after another and the bars grow, all within a second; with Reduce Motion it is shown
+/// still, only faded in with the screen.
+private struct DoneScreen<Actions: View>: View {
+    @ObservedObject var model: SmartScanModel
+    let module: Module
+    let report: CleanReport
+    let actions: Actions
+    /// Read when the screen is created; later redraws pass the cleared flag, which `@State` ignores.
+    private let animates: Bool
+    @State private var revealed: Bool
+
+    init(model: SmartScanModel, module: Module, report: CleanReport, @ViewBuilder actions: () -> Actions) {
+        self.model = model
+        self.module = module
+        self.report = report
+        self.actions = actions()
+        animates = model.revealsDone && !reducesMotion
+        _revealed = State(initialValue: !animates)
+    }
+
+    var body: some View {
+        EmptyStateView {
+            Image(systemName: "checkmark.circle")
+                .scaleEffect(revealed ? 1 : 0.6)
+                .opacity(revealed ? 1 : 0)
+                .animation(.spring(response: 0.35, dampingFraction: 0.75), value: revealed)
+        } title: {
+            CountingBytes(report.freed, countsUp: animates) { Text("Freed \($0)") }
+        } description: {
+            if module == .privacy {
+                Text("The selected traces were erased.")
+            }
+            let trashed = model.cleanedGroups.reduce(Int64(0)) { $0 + $1.trashed }
+            if let result = report.undo {
+                UndoTrashResult(result: result)
+            } else if trashed > 0 {
+                Text("\(trashed, format: .fileSize) of it is in the Trash: empty the Trash to free that space.")
+            }
+            if report.upTo > 0 {
+                Text("\(report.upTo, format: .fileSize) of it came from caches that share files with your projects, so less space may be freed.")
+            }
+            if report.skipped > 0 {
+                Text("Skipped (in use or not permitted): \(report.skipped)")
+            }
+            if !model.cleanedGroups.isEmpty {
+                cleanedGroups
+            }
+            if let change = model.freeSpaceChange {
+                freeSpace(change)
+            }
+        } actions: {
+            actions
+        }
+        .onAppear {
+            model.revealsDone = false
+            revealed = true
+        }
+    }
+
+    /// What each group freed, largest bar = the group that freed most.
+    private var cleanedGroups: some View {
+        let largest = model.cleanedGroups.map(\.freed).max() ?? 0
+        return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+            ForEach(Array(model.cleanedGroups.enumerated()), id: \.element.id) { order, group in
+                GridRow {
+                    Label { Text(group.title) } icon: { Image(systemName: group.systemImage) }
+                        .foregroundStyle(.primary) // not the description's faded grey
+                        .reveal(revealed, order: order)
+                    Group {
+                        if group.trashed == 0 {
+                            Text(group.freed, format: .fileSize)
+                        } else if group.trashed == group.freed {
+                            Text("\(group.freed, format: .fileSize) moved to the Trash")
+                        } else {
+                            Text("\(group.freed, format: .fileSize) (\(group.trashed, format: .fileSize) moved to the Trash)")
+                        }
+                    }
+                    .monospacedDigit()
+                    .foregroundStyle(.primary) // same size as the title, not the description's faded grey
+                    .gridColumnAlignment(.trailing)
+                    .reveal(revealed, order: order)
+                    SizeBar(size: revealed ? group.freed : 0, largest: largest)
+                        .reveal(revealed, order: order)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .fixedSize()
+        .padding(.top, 8)
+    }
+
+    /// The home volume's used space before → after as a bar, above the numbers. Reference only: other apps,
+    /// Spotlight and snapshots change it too.
+    private func freeSpace(_ change: SmartScanModel.FreeSpaceChange) -> some View {
+        VStack(spacing: 6) {
+            if change.total > 0 {
+                let free = revealed ? change.after : change.before
+                SizeBar(size: max(change.total - free, 0), largest: change.total, height: 8, width: 240)
+                    .animation(.easeInOut(duration: 0.6).delay(0.3), value: revealed)
+            }
+            Text("Free space: \(change.before, format: .fileSize) → \(change.after, format: .fileSize)")
+                .font(.caption)
+        }
+        .padding(.top, 4)
     }
 }
