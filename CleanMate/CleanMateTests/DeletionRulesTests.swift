@@ -117,6 +117,44 @@ final class DeletionRulesTests {
         #expect(CleanerGroup.skipsGroupCache(group, runningApps: ["com.bar.other"]))
     }
 
+    /// `<TEAMID>.<group>`: kept while an app signed by that team runs, whatever its bundle id; a running app of
+    /// another known team can't use it, so its vendor no longer keeps it; an app with no readable team still does.
+    @Test func groupCacheMatchedByRunningAppTeam() throws {
+        let team = try groupEntry("X1234567AB.weird.shared", creator: "net.other.maker")
+        #expect(CleanerGroup.skipsGroupCache(team, runningApps: ["io.zzz.app"], runningAppTeams: ["io.zzz.app": "X1234567AB"]))
+        #expect(!CleanerGroup.skipsGroupCache(team, runningApps: ["io.zzz.app"], runningAppTeams: ["io.zzz.app": "ZZZZZ99999"]))
+        #expect(!CleanerGroup.skipsGroupCache(team, runningApps: ["io.zzz.app"]))
+        let foo = try groupEntry("ABCDE12345.com.foo.shared", creator: "com.foo.app")
+        #expect(!CleanerGroup.skipsGroupCache(foo, runningApps: ["com.foo.other"], runningAppTeams: ["com.foo.other": "ZZZZZ99999"]))
+        #expect(CleanerGroup.skipsGroupCache(foo, runningApps: ["com.foo.other"])) // team unknown: by vendor, as before
+        // `group.<id>` has no team in its name: by vendor, team known or not.
+        let group = try groupEntry("group.com.foo.shared", creator: "com.foo.app")
+        #expect(CleanerGroup.skipsGroupCache(group, runningApps: ["com.foo.helper"], runningAppTeams: ["com.foo.helper": "ZZZZZ99999"]))
+    }
+
+    /// The Smart Scan item reads the running apps' teams with the running apps, and checks them for each entry.
+    @Test func groupCachesItemUsesRunningAppTeams() throws {
+        let entry = try groupEntry("X1234567AB.weird.shared", creator: "net.other.maker")
+        func item(_ teams: [String: String]) throws -> CleanerItem {
+            try #require(CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true, runningAppTeams: { teams },
+                                                runningApps: { ["io.zzz.app"] }).flatMap(\.items).first { $0.id == "group-caches" })
+        }
+        #expect(try item(["io.zzz.app": "X1234567AB"]).skipsEntry?()(entry) == true)
+        #expect(try item([:]).skipsEntry?()(entry) == false)
+    }
+
+    @Test func teamIDsAndGroupPrefixes() throws {
+        #expect(CodeSignature.teamPrefix(ofGroup: "UBF8T346G9.Office") == "UBF8T346G9")
+        #expect(CodeSignature.teamPrefix(ofGroup: "group.com.foo.x") == nil)
+        #expect(CodeSignature.teamPrefix(ofGroup: "ubf8t346g9.Office") == nil)
+        #expect(CodeSignature.teamPrefix(ofGroup: "UBF8T346G9") == nil)
+        // Apple's own apps have no team; an unsigned folder has none either.
+        #expect(CodeSignature.teamID(of: URL(filePath: "/System/Applications/Calculator.app")) == nil)
+        let unsigned = root.appending(path: "Unsigned.app")
+        try FileManager.default.createDirectory(at: unsigned, withIntermediateDirectories: true)
+        #expect(CodeSignature.teamID(of: unsigned) == nil)
+    }
+
     @Test func appleAndSharedGroupsAreKept() throws {
         #expect(CleanerGroup.skipsGroupCache(try groupEntry("group.com.apple.notes", creator: "com.apple.Notes"), runningApps: []))
         #expect(CleanerGroup.skipsGroupCache(try groupEntry("ABCDE12345.com.foo.x", creator: "com.apple.Foo"), runningApps: []))

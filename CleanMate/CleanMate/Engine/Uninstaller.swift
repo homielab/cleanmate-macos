@@ -69,12 +69,29 @@ nonisolated enum AppMatcher {
         }
         if folder == "Group Containers" {
             let parts = id.split(separator: ".", maxSplits: 1).map(String.init)
-            if parts.count == 2, parts[0].count == 10, parts[0].allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }) {
+            if parts.count == 2, CodeSignature.isTeamID(parts[0]) {
                 id = parts[1]
             }
             for prefix in ["groups.", "group."] where id.lowercased().hasPrefix(prefix) { id = String(id.dropFirst(prefix.count)) }
         }
         return id.lowercased()
+    }
+
+    /// A group container `<team>.<group>` (`id`: its `identifier`) that `kind` didn't match, for an app signed by
+    /// `appTeam`: only apps of that team can use it, so it is the app's (`.data`) — or `.suggested` when another app
+    /// may share it: another installed app of the same vendor (`UBF8T346G9.Office` is Word's, Excel's and Outlook's)
+    /// or signed by the same team (`teamShared`: one team signs `com.agilebits.*` and `com.1password.*`). nil for
+    /// another team or none, and for what `kind` leaves out on purpose: an id of the app's bundle id (another release
+    /// channel, `<id>.Beta`, or claimed by a longer installed id) or of another app's bundle id.
+    static func teamGroupKind(id: String, team: String?, appTeam: String?, bundleID: String, otherBundleIDs: Set<String>,
+                              teamShared: Bool) -> AppDataEntry.Kind? {
+        guard let team, team == appTeam else { return nil }
+        let own = bundleID.lowercased()
+        guard !belongs(id, to: own), !otherBundleIDs.contains(where: { belongs(id, to: $0) }) else { return nil }
+        let vendor = vendor(own)
+        // The app's own helpers (`<id>.helper`) don't count as another app.
+        let shared = teamShared || otherBundleIDs.contains { !belongs($0.lowercased(), to: own) && Self.vendor($0) == vendor }
+        return shared ? .suggested : .data
     }
 
     /// `id` is `bundleID` itself or `bundleID.something` (`com.foo.App.helper`), never just a shared prefix.
@@ -374,14 +391,20 @@ nonisolated enum Uninstaller {
         return !paths.allSatisfy { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path.hasPrefix(bundle) }
     }
 
-    /// The Library entries and config items one app would list, with how each belongs to it.
+    /// The Library entries and config items one app would list, with how each belongs to it. `teamID`: the app's
+    /// signing team, which also claims group containers named `<teamID>.<group>` (`AppMatcher.teamGroupKind`);
+    /// `teamShared`: another installed app is signed by that team.
     private static func classify(_ app: InstalledApp, library: [LibraryItem], config: [(name: String, inConfig: Bool, url: URL)],
                                  otherBundleIDs: Set<String>, otherAppNames: Set<String>,
-                                 tools: [String: [String]]) -> [(url: URL, kind: AppDataEntry.Kind)] {
+                                 tools: [String: [String]], teamID: String? = nil,
+                                 teamShared: Bool = false) -> [(url: URL, kind: AppDataEntry.Kind)] {
         let names = AppMatcher.Names(app)
+        let others = Set(otherBundleIDs.map { $0.lowercased() })
         let data = library.compactMap { item in
             AppMatcher.kind(id: item.id, lowerName: item.lowerName, folder: item.folder, app: names,
                             otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames).map { (url: item.url, kind: $0) }
+                ?? AppMatcher.teamGroupKind(id: item.id, team: item.team, appTeam: teamID, bundleID: app.bundleID,
+                                            otherBundleIDs: others, teamShared: teamShared).map { (url: item.url, kind: $0) }
         }
         let configs = config.compactMap { item -> (url: URL, kind: AppDataEntry.Kind)? in
             guard let matched = AppMatcher.configName(item.name, inConfigFolder: item.inConfig, app: names,
@@ -395,23 +418,36 @@ nonisolated enum Uninstaller {
     }
 
     /// A non-Apple Library entry with the per-entry work of `AppMatcher.kind` done once.
-    private struct LibraryItem { let id: String; let lowerName: String; let folder: String; let url: URL }
+    /// `team`: the `<TEAMID>` of a group container named `<TEAMID>.<group>`.
+    private struct LibraryItem { let id: String; let lowerName: String; let folder: String; let url: URL; var team: String? }
 
     private static func libraryItems(policy: SafetyPolicy, skipped: Set<String> = []) -> [LibraryItem] {
         dataFolderItems(policy: policy, skipped: skipped).filter { !SafetyPolicy.isApple($0.name) }.map {
             LibraryItem(id: AppMatcher.identifier($0.name, in: $0.folder), lowerName: $0.name.lowercased(), folder: $0.folder,
-                        url: $0.url)
+                        url: $0.url, team: $0.folder == "Group Containers" ? CodeSignature.teamPrefix(ofGroup: $0.name) : nil)
         }
     }
 
     /// The app's data in ~/Library and its config in ~, ~/.config and ~/.local/share, largest first. `otherBundleIDs`/`otherAppNames`:
     /// every other installed or running app (all names it goes by), whose data must never be picked. `tools` defaults
-    /// to `toolPaths`.
+    /// to `toolPaths`. `teamID` reads a signing team (tests pass a fake): the app's, and — only when a group container
+    /// of its team is found — the other installed apps' (`otherApps`, default `allAppURLs`; cached, about 1 s for
+    /// 120 apps the first time) to tell whether the team signs another app.
     @concurrent static func data(of app: InstalledApp, otherBundleIDs: Set<String>, otherAppNames: Set<String> = [],
-                                 tools: [String: [String]]? = nil, policy: SafetyPolicy = .current) async -> [AppDataEntry] {
-        let found = classify(app, library: libraryItems(policy: policy), config: configItems(policy: policy),
+                                 tools: [String: [String]]? = nil, policy: SafetyPolicy = .current,
+                                 teamID: @Sendable (URL) -> String? = CodeSignature.teamID,
+                                 otherApps: (() -> [URL])? = nil) async -> [AppDataEntry] {
+        let library = libraryItems(policy: policy)
+        let team = teamID(app.url)
+        var teamShared = false
+        if let team, library.contains(where: { $0.team == team }) {
+            let own = SafetyPolicy.normalize(app.url)
+            teamShared = (otherApps?() ?? allAppURLs(policy: policy))
+                .contains { SafetyPolicy.normalize($0) != own && teamID($0) == team }
+        }
+        let found = classify(app, library: library, config: configItems(policy: policy),
                              otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames,
-                             tools: tools ?? toolPaths(home: policy.homeURL))
+                             tools: tools ?? toolPaths(home: policy.homeURL), teamID: team, teamShared: teamShared)
         var entries: [AppDataEntry] = []
         for item in found { entries.append(AppDataEntry(url: item.url, size: await size(of: item.url), kind: item.kind)) }
         return entries.sorted { $0.size > $1.size }

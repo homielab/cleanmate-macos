@@ -9,7 +9,7 @@ extension CleanerGroup {
             Set(NSWorkspace.shared.runningApplications.flatMap { app in
                 [app.localizedName, app.bundleURL?.deletingPathExtension().lastPathComponent].compactMap { $0 }
             })
-        }) {
+        }, runningAppTeams: CodeSignature.runningAppTeams) {
             Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         }
     }
@@ -19,10 +19,12 @@ extension CleanerGroup {
     /// `runningApps` is read once per scan of the user, sandboxed, group cache and temp items, and again right
     /// before removing each of their entries. `runningAppNames` (display and .app file names) is read with it for
     /// user caches only: sandboxed and group caches are named by bundle/group id, never by app name.
+    /// `runningAppTeams` (bundle id → signing Team ID, `CodeSignature.runningAppTeams`) is read with it for group caches only.
     /// `screenshotFolder`: where screenshots are saved (`OldScreenshots.folder`), Desktop unless given.
     nonisolated static func smartScan(ages: CleanupAges, hasFullDiskAccess: Bool = false,
                                       screenshotFolder: String? = OldScreenshots.defaultFolder,
                                       runningAppNames: @escaping @Sendable () -> Set<String> = { [] },
+                                      runningAppTeams: @escaping @Sendable () -> [String: String] = { [:] },
                                       runningApps: @escaping @Sendable () -> Set<String> = { [] }) -> [CleanerGroup] { [
         CleanerGroup(id: "system-junk", title: "System Junk", systemImage: "internaldrive", items: [
             // A running app's cache folder (by bundle id, helpers `<id>.*` included; or by app name) is kept,
@@ -42,11 +44,13 @@ extension CleanerGroup {
                             let apps = runningApps()
                             return { skipsSandboxCache($0, runningApps: apps) }
                         }),
-            // Only `Library/Caches` of each app group container; never Apple's nor one whose vendor has an app running.
+            // Only `Library/Caches` of each app group container; never Apple's nor one a running app may use (same
+            // signing team, or same vendor when the team is unknown).
             CleanerItem(id: "group-caches", title: "App group caches", paths: ["~/Library/Group Containers/*/Library/Caches"],
                         excluded: keptCaches, showsWhenEmpty: false, skipsEntry: {
                             let apps = runningApps()
-                            return { skipsGroupCache($0, runningApps: apps) }
+                            let teams = runningAppTeams()
+                            return { skipsGroupCache($0, runningApps: apps, runningAppTeams: teams) }
                         }),
             // Deliberate exception to "never Apple's containers": only Mail's copies of opened attachments
             // (the originals stay in the messages). Moved to the Trash, unticked, old ones only, never while Mail runs.
@@ -172,10 +176,12 @@ extension CleanerGroup {
 
     /// Whether `…/Group Containers/<group>/Library/Caches/<entry>` must be kept: not such an entry, no creator in
     /// containermanagerd's metadata (cannot tell whose it is), Apple's (by id or creator, Shortcuts is `is.workflow`),
-    /// or an app of the same vendor is running. Vendor = `com.vendor` of the creator and of the group id without its
-    /// `<TEAMID>.`/`group.` prefix: a group is shared by several apps of one vendor (`UBF8T346G9.Office`, created by
-    /// Excel, is used by Word and Outlook too), so any running `com.microsoft.*` app keeps it.
-    nonisolated static func skipsGroupCache(_ url: URL, runningApps: Set<String>) -> Bool {
+    /// or a running app may use it. A `<TEAMID>.<group>` can only be used by apps signed by that team
+    /// (`UBF8T346G9.Office`, created by Excel, is used by Word and Outlook too): kept while an app of that team runs
+    /// (`runningAppTeams`: bundle id → Team ID). Running apps whose team is unknown (not in `runningAppTeams`), and
+    /// every running app for a `group.<id>` group, are matched by vendor instead: `com.vendor` of the creator and of
+    /// the group id without its `<TEAMID>.`/`group.` prefix.
+    nonisolated static func skipsGroupCache(_ url: URL, runningApps: Set<String>, runningAppTeams: [String: String] = [:]) -> Bool {
         let group = url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         guard group.deletingLastPathComponent().lastPathComponent == "Group Containers",
               let metadata = NSDictionary(contentsOf: group.appending(path: ".com.apple.containermanagerd.metadata.plist")),
@@ -184,7 +190,11 @@ extension CleanerGroup {
         let vendors = Set([creator.lowercased(), id].filter { $0.contains(".") }.map(AppMatcher.vendor))
         guard !vendors.isEmpty, !SafetyPolicy.isApple(group.lastPathComponent), !SafetyPolicy.isApple(creator),
               vendors.isDisjoint(with: AppMatcher.sharedVendors) else { return true }
-        return runningApps.contains { vendors.contains(AppMatcher.vendor($0)) }
+        let team = CodeSignature.teamPrefix(ofGroup: group.lastPathComponent)
+        if let team, runningAppTeams.values.contains(team) { return true }
+        // A known team other than the group's can't use it; an unknown one is matched by vendor.
+        let byVendor = team == nil ? runningApps : runningApps.filter { runningAppTeams[$0] == nil }
+        return byVendor.contains { vendors.contains(AppMatcher.vendor($0)) }
     }
 
     /// Containers whose `Data/Library/Caches` an app item lists, kept out of "Sandboxed app caches".

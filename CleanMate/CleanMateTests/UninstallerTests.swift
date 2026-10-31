@@ -403,6 +403,44 @@ final class UninstallerTests {
         #expect(Set(leftovers.map { $0.url.lastPathComponent }) == ["com.gone.App", "com.gone.agent.plist"])
     }
 
+    /// A group container `<TEAMID>.<group>` named after nothing of the app is its data when the app is signed by that
+    /// team (ticked); `.suggested` when another installed app of the vendor or of the team may share it; never for
+    /// another team, nor for what the id rules leave out on purpose (another release channel, an id another app claims).
+    @Test func groupContainerOfTheAppsTeamIsItsData() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for path in ["Library/Group Containers/X1234567AB.shared.stuff", "Library/Group Containers/ZZZZZ99999.other.stuff",
+                     "Library/Group Containers/X1234567AB.com.foo.Bar.beta", "Library/Group Containers/X1234567AB.com.foo.Bar.Pro",
+                     "Library/Group Containers/X1234567AB.com.foo.Other.group"] {
+            try make(path, folder: true)
+            try make(path + "/file")
+        }
+        let bar = InstalledApp(url: home.appending(path: "Applications/Barista.app"), name: "Barista", bundleID: "com.foo.Bar",
+                               version: nil, lastUsed: nil)
+        let vault = home.appending(path: "Applications/Vault.app")
+        func kinds(team: String?, others: Set<String> = [], teams: [URL: String] = [:]) async -> [String: AppDataEntry.Kind] {
+            let data = await Uninstaller.data(of: bar, otherBundleIDs: others, tools: [:], policy: policy,
+                                              teamID: { $0 == bar.url ? team : teams[$0] }, otherApps: { [bar.url, vault] })
+            return Dictionary(uniqueKeysWithValues: data.map { ($0.url.lastPathComponent, $0.kind) })
+        }
+        // `.beta` is another release channel of the app, installed or not: never ticked through the team.
+        #expect(await kinds(team: "X1234567AB")
+                == ["X1234567AB.shared.stuff": .data, "X1234567AB.com.foo.Bar.Pro": .data, "X1234567AB.com.foo.Other.group": .data])
+        // An installed com.foo.Bar.Pro claims its container; com.foo.Other (same vendor) claims its own and shares the rest.
+        #expect(await kinds(team: "X1234567AB", others: ["com.foo.Bar", "com.foo.Bar.helper", "com.foo.Bar.Pro"])
+                == ["X1234567AB.shared.stuff": .data, "X1234567AB.com.foo.Other.group": .data])
+        // Matched by bundle id (`com.foo.Bar.Pro`, not installed here) stays `.data`; only the team match is shared.
+        #expect(await kinds(team: "X1234567AB", others: ["com.foo.Other"]) == ["X1234567AB.shared.stuff": .suggested,
+                                                                                "X1234567AB.com.foo.Bar.Pro": .data])
+        // Another installed app signed by the same team under another vendor prefix (com.agilebits / com.1password).
+        #expect(await kinds(team: "X1234567AB", others: ["com.1password.vault"], teams: [vault: "X1234567AB"])
+                == ["X1234567AB.shared.stuff": .suggested, "X1234567AB.com.foo.Bar.Pro": .data,
+                    "X1234567AB.com.foo.Other.group": .suggested])
+        #expect(await kinds(team: "X1234567AB", teams: [vault: "ZZZZZ99999"])["X1234567AB.shared.stuff"] == .data)
+        // Another team or no signature: only what the bundle id matches.
+        #expect(await kinds(team: "AAAAA11111") == ["X1234567AB.com.foo.Bar.Pro": .data])
+        #expect(await kinds(team: nil) == ["X1234567AB.com.foo.Bar.Pro": .data])
+    }
+
     /// One listing for all apps gives each app exactly what its detail lists (`data(of:)`), and skipped (protected)
     /// folders are not listed.
     @Test func dataMatchesEqualEachAppsDetail() async throws {

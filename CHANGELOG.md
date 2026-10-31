@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Uninstaller**: tick several apps (or all apps listed, for example after **Not Used for a Year**) and uninstall them with one confirmation. Each goes to the Trash with the data that surely belongs to it; possibly related items and config are kept, open apps are skipped and an app that can't be moved doesn't stop the others. One Undo puts everything back.
 - **Maintenance**: **Time Machine local snapshots** lists the snapshots Time Machine keeps on this Mac, with **Delete…** for one and **Delete All…**; both ask first, because a deleted snapshot can't be brought back (backups on your Time Machine disk are not affected). No administrator password is needed, and each deletion is recorded in **Settings › Activity**. The Overview's snapshot row now has **Delete…**, which opens Maintenance.
 
+### Changed
+- **Smart Scan** and **Uninstaller**: app group containers (`<TEAMID>.<group>`) are matched by the team that signed the app instead of the vendor name. Smart Scan keeps an app group's caches while any app of that team runs, and stops keeping them just because an app of another team with a similar name runs; the Uninstaller lists such a container with the app it belongs to.
+
 ## [1.4] - 2026-10-31
 
 ### Added
