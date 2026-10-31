@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Uninstaller**: **Reset…** next to **Uninstall…** moves an app's own data (caches, preferences, Application Support, containers, saved state, logs, web data) to the Trash and keeps the app, so it starts fresh without reinstalling. The sheet lists each item with its size, all ticked; open apps can't be reset, and Undo (⌘Z) puts everything back.
 - **Maintenance**: **Reset Font Cache** (text in the wrong font or shown as boxes) and **Clear Icon Cache** (wrong or blank icons in the Dock and Finder; restarts the Dock after asking). Neither needs an administrator password.
 - **Smart Scan › Developer Junk**: **CocoaPods spec repo clones** (git copies like `~/.cocoapods/repos/master`, often 1–3 GB, unused since CocoaPods switched to its CDN; `trunk` is never listed), **Xcode documentation cache** and **Xcode device logs** (iOS, watchOS and tvOS). All unticked and deleted; skipped while `pod` or Xcode runs.
 - **Smart Scan › Apps**: **Telegram media cache** (photos, videos and files from chats, with Full Disk Access) and **Spotify stream cache**, often several GB outside the usual cache folder. Both are unticked, deleted and skipped while the app runs; Telegram's chats, keys and sign-in are never touched.

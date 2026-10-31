@@ -8,6 +8,7 @@ struct UninstallerView: View {
     @Environment(\.locale) private var locale
     @State private var confirming = false
     @State private var confirmingBatch = false
+    @State private var resetting = false
     @State private var previewURL: URL?
     @AppStorage(Preferences.uninstallerSort) private var sort = UninstallerModel.AppSort.name
     @AppStorage(Preferences.uninstallerUnused) private var unused = UninstallerModel.UnusedFilter.all
@@ -312,7 +313,7 @@ struct UninstallerView: View {
                         }
                         if model.isRunning(app) {
                             HStack {
-                                Text("The app is open. Quit it before uninstalling.").foregroundStyle(.orange)
+                                Text("The app is open. Quit it before uninstalling or resetting it.").foregroundStyle(.orange)
                                 Button("Quit App") { model.quit(app) }.buttonStyle(.link)
                             }
                             .font(.callout)
@@ -634,6 +635,17 @@ struct UninstallerView: View {
             Text("Selected: \(count + (uninstalling ? 1 : 0)) items, \(size)").monospacedDigit()
             Spacer()
             if model.working { ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…") }
+            // Unticking the app row already turns the main button into Reset.
+            if let app, model.trashApp {
+                let running = model.isRunning(app)
+                Button("Reset…") {
+                    model.prepareReset()
+                    resetting = true
+                }
+                .disabled(model.working || model.loadingEntries || running || model.resetEntries.isEmpty)
+                .help(running ? Text("Quit \(app.name) first.")
+                      : Text("Move the app’s settings, caches and saved data to the Trash and keep the app"))
+            }
             Button { confirming = true } label: { button }
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.working || model.loadingEntries
@@ -641,7 +653,10 @@ struct UninstallerView: View {
         }
         .padding()
         .background(.bar)
-        .focusedSceneValue(\.confirming, confirming)
+        .focusedSceneValue(\.confirming, confirming || resetting)
+        .sheet(isPresented: $resetting) {
+            if let app { ResetSheet(model: model, app: app) }
+        }
         .confirmationDialog(
             app.map { app in
                 uninstalling ? Text("Move \(app.name) and \(count) related items (\(size)) to the Trash?")
@@ -671,6 +686,76 @@ private extension View {
             model.toggle(urls: model.highlighted)
             return true
         }
+    }
+}
+
+/// "Reset…": the app's own data with sizes, all ticked; each can be unticked. The app itself is not listed.
+struct ResetSheet: View {
+    @ObservedObject var model: UninstallerModel
+    let app: InstalledApp
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        let entries = model.resetEntries
+        let count = entries.count { model.resetChecked.contains($0.url) }
+        let running = model.isRunning(app)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                AppIcon(url: app.url, size: 40)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Reset \(app.name)?").font(.headline)
+                    Text("Its settings, caches and saved data go to the Trash, so it starts as if newly installed. The app itself stays installed. You can put them back with Undo or from the Trash.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            List {
+                ForEach(entries) { entry in
+                    row(entry, largest: entries.lazy.map(\.size).max() ?? 0)
+                }
+            }
+            .frame(minHeight: 150, idealHeight: 240)
+            if running {
+                Text("Quit \(app.name) first.").font(.callout).foregroundStyle(.orange)
+            }
+            HStack {
+                Text("Selected: \(count) items, \(model.resetSize.formatted(.fileSize.locale(locale)))").monospacedDigit()
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button("Reset") {
+                    dismiss()
+                    Task { await model.reset() }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(count == 0 || running || model.working)
+            }
+        }
+        .padding(20)
+        .frame(width: 520)
+    }
+
+    private func row(_ entry: AppDataEntry, largest: Int64) -> some View {
+        let isOn = Binding(
+            get: { model.resetChecked.contains(entry.url) },
+            set: { if $0 { model.resetChecked.insert(entry.url) } else { model.resetChecked.remove(entry.url) } })
+        let size = entry.size.formatted(.fileSize.locale(locale))
+        return HStack {
+            Toggle(isOn: isOn) { EmptyView() }
+                .toggleStyle(SelectionCheckboxStyle())
+                .accessibilityLabel(Text(verbatim: "\(entry.url.lastPathComponent), \(size)"))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.url.lastPathComponent).lineLimit(1).truncationMode(.middle)
+                Text(verbatim: entry.location).font(.subheadline).foregroundStyle(.secondary)
+            }
+            .help(entry.url.path)
+            Spacer()
+            Text(size).sizeColumnStyle(emphasized: isOn.wrappedValue)
+            SizeBar(size: entry.size, largest: largest, tint: isOn.wrappedValue ? .accentColor : .secondary)
+        }
+        .padding(.vertical, 2)
+        .selectionRow(isOn: isOn.wrappedValue) { isOn.wrappedValue.toggle() }
     }
 }
 

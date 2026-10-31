@@ -902,6 +902,59 @@ final class UninstallerTests {
         #expect(model.apps.isEmpty && model.selection == nil)
     }
 
+    /// "Reset…" on a fake app with Caches, Preferences, Application Support and a launch agent: the sheet lists the
+    /// three data items (all ticked), never the app or its agent; only the ticked ones reach the (fake) Trash, the app
+    /// stays on disk and in the list, ⌘Z puts them back. Refused while the app is open.
+    @MainActor @Test func resetMovesTheAppsDataAndKeepsTheApp() async throws {
+        let bundle = try app("Applications/Quoxel.app", bundleID: "com.test.quoxel")
+        let cache = try make("Library/Caches/com.test.quoxel", folder: true)
+        let prefs = try make("Library/Preferences/com.test.quoxel.plist")
+        let support = try make("Library/Application Support/Quoxel", folder: true)
+        let agent = try agent("Library/LaunchAgents/com.test.quoxel.helper.plist", label: "com.test.quoxel.helper")
+        let item = InstalledApp(url: bundle, name: "Quoxel", bundleID: "com.test.quoxel", version: nil, lastUsed: nil)
+        let model = UninstallerModel(), undo = UndoManager()
+        undo.groupsByEvent = false
+        model.undoManager = undo
+        let policy = policy
+        model.apps = [item]
+        model.runningApps = []
+        model.appBundleIDs = { [] }
+        model.appData = { app, _, _ in await Uninstaller.data(of: app, otherBundleIDs: [], tools: [:], policy: policy) }
+        let moved = Moved()
+        model.trash = { app, data throws(Uninstaller.AppTrashError) in
+            try await Uninstaller.trash(app: app, data: data, policy: policy, launchctl: { _ in true },
+                                        moveToTrash: { moved.add($0); return $0 }, isRunning: { _ in false })
+        }
+        var restored: [URL] = []
+        model.restore = { items in restored += items.map(\.original); return TrashUndo.Result(restored: items.count, skipped: 0) }
+        model.selection = .app(bundle)
+        await model.loadEntries()
+        #expect(Set(model.entries.map(\.url)) == [cache, prefs, support, agent])
+        #expect(Set(model.resetEntries.map(\.url)) == [cache, prefs, support])
+        model.prepareReset()
+        #expect(model.resetChecked == [cache, prefs, support])
+        model.resetChecked.remove(support)
+        #expect(model.resetSize == model.entries.filter { [cache, prefs].contains($0.url) }.reduce(0) { $0 + $1.size })
+
+        model.appBundleIDs = { ["com.test.quoxel"] } // opened meanwhile: nothing moves
+        await model.reset()
+        #expect(moved.all.isEmpty && model.outcome == nil)
+        model.appBundleIDs = { [] }
+        model.runningApps = []
+
+        undo.beginUndoGrouping()
+        await model.reset()
+        undo.endUndoGrouping()
+        #expect(Set(moved.all) == [cache, prefs])
+        #expect(FileManager.default.fileExists(atPath: bundle.path) && model.apps.map(\.url) == [bundle])
+        #expect(model.selection == .app(bundle) && model.trashApp) // still selected, its row still ticked
+        guard case .removed(let report) = model.outcome else { Issue.record("outcome"); return }
+        #expect(Set(report.trashed.map(\.original)) == [cache, prefs] && undo.canUndo && undo.undoActionName == "Reset")
+        undo.undo()
+        for _ in 0..<5000 where restored.isEmpty { try? await Task.sleep(for: .milliseconds(2)) } // ≥ 10 s: busy machines
+        #expect(Set(restored) == [cache, prefs])
+    }
+
     /// Space on highlighted rows: any tickable one off → tick all, else untick all; locked rows untouched.
     @MainActor @Test func spaceTogglesHighlightedRows() {
         let model = UninstallerModel()

@@ -51,6 +51,7 @@ final class UninstallerModel: ObservableObject {
             highlighted = []
             entries = []
             checked = []
+            resetChecked = []
             entriesGeneration += 1
         }
     }
@@ -69,6 +70,8 @@ final class UninstallerModel: ObservableObject {
     @Published var entries: [AppDataEntry] = []
     @Published var loadingEntries = false
     @Published var checked: Set<URL> = []
+    /// Rows ticked in the Reset sheet (`resetEntries`); all of them when it opens (`prepareReset`).
+    @Published var resetChecked: Set<URL> = []
     @Published var working = false
     @Published var outcome: Outcome?
     @Published var dropRejection: DropRejection?
@@ -468,6 +471,31 @@ final class UninstallerModel: ObservableObject {
         Attention.finished()
     }
 
+    /// What Reset moves for the selected app: its own data in ~/Library (`.data`: caches, preferences, Application
+    /// Support, containers, saved state, logs, WebKit, HTTP storage), never its launch agents (they go with its login
+    /// items, which Reset leaves alone), suggestions or config, and never the app itself.
+    var resetEntries: [AppDataEntry] { selectedApp == nil ? [] : Self.resetItems(entries) }
+
+    nonisolated static func resetItems(_ entries: [AppDataEntry]) -> [AppDataEntry] {
+        entries.filter { $0.kind == .data && $0.folder != "LaunchAgents" }
+    }
+
+    /// The Reset sheet opens with every row ticked.
+    func prepareReset() { resetChecked = Set(resetEntries.map(\.url)) }
+
+    var resetSize: Int64 { resetEntries.filter { resetChecked.contains($0.url) }.reduce(0) { $0 + $1.size } }
+
+    /// "Reset…": moves the ticked `resetEntries` to the Trash and keeps the app, whatever its row in the detail says.
+    /// Refused while the app is open (it would rewrite its data while it goes). One Undo puts them back.
+    func reset() async {
+        guard let app = selectedApp else { return }
+        runningApps = appBundleIDs() // a launch may not have been notified yet
+        guard !isRunning(app), !working else { return }
+        let data = resetEntries.filter { resetChecked.contains($0.url) }
+        guard !data.isEmpty else { return }
+        await move(app: nil, data: data)
+    }
+
     /// Moves the selected app (if its row is ticked) and the ticked items to the Trash.
     /// App unticked = reset: only its data goes, the bundle stays and its data is listed again.
     func remove() async {
@@ -481,6 +509,11 @@ final class UninstallerModel: ObservableObject {
         let app = trashApp ? selected : nil
         let data = checkedEntries
         if app == nil && data.isEmpty { return }
+        await move(app: app, data: data)
+    }
+
+    /// `app` (nil: a reset, or leftovers) and `data` to the Trash, then the result alert, Undo, and the list again.
+    private func move(app: InstalledApp?, data: [AppDataEntry]) async {
         working = true
         defer { working = false }
         undoManager?.removeAllActions(withTarget: self)

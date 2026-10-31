@@ -385,6 +385,17 @@ struct UISnapshots {
             model.extensionItems = []
             return UninstallerView(model: model)
         }
+        // "Reset…" sheet: only the app's own data, all ticked but one; the app itself is not listed.
+        try await snapshot("uninstaller-reset-sheet", size: CGSize(width: 520, height: 400)) {
+            let model = UninstallerModel()
+            model.apps = apps
+            model.runningApps = []
+            model.selection = .app(apps[0].url)
+            model.entries = data
+            model.prepareReset()
+            model.resetChecked.remove(data[3].url)
+            return ResetSheet(model: model, app: apps[0])
+        }
         // Read-only list of unknown hidden config: no checkbox, no footer.
         let home = URL(fileURLWithPath: "/Users/Shared/Sample")
         let hidden = [(".mysterytool", true, true), (".config/oddsync", false, true), (".legacy-cache", false, false)].map {

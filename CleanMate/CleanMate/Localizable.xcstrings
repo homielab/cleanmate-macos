@@ -1071,6 +1071,16 @@
         }
       }
     },
+    "Its settings, caches and saved data go to the Trash, so it starts as if newly installed. The app itself stays installed. You can put them back with Undo or from the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt, bộ nhớ đệm và dữ liệu đã lưu của ứng dụng được chuyển vào Thùng rác để nó chạy lại như mới cài. Bản thân ứng dụng vẫn được giữ. Bạn có thể lấy lại bằng Hoàn tác hoặc từ Thùng rác."
+          }
+        }
+      }
+    },
     "Keeps the oldest copy of each file" : {
       "localizations" : {
         "vi" : {
@@ -1245,6 +1255,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hàng tháng"
+          }
+        }
+      }
+    },
+    "Move the app’s settings, caches and saved data to the Trash and keep the app" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển cài đặt, bộ nhớ đệm và dữ liệu đã lưu của ứng dụng vào Thùng rác, giữ lại ứng dụng"
           }
         }
       }
@@ -1579,12 +1599,32 @@
         }
       }
     },
+    "Quit %@ first." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy thoát %@ trước."
+          }
+        }
+      }
+    },
     "Read from macOS. CleanMate does not change these settings." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đọc từ macOS. CleanMate không thay đổi các cài đặt này."
+          }
+        }
+      }
+    },
+    "Reset %@?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại %@?"
           }
         }
       }
@@ -1759,6 +1799,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp tạm: %lld ngày"
+          }
+        }
+      }
+    },
+    "The app is open. Quit it before uninstalling or resetting it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng đang mở. Hãy thoát trước khi gỡ hoặc đặt lại."
           }
         }
       }
@@ -5567,16 +5617,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ứng dụng đang mở nên sẽ được bỏ qua"
-          }
-        }
-      }
-    },
-    "The app is open. Quit it before uninstalling." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ứng dụng đang mở. Hãy thoát trước khi gỡ."
           }
         }
       }
