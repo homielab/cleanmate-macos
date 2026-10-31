@@ -217,6 +217,10 @@ struct EndToEndCleanTests {
                     try (["MCMMetadataCreator": "com.example.app"] as NSDictionary).write(to: folder
                         .deletingLastPathComponent().deletingLastPathComponent().appending(path: ".com.apple.containermanagerd.metadata.plist"))
                 }
+                if item.id == "cocoapods-spec-repos" { // only a git clone of a spec repo is listed (not the CDN's `trunk`)
+                    try write(folder.appending(path: "junk-\(item.id)/.git/config"), Data(repeating: 1, count: 4096))
+                    continue
+                }
                 if item.id == VideoRenderFiles.id { // a library in each folder: only its render files go
                     try write(folder.appending(path: "junk-\(item.id).fcpbundle/Event/Render Files/r.mov"),
                               Data(repeating: 1, count: 4096))
