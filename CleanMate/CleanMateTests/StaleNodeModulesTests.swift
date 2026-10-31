@@ -184,6 +184,59 @@ struct StaleNodeModulesTests {
         #expect(count(links, "link") == 0 && links.linkedBytes == Scanner.fileSize(root.appending(path: "original")))
     }
 
+    /// The folder walk with one listing per folder gives what fts gives with a `getattrlist` per file: hard links in and
+    /// out of the folder, whole and changed clones, a clone of a file outside, symlinks, a pipe, an empty and an
+    /// unreadable folder, and a folder of 3 000 files (several listings).
+    @Test func freeableWalkMatchesFts() async throws {
+        let tree = root.appending(path: "tree"), outside = root.appending(path: "outside")
+        defer {
+            chmod(tree.appending(path: "locked").path, 0o755)
+            try? fm.removeItem(at: root)
+        }
+        try write(outside.appending(path: "store-file"), bytes: 200_000)
+        try write(outside.appending(path: "store-clone"), bytes: 300_000)
+        try write(tree.appending(path: "a/own.js"), bytes: 50_000)
+        try write(tree.appending(path: "a/b/c/deep.js"), bytes: 9_000)
+        try fm.linkItem(at: tree.appending(path: "a/own.js"), to: tree.appending(path: "a/b/own-link.js"))
+        try fm.linkItem(at: outside.appending(path: "store-file"), to: tree.appending(path: "a/store-link.js"))
+        try #require(clonefile(outside.appending(path: "store-clone").path, tree.appending(path: "a/clone.js").path, 0) == 0)
+        try #require(clonefile(outside.appending(path: "store-clone").path, tree.appending(path: "a/changed.js").path, 0) == 0)
+        let handle = try FileHandle(forWritingTo: tree.appending(path: "a/changed.js"))
+        try handle.write(contentsOf: Data(repeating: 3, count: 100_000))
+        try handle.close()
+        try write(tree.appending(path: "a/twin.js"), bytes: 80_000)
+        try #require(clonefile(tree.appending(path: "a/twin.js").path, tree.appending(path: "a/twin-clone.js").path, 0) == 0)
+        try fm.createSymbolicLink(atPath: tree.appending(path: "a/link").path, withDestinationPath: outside.path)
+        try fm.createSymbolicLink(atPath: tree.appending(path: "a/dangling").path, withDestinationPath: "/nonexistent")
+        try #require(mkfifo(tree.appending(path: "a/pipe").path, 0o600) == 0)
+        try fm.createDirectory(at: tree.appending(path: "empty"), withIntermediateDirectories: true)
+        try write(tree.appending(path: "locked/secret"), bytes: 4096)
+        let many = tree.appending(path: "many")
+        try fm.createDirectory(at: many, withIntermediateDirectories: true)
+        for index in 0..<3_000 {
+            try Data(repeating: 1, count: index % 7 * 1_000).write(to: many.appending(path: "file-with-a-long-name-\(index).js"))
+        }
+        #expect(chmod(tree.appending(path: "locked").path, 0) == 0)
+        let device = try #require(SafetyPolicy.deviceID(tree.path))
+        for clones in [true, false] {
+            let fts = FreeableBytes(clones: clones), bulk = FreeableBytes(clones: clones)
+            let expected = try #require(Scanner.tree(tree, dates: true, device: device, freeable: fts))
+            let walked = try #require(bulk.walk(tree.path, device: device))
+            #expect(walked.0 + bulk.linkedBytes == expected.0 + fts.linkedBytes, "clones: \(clones)")
+            #expect(walked.2 && expected.2, "unreadable folder flagged")
+            #expect(bulk.linkedBytes == fts.linkedBytes && bulk.linkedBytes > 0)
+            // Through `Scanner.tree` the walk is used whenever dates are not needed; split, it gives the same.
+            let viaTree = FreeableBytes(clones: clones)
+            #expect(Scanner.tree(tree, dates: false, device: device, freeable: viaTree)?.0 == walked.0)
+            for depth in [1, 3] {
+                let split = FreeableBytes(clones: clones)
+                let parallel = try #require(await Scanner.undatedTree(tree.path, device: device, links: .init(),
+                                                                      freeable: split, depth: depth))
+                #expect(parallel.0 + split.linkedBytes == walked.0 + bulk.linkedBytes && parallel.2, "depth \(depth)")
+            }
+        }
+    }
+
     /// A project something works on is kept: node or a package manager running in it, an exclusion, a file opened or
     /// a lockfile written after the scan.
     @Test func projectsInUseAreKept() async throws {

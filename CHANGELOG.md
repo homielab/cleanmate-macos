@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Maintenance**: **Time Machine local snapshots** lists the snapshots Time Machine keeps on this Mac, with **Delete…** for one and **Delete All…**; both ask first, because a deleted snapshot can't be brought back (backups on your Time Machine disk are not affected). No administrator password is needed, and each deletion is recorded in **Settings › Activity**. The Overview's snapshot row now has **Delete…**, which opens Maintenance.
 
 ### Changed
+- **Smart Scan**: the first scan on a Mac with many JavaScript projects is about twice as fast: measuring what stale `node_modules` and build folders really free now reads each folder in one go (35 projects, 21 GB: 13 s → 6 s). Sizes are unchanged.
 - **Smart Scan** and **Uninstaller**: app group containers (`<TEAMID>.<group>`) are matched by the team that signed the app instead of the vendor name. Smart Scan keeps an app group's caches while any app of that team runs, and stops keeping them just because an app of another team with a similar name runs; the Uninstaller lists such a container with the app it belongs to.
 
 ## [1.4] - 2026-10-31

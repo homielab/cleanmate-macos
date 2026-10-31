@@ -143,6 +143,21 @@ struct ScanBenchmark {
     /// machine full of old projects. Only scans, like the rest of this suite.
     @Test func staleNodeModulesWorstCase() async {
         let later: @Sendable () -> Date = { .now.addingTimeInterval(3650 * 86_400) }
+        // A whole Smart Scan in parallel with these items, the first time (nothing measured yet) and the next.
+        let fresh = [StaleNodeModules.item(running: { [] }, now: later, sizes: FolderSizeCache(file: nil)),
+                     StaleBuildFolders.item(running: { [] }, now: later, sizes: FolderSizeCache(file: nil))]
+        let smart = CleanerGroup.smartScan.flatMap(\.items).map { item in fresh.first { $0.id == item.id } ?? item }
+        for run in ["first", "next"] {
+            let (_, seconds) = await timed {
+                await withTaskGroup(of: Void.self) { group in
+                    let openFiles = OpenFiles()
+                    for item in smart {
+                        group.addTask { _ = await Scanner.scan(item, policy: policy, openPaths: { await openFiles.paths(under: $0) }) }
+                    }
+                }
+            }
+            report("smart scan with stale items, \(run) (parallel)", seconds, 0)
+        }
         let all = [StaleNodeModules.item(running: { [] }, now: later, sizes: FolderSizeCache(file: nil)),
                    StaleBuildFolders.item(running: { [] }, now: later, sizes: FolderSizeCache(file: nil))]
         for item in all {
@@ -150,6 +165,12 @@ struct ScanBenchmark {
                 let (scan, seconds) = await timed { await Scanner.scan(item, policy: policy) }
                 report("\(item.id) all \(run) (\(scan.entries.count))", seconds, scan.size)
             }
+            // The same folders measured like any other cache (every byte, no hard link or clone rule), no sizes kept:
+            // what the first measure costs on top of a plain walk.
+            var plain = item
+            (plain.freeableSize, plain.entrySizes) = (nil, nil)
+            let (scan, seconds) = await timed { await Scanner.scan(plain, policy: policy) }
+            report("\(item.id) plain (\(scan.entries.count))", seconds, scan.size)
         }
         await scanItems("smart-all-stale", CleanerGroup.smartScan.map { group in
             CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage,

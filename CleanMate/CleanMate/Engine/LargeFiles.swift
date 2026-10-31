@@ -404,10 +404,12 @@ nonisolated enum DuplicateFinder {
         url.path.withCString { privateSize(path: $0) }
     }
 
-    /// `privateSize(of:)` for a path already in C form (`Scanner.tree`'s fts walk).
-    static func privateSize(path: UnsafePointer<CChar>) -> Int64? {
+    /// `privateSize(of:)` for a path already in C form (`Scanner.tree`'s fts walk), or a name inside the open folder
+    /// `directory` (`FreeableBytes.walk`).
+    static func privateSize(path: UnsafePointer<CChar>, in directory: Int32 = AT_FDCWD) -> Int64? {
         let sharing = UInt64(EF_MAY_SHARE_BLOCKS | EF_SHARES_ALL_BLOCKS)
-        guard let attrs = cloneAttributes(path: path, privateSize: true), attrs.flags & sharing != 0 else { return nil }
+        guard let attrs = cloneAttributes(path: path, in: directory, privateSize: true), attrs.flags & sharing != 0
+        else { return nil }
         return attrs.privateSize
     }
 
@@ -417,7 +419,8 @@ nonisolated enum DuplicateFinder {
         url.path.withCString { cloneAttributes(path: $0) }
     }
 
-    private static func cloneAttributes(path: UnsafePointer<CChar>, privateSize: Bool = false) -> (id: UInt64, flags: UInt64, privateSize: Int64?)? {
+    private static func cloneAttributes(path: UnsafePointer<CChar>, in directory: Int32 = AT_FDCWD,
+                                        privateSize: Bool = false) -> (id: UInt64, flags: UInt64, privateSize: Int64?)? {
         var attrs = attrlist()
         attrs.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
         attrs.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS)
@@ -426,7 +429,7 @@ nonisolated enum DuplicateFinder {
         // u_int32 length, attribute_set_t returned, then in bit order: off_t private size (if asked),
         // u_int64 clone ID, u_int64 extended flags
         var buffer = [UInt8](repeating: 0, count: 64)
-        guard getattrlist(path, &attrs, &buffer, buffer.count, UInt32(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW)) == 0
+        guard getattrlistat(directory, path, &attrs, &buffer, buffer.count, UInt(FSOPT_ATTR_CMN_EXTENDED | FSOPT_NOFOLLOW)) == 0
         else { return nil }
         return buffer.withUnsafeBytes { raw in
             let returned = raw.loadUnaligned(fromByteOffset: 4, as: attribute_set_t.self)

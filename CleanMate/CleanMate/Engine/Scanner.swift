@@ -388,6 +388,12 @@ nonisolated enum Scanner {
     /// partial size with `.distantFuture`: the entry is kept anyway.
     static func tree(_ url: URL, dates: Bool, device: dev_t, links: SpaceLens.HardLinks = .init(),
                      freeable: FreeableBytes? = nil, stopAt: Date? = nil) -> (Int64, Date, Bool)? {
+        // A folder measured for what removing it frees: one listing per folder with the clone flags (`FreeableBytes.walk`).
+        var info = stat()
+        if let freeable, !dates, stopAt == nil, lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+           info.st_dev == device {
+            return freeable.walk(url.path, device: device)
+        }
         guard let stream = url.path.withCString({ path -> UnsafeMutablePointer<FTS>? in
             var paths: [UnsafeMutablePointer<CChar>?] = [UnsafeMutablePointer(mutating: path), nil]
             return fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nil)
@@ -436,6 +442,10 @@ nonisolated enum Scanner {
     static func undatedTree(_ path: String, device: dev_t, links: SpaceLens.HardLinks, freeable: FreeableBytes? = nil,
                             depth: Int, root: Bool = true) async -> (Int64, Date, Bool)? {
         var info = stat()
+        // Measured for what removing it frees: one listing per folder, split the same way (`FreeableBytes.walk`).
+        if let freeable, lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_dev == device {
+            return await freeable.walk(path, device: device, depth: depth)
+        }
         guard depth > 0, lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_dev == device,
               let names = try? FileManager.default.contentsOfDirectory(atPath: path) else {
             // Below the root, `tree` (FTS_XDEV) neither counts nor enters a folder on another volume.
