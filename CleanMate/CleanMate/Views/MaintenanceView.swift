@@ -25,13 +25,17 @@ struct MaintenanceView: View {
         .task { await model.loadSnapshots() }
         .focusedSceneValue(\.confirming, confirming != nil || model.pendingDeletion != nil)
         .confirmationDialog(
-            Text("Restart Finder and Dock?"),
+            Text(confirming == .iconCache ? LocalizedStringKey("Clear the icon cache and restart the Dock?") : "Restart Finder and Dock?"),
             isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
             presenting: confirming
         ) { task in
             Button("Restart") { Task { await model.run(task) } }
-        } message: { _ in
-            Text("Finder windows close and open again, and the Dock disappears for a moment. A copy in progress in Finder stops.")
+        } message: { task in
+            if task == .iconCache {
+                Text("The Dock disappears for a moment. Icons may look blank briefly while macOS draws them again.")
+            } else {
+                Text("Finder windows close and open again, and the Dock disappears for a moment. A copy in progress in Finder stops.")
+            }
         }
     }
 }

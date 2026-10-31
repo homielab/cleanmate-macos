@@ -59,6 +59,23 @@ struct MaintenanceModelTests {
         #expect(model.running == nil)
     }
 
+    /// Font cache: the user's registry only, then the font server; icon cache: only the user's caches, then the Dock.
+    @Test func fontAndIconCacheTasks() async {
+        let fake = Fake()
+        let model = fake.model()
+        await model.run(.fontCache)
+        await model.run(.iconCache)
+        let dir = MaintenanceTask.userCacheDir
+        #expect(dir.hasPrefix("/") && dir.hasSuffix("/C/"))
+        #expect(fake.calls == [
+            "atsutil databases -removeUser", "atsutil server -shutdown", "atsutil server -ping",
+            "rm -rf \(dir)com.apple.dock.iconcache \(dir)com.apple.iconservices \(dir)com.apple.iconservices.store",
+            "killall Dock",
+        ])
+        #expect(fake.recorded.map(\.0) == [.fontCache, .iconCache] && fake.recorded.allSatisfy(\.1))
+        #expect(MaintenanceTask.iconCachePaths(in: "/var/folders/x/C").allSatisfy { $0.hasPrefix("/var/folders/x/C/com.apple.") })
+    }
+
     @Test func outputOfEveryStepIsKept() async {
         let fake = Fake()
         fake.outcomes["qlmanage -r"] = .init(succeeded: true, output: "qlmanage: resetting quicklookd\n")
@@ -130,9 +147,9 @@ struct MaintenanceModelTests {
         #expect(await ShellCommand(executable: "/no/such/tool").outcome() == nil)
     }
 
-    /// Only Restart Finder and Dock asks first; no task needs root (no sudo, no osascript with administrator privileges).
+    /// Only the tasks restarting the Dock ask first; no task needs root (no sudo, no osascript with administrator privileges).
     @Test func tasksAreSafeToRun() {
-        #expect(MaintenanceTask.allCases.filter(\.asksFirst) == [.finderAndDock])
+        #expect(MaintenanceTask.allCases.filter(\.asksFirst) == [.finderAndDock, .iconCache])
         for task in MaintenanceTask.allCases {
             for command in task.commands {
                 #expect(command.executable.hasPrefix("/"), "\(task) runs \(command.executable) from PATH")

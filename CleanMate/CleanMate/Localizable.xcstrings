@@ -2991,6 +2991,66 @@
         }
       }
     },
+    "Reset Font Cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại bộ nhớ đệm phông chữ"
+          }
+        }
+      }
+    },
+    "Clear Icon Cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá bộ nhớ đệm biểu tượng"
+          }
+        }
+      }
+    },
+    "Fixes text drawn in the wrong font or as boxes by clearing your font cache. Open apps may need a restart." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa chữ hiện sai phông hoặc thành ô vuông bằng cách xoá bộ nhớ đệm phông chữ của bạn. Ứng dụng đang mở có thể cần mở lại."
+          }
+        }
+      }
+    },
+    "Fixes wrong or blank app icons in the Dock and Finder by clearing your icon cache, then restarts the Dock." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa biểu tượng ứng dụng sai hoặc trống trong Dock và Finder bằng cách xoá bộ nhớ đệm biểu tượng của bạn, rồi khởi động lại Dock."
+          }
+        }
+      }
+    },
+    "Clear the icon cache and restart the Dock?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá bộ nhớ đệm biểu tượng và khởi động lại Dock?"
+          }
+        }
+      }
+    },
+    "The Dock disappears for a moment. Icons may look blank briefly while macOS draws them again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dock biến mất trong giây lát. Biểu tượng có thể trống một lúc trong khi macOS vẽ lại."
+          }
+        }
+      }
+    },
     "Collapse %@" : {
       "localizations" : {
         "vi" : {
