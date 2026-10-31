@@ -114,6 +114,8 @@ release notes come from the version's section in [CHANGELOG.md](CHANGELOG.md).
 - `CleanMate/CleanMateTests/` — unit and end-to-end tests.
 - `scripts/` — smoke test, warning check, snapshot diff and release script.
 - `docs/` — detailed features and the README screenshots.
+- `docs/site/` — the project website (plain HTML and CSS, English in `index.html`, Vietnamese in `vi/index.html`;
+  no scripts, nothing loaded from other sites). Served by GitHub Pages from `/docs`, so it lives under `/site/`.
 
 ## Contributing
 

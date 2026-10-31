@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CleanMate — free, open-source Mac cleaner for developers</title>
+  <meta name="description" content="CleanMate is a free, open-source Mac cleaner. Clear system junk, Xcode and developer caches, AI tool data and privacy traces, uninstall apps completely and find large files. Everything is previewed first; no account, no tracking.">
+  <link rel="canonical" href="https://homielab.github.io/cleanmate/site/">
+  <link rel="alternate" hreflang="en" href="https://homielab.github.io/cleanmate/site/">
+  <link rel="alternate" hreflang="vi" href="https://homielab.github.io/cleanmate/site/vi/">
+  <link rel="alternate" hreflang="x-default" href="https://homielab.github.io/cleanmate/site/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CleanMate">
+  <meta property="og:title" content="CleanMate — free, open-source Mac cleaner for developers">
+  <meta property="og:description" content="CleanMate is a free, open-source Mac cleaner. Clear system junk, Xcode and developer caches, AI tool data and privacy traces, uninstall apps completely and find large files. Everything is previewed first; no account, no tracking.">
+  <meta property="og:url" content="https://homielab.github.io/cleanmate/site/">
+  <meta property="og:image" content="https://homielab.github.io/cleanmate/site/images/1-smart-scan-light.png">
+  <meta property="og:image:width" content="1171">
+  <meta property="og:image:height" content="772">
+  <meta property="og:image:alt" content="CleanMate Smart Scan results on a Mac">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="./"><img src="favicon.svg" width="28" height="28" alt="">CleanMate</a>
+      <nav class="lang" aria-label="Language">
+        <a href="./" hreflang="en" lang="en" aria-current="page">English</a>
+        <a href="vi/" hreflang="vi" lang="vi">Tiếng Việt</a>
+      </nav>
+    </header>
+    <main>
+      <div class="hero">
+        <h1>CleanMate</h1>
+        <p class="lead">A free, open-source Mac cleaner that frees disk space and clears privacy traces — built for developers, careful with your files.</p>
+        <div class="actions">
+          <a class="button" href="https://github.com/homielab/cleanmate/releases/latest">Download for macOS</a>
+          <a class="button secondary" href="https://github.com/homielab/cleanmate">View on GitHub</a>
+        </div>
+        <p class="small">Free and open source (MIT). Requires macOS 13 Ventura or later, Apple silicon or Intel.</p>
+        <div class="brew"><span class="small">Or with Homebrew, once its tap is published:</span><br><pre><code>brew install --cask homielab/tap/cleanmate</code></pre></div>
+        <div class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="images/1-smart-scan-dark.png"><img src="images/1-smart-scan-light.png" width="1171" height="772" alt="CleanMate Smart Scan results with system junk, developer junk and AI tool data"></picture></div>
+      </div>
+      <section id="features">
+        <h2>What CleanMate does</h2>
+      <div class="feature">
+        <div class="text"><h3>Smart Scan</h3><p>System junk, developer junk and app caches in one scan: Xcode DerivedData and simulators, npm, Yarn, pnpm, Cargo, Gradle, Docker, Homebrew and dozens more. When a tool has its own cleanup command, CleanMate uses it.</p></div>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="images/1-smart-scan-dark.png"><img src="images/1-smart-scan-light.png" width="1171" height="772" alt="Smart Scan results grouped into system junk, developer junk and AI tools" loading="lazy"></picture>
+      </div>
+      <div class="feature">
+        <div class="text"><h3>AI tool data</h3><p>Old sessions and caches of Claude Code, Codex, Gemini CLI, Copilot CLI, Ollama and LM Studio models — often several gigabytes — listed one by one so you choose what goes.</p></div>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="images/7-freed-dark.png"><img src="images/7-freed-light.png" width="1171" height="772" alt="CleanMate after a cleanup showing the space freed" loading="lazy"></picture>
+      </div>
+      <div class="feature">
+        <div class="text"><h3>Privacy</h3><p>Browsing history, download history, cookies and autofill for Safari, Chrome, Edge, Brave, Arc, Firefox and more, plus recent items and shell history. Nothing is ticked until you choose it.</p></div>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="images/2-privacy-dark.png"><img src="images/2-privacy-light.png" width="1171" height="772" alt="Privacy module listing browser data per browser" loading="lazy"></picture>
+      </div>
+      <div class="feature">
+        <div class="text"><h3>Large &amp; Old Files</h3><p>Find big or unused files in your home folder, a folder you pick or an external drive, filter by size, age and kind, and spot exact duplicates.</p></div>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="images/3-large-and-old-files-dark.png"><img src="images/3-large-and-old-files-light.png" width="1171" height="772" alt="Large and old files sorted by size with filters" loading="lazy"></picture>
+      </div>
+      <div class="feature">
+        <div class="text"><h3>Uninstaller</h3><p>Remove apps together with their data, reset a misbehaving app, find leftovers of apps already deleted, and clean up Homebrew casks properly.</p></div>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="images/4-uninstaller-dark.png"><img src="images/4-uninstaller-light.png" width="1171" height="772" alt="Uninstaller showing an app and the data that belongs to it" loading="lazy"></picture>
+      </div>
+      <div class="feature">
+        <div class="text"><h3>Space Lens</h3><p>Browse any folder sorted by size with a chart of what fills it, drill down, preview with Quick Look and move what you don&#x27;t need to the Trash.</p></div>
+        <picture><source media="(prefers-color-scheme: dark)" srcset="images/5-space-lens-dark.png"><img src="images/5-space-lens-light.png" width="1171" height="772" alt="Space Lens chart of a home folder by size" loading="lazy"></picture>
+      </div>
+        <h2>And more</h2>
+        <div class="grid">
+        <div class="card"><h3>Overview</h3><p>Free space on each drive, a 30-day trend, and what CleanMate freed.</p></div>
+        <div class="card"><h3>Login Items</h3><p>Disable, enable or remove the launch agents that start with your Mac.</p></div>
+        <div class="card"><h3>Maintenance</h3><p>Rebuild Launch Services, reset Quick Look, restart Finder and Dock, delete Time Machine local snapshots — no administrator password.</p></div>
+        </div>
+      </section>
+      <section id="safety">
+        <h2>Careful by design</h2>
+        <div class="grid">
+        <div class="card"><h3>Preview first</h3><p>Every module shows what it found and its size. Nothing is removed until you confirm.</p></div>
+        <div class="card"><h3>Trash for your files</h3><p>Caches and logs that apps rebuild are deleted. Your files, apps and app data go to the Trash, so you can put them back.</p></div>
+        <div class="card"><h3>Undo</h3><p>⌘Z puts back what a module just moved to the Trash, and an activity log records every removal.</p></div>
+        <div class="card"><h3>No data collected</h3><p>No account, no analytics, no telemetry. The only network connection is the update check, which you can turn off.</p></div>
+        <div class="card"><h3>Only your account</h3><p>No administrator rights, no privileged helper, no system files. Passwords, keys, documents and photos are never touched.</p></div>
+        <div class="card"><h3>Running apps are skipped</h3><p>Apps that are open, and files a running process still uses, are left alone.</p></div>
+        </div>
+      </section>
+      <section id="faq">
+        <h2>Questions</h2>
+      <details><summary>Does CleanMate need Full Disk Access?</summary><p>No, it is optional. With it, CleanMate can also read the Trash, Safari data and some app containers. CleanMate asks once at first launch, and you can grant it later in System Settings › Privacy &amp; Security › Full Disk Access.</p></details>
+      <details><summary>Is it really free?</summary><p>Yes. CleanMate is open source under the MIT license: no subscription, no ads, no paid tier. The source code is on GitHub, and you are welcome to read it, build it yourself or contribute.</p></details>
+      <details><summary>Is there a version for Linux or Windows?</summary><p>This app is for macOS only. A separate CleanMate for Ubuntu is being developed with the same safety rules; there is no Windows version.</p></details>
+      <details><summary>Is CleanMate related to CleanMyMac?</summary><p>No. CleanMate is an independent open-source project, not affiliated with MacPaw or CleanMyMac.</p></details>
+      </section>
+    </main>
+    <footer>
+      <a href="https://github.com/homielab/cleanmate">Source code</a>
+      <a href="https://github.com/homielab/cleanmate/releases">Releases</a>
+      <a href="https://github.com/homielab/cleanmate/blob/main/docs/FEATURES.md">All features</a>
+      <a href="https://github.com/homielab/cleanmate/blob/main/LICENSE">MIT license</a>
+      <p>© HomieLab. CleanMate is not affiliated with MacPaw or CleanMyMac.</p>
+    </footer>
+  </div>
+</body>
+</html>
