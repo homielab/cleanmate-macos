@@ -5,9 +5,9 @@ import Combine
 final class UninstallerModel: ObservableObject {
     /// `hiddenConfig` is read-only: `remove()` ignores it. `extensions` items are never ticked for the user.
     enum Selection: Hashable { case app(URL), leftovers, hiddenConfig, extensions }
-    enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), restored(TrashUndo.Result), batch(BatchResult) }
+    enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), appBrewBusy(InstalledApp), restored(TrashUndo.Result), batch(BatchResult) }
     /// Why an app ticked for a batch uninstall stayed.
-    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed }
+    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed, brewBusy }
     /// Several ticked apps uninstalled at once: what went to the Trash, and the apps left with their reason.
     struct BatchResult {
         var report = CleanReport()
@@ -104,8 +104,9 @@ final class UninstallerModel: ObservableObject {
     /// "Undo"; tests pass their own so the real Trash is never touched.
     var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Uninstaller") }
     /// Injected by tests so nothing real goes to the Trash. Arguments: the app (if any), the ticked data.
-    var trash: (URL?, [AppDataEntry]) async throws(Uninstaller.AppTrashError) -> CleanReport = {
-        try await Uninstaller.trash(app: $0, data: $1)
+    /// The app's Homebrew cask is read from Caskroom again right before it goes.
+    var trash: (URL?, [AppDataEntry]) async throws(Uninstaller.AppTrashError) -> CleanReport = { app, data throws(Uninstaller.AppTrashError) in
+        try await Uninstaller.trash(app: app, data: data, cask: app.flatMap { HomebrewCasks.cask(for: $0) })
     }
 
     /// Injected by tests (a fake home instead of the real one).
@@ -450,6 +451,7 @@ final class UninstallerModel: ObservableObject {
                 case .locked: .locked
                 case .cancelled: .cancelled
                 case .notTrashed: .notTrashed
+                case .brewBusy: .brewBusy
                 }
                 result.skipped.append((app, reason))
             }
@@ -490,6 +492,7 @@ final class UninstallerModel: ObservableObject {
                 case .cancelled: outcome = .appTrashCancelled(app)
                 case .locked: outcome = .appLocked(app)
                 case .notTrashed: outcome = .appNotTrashed(app)
+                case .brewBusy: outcome = .appBrewBusy(app)
                 }
             }
             Attention.finished()

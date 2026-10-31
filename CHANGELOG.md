@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Uninstaller**: tick several apps (or all apps listed, for example after **Not Used for a Year**) and uninstall them with one confirmation. Each goes to the Trash with the data that surely belongs to it; possibly related items and config are kept, open apps are skipped and an app that can't be moved doesn't stop the others. One Undo puts everything back.
+- **Uninstaller**: apps installed with `brew install --cask` show **Homebrew cask (<token>)**. Uninstalling one still moves the app to the Trash, then runs `brew uninstall --cask <token>` so Homebrew forgets it and `brew upgrade` doesn't install it again (never `--zap`: the app's data is handled as usual). If brew fails or isn't there, the app stays in the Trash and the result says which command to run in Terminal; while a `brew` command runs, cask apps are left in place.
 - **Maintenance**: **Time Machine local snapshots** lists the snapshots Time Machine keeps on this Mac, with **Delete…** for one and **Delete All…**; both ask first, because a deleted snapshot can't be brought back (backups on your Time Machine disk are not affected). No administrator password is needed, and each deletion is recorded in **Settings › Activity**. The Overview's snapshot row now has **Delete…**, which opens Maintenance.
 
 ### Changed

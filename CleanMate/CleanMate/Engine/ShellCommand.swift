@@ -11,6 +11,8 @@ nonisolated struct ShellCommand: Sendable {
     /// false: `output()` also returns what a tool printed before exiting with a non-zero code (`spctl --status`
     /// exits 1 when assessments are disabled). Missing, killed or timed-out tools still give nil.
     var requiresSuccess = true
+    /// Variables set for the tool on top of the app's own environment (`HOMEBREW_NO_AUTO_UPDATE`).
+    var environment: [String: String] = [:]
 
     static let searchPaths = [
         "/opt/homebrew/bin", "/usr/local/bin", "~/.docker/bin", "~/.local/bin", "~/.cargo/bin", "~/.bun/bin",
@@ -57,7 +59,7 @@ nonisolated struct ShellCommand: Sendable {
     /// Wait status and captured output ("" without `capture`); nil when missing, timed out or cancelled.
     private func execute(capture: Bool, includeErrors: Bool = false) async -> (status: Int32, output: String)? {
         guard let path = resolvedPath, let leading = leadingArguments() else { return nil }
-        var environment = ProcessInfo.processInfo.environment
+        var environment = ProcessInfo.processInfo.environment.merging(self.environment) { $1 }
         // Script tools (`#!/usr/bin/env node`, brew) need their siblings on PATH.
         environment["PATH"] = ([(path as NSString).deletingLastPathComponent] + Self.searchPaths
             + [environment["PATH"] ?? ""]).joined(separator: ":")

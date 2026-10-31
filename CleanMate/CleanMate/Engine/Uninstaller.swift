@@ -16,6 +16,8 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     /// `CFBundleName` and `CFBundleExecutable`: folders are often named after these (`Code` for Visual Studio Code).
     var bundleName: String? = nil
     var executableName: String? = nil
+    /// The Homebrew cask that installed the app (`brew install --cask`), read from Caskroom.
+    var cask: HomebrewCask? = nil
 
     var id: URL { url }
     /// Every name the app goes by, for `otherAppNames` of the other apps.
@@ -259,6 +261,7 @@ nonisolated enum Uninstaller {
     /// Apps that may be uninstalled (`SafetyPolicy.allowsApp`), sorted by name.
     @concurrent static func installedApps(policy: SafetyPolicy = .current) async -> [InstalledApp] {
         var apps: [InstalledApp] = []
+        let casks = HomebrewCasks.installed()
         for folder in policy.applicationFolders {
             for url in appURLs(in: folder) where policy.allowsApp(url) {
                 guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { continue }
@@ -271,7 +274,8 @@ nonisolated enum Uninstaller {
                     url: url, name: name, bundleID: id,
                     version: info?["CFBundleShortVersionString"] as? String,
                     lastUsed: used.date, lastUsedIsEstimate: used.isEstimate,
-                    bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String))
+                    bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String,
+                    cask: HomebrewCasks.cask(for: url, in: casks)))
             }
         }
         return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -587,8 +591,9 @@ nonisolated enum Uninstaller {
     }
 
     /// Why `trash` left everything in place: the app couldn't go to the Trash, the user cancelled the password prompt,
-    /// or the app is locked in Finder (`Scanner.isLocked`; `recycle` refuses it too).
-    enum AppTrashError: Error, Equatable { case notTrashed, cancelled, locked }
+    /// the app is locked in Finder (`Scanner.isLocked`; `recycle` refuses it too), or it is a Homebrew cask while a
+    /// `brew` command runs (it may be installing or upgrading that very cask).
+    enum AppTrashError: Error, Equatable { case notTrashed, cancelled, locked, brewBusy }
 
     /// `NSWorkspace.recycle`: like Finder, asks for an admin password when the app is owned by root or the App Store
     ///. Returns where the app now is inside the Trash; throws `CocoaError.userCancelled` if the prompt is cancelled.
@@ -609,16 +614,24 @@ nonisolated enum Uninstaller {
     /// If `FileManager.trashItem` is refused for lack of permission (owned by root or another user, App Store), the
     /// app goes through `recycle` instead. If the app still isn't trashed, nothing else is touched and it throws.
     /// Launch agents among the data are booted out first, so they don't keep running a removed program until logout.
-    /// `moveToTrash` (app and data) and `recycle` are injectable so tests never touch a real app or the real Trash.
-    @concurrent static func trash(app: URL?, data: [AppDataEntry], policy: SafetyPolicy = .current,
+    /// An app installed by Homebrew (`cask`) is refused while `brew` runs; once it is in the Trash,
+    /// `brew uninstall --cask <token>` (`uninstallCask`) clears Homebrew's record (it finds the app gone and only drops
+    /// the record). If that fails the app stays in the Trash and the token goes to `CleanReport.casksLeft`.
+    /// `moveToTrash` (app and data), `recycle` and `uninstallCask` are injectable so tests never touch a real app, the real
+    /// Trash or brew.
+    @concurrent static func trash(app: URL?, data: [AppDataEntry], policy: SafetyPolicy = .current, cask: HomebrewCask? = nil,
                                   launchctl: LaunchAgents.Runner = LaunchAgents.launchctlRunner,
                                   moveToTrash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash,
                                   recycle: @Sendable (URL) async throws -> URL? = recycle,
-                                  isRunning: @Sendable (URL) -> Bool = isRunning) async throws(AppTrashError) -> CleanReport {
+                                  isRunning: @Sendable (URL) -> Bool = isRunning,
+                                  brewRunning: @Sendable () -> Bool = HomebrewCasks.isBrewRunning,
+                                  uninstallCask: @Sendable (HomebrewCask) async -> Bool = HomebrewCasks.uninstall)
+        async throws(AppTrashError) -> CleanReport {
         var report = CleanReport()
         if let app {
             guard policy.allowsApp(app) else { throw .notTrashed }
             guard !Scanner.isLocked(app) else { throw .locked }
+            if cask != nil, brewRunning() { throw .brewBusy }
             let size = await size(of: app)
             guard !isRunning(app) else { throw .notTrashed }
             let inTrash: URL?
@@ -631,6 +644,12 @@ nonisolated enum Uninstaller {
             report.freed += size
             if let inTrash { report.trashed.append(TrashedItem(original: app, inTrash: inTrash, size: size)) }
             ActivityLog.record(module: "Uninstaller", item: app.path, size: size, mode: .trash, home: policy.homeURL)
+            if let cask {
+                let cleared = await uninstallCask(cask)
+                if !cleared { report.casksLeft.append(cask.token) }
+                ActivityLog.recordTask(module: "Uninstaller", item: "brew uninstall --cask \(cask.token)", succeeded: cleared,
+                                       home: policy.homeURL)
+            }
         }
         await bootOutAgents(in: data, policy: policy, run: launchctl)
         report += CleanReport.trashing(data.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,

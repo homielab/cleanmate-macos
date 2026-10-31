@@ -78,9 +78,9 @@ struct UninstallerView: View {
         } message: { outcome in
             switch outcome {
             case .removed(let report):
-                Text(verbatim: [String(localized: "Empty the Trash to free the space."),
+                Text(verbatim: (Self.casksLeftLines(report) + [String(localized: "Empty the Trash to free the space."),
                                 report.skipped > 0 ? String(localized: "Skipped (in use or not permitted): \(report.skipped)") : nil,
-                                report.locked > 0 ? String(localized: "Locked in Finder (turn off Locked in Get Info): \(report.locked)") : nil]
+                                report.locked > 0 ? String(localized: "Locked in Finder (turn off Locked in Get Info): \(report.locked)") : nil])
                     .compactMap { $0 }.joined(separator: " "))
             case .restored(let result):
                 if result.skipped > 0 {
@@ -90,6 +90,8 @@ struct UninstallerView: View {
                 Text("Nothing was moved to the Trash.")
             case .appLocked:
                 Text("It is locked in Finder. Select it, choose File > Get Info, turn off Locked, then try again. Nothing was moved.")
+            case .appBrewBusy:
+                Text("It was installed with Homebrew, and a brew command is running now. Wait until it finishes, then try again. Nothing was moved.")
             case .appNotTrashed:
                 Text("It may belong to the system or another user, for example an App Store app. Drag it to the Trash in Finder, which asks for your password, then remove its leftovers here. Nothing was moved.")
             case .batch(let result):
@@ -102,7 +104,7 @@ struct UninstallerView: View {
         switch model.outcome {
         case .removed(let report): Text("Moved \(report.freed, format: .fileSize) to the Trash")
         case .restored(let result): Text("Put back from the Trash: \(result.restored)")
-        case .appNotTrashed(let app), .appLocked(let app): Text("Couldn’t move \(app.name) to the Trash")
+        case .appNotTrashed(let app), .appLocked(let app), .appBrewBusy(let app): Text("Couldn’t move \(app.name) to the Trash")
         case .appTrashCancelled(let app): Text("Uninstall of \(app.name) cancelled")
         case .batch(let result) where result.removed.isEmpty: Text("No apps were uninstalled")
         case .batch(let result): Text("Moved \(result.report.freed, format: .fileSize) to the Trash")
@@ -119,13 +121,22 @@ struct UninstallerView: View {
             case .locked: String(localized: "\(app.name) is locked in Finder: turn off Locked in Get Info, then try again.")
             case .cancelled: String(localized: "\(app.name) was not moved: the password prompt was cancelled.")
             case .notTrashed: String(localized: "\(app.name) couldn’t be moved to the Trash: it may belong to the system or another user.")
+            case .brewBusy: String(localized: "\(app.name) was not moved: it was installed with Homebrew, which is running now. Try again when it finishes.")
             }
         }
         return ([result.removed.isEmpty ? nil : String(localized: "Uninstalled: \(result.removed.count)")] + skipped
+                + casksLeftLines(report)
                 + [result.removed.isEmpty ? nil : String(localized: "Empty the Trash to free the space."),
                    report.skipped > 0 ? String(localized: "Skipped (in use or not permitted): \(report.skipped)") : nil,
                    report.locked > 0 ? String(localized: "Locked in Finder (turn off Locked in Get Info): \(report.locked)") : nil])
             .compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// One line per Homebrew cask whose app is in the Trash but whose record brew kept.
+    static func casksLeftLines(_ report: CleanReport) -> [String?] {
+        report.casksLeft.map { token in
+            String(localized: "Uninstalled; Homebrew’s record not cleared — run “brew uninstall --cask \(token)” in Terminal.")
+        }
     }
 
     private var appList: some View {
@@ -151,6 +162,10 @@ struct UninstallerView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(app.name).lineLimit(1)
                             Group {
+                                if let cask = app.cask {
+                                    Text("Homebrew cask (\(cask.token))").lineLimit(1)
+                                        .help("Installed with brew install --cask")
+                                }
                                 sizeText(app).lineLimit(1)
                                 if let lastUsed = app.lastUsed, app.lastUsedIsEstimate {
                                     Text("Last used ≈ \(lastUsed, format: .relative(presentation: .named))").lineLimit(1)
@@ -287,6 +302,10 @@ struct UninstallerView: View {
                         Text(app.name).font(.title2.bold())
                         Text(verbatim: [app.version, app.bundleID].compactMap { $0 }.joined(separator: " · "))
                             .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                        if let cask = app.cask {
+                            Text("Installed with Homebrew (cask \(cask.token)). Uninstall moves the app to the Trash, then runs “brew uninstall --cask \(cask.token)” so Homebrew forgets it.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                         if model.batchMode {
                             Button("Show the \(model.appTicks.count) Ticked Apps") { model.selection = nil }
                                 .buttonStyle(.link).font(.callout)

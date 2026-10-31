@@ -6558,6 +6558,66 @@
         }
       }
     },
+    "Homebrew cask (%@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Homebrew cask (%@)"
+          }
+        }
+      }
+    },
+    "Installed with brew install --cask" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài bằng brew install --cask"
+          }
+        }
+      }
+    },
+    "Installed with Homebrew (cask %@). Uninstall moves the app to the Trash, then runs “brew uninstall --cask %@” so Homebrew forgets it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài bằng Homebrew (cask %@). Gỡ cài đặt chuyển app vào Thùng rác, rồi chạy “brew uninstall --cask %@” để Homebrew xoá bản ghi của nó."
+          }
+        }
+      }
+    },
+    "Uninstalled; Homebrew’s record not cleared — run “brew uninstall --cask %@” in Terminal." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã gỡ; bản ghi Homebrew chưa dọn — chạy “brew uninstall --cask %@” trong Terminal."
+          }
+        }
+      }
+    },
+    "It was installed with Homebrew, and a brew command is running now. Wait until it finishes, then try again. Nothing was moved." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App này cài bằng Homebrew và một lệnh brew đang chạy. Chờ lệnh đó xong rồi thử lại. Chưa có gì bị chuyển đi."
+          }
+        }
+      }
+    },
+    "%@ was not moved: it was installed with Homebrew, which is running now. Try again when it finishes." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ chưa được chuyển: app cài bằng Homebrew và brew đang chạy. Thử lại khi brew chạy xong."
+          }
+        }
+      }
+    },
     "%@ is open: quit it, then uninstall it." : {
       "localizations" : {
         "vi" : {

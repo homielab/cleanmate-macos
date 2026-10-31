@@ -24,6 +24,8 @@ nonisolated struct CleanReport: Sendable {
     var trashed: [TrashedItem] = []
     /// Set once "Undo" ran; `trashed` is emptied at the same time so it can't run twice.
     var undo: TrashUndo.Result?
+    /// Homebrew casks whose app went to the Trash but whose record `brew uninstall --cask` didn't clear.
+    var casksLeft: [String] = []
 
     static func += (lhs: inout CleanReport, rhs: CleanReport) {
         lhs.freed += rhs.freed
@@ -31,6 +33,7 @@ nonisolated struct CleanReport: Sendable {
         lhs.skipped += rhs.skipped
         lhs.locked += rhs.locked
         lhs.trashed += rhs.trashed
+        lhs.casksLeft += rhs.casksLeft
     }
 
     /// `FileManager.trashItem`, returning where the item now is inside the Trash.
