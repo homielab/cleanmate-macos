@@ -229,7 +229,8 @@ nonisolated enum Scanner {
                         if let fingerprint, let known = item.entrySizes?.size(of: url, fingerprint) {
                             found = ScanEntry(url: url, size: known.size, partlyUnreadable: known.partlyUnreadable)
                         } else {
-                            guard let measured = await entry(at: url, olderThan: cutoff, splitDepth: split) else { return nil }
+                            guard let measured = await entry(at: url, olderThan: cutoff, splitDepth: split,
+                                                             freeable: item.freeableSize?(url)) else { return nil }
                             found = measured
                             if let fingerprint {
                                 item.entrySizes?.remember(url, fingerprint, size: found.size, partlyUnreadable: found.partlyUnreadable)
@@ -328,8 +329,9 @@ nonisolated enum Scanner {
     }
 
     /// The entry with its allocated size, or nil when something inside changed after `cutoff` (or when cancelled).
-    /// `splitDepth`: see `Scanner.splitDepth`.
-    static func entry(at url: URL, olderThan cutoff: Date?, splitDepth: Int = 0) async -> ScanEntry? {
+    /// `splitDepth`: see `Scanner.splitDepth`. `freeable`: count only what removing the folder frees (see `FreeableBytes`).
+    static func entry(at url: URL, olderThan cutoff: Date?, splitDepth: Int = 0,
+                      freeable: FreeableBytes? = nil) async -> ScanEntry? {
         guard let values = try? url.resourceValues(forKeys: Set(keys)) else { return nil }
         var size = Int64(values.totalFileAllocatedSize ?? 0)
         var newest = modified(values)
@@ -347,8 +349,10 @@ nonisolated enum Scanner {
             let trees = await withTaskGroup(of: (Int64, Date, Bool)?.self) { group in
                 for child in children {
                     group.addTask {
-                        guard cutoff == nil else { return tree(child, dates: true, device: device, links: links, stopAt: cutoff) }
-                        return await undatedTree(child.path, device: device, links: links, depth: splitDepth)
+                        guard cutoff == nil else {
+                            return tree(child, dates: true, device: device, links: links, freeable: freeable, stopAt: cutoff)
+                        }
+                        return await undatedTree(child.path, device: device, links: links, freeable: freeable, depth: splitDepth)
                     }
                 }
                 var trees: [(Int64, Date, Bool)?] = []
@@ -365,6 +369,7 @@ nonisolated enum Scanner {
                 newest = max(newest, date)
                 unreadable = unreadable || skipped
             }
+            size += freeable?.linkedBytes ?? 0
         }
         if Task.isCancelled { return nil }
         if let cutoff, newest >= cutoff { return nil }
@@ -377,10 +382,12 @@ nonisolated enum Scanner {
     /// Symlinks count themselves, never their target.
     /// Walked with fts (one lstat per file) rather than URL resource values: st_blocks × 512 and st_mtimespec
     /// are the values `totalFileAllocatedSize` and `contentModificationDate` report (checked by `treeMatchesResourceValues`).
-    /// A file with several hard links counts once per `links` (shared by the walks of one entry), like `du`.
+    /// A file with several hard links counts once per `links` (shared by the walks of one entry), like `du`; with
+    /// `freeable`, files count through it instead (see `FreeableBytes`).
     /// With `stopAt`, the walk stops at the first item modified at or after it (or a socket/pipe) and returns that
     /// partial size with `.distantFuture`: the entry is kept anyway.
-    static func tree(_ url: URL, dates: Bool, device: dev_t, links: SpaceLens.HardLinks = .init(), stopAt: Date? = nil) -> (Int64, Date, Bool)? {
+    static func tree(_ url: URL, dates: Bool, device: dev_t, links: SpaceLens.HardLinks = .init(),
+                     freeable: FreeableBytes? = nil, stopAt: Date? = nil) -> (Int64, Date, Bool)? {
         guard let stream = url.path.withCString({ path -> UnsafeMutablePointer<FTS>? in
             var paths: [UnsafeMutablePointer<CChar>?] = [UnsafeMutablePointer(mutating: path), nil]
             return fts_open(&paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, nil)
@@ -403,7 +410,10 @@ nonisolated enum Scanner {
             guard let info = entry.pointee.fts_statp?.pointee, info.st_dev == device else { continue }
             let type = info.st_mode & S_IFMT
             // A folder's own blocks are not counted: `totalFileAllocatedSize` is nil for folders.
-            if type != S_IFDIR, links.count(info) { size += Int64(info.st_blocks) * 512 }
+            if type != S_IFDIR {
+                if let freeable { size += freeable.count(info, path: entry.pointee.fts_path) }
+                else if links.count(info) { size += Int64(info.st_blocks) * 512 }
+            }
             guard dates else { continue }
             if type == S_IFSOCK || type == S_IFIFO { socketOrPipe = true } // see `modified`
             let time = info.st_mtimespec
@@ -423,14 +433,14 @@ nonisolated enum Scanner {
 
     /// `tree(path, dates: false)`, with folders `depth` levels down walked in parallel; same sizes and unreadable flag.
     /// Anything `tree` treats specially at its root (not a folder, another volume, unreadable) goes to `tree` as is.
-    static func undatedTree(_ path: String, device: dev_t, links: SpaceLens.HardLinks, depth: Int,
-                            root: Bool = true) async -> (Int64, Date, Bool)? {
+    static func undatedTree(_ path: String, device: dev_t, links: SpaceLens.HardLinks, freeable: FreeableBytes? = nil,
+                            depth: Int, root: Bool = true) async -> (Int64, Date, Bool)? {
         var info = stat()
         guard depth > 0, lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR, info.st_dev == device,
               let names = try? FileManager.default.contentsOfDirectory(atPath: path) else {
             // Below the root, `tree` (FTS_XDEV) neither counts nor enters a folder on another volume.
             if !root, lstat(path, &info) == 0, info.st_dev != device { return (0, .distantPast, false) }
-            return tree(URL(fileURLWithPath: path), dates: false, device: device, links: links)
+            return tree(URL(fileURLWithPath: path), dates: false, device: device, links: links, freeable: freeable)
         }
         if Task.isCancelled { return nil }
         let prefix = path.hasSuffix("/") ? path : path + "/"
@@ -442,9 +452,12 @@ nonisolated enum Scanner {
                 var childInfo = stat()
                 guard lstat(child, &childInfo) == 0 else { continue } // FTS_NS: skipped
                 if childInfo.st_mode & S_IFMT == S_IFDIR {
-                    group.addTask { await undatedTree(child, device: device, links: links, depth: depth - 1, root: false) }
-                } else if childInfo.st_dev == device, links.count(childInfo) {
-                    size += Int64(childInfo.st_blocks) * 512
+                    group.addTask {
+                        await undatedTree(child, device: device, links: links, freeable: freeable, depth: depth - 1, root: false)
+                    }
+                } else if childInfo.st_dev == device {
+                    if let freeable { size += child.withCString { freeable.count(childInfo, path: $0) } }
+                    else if links.count(childInfo) { size += Int64(childInfo.st_blocks) * 512 }
                 }
             }
             for await sub in group {

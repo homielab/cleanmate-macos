@@ -122,6 +122,68 @@ struct StaleNodeModulesTests {
         #expect(fm.fileExists(atPath: home.appending(path: "Documents/thesis/node_modules/left-pad/index.js").path))
     }
 
+    /// pnpm and Bun install from a store: a file hard-linked to the store or an untouched APFS clone of it frees nothing,
+    /// so the entry counts only its own files, a file linked twice inside node_modules once. Cleaning reports that size,
+    /// and a later scan takes it from the size cache.
+    @Test func countsOnlyWhatRemovingFrees() async throws {
+        defer { try? fm.removeItem(at: root) }
+        let modules = developer.appending(path: "pnpm-app/node_modules")
+        let own = try project("pnpm-app")
+        let store = home.appending(path: "Library/pnpm/store/v10/files")
+        try write(store.appending(path: "00/linked"), bytes: 300_000)
+        try write(store.appending(path: "01/cloned"), bytes: 500_000)
+        try fm.createDirectory(at: modules.appending(path: ".pnpm/lodash/lib"), withIntermediateDirectories: true)
+        try fm.linkItem(at: store.appending(path: "00/linked"), to: modules.appending(path: ".pnpm/lodash/lib/linked.js"))
+        try #require(clonefile(store.appending(path: "01/cloned").path, modules.appending(path: ".pnpm/lodash/lib/cloned.js").path, 0) == 0)
+        try write(modules.appending(path: ".pnpm/inner/a.js"), bytes: 70_000)
+        try fm.linkItem(at: modules.appending(path: ".pnpm/inner/a.js"), to: modules.appending(path: ".pnpm/inner/b.js"))
+        let inner = Scanner.fileSize(modules.appending(path: ".pnpm/inner/a.js"))
+        try touch(modules, old)
+
+        let sizes = FolderSizeCache(file: nil)
+        let item = StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] }, sizes: sizes)
+        let scan = await Scanner.scan(item, policy: policy(), openPaths: EndToEndCleanTests.ownOpenPaths)
+        let entry = try #require(scan.entries.first)
+        #expect(scan.entries.count == 1 && entry.size == own + inner)
+        // Without the rule the same folder is the store's size too.
+        let whole = try #require(await Scanner.entry(at: modules, olderThan: nil)).size
+        #expect(whole >= own + inner + 800_000)
+        #expect(sizes.count == 1)
+        #expect(await Scanner.scan(item, policy: policy(), openPaths: EndToEndCleanTests.ownOpenPaths).entries.first?.size == entry.size)
+
+        try fm.createDirectory(at: trash, withIntermediateDirectories: true)
+        let report = await Cleaner.clean(item, scan: scan, policy: policy(), trash: moveToFakeTrash,
+                                         openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(report.freed == own + inner && report.trashed.count == 1)
+        #expect(fm.fileExists(atPath: store.appending(path: "00/linked").path))
+    }
+
+    /// The counter alone: a clone changed in place counts its rewritten part only; a hard link counts once all its
+    /// links are met, never when one is outside.
+    @Test func freeableBytesRules() throws {
+        defer { try? fm.removeItem(at: root) }
+        try write(root.appending(path: "original"), bytes: 1_000_000)
+        try #require(clonefile(root.appending(path: "original").path, root.appending(path: "clone").path, 0) == 0)
+        let handle = try FileHandle(forWritingTo: root.appending(path: "clone"))
+        try handle.write(contentsOf: Data(repeating: 2, count: 100_000))
+        try handle.close()
+        func count(_ counter: FreeableBytes, _ name: String) -> Int64 {
+            var info = stat()
+            let path = root.appending(path: name).path
+            guard lstat(path, &info) == 0 else { return -1 }
+            return path.withCString { counter.count(info, path: $0) }
+        }
+        let clones = FreeableBytes(clones: true)
+        let changed = count(clones, "clone")
+        #expect(changed >= 100_000 && changed < Scanner.fileSize(root.appending(path: "clone")))
+        #expect(count(FreeableBytes(clones: false), "clone") == Scanner.fileSize(root.appending(path: "clone")))
+
+        try fm.linkItem(at: root.appending(path: "original"), to: root.appending(path: "link"))
+        let links = FreeableBytes(clones: false)
+        #expect(count(links, "original") == 0 && links.linkedBytes == 0) // one of two links met
+        #expect(count(links, "link") == 0 && links.linkedBytes == Scanner.fileSize(root.appending(path: "original")))
+    }
+
     /// A project something works on is kept: node or a package manager running in it, an exclusion, a file opened or
     /// a lockfile written after the scan.
     @Test func projectsInUseAreKept() async throws {

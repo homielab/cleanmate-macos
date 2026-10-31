@@ -186,4 +186,29 @@ struct StaleBuildFoldersTests {
         #expect(try #require(StaleBuildFolders.lastWorkedOn(venv, home: home)) > .now.addingTimeInterval(-60))
         #expect(StaleBuildFolders.label(venv, home: home) == "~/Developer/py — venv/")
     }
+
+    /// uv clones a virtual environment's packages from its cache: an untouched clone counts 0 in `.venv`; Cargo's
+    /// `target` is measured whole (no clone lookups), except hard links to files outside it.
+    @Test func venvClonesCountOnlyTheirOwnBytes() async throws {
+        defer { try? fm.removeItem(at: root) }
+        let cache = home.appending(path: ".cache/uv/archive-v0/x/site-packages/numpy/core.so")
+        try write(cache, bytes: 400_000)
+        let venvOwn = try project("py", files: ["pyproject.toml", "uv.lock"], folder: ".venv",
+                                  contents: ["pyvenv.cfg": 100, "lib/python3.12/site-packages/app.py": 20_000])
+        let numpy = developer.appending(path: "py/.venv/lib/python3.12/site-packages/numpy/core.so")
+        try fm.createDirectory(at: numpy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try #require(clonefile(cache.path, numpy.path, 0) == 0)
+        let rust = try cargo("rust-cli")
+        let rustClone = developer.appending(path: "rust-cli/target/debug/copy")
+        try #require(clonefile(cache.path, rustClone.path, 0) == 0)
+        try fm.linkItem(at: cache, to: developer.appending(path: "rust-cli/target/debug/linked"))
+        for folder in ["py/.venv", "rust-cli/target"] {
+            try fm.setAttributes([.modificationDate: old], ofItemAtPath: developer.appending(path: folder).path)
+        }
+
+        let item = StaleBuildFolders.item(home: home, hasFullDiskAccess: { true }, running: { [] }, sizes: FolderSizeCache(file: nil))
+        let scan = await Scanner.scan(item, policy: policy(), openPaths: EndToEndCleanTests.ownOpenPaths)
+        let sizes = Dictionary(uniqueKeysWithValues: scan.entries.map { ($0.url.lastPathComponent, $0.size) })
+        #expect(sizes == [".venv": venvOwn, "target": rust + Scanner.fileSize(rustClone)])
+    }
 }

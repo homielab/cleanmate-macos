@@ -34,7 +34,8 @@ nonisolated enum StaleNodeModules {
                             .filter { $0.lastPathComponent == folderName }
                     },
                     allowsEntry: { $0.allowsNodeModules($1) },
-                    entrySizes: sizes)
+                    entrySizes: sizes,
+                    freeableSize: { _ in FreeableBytes(clones: true) }) // pnpm and Bun clone or link from their store
     }
 
     /// `node`, `node22`, `bun`, `pnpm`…

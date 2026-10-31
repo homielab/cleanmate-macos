@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   10 times a second.
 
 ### Fixed
+- **Developer Junk**: **Stale node_modules** and the virtual environments in **Stale build folders** now show what moving them really frees. Files pnpm, Bun and uv share with their store or cache (hard links, APFS clones) no longer count, so a project that showed several GB may now show a few hundred MB, and **Freed** after cleaning matches. The first scan of large projects takes longer once; sizes are then remembered.
 - **AI tools › Ollama models**: a layer several ticked models share now counts once in the selected size and in the space freed, which were smaller than what the clean really freed; hover a model's size to see what it shares and with which models.
 - **Uninstaller**: apps macOS has no last-opened date for are no longer treated as never used: they show an estimate from their settings and cache files, or **Unknown**, and the "Not used for" filter leaves unknown ones out unless you choose **Show**.
 - **Uninstaller**: Leftovers of Removed Apps no longer lists a config folder of an installed Homebrew formula or cask as orphaned.

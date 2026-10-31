@@ -33,7 +33,9 @@ nonisolated enum StaleBuildFolders {
                             .filter { folderNames.contains($0.lastPathComponent) }
                     },
                     allowsEntry: { $0.allowsBuildFolder($1) },
-                    entrySizes: sizes)
+                    entrySizes: sizes,
+                    // uv clones a virtual environment's packages from its cache; Cargo and CocoaPods write their own files.
+                    freeableSize: { FreeableBytes(clones: [".venv", "venv"].contains($0.lastPathComponent)) })
     }
 
     /// `cargo`, `rustc`, `uv`, `pod`, `python3.12`…

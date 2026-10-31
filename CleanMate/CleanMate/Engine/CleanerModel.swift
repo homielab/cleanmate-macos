@@ -245,6 +245,9 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Sizes of the item's folder entries kept between scans (`FolderSizeCache`): an entry whose top level did not
     /// change since it was measured is not walked again. Only for items without `minAge` (a cached size has no date).
     var entrySizes: FolderSizeCache? = nil
+    /// Measures each folder entry as what removing it frees, with a new counter per entry (`FreeableBytes`): hard links
+    /// into a store outside count 0, and APFS clones only their private bytes when the counter has `clones`.
+    var freeableSize: (@Sendable (URL) -> FreeableBytes)? = nil
     /// Per-entry lock: the entry is listed with this reason but can't be ticked, and is skipped at clean (an old Node
     /// version a program still runs from). Makes the check like `skipsEntry`: once per scan, anew for each entry removed.
     var locksEntry: (@Sendable () -> @Sendable (URL) -> String?)? = nil

@@ -81,4 +81,19 @@ struct FolderSizeCacheTests {
         try write(file, bytes: 10)
         #expect(FolderSizeCache(file: file).count == 0)
     }
+
+    /// A size saved by a version that measured differently (no `version`, counting store links and clones) is measured again.
+    @Test func olderRecordsAreMeasuredAgain() throws {
+        defer { try? fm.removeItem(at: root) }
+        let folder = home.appending(path: "Developer/app/node_modules")
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let fingerprint = try #require(FolderSizeCache.Fingerprint(folder))
+        let old = #"{"\#(folder.standardizedFileURL.path)":{"seconds":\#(fingerprint.seconds),"nanoseconds":\#(fingerprint.nanoseconds),"links":\#(fingerprint.links),"size":999,"partlyUnreadable":false,"used":0}}"#
+        try fm.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(old.utf8).write(to: file)
+        let sizes = FolderSizeCache(file: file)
+        #expect(sizes.count == 1 && sizes.size(of: folder, fingerprint) == nil)
+        sizes.remember(folder, fingerprint, size: 5, partlyUnreadable: false)
+        #expect(sizes.size(of: folder, fingerprint)?.size == 5)
+    }
 }

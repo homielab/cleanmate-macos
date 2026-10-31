@@ -9,6 +9,8 @@ import Foundation
 /// any read or write error means no cache.
 nonisolated final class FolderSizeCache: @unchecked Sendable {
     static let limit = 1_000
+    /// Bumped when entries are measured another way: older records are measured again (2: `FreeableBytes`).
+    static let version = 2
     /// The app's cache file; memory only under tests, which never touch the real one.
     static let shared = FolderSizeCache(
         file: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? defaultURL : nil)
@@ -39,6 +41,8 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
         var size: Int64
         var partlyUnreadable: Bool
         var used: Double
+        /// nil in files written before `version` existed.
+        var version: Int?
     }
 
     let file: URL?
@@ -58,7 +62,8 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
             load(&records)
             let path = url.standardizedFileURL.path
             guard var record = records?[path], record.seconds == fingerprint.seconds,
-                  record.nanoseconds == fingerprint.nanoseconds, record.links == fingerprint.links else { return nil }
+                  record.nanoseconds == fingerprint.nanoseconds, record.links == fingerprint.links,
+                  record.version == Self.version else { return nil }
             record.used = now.timeIntervalSince1970
             records?[path] = record
             return (record.size, record.partlyUnreadable)
@@ -72,7 +77,8 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
             load(&records)
             records?[url.standardizedFileURL.path] = Record(seconds: fingerprint.seconds, nanoseconds: fingerprint.nanoseconds,
                                                             links: fingerprint.links, size: size,
-                                                            partlyUnreadable: partlyUnreadable, used: now.timeIntervalSince1970)
+                                                            partlyUnreadable: partlyUnreadable, used: now.timeIntervalSince1970,
+                                                            version: Self.version)
         }
     }
 
