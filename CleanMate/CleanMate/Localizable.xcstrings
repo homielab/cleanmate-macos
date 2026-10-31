@@ -6557,6 +6557,298 @@
           }
         }
       }
+    },
+    "%@ is open: quit it, then uninstall it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ đang mở: hãy thoát rồi gỡ lại."
+          }
+        }
+      }
+    },
+    "%@ is locked in Finder: turn off Locked in Get Info, then try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ bị khoá trong Finder: tắt Khoá trong Lấy thông tin rồi thử lại."
+          }
+        }
+      }
+    },
+    "%@ was not moved: the password prompt was cancelled." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ không được chuyển: hộp hỏi mật khẩu đã bị huỷ."
+          }
+        }
+      }
+    },
+    "%@ couldn’t be moved to the Trash: it may belong to the system or another user." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không chuyển được %@ vào Thùng rác: có thể nó thuộc hệ thống hoặc người dùng khác."
+          }
+        }
+      }
+    },
+    "Uninstalled: %lld" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã gỡ: %lld"
+          }
+        }
+      }
+    },
+    "No apps were uninstalled" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không gỡ được ứng dụng nào"
+          }
+        }
+      }
+    },
+    "Tick several apps to uninstall them together" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn nhiều ứng dụng để gỡ cùng lúc"
+          }
+        }
+      }
+    },
+    "Select All Apps" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn tất cả ứng dụng"
+          }
+        }
+      }
+    },
+    "%lld ticked" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chọn %lld"
+          }
+        }
+      }
+    },
+    "Show the %lld Ticked Apps" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem %lld ứng dụng đã chọn"
+          }
+        }
+      }
+    },
+    "%lld Apps Ticked" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chọn %lld ứng dụng"
+          }
+        }
+      }
+    },
+    "Each app goes to the Trash with the data in your Library that surely belongs to it. Items marked “Possibly related” and config in your home folder are kept: select an app on its own to review them." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mỗi ứng dụng vào Thùng rác cùng dữ liệu trong Library chắc chắn là của nó. Mục ghi “Có thể liên quan” và cấu hình trong thư mục người dùng được giữ lại: chọn riêng từng ứng dụng để xem chúng."
+          }
+        }
+      }
+    },
+    "Open apps are skipped. Quit them to uninstall them too." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng đang mở sẽ bị bỏ qua. Thoát chúng để gỡ luôn."
+          }
+        }
+      }
+    },
+    "Open: it will be skipped" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang mở: sẽ bị bỏ qua"
+          }
+        }
+      }
+    },
+    "Looking for its data…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang tìm dữ liệu…"
+          }
+        }
+      }
+    },
+    "Show Files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem tệp"
+          }
+        }
+      }
+    },
+    "Selected: %lld apps, %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Selected: %lld app, %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Selected: %lld apps, %@"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chọn: %1$lld ứng dụng, %2$@"
+          }
+        }
+      }
+    },
+    "Uninstall %lld Apps…" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Uninstall %lld App…"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Uninstall %lld Apps…"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gỡ %lld ứng dụng…"
+          }
+        }
+      }
+    },
+    "Uninstall %lld apps (%@)?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Uninstall %lld app (%@)?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Uninstall %lld apps (%@)?"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gỡ %1$lld ứng dụng (%2$@)?"
+          }
+        }
+      }
+    },
+    "%@ go to the Trash with their data in your Library. You can put them back from the Trash until it is emptied." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ sẽ vào Thùng rác cùng dữ liệu trong Library. Bạn có thể khôi phục chúng từ Thùng rác cho tới khi Thùng rác được dọn sạch."
+          }
+        }
+      }
+    },
+    "%@ go to the Trash with their data in your Library. Open apps are skipped: %@. You can put them back from the Trash until it is emptied." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ sẽ vào Thùng rác cùng dữ liệu trong Library. Ứng dụng đang mở bị bỏ qua: %2$@. Bạn có thể khôi phục chúng từ Thùng rác cho tới khi Thùng rác được dọn sạch."
+          }
+        }
+      }
+    },
+    "App and %lld data items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "App and %lld data item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "App and %lld data items"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng và %lld mục dữ liệu"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

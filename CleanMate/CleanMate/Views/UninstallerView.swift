@@ -1,11 +1,13 @@
 import QuickLook
 import SwiftUI
 
-/// Uninstaller: apps on the left, the selected app's files (or leftovers of removed apps) on the right.
+/// Uninstaller: apps on the left, the selected app's files (or leftovers of removed apps) on the right; with several
+/// apps ticked, the batch panel lists them for one confirmation.
 struct UninstallerView: View {
     @ObservedObject var model: UninstallerModel
     @Environment(\.locale) private var locale
     @State private var confirming = false
+    @State private var confirmingBatch = false
     @State private var previewURL: URL?
     @AppStorage(Preferences.uninstallerSort) private var sort = UninstallerModel.AppSort.name
     @AppStorage(Preferences.uninstallerUnused) private var unused = UninstallerModel.UnusedFilter.all
@@ -48,6 +50,7 @@ struct UninstallerView: View {
         .task { if model.extensionItems == nil { await model.loadExtensions() } }
         .task(id: model.selection) { await model.loadEntries() }
         .task(id: model.dataGeneration) { await model.measureAppData() }
+        .task(id: [AnyHashable(model.appTicks), AnyHashable(model.dataGeneration)]) { await model.loadBatch() }
         .quickLookPreview($previewURL)
         .dropDestination(for: URL.self) { urls, _ in model.drop(urls) }
         .alert("Can’t Select This Item", isPresented: Binding(get: { model.dropRejection != nil }, set: { if !$0 { model.dropRejection = nil } }),
@@ -66,6 +69,8 @@ struct UninstallerView: View {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
             case .removed(let report):
                 TrashReportButtons(report: report) { await model.undo(report) }
+            case .batch(let result):
+                TrashReportButtons(report: result.report) { await model.undo(result.report) }
             default:
                 EmptyView()
             }
@@ -87,6 +92,8 @@ struct UninstallerView: View {
                 Text("It is locked in Finder. Select it, choose File > Get Info, turn off Locked, then try again. Nothing was moved.")
             case .appNotTrashed:
                 Text("It may belong to the system or another user, for example an App Store app. Drag it to the Trash in Finder, which asks for your password, then remove its leftovers here. Nothing was moved.")
+            case .batch(let result):
+                Text(verbatim: Self.batchMessage(result))
             }
         }
     }
@@ -97,8 +104,28 @@ struct UninstallerView: View {
         case .restored(let result): Text("Put back from the Trash: \(result.restored)")
         case .appNotTrashed(let app), .appLocked(let app): Text("Couldn’t move \(app.name) to the Trash")
         case .appTrashCancelled(let app): Text("Uninstall of \(app.name) cancelled")
+        case .batch(let result) where result.removed.isEmpty: Text("No apps were uninstalled")
+        case .batch(let result): Text("Moved \(result.report.freed, format: .fileSize) to the Trash")
         case nil: Text(verbatim: "")
         }
+    }
+
+    /// Apps uninstalled, then each app left with its reason, then the usual Trash lines.
+    static func batchMessage(_ result: UninstallerModel.BatchResult) -> String {
+        let report = result.report
+        let skipped = result.skipped.map { app, reason in
+            switch reason {
+            case .running: String(localized: "\(app.name) is open: quit it, then uninstall it.")
+            case .locked: String(localized: "\(app.name) is locked in Finder: turn off Locked in Get Info, then try again.")
+            case .cancelled: String(localized: "\(app.name) was not moved: the password prompt was cancelled.")
+            case .notTrashed: String(localized: "\(app.name) couldn’t be moved to the Trash: it may belong to the system or another user.")
+            }
+        }
+        return ([result.removed.isEmpty ? nil : String(localized: "Uninstalled: \(result.removed.count)")] + skipped
+                + [result.removed.isEmpty ? nil : String(localized: "Empty the Trash to free the space."),
+                   report.skipped > 0 ? String(localized: "Skipped (in use or not permitted): \(report.skipped)") : nil,
+                   report.locked > 0 ? String(localized: "Locked in Finder (turn off Locked in Get Info): \(report.locked)") : nil])
+            .compactMap { $0 }.joined(separator: " ")
     }
 
     private var appList: some View {
@@ -112,9 +139,14 @@ struct UninstallerView: View {
                     .badge(model.extensionItems?.count ?? 0)
                     .tag(UninstallerModel.Selection.extensions)
             }
-            Section("Applications") {
+            Section {
                 ForEach(UninstallerModel.sorted(model.filteredApps, by: sort, sizes: model.totalSizes)) { app in
                     HStack {
+                        Toggle(isOn: ticked(app.url)) { EmptyView() }
+                            .toggleStyle(SelectionCheckboxStyle())
+                            .accessibilityLabel(Text(verbatim: app.name))
+                            .disabled(model.working)
+                            .help("Tick several apps to uninstall them together")
                         AppIcon(url: app.url, size: 28)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(app.name).lineLimit(1)
@@ -134,7 +166,7 @@ struct UninstallerView: View {
                         }
                     }
                     .padding(.vertical, 2)
-                    .accessibilityElement(children: .combine) // name + app size + data size + last used as one element
+                    .accessibilityElement(children: .contain) // the checkbox stays its own element
                     .tag(UninstallerModel.Selection.app(app.url))
                 }
                 if model.hiddenUndatedCount > 0 {
@@ -156,9 +188,37 @@ struct UninstallerView: View {
                     }
                     .padding(.vertical, 4)
                 }
+            } header: {
+                appsHeader
             }
         }
         .overlay { if model.loadingApps { ProgressView().accessibilityLabel("Loading…") } }
+    }
+
+    /// "Applications" with a checkbox: on when every listed app is ticked, mixed when some are; it ticks or unticks the
+    /// listed apps.
+    private var appsHeader: some View {
+        let listed = model.filteredApps.map(\.url)
+        let all = !listed.isEmpty && listed.allSatisfy(model.appTicks.contains)
+        let any = listed.contains(where: model.appTicks.contains)
+        // Two sources that disagree make the checkbox mixed, like Smart Scan's group headers.
+        let sources = [Binding { any } set: { model.tickListed($0) }, Binding { all } set: { model.tickListed($0) }]
+        return HStack(spacing: 6) {
+            Toggle(sources: sources, isOn: \.self) { EmptyView() }
+                .toggleStyle(SelectionCheckboxStyle())
+                .disabled(listed.isEmpty || model.working)
+                .accessibilityLabel(Text("Select All Apps"))
+            Text("Applications")
+            Spacer()
+            if model.appTicks.count > 0 {
+                Text("\(model.appTicks.count) ticked").monospacedDigit()
+            }
+        }
+    }
+
+    private func ticked(_ url: URL) -> Binding<Bool> {
+        Binding(get: { model.appTicks.contains(url) },
+                set: { if $0 { model.appTicks.insert(url) } else { model.appTicks.remove(url) } })
     }
 
     /// "45 MB · data 1.2 GB" once the app's ~/Library data is measured and not empty.
@@ -170,6 +230,8 @@ struct UninstallerView: View {
 
     @ViewBuilder private var detail: some View {
         switch model.selection {
+        case nil where model.batchMode:
+            batchPanel
         case nil:
             EmptyStateView(title: Text(Module.uninstaller.title), systemImage: Module.uninstaller.systemImage) {
                 VStack(spacing: 8) {
@@ -225,6 +287,10 @@ struct UninstallerView: View {
                         Text(app.name).font(.title2.bold())
                         Text(verbatim: [app.version, app.bundleID].compactMap { $0 }.joined(separator: " · "))
                             .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                        if model.batchMode {
+                            Button("Show the \(model.appTicks.count) Ticked Apps") { model.selection = nil }
+                                .buttonStyle(.link).font(.callout)
+                        }
                         if model.isRunning(app) {
                             HStack {
                                 Text("The app is open. Quit it before uninstalling.").foregroundStyle(.orange)
@@ -240,6 +306,101 @@ struct UninstallerView: View {
                     entryList(app: app, empty: Text("No Related Files Found"))
                     footer(button: model.trashApp ? Text("Uninstall…") : Text("Reset…"), app: app)
                 }
+            }
+        }
+    }
+
+    /// Several ticked apps: each with its app + data size, one Uninstall for all. Only data surely the app's goes.
+    private var batchPanel: some View {
+        let apps = model.tickedApps
+        let largest = apps.map(batchSize).max() ?? 0
+        let open = apps.filter(model.isRunning)
+        return VStack(spacing: 0) {
+            header {
+                Image(systemName: "square.stack.3d.up").font(.largeTitle).foregroundStyle(.tint)
+            } text: {
+                Text("\(apps.count) Apps Ticked").font(.title2.bold())
+                Text("Each app goes to the Trash with the data in your Library that surely belongs to it. Items marked “Possibly related” and config in your home folder are kept: select an app on its own to review them.")
+                    .font(.callout).foregroundStyle(.secondary)
+                if !open.isEmpty {
+                    Text("Open apps are skipped. Quit them to uninstall them too.").font(.callout).foregroundStyle(.orange)
+                }
+            }
+            List {
+                ForEach(apps) { app in
+                    batchRow(app, largest: largest)
+                }
+            }
+            batchFooter(apps)
+        }
+    }
+
+    /// App bundle + its `.data` entries; the bundle alone while the data is loading.
+    private func batchSize(_ app: InstalledApp) -> Int64 {
+        (model.batchData[app.url] ?? []).reduce(model.appSizes[app.url] ?? 0) { $0 + $1.size }
+    }
+
+    private func batchRow(_ app: InstalledApp, largest: Int64) -> some View {
+        let running = model.isRunning(app)
+        let data = model.batchData[app.url]
+        let size = model.appSizes[app.url] != nil && data != nil ? batchSize(app) : nil
+        return HStack {
+            Toggle(isOn: ticked(app.url)) { EmptyView() }
+            .toggleStyle(SelectionCheckboxStyle())
+            .accessibilityLabel(Text(verbatim: "\(app.name), \(size?.formatted(.fileSize.locale(locale)) ?? "…")"))
+            .disabled(model.working)
+            AppIcon(url: app.url, size: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(app.name).lineLimit(1)
+                Group {
+                    if running {
+                        HStack {
+                            Text("Open: it will be skipped").foregroundStyle(.orange)
+                            Button("Quit App") { model.quit(app) }.buttonStyle(.link)
+                        }
+                    } else if let data {
+                        Text("App and \(data.count) data items")
+                    } else {
+                        Text("Looking for its data…")
+                    }
+                }
+                .font(.subheadline).foregroundStyle(.secondary)
+            }
+            .help(app.url.path)
+            Spacer()
+            Text(size?.formatted(.fileSize.locale(locale)) ?? "…").sizeColumnStyle(emphasized: !running)
+            SizeBar(size: size ?? 0, largest: largest, tint: running ? .secondary : .accentColor)
+            Button("Show Files", systemImage: "list.bullet") { model.selection = .app(app.url) }
+                .labelStyle(.iconOnly).buttonStyle(.borderless).help("Show Files")
+        }
+        .padding(.vertical, 3)
+    }
+
+    private func batchFooter(_ apps: [InstalledApp]) -> some View {
+        // Open apps are skipped: neither counted nor in the size.
+        let going = apps.filter { !model.isRunning($0) }
+        let size = model.batchSize
+        let sizeText = size?.formatted(.fileSize.locale(locale)) ?? "…"
+        let open = apps.filter(model.isRunning).map(\.name)
+        return HStack {
+            Text("Selected: \(going.count) apps, \(sizeText)").monospacedDigit()
+            Spacer()
+            if model.working { ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…") }
+            Button("Uninstall \(going.count) Apps…") { confirmingBatch = true }
+                .keyboardShortcut(.defaultAction)
+                .disabled(model.working || size == nil || going.isEmpty)
+        }
+        .padding()
+        .background(.bar)
+        .focusedSceneValue(\.confirming, confirmingBatch)
+        .confirmationDialog(Text("Uninstall \(going.count) apps (\(sizeText))?"), isPresented: $confirmingBatch) {
+            Button("Uninstall", role: .destructive) { Task { await model.removeBatch() } }
+        } message: {
+            let names = going.map(\.name).formatted(.list(type: .and).locale(locale))
+            if open.isEmpty {
+                Text("\(names) go to the Trash with their data in your Library. You can put them back from the Trash until it is emptied.")
+            } else {
+                Text("\(names) go to the Trash with their data in your Library. Open apps are skipped: \(open.formatted(.list(type: .and).locale(locale))). You can put them back from the Trash until it is emptied.")
             }
         }
     }

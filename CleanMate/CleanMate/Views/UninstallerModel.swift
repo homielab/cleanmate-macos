@@ -5,7 +5,15 @@ import Combine
 final class UninstallerModel: ObservableObject {
     /// `hiddenConfig` is read-only: `remove()` ignores it. `extensions` items are never ticked for the user.
     enum Selection: Hashable { case app(URL), leftovers, hiddenConfig, extensions }
-    enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), restored(TrashUndo.Result) }
+    enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), restored(TrashUndo.Result), batch(BatchResult) }
+    /// Why an app ticked for a batch uninstall stayed.
+    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed }
+    /// Several ticked apps uninstalled at once: what went to the Trash, and the apps left with their reason.
+    struct BatchResult {
+        var report = CleanReport()
+        var removed: [InstalledApp] = []
+        var skipped: [(app: InstalledApp, reason: SkipReason)] = []
+    }
     /// Why a file dropped on the window was not selected.
     enum DropRejection { case notApp, notListed }
     /// Order of the app list, remembered in `Preferences.uninstallerSort`.
@@ -48,6 +56,13 @@ final class UninstallerModel: ObservableObject {
     }
     /// Rows highlighted in the detail list (arrow keys); Space ticks them via `toggle(urls:)`.
     @Published var highlighted: Set<URL> = []
+    /// Apps ticked in the list for a batch uninstall. Kept when the selection, search or filter changes; more than
+    /// one shows the batch panel instead of an app's detail.
+    @Published var appTicks: Set<URL> = [] {
+        didSet { if batchMode, appTicks != oldValue, case .app = selection { selection = nil } } // show the batch panel
+    }
+    /// `.data` entries of each ticked app, loaded by `loadBatch` (suggestions and config are never part of a batch).
+    @Published var batchData: [URL: [AppDataEntry]] = [:]
     /// The selected app's own row is ticked. Unticked: `remove()` resets the app (moves only its ticked data).
     @Published var trashApp = true
     /// Data and config of the selected app, or leftovers of removed apps.
@@ -179,6 +194,30 @@ final class UninstallerModel: ObservableObject {
         if case .app(let url) = selection, !filteredApps.contains(where: { $0.url == url }) { selection = nil }
     }
 
+    /// Ticked apps in list order (also those the search or filter hides now: the batch panel lists them all).
+    var tickedApps: [InstalledApp] { apps.filter { appTicks.contains($0.url) } }
+
+    /// More than one app ticked: the batch panel replaces an app's detail.
+    var batchMode: Bool { appTicks.count > 1 }
+
+    /// The Applications header checkbox: ticks every listed app, or unticks them when all are ticked.
+    func tickListed(_ on: Bool) {
+        guard !working else { return }
+        let listed = filteredApps.map(\.url)
+        if on { appTicks.formUnion(listed) } else { appTicks.subtract(listed) }
+    }
+
+    /// App + `.data` size of each ticked app that is not open (open ones are skipped); nil while one is still
+    /// measured or loading.
+    var batchSize: Int64? {
+        var total: Int64 = 0
+        for app in tickedApps where !isRunning(app) {
+            guard let size = appSizes[app.url], let data = batchData[app.url] else { return nil }
+            total += data.reduce(size) { $0 + $1.size }
+        }
+        return total
+    }
+
     var selectedApp: InstalledApp? {
         guard case .app(let url) = selection else { return nil }
         return apps.first { $0.url == url }
@@ -258,6 +297,7 @@ final class UninstallerModel: ObservableObject {
         loadingApps = true
         apps = await installedApps()
         loadingApps = false
+        appTicks.formIntersection(apps.map(\.url)) // removed outside CleanMate
         deselectUnlistedApp() // removed outside CleanMate: show the empty state, not a blank detail
         let appSize = appSize
         await withTaskGroup(of: (URL, Int64).self) { group in
@@ -273,6 +313,7 @@ final class UninstallerModel: ObservableObject {
     /// Forgets measured data sizes (after Uninstall, Reset, Undo, Refresh) and measures again.
     func invalidateAppData() {
         appDataSizes = [:]
+        batchData = [:]
         dataEntrySizes = [:]
         dataGeneration += 1
     }
@@ -355,11 +396,7 @@ final class UninstallerModel: ObservableObject {
             return // shown from `hiddenItems`/`extensionItems`; nothing to tick
         case .app:
             guard let app = selectedApp else { return }
-            // All installed apps (incl. Apple's, nested and unlisted ones) and running ones, not just the listed apps.
-            let others = apps.filter { $0.url != app.url }
-            let ids = Uninstaller.allBundleIDs().union(runningApps).union(others.map(\.bundleID))
-            let names = Set(others.flatMap(\.names)).union(Uninstaller.otherAppNames(than: app.url, in: Uninstaller.allAppURLs()))
-            let found = await appData(app, ids, names)
+            let found = await data(of: app)
             guard !Task.isCancelled, current == entriesGeneration else { return }
             entries = found
             checked = Set(found.filter { $0.kind == .data }.map(\.url)) // suggestions and config: never ticked for the user
@@ -369,6 +406,64 @@ final class UninstallerModel: ObservableObject {
             guard !Task.isCancelled, current == entriesGeneration else { return }
             entries = found
         }
+    }
+
+    /// What the app's detail lists. All installed apps (incl. Apple's, nested and unlisted ones) and running ones
+    /// shield their data, not just the listed apps.
+    private func data(of app: InstalledApp) async -> [AppDataEntry] {
+        let others = apps.filter { $0.url != app.url }
+        let ids = Uninstaller.allBundleIDs().union(runningApps).union(others.map(\.bundleID))
+        let names = Set(others.flatMap(\.names)).union(Uninstaller.otherAppNames(than: app.url, in: Uninstaller.allAppURLs()))
+        return await appData(app, ids, names)
+    }
+
+    /// Loads the `.data` entries of ticked apps not loaded yet, for the batch panel's sizes and `removeBatch`.
+    func loadBatch() async {
+        for app in tickedApps where batchData[app.url] == nil {
+            let found = await data(of: app).filter { $0.kind == .data }
+            guard !Task.isCancelled else { return }
+            if appTicks.contains(app.url) { batchData[app.url] = found }
+        }
+    }
+
+    /// Uninstalls the ticked apps one by one through the same path as one app: the app, then its `.data` entries
+    /// (never suggestions or config). An open app, one locked in Finder or one that can't go to the Trash is left
+    /// with its reason; it doesn't stop the others. One Undo puts back everything moved.
+    func removeBatch() async {
+        guard !working else { return }
+        let ticked = tickedApps
+        guard !ticked.isEmpty else { return }
+        runningApps = appBundleIDs() // a launch may not have been notified yet
+        working = true
+        defer { working = false }
+        undoManager?.removeAllActions(withTarget: self)
+        var result = BatchResult()
+        for app in ticked {
+            if isRunning(app) { result.skipped.append((app, .running)); continue }
+            let ownData: [AppDataEntry]
+            if let loaded = batchData[app.url] { ownData = loaded } else { ownData = await data(of: app).filter { $0.kind == .data } }
+            do {
+                result.report += try await trash(app.url, ownData)
+                result.removed.append(app)
+            } catch {
+                let reason: SkipReason = switch error {
+                case .locked: .locked
+                case .cancelled: .cancelled
+                case .notTrashed: .notTrashed
+                }
+                result.skipped.append((app, reason))
+            }
+        }
+        let removed = Set(result.removed.map(\.url))
+        apps.removeAll { removed.contains($0.url) }
+        appTicks.subtract(removed)
+        if case .app(let url) = selection, removed.contains(url) { selection = nil }
+        outcome = .batch(result)
+        invalidateAppData()
+        if !result.report.trashed.isEmpty {
+            undoManager?.registerTrashUndo(self, name: String(localized: "Uninstall")) { await $0.undo(result.report) }
+        }
+        Attention.finished()
     }
 
     /// Moves the selected app (if its row is ticked) and the ticked items to the Trash.
@@ -409,6 +504,7 @@ final class UninstallerModel: ObservableObject {
         // The user may have picked another app meanwhile: leave that selection and its entries alone.
         if let app {
             apps.removeAll { $0.url == app.url }
+            appTicks.remove(app.url)
             if selection == removing { selection = nil }
         } else if selection == removing {
             await loadEntries() // leftovers, or the reset app's data

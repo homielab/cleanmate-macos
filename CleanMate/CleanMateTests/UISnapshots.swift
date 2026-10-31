@@ -441,6 +441,23 @@ struct UISnapshots {
             model.selection = .leftovers
             return UninstallerView(model: model)
         }
+        // Several apps ticked: the batch panel with each app's size (app + data surely its own) and one Uninstall;
+        // an open app is shown as skipped.
+        try await snapshot("uninstaller-batch") {
+            let model = UninstallerModel()
+            model.appData = { _, _, _ in data }
+            model.apps = apps
+            model.appSizes = Dictionary(uniqueKeysWithValues: apps.enumerated().map { ($1.url, Int64($0 + 1) * 45_000_000) })
+            model.appDataSizes = Self.appDataSizes(apps) // Also keeps the view from measuring the real ~/Library
+            model.runningApps = [apps[2].bundleID]
+            model.appTicks = [apps[0].url, apps[1].url, apps[2].url]
+            model.batchData = Dictionary(uniqueKeysWithValues: apps.prefix(3).enumerated().map { index, app in
+                (app.url, Array(data.filter { $0.kind == .data }.prefix(4 - index)))
+            })
+            model.hiddenItems = []
+            model.extensionItems = []
+            return UninstallerView(model: model)
+        }
         try await snapshot("uninstaller-no-selection") {
             let model = UninstallerModel()
             model.apps = apps
