@@ -273,7 +273,9 @@ extension CleanerGroup {
         // Cloud sync apps' caches (`CloudSyncCaches`): unticked, deleted, skipped while the app runs.
         CloudSyncCaches.googleDrive,
         CloudSyncCaches.dropbox(hasFullDiskAccess: { hasFullDiskAccess }),
-    ] + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive] : []))
+        // Media caches outside ~/Library/Caches (`MediaAppCaches`): unticked, deleted, skipped while the app runs.
+        MediaAppCaches.spotify,
+    ] + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive, MediaAppCaches.telegram] : []))
     }
 
     /// Adobe apps that read and write the media cache. Bundle ids and executables carry the version

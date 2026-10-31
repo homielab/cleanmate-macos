@@ -6458,6 +6458,46 @@
         }
       }
     },
+    "Telegram media cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm phương tiện Telegram"
+          }
+        }
+      }
+    },
+    "Photos, videos and files from chats are downloaded again when opened; your chats and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh, video và tệp trong cuộc trò chuyện được tải lại khi mở; cuộc trò chuyện và phiên đăng nhập được giữ"
+          }
+        }
+      }
+    },
+    "Spotify stream cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm phát trực tuyến Spotify"
+          }
+        }
+      }
+    },
+    "Songs are streamed again when played; songs downloaded for offline use must be downloaded again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bài hát được phát trực tuyến lại khi nghe; bài đã tải để nghe ngoại tuyến phải tải lại"
+          }
+        }
+      }
+    },
     "Dropbox cache" : {
       "localizations" : {
         "vi" : {

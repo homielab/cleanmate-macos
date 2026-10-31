@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan › Apps**: **Telegram media cache** (photos, videos and files from chats, with Full Disk Access) and **Spotify stream cache**, often several GB outside the usual cache folder. Both are unticked, deleted and skipped while the app runs; Telegram's chats, keys and sign-in are never touched.
 - **Smart Scan › Developer Junk**: caches of Deno, Zig, Bazel, ccache, sccache, NuGet, Poetry, pre-commit and `pipx run`, each its own unticked item, skipped while the tool runs. Only the caches are listed (also where your shell profile moves them); installed packages, virtualenvs, pipx apps and Bazel's project outputs are never touched.
 - **Smart Scan › Apps**: **Zoom: downloaded updates** (old installers in Zoom's AutoUpdater folder), **Microsoft AutoUpdate cache**, and **Downloaded app updates**, the updates apps using Sparkle leave in their cache folder, one row per app. All three are ticked and deleted; an open app keeps its files, and so does CleanMate's own update while it is being downloaded or installed. **User caches** no longer counts these Sparkle folders.
 - **Uninstaller**: tick several apps (or all apps listed, for example after **Not Used for a Year**) and uninstall them with one confirmation. Each goes to the Trash with the data that surely belongs to it; possibly related items and config are kept, open apps are skipped and an app that can't be moved doesn't stop the others. One Undo puts everything back.
