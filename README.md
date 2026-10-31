@@ -2,6 +2,8 @@
 
 A native macOS app that frees disk space and clears privacy traces — fast, simple and careful.
 
+Website: [cleanmate.homielab.com](https://cleanmate.homielab.com)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/1-smart-scan-dark.png">
   <img src="docs/images/1-smart-scan-light.png" alt="CleanMate Smart Scan results with system junk, developer junk and AI tool data">
@@ -43,6 +45,8 @@ Homebrew (coming soon, once the tap is published): `brew install --cask homielab
 The cask is in `packaging/Casks/cleanmate.rb`.
 
 Requires **macOS 13** or later.
+
+CleanMate is also available for Ubuntu: [homielab/cleanmate-linux](https://github.com/homielab/cleanmate-linux).
 
 ## Safety
 
