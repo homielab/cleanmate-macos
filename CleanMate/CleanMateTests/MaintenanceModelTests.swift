@@ -6,11 +6,20 @@ import Testing
 @MainActor
 struct MaintenanceModelTests {
     nonisolated static let date = Date(timeIntervalSince1970: 1_768_478_400)
+    nonisolated static let twoSnapshots = LocalSnapshots.parse("""
+        Snapshots for disk /:
+        com.apple.TimeMachine.2026-10-30-101112.local
+        com.apple.TimeMachine.2026-10-28-230501.local
+        """)
 
     /// A model whose runner answers from `outcomes` (by executable + arguments) and remembers every call.
     @MainActor final class Fake {
         var calls: [String] = []
         var recorded: [(MaintenanceTask, Bool)] = []
+        var recordedSnapshots: [(String, Bool)] = []
+        /// What the snapshot list reads, in order; the last one repeats.
+        var lists: [LocalSnapshots] = [MaintenanceModelTests.twoSnapshots]
+        var reads = 0
         var outcomes: [String: ShellCommand.Outcome?] = [:]
 
         func model() -> MaintenanceModel {
@@ -21,6 +30,13 @@ struct MaintenanceModelTests {
                 return self.outcomes[line] ?? ShellCommand.Outcome(succeeded: true, output: "")
             }
             model.record = { self.recorded.append(($0, $1)) }
+            model.recordSnapshot = { self.recordedSnapshots.append(($0.stamp, $1)) }
+            model.readSnapshots = {
+                await MainActor.run {
+                    self.reads += 1
+                    return self.lists[min(self.reads, self.lists.count) - 1]
+                }
+            }
             model.now = { MaintenanceModelTests.date }
             return model
         }
@@ -143,5 +159,111 @@ struct MaintenanceModelTests {
         #expect(ActivityLog.cleanups(now: Self.date, home: home) == ActivityLog.Cleanups())
         #expect(ActivitySettings.isTask("ran") && ActivitySettings.isTask("failed") && !ActivitySettings.isTask("deleted"))
         #expect(ActivitySettings.kindLabel("ran", locale: Locale(identifier: "en")).title == "Ran")
+    }
+
+    // MARK: Time Machine local snapshots
+
+    /// Nothing is deleted until the user confirms: asking runs no command, cancelling forgets the request.
+    @Test func snapshotDeletionNeedsConfirmation() async throws {
+        let fake = Fake()
+        let model = fake.model()
+        await model.loadSnapshots()
+        let list = try #require(model.snapshots?.list)
+        await model.confirmDeletion() // nothing asked yet
+        model.askToDelete(list)
+        #expect(model.pendingDeletion == list)
+        #expect(fake.calls.isEmpty)
+        model.cancelDeletion()
+        await model.confirmDeletion()
+        #expect(model.pendingDeletion == nil && model.snapshotResult == nil)
+        model.askToDelete([])
+        #expect(model.pendingDeletion == nil)
+        #expect(fake.calls.isEmpty && fake.recordedSnapshots.isEmpty)
+    }
+
+    /// Confirmed: `tmutil deletelocalsnapshots <date>` per snapshot, oldest first, one Activity line each, then the
+    /// list is read again.
+    @Test func confirmedDeletionRunsTmutilWithEachSnapshotDate() async {
+        let fake = Fake()
+        fake.lists = [Self.twoSnapshots, LocalSnapshots.parse("Snapshots for disk /:\n")]
+        fake.outcomes["tmutil deletelocalsnapshots 2026-10-28-230501"] = .init(succeeded: true, output: "Deleted local snapshot '2026-10-28-230501'\n")
+        let model = fake.model()
+        await model.loadSnapshots()
+        model.askToDelete(model.snapshots!.list)
+        await model.confirmDeletion()
+        #expect(fake.calls == ["tmutil deletelocalsnapshots 2026-10-28-230501", "tmutil deletelocalsnapshots 2026-10-30-101112"])
+        #expect(fake.recordedSnapshots.map(\.0) == ["2026-10-28-230501", "2026-10-30-101112"])
+        #expect(fake.recordedSnapshots.map(\.1) == [true, true])
+        #expect(model.snapshotResult == .init(status: .succeeded(Self.date), output: "Deleted local snapshot '2026-10-28-230501'"))
+        #expect(fake.reads == 2 && model.snapshots?.count == 0)
+        #expect(model.pendingDeletion == nil && !model.busy)
+    }
+
+    /// One snapshot that can't be deleted (in use by a backup) doesn't stop the others; the result says failed.
+    @Test func aFailedDeletionDoesNotStopTheOthers() async {
+        let fake = Fake()
+        fake.outcomes["tmutil deletelocalsnapshots 2026-10-28-230501"] = .init(succeeded: false, output: "Failed to delete local snapshot '2026-10-28-230501'\n")
+        fake.outcomes["tmutil deletelocalsnapshots 2026-10-30-101112"] = .some(nil)
+        let model = fake.model()
+        await model.loadSnapshots()
+        model.askToDelete(model.snapshots!.list)
+        await model.confirmDeletion()
+        #expect(fake.calls.count == 2)
+        #expect(fake.recordedSnapshots.map(\.1) == [false, false])
+        #expect(model.snapshotResult?.status == .failed(Self.date))
+        #expect(model.snapshotResult?.output.contains("Failed to delete") == true)
+        #expect(model.snapshotResult?.output.contains("tmutil") == true)
+    }
+
+    /// While snapshots are being deleted no task runs and nothing else can be asked, and the other way round.
+    @Test func deletionAndTasksDoNotOverlap() async {
+        let fake = Fake()
+        let model = fake.model()
+        await model.loadSnapshots()
+        let list = model.snapshots!.list
+        let (deleteGate, openDelete) = AsyncStream.makeStream(of: Void.self)
+        let (taskGate, openTask) = AsyncStream.makeStream(of: Void.self)
+        let base = model.runCommand
+        model.runCommand = { command in
+            if command.arguments.first == "deletelocalsnapshots" { for await _ in deleteGate { break } }
+            if command.arguments == ["-gc"] { for await _ in taskGate { break } }
+            return await base(command)
+        }
+        model.askToDelete([list[0]])
+        let deletion = Task { await model.confirmDeletion() }
+        while !model.deletingSnapshots { await Task.yield() }
+        #expect(model.busy)
+        await model.run(.quickLook)
+        model.askToDelete([list[1]])
+        #expect(model.results[.quickLook] == nil && model.pendingDeletion == nil)
+        openDelete.yield()
+        await deletion.value
+        #expect(fake.calls == ["tmutil deletelocalsnapshots 2026-10-28-230501"])
+
+        let task = Task { await model.run(.launchServices) }
+        while model.running == nil { await Task.yield() }
+        model.askToDelete(list)
+        #expect(model.pendingDeletion == nil)
+        openTask.yield()
+        await task.value
+    }
+
+    /// Under XCTest the default list reads nothing, so `tmutil` never runs.
+    @Test func defaultSnapshotReaderRunsNothingInTests() async {
+        let model = MaintenanceModel()
+        await model.loadSnapshots()
+        #expect(model.snapshots == .unreadable)
+    }
+
+    /// The Activity line of a deletion: "ran"/"failed" with the snapshot date, shown in the app's language.
+    @Test func snapshotActivityLine() throws {
+        let home = TestTemp.url("CleanMateMaintenanceSnapshot")
+        defer { try? FileManager.default.removeItem(at: home) }
+        ActivityLog.recordTask(module: "Maintenance", item: ActivityLog.english("Delete local snapshot \("2026-10-28-230501")"),
+                               succeeded: true, home: home, date: Self.date)
+        let line = try #require(ActivityLog.read(home: home).split(separator: "\n").first)
+        #expect(ActivityLog.entry(line, locale: Locale(identifier: "en")).item == "Delete local snapshot 2026-10-28-230501")
+        #expect(ActivityLog.entry(line, locale: Locale(identifier: "vi")).item == "Xoá snapshot cục bộ 2026-10-28-230501")
+        #expect(ActivityLog.entry(line, locale: Locale(identifier: "en")).kind == "ran")
     }
 }

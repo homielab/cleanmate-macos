@@ -25,6 +25,16 @@ struct LocalSnapshotsTests {
         #expect(list.readable && list.count == 3)
         #expect(list.oldest == date("2026-10-28T23:05:01Z"))
         #expect(list.newest == date("2026-10-30T10:11:12Z"))
+        #expect(list.list.map(\.stamp) == ["2026-10-28-230501", "2026-10-29-080000", "2026-10-30-101112"])
+        #expect(list.list.first?.date == list.oldest)
+    }
+
+    /// Deleting runs `tmutil deletelocalsnapshots <date>` by its full path, without admin rights.
+    @Test func deleteCommandTakesTheSnapshotDate() throws {
+        let snapshot = try #require(LocalSnapshots.parse("com.apple.TimeMachine.2026-10-30-101112.local").list.first)
+        let command = LocalSnapshots.deleteCommand(snapshot)
+        #expect(command.executable == "/usr/bin/tmutil")
+        #expect(command.arguments == ["deletelocalsnapshots", "2026-10-30-101112"])
     }
 
     /// Before macOS 10.15: no header, no ".local"; other snapshots are not Time Machine's; a name without a
@@ -38,6 +48,7 @@ struct LocalSnapshotsTests {
         let list = LocalSnapshots.parse(output, timeZone: Self.utc)
         #expect(list.count == 2)
         #expect(list.oldest == date("2019-05-01T12:00:00Z") && list.newest == list.oldest)
+        #expect(list.list.map(\.stamp) == ["2019-05-01-120000"]) // only names with a date can be deleted
     }
 
     @Test func noSnapshotsOrNoOutput() {

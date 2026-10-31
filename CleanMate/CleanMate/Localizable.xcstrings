@@ -6060,16 +6060,6 @@
         }
       }
     },
-    "In use, but in none of your folders. Shown for information: CleanMate changes nothing here." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đang dùng nhưng không nằm trong thư mục nào của bạn. Chỉ để bạn biết: CleanMate không thay đổi gì ở đây."
-          }
-        }
-      }
-    },
     "Time Machine local snapshots" : {
       "localizations" : {
         "vi" : {
@@ -6120,32 +6110,12 @@
         }
       }
     },
-    "macOS deletes them by itself when it needs the space. To delete them now: Time Machine settings, or “tmutil thinlocalsnapshots” in Terminal (needs an administrator)." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS tự xoá khi cần chỗ. Xoá ngay: cài đặt Time Machine, hoặc “tmutil thinlocalsnapshots” trong Terminal (cần quyền quản trị)."
-          }
-        }
-      }
-    },
     "Measuring their size needs administrator rights." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đo dung lượng của chúng cần quyền quản trị."
-          }
-        }
-      }
-    },
-    "Open Time Machine Settings…" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mở cài đặt Time Machine…"
           }
         }
       }
@@ -6474,6 +6444,116 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không có %@, hoặc chạy quá lâu nên đã bị dừng."
+          }
+        }
+      }
+    },
+    "Delete local snapshot %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá snapshot cục bộ %@"
+          }
+        }
+      }
+    },
+    "Delete…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá…"
+          }
+        }
+      }
+    },
+    "Delete All…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá tất cả…"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá"
+          }
+        }
+      }
+    },
+    "Copies of your disk that Time Machine keeps on this Mac between backups. macOS deletes them by itself when it needs the space; deleting them now frees it at once. Backups on your Time Machine disk are not touched. Each deletion is recorded in Settings › Activity." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản sao ổ đĩa mà Time Machine giữ trên máy này giữa các lần sao lưu. macOS tự xoá khi cần chỗ; xoá ngay thì giải phóng dung lượng ngay. Bản sao lưu trên ổ Time Machine không bị đụng tới. Mỗi lần xoá được ghi trong Cài đặt › Hoạt động."
+          }
+        }
+      }
+    },
+    "These are backup copies Time Machine keeps on this Mac. Deleting them can’t be undone. Backups on your Time Machine disk are not affected." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đây là bản sao lưu Time Machine giữ trên máy này. Xoá rồi thì không hoàn tác được. Bản sao lưu trên ổ Time Machine không bị ảnh hưởng."
+          }
+        }
+      }
+    },
+    "Delete the local snapshot of %@?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá snapshot cục bộ lúc %@?"
+          }
+        }
+      }
+    },
+    "Delete all %lld local snapshots?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá cả %lld snapshot cục bộ?"
+          }
+        }
+      }
+    },
+    "None on this Mac." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có trên máy này."
+          }
+        }
+      }
+    },
+    "macOS deletes them by itself when it needs the space. To delete them now: Maintenance." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS tự xoá khi cần chỗ. Xoá ngay: Bảo trì."
+          }
+        }
+      }
+    },
+    "In use, but in none of your folders. Shown for information; local snapshots can be deleted in Maintenance." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang dùng nhưng không nằm trong thư mục nào của bạn. Chỉ để bạn biết; snapshot cục bộ xoá được trong Bảo trì."
           }
         }
       }

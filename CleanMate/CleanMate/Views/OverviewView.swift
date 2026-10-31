@@ -91,7 +91,7 @@ struct OverviewView: View {
                 if model.measuring { ProgressView().controlSize(.small) }
             }
         } footer: {
-            Text("In use, but in none of your folders. Shown for information: CleanMate changes nothing here.")
+            Text("In use, but in none of your folders. Shown for information; local snapshots can be deleted in Maintenance.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -214,7 +214,7 @@ private struct OutsideRow: View {
     var largest: Int64 = 0
     let note: Text
     var help: Text?
-    var action: (title: LocalizedStringKey, url: URL)?
+    var action: (title: LocalizedStringKey, perform: () -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -224,7 +224,7 @@ private struct OutsideRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 if let action {
-                    Button(action.title) { openSettingsPane(action.url) }.controlSize(.small)
+                    Button(action.title, action: action.perform).controlSize(.small)
                 }
             }
             .padding(.leading, 28)
@@ -249,11 +249,10 @@ private struct OutsideRow: View {
     }
 }
 
-/// Time Machine's local snapshots: how many and from when. Their size needs admin rights to measure, so none is shown.
+/// Time Machine's local snapshots: how many and from when, and "Delete…" to Maintenance, where they are deleted.
+/// Their size needs admin rights to measure, so none is shown.
 private struct SnapshotsRow: View {
     let snapshots: LocalSnapshots?
-
-    private static let settings = URL(string: "x-apple.systempreferences:com.apple.Time-Machine-Settings.extension")!
 
     var body: some View {
         let title = Text("Time Machine local snapshots")
@@ -269,8 +268,8 @@ private struct SnapshotsRow: View {
             OutsideRow(symbol: "clock.arrow.circlepath", title: title, value: Text("None"), note: about)
         case let list?:
             OutsideRow(symbol: "clock.arrow.circlepath", title: title, value: Text("\(list.count) snapshots"),
-                       note: dates(list) + Text("macOS deletes them by itself when it needs the space. To delete them now: Time Machine settings, or “tmutil thinlocalsnapshots” in Terminal (needs an administrator)."),
-                       help: help, action: ("Open Time Machine Settings…", Self.settings))
+                       note: dates(list) + Text("macOS deletes them by itself when it needs the space. To delete them now: Maintenance."),
+                       help: help, action: ("Delete…", { ModuleRouter.shared.requested = .maintenance }))
         }
     }
 

@@ -593,6 +593,10 @@ struct UISnapshots {
             }
         }
         for task in MaintenanceTask.allCases { await model.run(task) }
+        model.readSnapshots = {
+            LocalSnapshots.parse("com.apple.TimeMachine.2026-10-29-080000.local\ncom.apple.TimeMachine.2026-10-30-101112.local")
+        }
+        await model.loadSnapshots()
         try await snapshot("maintenance-results") { MaintenanceView(model: model) }
     }
 
