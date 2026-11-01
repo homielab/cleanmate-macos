@@ -22,6 +22,10 @@ Options for `scan` and `clean`:
 - `clean` without `--only` never cleans an item with `"dataLoss": true` (`docker-volumes`, `docker-containers`), even
   ticked in the app: it lists it with `"locked": true` and the reason
   `"May hold data: name it with --only docker-volumes to clean it"`.
+- Named with `--only`, `docker-volumes` and `docker-containers` remove every volume or container in their `entries`,
+  one by one, except entries with a `reason` (a volume a stopped container still uses). The rows the user ticks in the
+  app's Smart Scan stay in the app: `clean` does not see them, so it takes all of them. To keep some (a database), the
+  user cleans them in the app instead, ticking only the ones to remove.
 
 ## Example conversation
 
@@ -67,7 +71,7 @@ Options for `scan` and `clean`:
     {
       "dataLoss" : true,
       "disposal" : "delete",
-      "entries" : [ { "name" : "postgres-data · local", "path" : "1", "size" : 17500000000 } ],
+      "entries" : [ { "name" : "postgres-data · local", "path" : "postgres-data", "size" : 17500000000 } ],
       "group" : "dev",
       "id" : "docker-volumes",
       "locked" : false,
@@ -99,7 +103,8 @@ Options for `scan` and `clean`:
 ```
 
 An item may also have `records` (database rows a Privacy item erases) and `needsFullDiskAccess: true`. An entry may
-have a `name` (a Docker volume or container, a simulator…): show it, its `path` is then only an index.
+have a `name` (a Docker volume or container, a simulator…): show it, its `path` is then an identifier (a volume name,
+a container or image ID), not a file.
 
 ## `clean --yes --json` (shortened)
 

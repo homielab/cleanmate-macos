@@ -6429,13 +6429,35 @@
         }
       }
     },
-    "Unreadable entries: %lld (prune may still remove them)" : {
+    "Docker did not report enough about these to remove them here" : {
+      "comment" : "Lock reason of the last row of a Docker list: records of docker system df that could not be read.",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Docker không báo đủ thông tin để xoá chúng ở đây"
+          }
+        }
+      }
+    },
+    "Unreadable entries: %lld" : {
       "comment" : "Last row of a Docker list: records of docker system df that could not be read.",
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mục không đọc được: %lld (lệnh dọn vẫn có thể xoá chúng)"
+            "value" : "Mục không đọc được: %lld"
+          }
+        }
+      }
+    },
+    "Used by the stopped container %@: remove it first" : {
+      "comment" : "Lock reason of an unused Docker volume that stopped containers still mount; %@ = their names.",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Container đã dừng %@ đang dùng: xoá container đó trước"
           }
         }
       }

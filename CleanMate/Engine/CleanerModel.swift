@@ -25,7 +25,7 @@ nonisolated struct SizeProbe: Sendable {
     var precondition: @Sendable () -> Bool = { true }
     /// Parses the command's standard output; nil = nothing to report.
     var parse: @Sendable (String) -> Result?
-    /// With `.bytes`: a second command whose parsed rows are listed in the expanded row (Docker's stopped containers).
+    /// With `.bytes`: a second command whose parsed rows are listed in the expanded row (Homebrew's unneeded formulae).
     /// Display only unless the item has an `entryCommand`: the item's command does the cleaning, these entries are
     /// never removed (see `Cleaner.remove`).
     /// The same command as `command` is not run again: the probe's output is parsed.

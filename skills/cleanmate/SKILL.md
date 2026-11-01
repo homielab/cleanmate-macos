@@ -19,8 +19,9 @@ apps are skipped. This skill drives it with `--json`.
 5. Items with `"dataLoss": true` (Docker volumes, stopped Docker containers) are deleted for good with whatever is
    inside: databases, files written in a container. Never suggest them and never add them to a clean on your own,
    even when `selectedByDefault` is true (the user ticked them in the app). Clean one only when the user names that
-   item after seeing its volumes or containers (`entries`), with its id in `--only`. A clean without `--only` never
-   takes them: it reports them `locked` with a `reason`.
+   item after seeing its volumes or containers (`entries`), with its id in `--only`: that removes all of them except
+   entries with a `reason`. If the user wants to keep some, send them to the app (Smart Scan › Developer Junk) to tick
+   only the ones to remove. A clean without `--only` never takes them: it reports them `locked` with a `reason`.
 6. Never pass `--privacy` (browser history, cookies, recent items) unless the user asked for privacy cleaning.
 7. Do not offer `locked` items: tell the user the `reason` (`"Google Chrome is running"`), to quit that app and rescan.
 8. When unsure, run the same clean with `--dry-run` first. Never delete files by hand instead of using `cleanmate`.

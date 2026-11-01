@@ -331,22 +331,38 @@ struct ScannerCleanerTests {
         #expect(FileManager.default.fileExists(atPath: key.path))
     }
 
-    /// Docker's listed containers and volumes are display-only: even with the
-    /// tool gone, the cleaner never removes an entry.
-    @Test(arguments: ["docker-containers", "docker-volumes"])
-    func dockerEntriesAreNeverRemoved(id: String) async throws {
+    /// Stopped containers and unused volumes: only the ticked rows reach docker, one `docker rm <id>` /
+    /// `docker volume rm <name>` each (never forced, never a prune); a row it can't name runs nothing.
+    @Test(arguments: [("docker-containers", "docker-container:" + String(repeating: "c1f4cbb8", count: 8),
+                       "rm " + String(repeating: "c1f4cbb8", count: 8)),
+                      ("docker-volumes", "docker-volume:api_pgdata18", "volume rm api_pgdata18")])
+    func dockerRowsAreRemovedOneByOne(id: String, ticked: String, call: String) async throws {
         let box = try Sandbox()
         defer { box.remove() }
-        let file = try box.file("Library/Caches/x/a")
-        let images = try #require(CleanerGroup.developer.items.first { $0.id == id })
-        #expect(images.paths.isEmpty && images.command != nil && !images.selectableEntries && images.probe?.details != nil)
-        var item = images
-        item.command = ShellCommand(executable: "cleanmate-no-such-tool")
+        let log = box.root.appending(path: "calls.txt")
+        let script = try box.file("fake-docker.sh")
+        try "#!/bin/sh\necho \"$@\" >> '\(log.path)'\n".write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        var item = try #require(CleanerGroup.developer.items.first { $0.id == id })
+        #expect(!item.selectedByDefault && item.selectableEntries && item.paths.isEmpty)
+        #expect(item.runningProcessNames == ["docker-buildx", "docker-compose"])
+        let real = try #require(item.entryCommand?(URL(string: ticked)!))
+        #expect(real.executable == "docker" && real.arguments.joined(separator: " ") == call)
+        item.command = ShellCommand(executable: script.path)
+        let entryCommand = try #require(item.entryCommand)
+        item.entryCommand = { url in entryCommand(url).map { ShellCommand(executable: script.path, arguments: $0.arguments) } }
         item.probe?.precondition = { true }
-        let scan = ItemScan(entries: [ScanEntry(url: file, size: 1), ScanEntry(url: URL(string: "docker-image:0")!, size: 1)],
-                            measuredSize: 2)
+        // What the user ticked: one real row, the unreadable row and rows that are not a container ID / volume name.
+        let file = try box.file("Library/Caches/x/a")
+        let scan = ItemScan(entries: [
+            ScanEntry(url: URL(string: ticked)!, size: 10), ScanEntry(url: file, size: 1),
+            ScanEntry(url: URL(string: id.dropLast() + ":-unreadable")!, size: 0),
+            ScanEntry(url: URL(string: id.dropLast() + ":--force")!, size: 1),
+            ScanEntry(url: URL(string: "docker-image:nginx:latest")!, size: 1),
+        ], measuredSize: 13)
         let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
-        #expect(report.freed == 0 && report.skipped == 1)
+        #expect(report.freed == 10 && report.skipped == 4)
+        #expect(try String(contentsOf: log, encoding: .utf8) == call + "\n")
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 
@@ -923,18 +939,10 @@ struct ProbeAndCommandTests {
 }
 
 struct DeveloperToolsTests {
-    @Test func dockerSystemDf() {
-        let output = """
-        {"Active":"2","Reclaimable":"1.995GB (77%)","Size":"2.573GB","TotalCount":"3","Type":"Images"}
-        {"Active":"2","Reclaimable":"0B (0%)","Size":"72.24MB","TotalCount":"2","Type":"Containers"}
-        {"Active":"1","Reclaimable":"14.21GB (98%)","Size":"14.45GB","TotalCount":"28","Type":"Local Volumes"}
-        {"Active":"0","Reclaimable":"512kB","Size":"0B","TotalCount":"0","Type":"Build Cache"}
-        """
-        #expect(DeveloperTools.dockerReclaimable("Images", in: output) == 1_995_000_000)
-        #expect(DeveloperTools.dockerReclaimable("Containers", in: output) == 0)
-        #expect(DeveloperTools.dockerReclaimable("Local Volumes", in: output) == 14_210_000_000)
-        #expect(DeveloperTools.dockerReclaimable("Build Cache", in: output) == 512_000)
-        #expect(DeveloperTools.dockerReclaimable("Images", in: "Cannot connect to the Docker daemon") == nil)
+    @Test func dockerSizes() {
+        #expect(DeveloperTools.bytes(fromDockerSize: "1.995GB") == 1_995_000_000)
+        #expect(DeveloperTools.bytes(fromDockerSize: "0B") == 0)
+        #expect(DeveloperTools.bytes(fromDockerSize: "512kB") == 512_000)
         #expect(DeveloperTools.bytes(fromDockerSize: "1.5GiB") == 1_610_612_736)
         #expect(DeveloperTools.bytes(fromDockerSize: "12XB") == nil)
     }
@@ -1038,45 +1046,66 @@ struct DeveloperToolsTests {
         #expect(await probe.output() == nil)
     }
 
-    /// Stopped containers / unused volumes listed exactly as `container prune` / `volume prune --all` remove them.
+    /// Stopped containers: every one `container prune` would remove, by ID. Unused volumes: every one no container
+    /// uses (`volume prune --all`), by name; one only stopped containers mount is locked naming them, one a running
+    /// container mounts is left out.
     @Test func dockerStoppedContainersAndUnusedVolumes() throws {
         let hex = String(repeating: "ed5c3850", count: 8)
+        func id(_ n: Int) -> String { String(repeating: "\(n)", count: 64) }
         let output = """
         {"Images":[],"Containers":[\
-        {"CreatedAt":"2026-10-22 13:05:02 +0700 +07","Image":"app-dev","Names":"web","Size":"2.75MB","State":"running","Status":"Up 8 minutes"},\
-        {"CreatedAt":"2026-10-22 03:16:13 +0700 +07","Image":"alpine:3","Names":"lint","Size":"0B","State":"created","Status":"Created"},\
-        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","Image":"postgres:17","Names":"db-1","Size":"16kB","State":"exited","Status":"Exited (0) 2 days ago"},\
-        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","Image":"redis","Names":"cache","Size":"1kB","State":"paused","Status":"Up 1 hour (Paused)"},\
-        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","Image":"redis","Names":"flaky","Size":"1kB","State":"restarting","Status":"Restarting"},\
-        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","Image":"redis","Names":"gone","Size":"1kB","State":"dead","Status":"Dead"}\
+        {"CreatedAt":"2026-10-22 13:05:02 +0700 +07","ID":"\(id(1))","Image":"app-dev","Mounts":"in-use,/Users/me/app","Names":"web","Size":"2.75MB","State":"running","Status":"Up 8 minutes"},\
+        {"CreatedAt":"2026-10-22 03:16:13 +0700 +07","ID":"\(id(2))","Image":"alpine:3","Mounts":"","Names":"lint","Size":"0B","State":"created","Status":"Created"},\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"\(id(3))","Image":"postgres:17","Mounts":"pgdata","Names":"db-1","Size":"16kB","State":"exited","Status":"Exited (0) 2 days ago"},\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"\(id(4))","Image":"redis","Names":"cache","Size":"1kB","State":"paused","Status":"Up 1 hour (Paused)"},\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"\(id(5))","Image":"redis","Names":"flaky","Size":"1kB","State":"restarting","Status":"Restarting"},\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"\(id(6))","Image":"redis","Mounts":"pgdata","Names":"gone","Size":"1kB","State":"dead","Status":"Dead"},\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"--force","Image":"redis","Names":"odd","Size":"1kB","State":"exited","Status":"Exited"}\
         ],"Volumes":[\
         {"Driver":"local","Labels":"com.docker.volume.anonymous=","Links":"0","Name":"\(hex)","Size":"314.7MB"},\
         {"Driver":"local","Labels":"","Links":"0","Name":"limcare_pgdata","Size":"48MB"},\
         {"Driver":"local","Labels":"","Links":"1","Name":"in-use","Size":"3.7GB"},\
+        {"Driver":"local","Labels":"","Links":"2","Name":"pgdata","Size":"1GB"},\
+        {"Driver":"local","Labels":"","Links":"1","Name":"nobody","Size":"1GB"},\
+        {"Driver":"local","Labels":"","Links":"0","Name":"-rf","Size":"1GB"},\
         {"Driver":"local","Labels":"","Links":"0","Name":"\(hex.dropLast(2))zz","Size":"N/A"}\
         ],"BuildCache":[]}
         """
         let containers = DeveloperTools.dockerStoppedContainers(in: output)
         #expect(containers.map(\.title) == ["lint · alpine:3 · Created", "db-1 · postgres:17 · Exited (0) 2 days ago",
-                                            "gone · redis · Dead"]) // running, paused, restarting are kept by prune
-        #expect(containers.map(\.size) == [0, 16_000, 1_000])
+                                            "gone · redis · Dead"]) // running, paused, restarting are kept; "--force" is no ID
+        #expect(containers.map(\.url.absoluteString) == [2, 3, 6].map { "docker-container:" + id($0) })
+        #expect(containers.map(\.size) == [0, 16_000, 1_000] && containers.allSatisfy { $0.lockReason == nil })
         #expect(containers[1].date == DeveloperTools.dockerDate("2026-10-19 11:43:56 +0700 +07") && containers[1].date != nil)
         let volumes = DeveloperTools.dockerUnusedVolumes(in: output)
-        #expect(volumes.count == 3) // `--all`: named unused volumes too; "in-use" has a container
+        #expect(volumes.map(\.url.absoluteString) == ["docker-volume:\(hex)", "docker-volume:limcare_pgdata",
+                                                     "docker-volume:pgdata", "docker-volume:\(hex.dropLast(2))zz"])
         #expect(volumes[0].title?.hasPrefix(String(hex.prefix(12)) + " · ") == true && volumes[0].title?.hasSuffix(" · local") == true)
         #expect(volumes[0].title != String(hex.prefix(12)) + " · local") // marked anonymous
-        #expect(volumes[1].title == "limcare_pgdata · local" && volumes[1].size == 48_000_000)
-        #expect(volumes[2].title == "\(hex.dropLast(2))zz · local" && volumes[2].size == 0) // not hex: named
-        let urls = (containers + volumes).map(\.url)
-        #expect(Set(urls).count == urls.count && urls.allSatisfy { !$0.isFileURL })
+        #expect(volumes[1].title == "limcare_pgdata · local" && volumes[1].size == 48_000_000 && volumes[1].lockReason == nil)
+        // Only stopped containers mount it: locked, naming them; "in-use" (a running one) and "nobody" (no container
+        // found) are left out.
+        #expect(volumes[2].lockReason?.contains("db-1, gone") == true && volumes[2].size == 1_000_000_000)
+        #expect(volumes[3].title == "\(hex.dropLast(2))zz · local" && volumes[3].size == 0) // not hex: named
+        #expect(volumes.compactMap { DeveloperTools.dockerVolumeName(of: $0.url) }.count == 4)
         #expect(DeveloperTools.dockerStoppedContainers(in: "Cannot connect").isEmpty)
         #expect(DeveloperTools.dockerUnusedVolumes(in: "Cannot connect").isEmpty)
-        // The prune commands these lists mirror (never made more aggressive).
+        // Measured as the rows that can be removed (the locked one left out); none → hidden.
         let items = CleanerGroup.developer.items
         let containerItem = try #require(items.first { $0.id == "docker-containers" })
         let volumeItem = try #require(items.first { $0.id == "docker-volumes" })
-        #expect(containerItem.command?.arguments == ["container", "prune", "--force"])
-        #expect(volumeItem.command?.arguments == ["volume", "prune", "--all", "--force"])
+        guard case .bytes(let volumeTotal)? = volumeItem.probe?.parse(output),
+              case .bytes(let containerTotal)? = containerItem.probe?.parse(output) else { Issue.record("no size"); return }
+        #expect(volumeTotal == 314_700_000 + 48_000_000 && containerTotal == 17_000)
+        let lockedOnly = #"{"Containers":[{"CreatedAt":"","ID":"\#(id(3))","Image":"x","Mounts":"pgdata","Names":"db-1","Size":"0B","State":"exited","Status":"Exited"}],"Volumes":[{"Driver":"local","Labels":"","Links":"1","Name":"pgdata","Size":"1GB"}]}"#
+        #expect(volumeItem.probe?.parse(lockedOnly) == nil)
+        // Never a prune: entries go one by one, and a name or ID that could be read as an option runs nothing.
+        for bad in ["docker-volume:-rf", "docker-volume:a", "docker-volume:a b", "docker-volume:-unreadable", "docker-container:pgdata"] {
+            #expect(volumeItem.entryCommand?(URL(string: bad.replacingOccurrences(of: " ", with: "%20"))!) == nil, "\(bad)")
+        }
+        for bad in ["docker-container:--force", "docker-container:ABCDEF012345", "docker-container:abc", "docker-container:-unreadable"] {
+            #expect(containerItem.entryCommand?(URL(string: bad)!) == nil, "\(bad)")
+        }
     }
 
     /// Build cache: every record not in use, one entry each by its ID; an in-use record is never listed.
@@ -1150,17 +1179,18 @@ struct DeveloperToolsTests {
     @Test func dockerRecordMissingFieldKeepsTheList() {
         let output = """
         {"Images":[],"Containers":[\
-        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","Image":"redis","Names":"gone","Size":"1kB","State":"exited","Status":"Exited"},\
-        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","Image":"redis","Names":"odd","Size":"1kB","Status":"Exited"}\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"0123456789ab","Image":"redis","Names":"gone","Size":"1kB","State":"exited","Status":"Exited"},\
+        {"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"0123456789ac","Image":"redis","Names":"odd","Size":"1kB","Status":"Exited"}\
         ],"Volumes":[{"Driver":"local","Labels":"","Links":"0","Name":"data","Size":"1kB"},{"Name":"broken"}],\
         "BuildCache":[{"ID":"x"}]}
         """
         let containers = DeveloperTools.dockerStoppedContainers(in: output)
         #expect(containers.count == 2 && containers[0].title == "gone · redis · Exited")
-        #expect(containers[1].size == 0 && containers[1].title?.contains("1") == true && containers[1].url.absoluteString == "docker-container:unreadable")
+        #expect(containers[1].size == 0 && containers[1].title?.contains("1") == true && containers[1].url.absoluteString == "docker-container:-unreadable")
+        #expect(containers[1].lockReason != nil && containers[0].lockReason == nil) // counted, never removed
         let volumes = DeveloperTools.dockerUnusedVolumes(in: output)
-        #expect(volumes.map(\.url.absoluteString) == ["docker-volume:0", "docker-volume:unreadable"])
-        #expect(DeveloperTools.dockerPrunableBuildCache(in: output).map(\.url.absoluteString) == ["docker-build-cache:unreadable"])
+        #expect(volumes.map(\.url.absoluteString) == ["docker-volume:data", "docker-volume:-unreadable"])
+        #expect(DeveloperTools.dockerPrunableBuildCache(in: output).map(\.url.absoluteString) == ["docker-build-cache:-unreadable"])
     }
 
     @Test func staleSimulatorRuntimes() throws {

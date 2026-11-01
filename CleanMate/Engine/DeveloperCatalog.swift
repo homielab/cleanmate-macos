@@ -280,15 +280,11 @@ extension CleanerGroup {
         dockerDangling,
         // Unticked: a record is reused by the next build; each one is removed by its own ID.
         dockerBuildCache,
-        // Unticked: a stopped container's own filesystem (outside volumes) is lost with it.
-        docker("docker-containers", "Docker: stopped containers",
-               note: "Files written inside these containers (outside volumes) are lost",
-               type: "Containers", ["container", "prune", "--force"], selected: false,
-               details: DeveloperTools.dockerStoppedContainers),
-        docker("docker-volumes", "Docker: unused volumes",
-               note: "Volumes no container uses; they may hold databases or other data",
-               type: "Local Volumes", ["volume", "prune", "--all", "--force"], selected: false,
-               details: DeveloperTools.dockerUnusedVolumes),
+        // Unticked: a stopped container's own filesystem (outside volumes) is lost with it. Each one is removed by its
+        // own ID, so an unticked one stays.
+        dockerContainers,
+        // Unticked: a volume may hold a database. Each one is removed by its own name, so an unticked one stays.
+        dockerVolumes,
         // OrbStack: the app's caches (its downloaded updates too) and logs; never ~/.orbstack's ssh keys, config,
         // shell setup or run folder, nor the machines and containers (in its group container). Skipped while the app
         // or its VM manager (`dev.kdrag0n.MacVirt.vmgr`) runs; a log a process still writes is kept.
@@ -455,24 +451,49 @@ extension CleanerGroup {
         return item
     }()
 
-    nonisolated private static func docker(
-        _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource, type: String,
-        _ cleanArguments: [String], selected: Bool = true,
-        details: (@Sendable (String) -> [ScanEntry])? = nil // parses `docker system df -v`, one entry each
+    /// Stopped containers (`docker system df -v`), one entry each, removed with `docker rm <id>` for the ticked ones:
+    /// no `-f`, so docker refuses a container started since the scan. Skipped while `docker compose` (or a build) runs:
+    /// it may be about to start one again.
+    nonisolated private static let dockerContainers: CleanerItem = dockerListed(
+        "docker-containers", "Docker: stopped containers",
+        note: "Files written inside these containers (outside volumes) are lost",
+        prune: ["container", "prune", "--force"], list: DeveloperTools.dockerStoppedContainers,
+        entryArguments: { DeveloperTools.dockerContainerID(of: $0).map { ["rm", $0] } })
+
+    /// Volumes no container uses (`docker system df -v`), one entry each, removed with `docker volume rm <name>` for the
+    /// ticked ones: no `-f`, so docker refuses a volume a container started using since the scan. A volume only stopped
+    /// containers use is a locked row (remove the container first). Skipped while `docker compose` (or a build) runs.
+    nonisolated private static let dockerVolumes: CleanerItem = dockerListed(
+        "docker-volumes", "Docker: unused volumes",
+        note: "Volumes no container uses; they may hold databases or other data",
+        prune: ["volume", "prune", "--all", "--force"], list: DeveloperTools.dockerUnusedVolumes,
+        entryArguments: { DeveloperTools.dockerVolumeName(of: $0).map { ["volume", "rm", $0] } })
+
+    /// An unticked item listing `docker system df -v` rows with `list`, one entry each, removed one by one with the
+    /// `entryArguments` docker command (nil: not a row it can remove, skipped). `prune` is never run: it only names the
+    /// tool that must be installed. Measured as its unlocked rows; none → hidden.
+    nonisolated private static func dockerListed(
+        _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource, prune: [String],
+        list parse: @escaping @Sendable (String) -> [ScanEntry],
+        entryArguments: @escaping @Sendable (URL) -> [String]?
     ) -> CleanerItem {
-        // `--host` beats DOCKER_HOST/DOCKER_CONTEXT and the current context, so a remote context is never pruned.
+        // `--host` beats DOCKER_HOST/DOCKER_CONTEXT and the current context, so a remote context is never touched.
         let host: @Sendable () -> [String]? = { DeveloperTools.localDockerHostArguments() }
-        return dev(id, title, note: note, [],
-            command: ShellCommand(executable: "docker", arguments: cleanArguments, timeout: .seconds(300),
-                                  leadingArguments: host),
-            probe: SizeProbe(command: ShellCommand(executable: "docker",
-                                                   arguments: ["system", "df", "--format", "{{json .}}"],
-                                                   timeout: .seconds(20), leadingArguments: host),
-                             precondition: DeveloperTools.dockerDaemonIsRunning,
-                             parse: { DeveloperTools.dockerReclaimable(type, in: $0).map(SizeProbe.Result.bytes) },
-                             details: details.map { (ShellCommand(executable: "docker", arguments: ["system", "df", "-v", "--format", "{{json .}}"],
-                                                                  timeout: .seconds(20), leadingArguments: host), $0) }),
-            selected: selected)
+        let list = ShellCommand(executable: "docker", arguments: ["system", "df", "-v", "--format", "{{json .}}"],
+                                timeout: .seconds(20), leadingArguments: host)
+        var item = dev(id, title, note: note, [],
+            command: ShellCommand(executable: "docker", arguments: prune, timeout: .seconds(300), leadingArguments: host),
+            probe: SizeProbe(command: list, precondition: DeveloperTools.dockerDaemonIsRunning,
+                             parse: { output in
+                                 let entries = parse(output).filter { $0.lockReason == nil }
+                                 return entries.isEmpty ? nil : .bytes(entries.reduce(0) { $0 + $1.size })
+                             },
+                             details: (list, parse)),
+            selected: false, processes: ["docker-buildx", "docker-compose"], selectableEntries: true)
+        item.entryCommand = { url in
+            entryArguments(url).map { ShellCommand(executable: "docker", arguments: $0, timeout: .seconds(60), leadingArguments: host) }
+        }
+        return item
     }
 }
 
@@ -542,17 +563,6 @@ nonisolated enum DeveloperTools {
     static func isIDECache(_ components: ArraySlice<String>) -> Bool {
         components.first == "JetBrains"
             || components.first == "Google" && components.dropFirst().first?.hasPrefix("AndroidStudio") == true
-    }
-
-    /// Reclaimable bytes of one `Type` ("Images", "Containers", "Local Volumes", "Build Cache")
-    /// from `docker system df --format '{{json .}}'` (one JSON object per line, e.g. "Reclaimable":"1.9GB (77%)").
-    static func dockerReclaimable(_ type: String, in output: String) -> Int64? {
-        for line in output.split(whereSeparator: \.isNewline) {
-            guard let row = try? JSONDecoder().decode([String: String].self, from: Data(line.utf8)),
-                  row["Type"] == type, let value = row["Reclaimable"] else { continue }
-            return bytes(fromDockerSize: String(value.split(separator: " ").first ?? ""))
-        }
-        return nil
     }
 
     /// Tagged images no container uses, from `docker images --format '{{json .}}'` and, after
@@ -653,37 +663,83 @@ nonisolated enum DeveloperTools {
         return shortImageID(String(text.dropFirst("docker-dangling:".count)))
     }
 
-    /// Containers `docker container prune` removes, from `docker system df -v --format '{{json .}}'`: every one
-    /// that is not running (prune keeps running, paused and restarting ones). Title "name · image · status".
+    /// Stopped containers from `docker system df -v --format '{{json .}}'`: every one that is not running, paused or
+    /// restarting (what `docker container prune` would remove). Entry URL `docker-container:<id>`; a record whose ID is
+    /// not a plain container ID is left out. Title "name · image · status" (the status says when it stopped), date =
+    /// creation.
     static func dockerStoppedContainers(in output: String) -> [ScanEntry] {
-        struct Container: Decodable {
-            let CreatedAt: String, Image: String, Names: String, Size: String, State: String, Status: String
-        }
-        struct Report: Decodable { let Containers: [Lenient<Container>]? }
-        guard let report = try? JSONDecoder().decode(Report.self, from: Data(output.utf8)) else { return [] }
-        return readable(report.Containers, scheme: "docker-container") { index, container in
-            guard !["running", "paused", "restarting"].contains(container.State),
-                  let url = URL(string: "docker-container:\(index)") else { return nil }
+        guard let report = try? JSONDecoder().decode(DiskUsage.self, from: Data(output.utf8)) else { return [] }
+        return readable(report.Containers, scheme: "docker-container") { _, container in
+            guard !container.isActive, let id = containerID(container.ID),
+                  let url = URL(string: "docker-container:\(id)") else { return nil }
             return ScanEntry(url: url, size: bytes(fromDockerSize: container.Size) ?? 0,
                              title: [container.Names, container.Image, container.Status].joined(separator: " · "),
                              date: dockerDate(container.CreatedAt))
         }
     }
 
-    /// Volumes `docker volume prune --all` removes (the item passes `--all`, so named volumes too, not only
-    /// anonymous ones): those no container uses, stopped ones included ("Links":"0"). Title "name · driver";
-    /// an anonymous volume (64-hex name or the anonymous label) shows its short ID and is marked as such.
+    /// Volumes from `docker system df -v --format '{{json .}}'` that no container uses, stopped ones included
+    /// ("Links":"0"; named volumes too, not only anonymous ones). Entry URL `docker-volume:<name>`; a name that is not a
+    /// plain volume name is left out. Title "name · driver"; an anonymous volume (64-hex name or the anonymous label)
+    /// shows its short ID and is marked as such. A volume only stopped containers mount is listed locked, naming them:
+    /// docker refuses to remove it until they are removed. One a running container mounts is left out.
     static func dockerUnusedVolumes(in output: String) -> [ScanEntry] {
-        struct Volume: Decodable { let Driver: String, Labels: String, Links: String, Name: String, Size: String }
-        struct Report: Decodable { let Volumes: [Lenient<Volume>]? }
-        guard let report = try? JSONDecoder().decode(Report.self, from: Data(output.utf8)) else { return [] }
-        return readable(report.Volumes, scheme: "docker-volume") { index, volume in
-            guard volume.Links == "0", let url = URL(string: "docker-volume:\(index)") else { return nil }
+        guard let report = try? JSONDecoder().decode(DiskUsage.self, from: Data(output.utf8)) else { return [] }
+        let containers = (report.Containers ?? []).compactMap(\.value)
+        return readable(report.Volumes, scheme: "docker-volume") { _, volume in
+            guard let name = volumeName(volume.Name), let url = URL(string: "docker-volume:" + name) else { return nil }
+            var lockReason: String?
+            if volume.Links != "0" {
+                let users = containers.filter { $0.Mounts?.split(separator: ",").contains(Substring(name)) == true }
+                guard !users.isEmpty, !users.contains(where: \.isActive) else { return nil }
+                let names = users.map(\.Names).joined(separator: ", ")
+                lockReason = String(localized: "Used by the stopped container \(names): remove it first")
+            }
             let anonymous = volume.Labels.contains("com.docker.volume.anonymous")
-                || volume.Name.count == 64 && volume.Name.allSatisfy(\.isHexDigit)
-            let name = anonymous ? String(volume.Name.prefix(12)) + " · " + String(localized: "anonymous") : volume.Name
-            return ScanEntry(url: url, size: bytes(fromDockerSize: volume.Size) ?? 0, title: name + " · " + volume.Driver)
+                || name.count == 64 && name.allSatisfy(\.isHexDigit)
+            let shown = anonymous ? String(name.prefix(12)) + " · " + String(localized: "anonymous") : name
+            return ScanEntry(url: url, size: bytes(fromDockerSize: volume.Size) ?? 0, title: shown + " · " + volume.Driver,
+                             lockReason: lockReason)
         }
+    }
+
+    /// The parts of `docker system df -v --format '{{json .}}'` the container and volume lists read.
+    struct DiskUsage: Decodable {
+        struct Container: Decodable {
+            let CreatedAt: String, ID: String, Image: String, Names: String, Size: String, State: String, Status: String
+            /// Volume names (or bind sources) it mounts, comma-separated.
+            let Mounts: String?
+            /// Running, paused or restarting: `docker container prune` keeps it and its volumes are in use.
+            var isActive: Bool { ["running", "paused", "restarting"].contains(State) }
+        }
+        struct Volume: Decodable { let Driver: String, Labels: String, Links: String, Name: String, Size: String }
+        let Containers: [Lenient<Container>]?
+        let Volumes: [Lenient<Volume>]?
+    }
+
+    /// 12 to 64 lowercase hex digits; anything else (an option, a name) is not a container ID.
+    static func containerID(_ text: String) -> String? {
+        (12...64).contains(text.count) && text.allSatisfy { $0.isHexDigit && !$0.isUppercase } ? text : nil
+    }
+
+    /// The container ID in a `docker-container:<id>` entry URL; nil for any other URL.
+    static func dockerContainerID(of url: URL) -> String? {
+        let text = url.absoluteString
+        guard text.hasPrefix("docker-container:") else { return nil }
+        return containerID(String(text.dropFirst("docker-container:".count)))
+    }
+
+    /// A volume name as docker's local driver allows it (`[a-zA-Z0-9][a-zA-Z0-9_.-]+`, at most 255 characters): never
+    /// starts with `-`, so it can't be read as an option of `docker volume rm`.
+    static func volumeName(_ text: String) -> String? {
+        text.count <= 255 && text.wholeMatch(of: #/[a-zA-Z0-9][a-zA-Z0-9_.-]+/#) != nil ? text : nil
+    }
+
+    /// The volume name in a `docker-volume:<name>` entry URL; nil for any other URL.
+    static func dockerVolumeName(of url: URL) -> String? {
+        let text = url.absoluteString
+        guard text.hasPrefix("docker-volume:") else { return nil }
+        return volumeName(String(text.dropFirst("docker-volume:".count)))
     }
 
     /// Build cache records that can be removed, from `docker system df -v --format '{{json .}}'`:
@@ -728,15 +784,16 @@ nonisolated enum DeveloperTools {
         init(from decoder: Decoder) { value = try? T(from: decoder) }
     }
 
-    /// `entry` of each readable record (with its index), then one size-0 row counting the unreadable ones: whether
-    /// prune removes those can't be told, so they are counted rather than silently dropped (display only).
+    /// `entry` of each readable record (with its index), then one size-0 locked row counting the unreadable ones, so
+    /// they are counted rather than silently dropped; they are never removed. Its URL `<scheme>:-unreadable` can't be
+    /// a record's (no ID or name starts with `-`).
     static func readable<T>(_ records: [Lenient<T>]?, scheme: String, _ entry: (Int, T) -> ScanEntry?) -> [ScanEntry] {
         let records = records ?? []
         var entries = records.enumerated().compactMap { index, record in record.value.flatMap { entry(index, $0) } }
         let unreadable = records.count(where: { $0.value == nil })
-        if unreadable > 0, let url = URL(string: "\(scheme):unreadable") {
-            entries.append(ScanEntry(url: url, size: 0,
-                                     title: String(localized: "Unreadable entries: \(unreadable) (prune may still remove them)")))
+        if unreadable > 0, let url = URL(string: "\(scheme):-unreadable") {
+            entries.append(ScanEntry(url: url, size: 0, title: String(localized: "Unreadable entries: \(unreadable)"),
+                                     lockReason: String(localized: "Docker did not report enough about these to remove them here")))
         }
         return entries
     }

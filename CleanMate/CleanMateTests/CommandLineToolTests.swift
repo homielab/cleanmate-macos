@@ -432,6 +432,62 @@ struct CommandLineToolTests {
         #expect(removed.freed == 8_192 && !fixture.exists(path))
     }
 
+    /// The real Docker volumes item against a fake `docker`: `scan` lists each volume with its name and marks the item
+    /// `dataLoss`; `clean` leaves it unless named; named, it removes each unused volume with its own `docker volume rm`
+    /// and keeps the locked one (a stopped container mounts it), reported with the reason.
+    @Test func dockerVolumesAreCleanedOneByOneWhenNamed() async throws {
+        let fixture = try Fixture()
+        let log = fixture.root.appending(path: "docker-calls.txt")
+        let df = fixture.root.appending(path: "df.json")
+        let stopped = String(repeating: "c1f4cbb8", count: 8)
+        try """
+        {"Containers":[{"CreatedAt":"2026-10-19 11:43:56 +0700 +07","ID":"\(stopped)","Image":"postgres:18","Mounts":"api_pgdata","Names":"api-db-1","Size":"16kB","State":"exited","Status":"Exited (0) 2 days ago"}],\
+        "Volumes":[{"Driver":"local","Labels":"","Links":"0","Name":"junk_cache","Size":"3MB"},\
+        {"Driver":"local","Labels":"","Links":"0","Name":"old_redis","Size":"2MB"},\
+        {"Driver":"local","Labels":"","Links":"1","Name":"api_pgdata","Size":"9MB"}]}
+        """.write(to: df, atomically: true, encoding: .utf8)
+        let script = fixture.root.appending(path: "docker")
+        try """
+        #!/bin/sh
+        if [ "$1" = system ]; then cat '\(df.path)'; else echo "$@" >> '\(log.path)'; fi
+
+        """.write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        var volumes = try #require(CleanerGroup.developer.items.first { $0.id == "docker-volumes" })
+        let fake = ShellCommand(executable: script.path, arguments: volumes.probe?.command.arguments ?? [])
+        volumes.command = ShellCommand(executable: script.path)
+        volumes.probe?.command = fake
+        volumes.probe?.details?.command = fake
+        volumes.probe?.precondition = { true }
+        let entryCommand = try #require(volumes.entryCommand)
+        volumes.entryCommand = { url in entryCommand(url).map { ShellCommand(executable: script.path, arguments: $0.arguments) } }
+        let groups = fixture.groups.map { group in
+            group.id != "developer" ? group
+                : CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage, items: group.items + [volumes])
+        }
+        var sources = fixture.sources()
+        sources.smartScan = { _ in groups }
+        sources.overrides = { ["docker-volumes": true] } // ticked in the app
+        func calls() -> String { (try? String(contentsOf: log, encoding: .utf8)) ?? "" }
+
+        let scan = try await Self.scanReport(["--only", "docker-volumes"], sources)
+        let item = try #require(scan.items.first)
+        #expect(item.dataLoss && !item.locked && item.size == 5_000_000)
+        #expect(item.entries.map(\.name) == ["api_pgdata · local", "junk_cache · local", "old_redis · local"])
+        #expect(item.entries[0].reason?.contains("api-db-1") == true && item.entries[1].reason == nil)
+
+        let held = try await Self.cleanReport(["--yes"], sources)
+        #expect(held.items.first { $0.id == "docker-volumes" }?.reason == HeadlessScan.dataLossReason("docker-volumes"))
+        #expect(calls().isEmpty)
+
+        let preview = try await Self.cleanReport(["--dry-run", "--only", "docker-volumes"], sources)
+        #expect(preview.freed == 5_000_000 && calls().isEmpty)
+        let cleaned = try await Self.cleanReport(["--yes", "--only", "docker-volumes"], sources)
+        let result = try #require(cleaned.items.first)
+        #expect(result.freed == 5_000_000 && result.skipped.count == 1 && result.skipped[0].reason.contains("api-db-1"))
+        #expect(calls() == "volume rm junk_cache\nvolume rm old_redis\n")
+    }
+
     /// What the cleaner kept gets a path and a reason; a tool's item without a listed entry gets one line.
     @Test func keptEntriesAreListed() throws {
         let fixture = try Fixture()
