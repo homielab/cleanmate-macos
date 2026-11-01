@@ -38,7 +38,7 @@ struct OpenFilesTests {
     }
 
     /// Three items that skip open files: one table read for the whole scan and one for the whole clean (never the
-    /// scan's). A file open at scan time is not listed; one opened after the scan is not removed.
+    /// scan's; read again only once it is older than `cleanMaxAge`). A file open at scan time is not listed; one opened after the scan is not removed.
     @MainActor @Test func smartScanReadsTheTableOncePerPass() async throws {
         let root = fm.temporaryDirectory.appending(path: "CleanMateOpenFiles-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: root) }
@@ -75,8 +75,13 @@ struct OpenFilesTests {
 
         let cleanHandle = try FileHandle(forReadingFrom: heldAtClean)
         defer { try? cleanHandle.close() }
+        let cleanStart = ContinuousClock.now
         await model.clean()
-        #expect(reads.withLock { $0 } == 2)
+        let cleanTime = cleanStart.duration(to: .now)
+        // One fresh read for the clean, plus one per `cleanMaxAge` it lasted: under a loaded full test run the clean
+        // can outlast it, and reading again then is intended.
+        let cleanReads = reads.withLock { $0 } - 1
+        #expect(cleanReads >= 1 && cleanReads <= 1 + Int(cleanTime / OpenFiles.cleanMaxAge), "\(cleanReads) reads in \(cleanTime)")
         guard case .done(let report) = model.phase else { Issue.record("not done: \(model.phase)"); return }
         #expect(report.skipped == 1)
         #expect(fm.fileExists(atPath: heldAtClean.path) && fm.fileExists(atPath: heldAtScan.path))

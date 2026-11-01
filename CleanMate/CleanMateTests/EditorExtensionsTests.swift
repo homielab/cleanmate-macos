@@ -62,7 +62,9 @@ final class EditorExtensionsTests {
 
     @Test func catalogItem() throws {
         let ids = CleanerGroup.developer.items.map(\.id)
-        #expect(ids.firstIndex(of: EditorExtensions.id) == ids.firstIndex(of: OldRuntimes.goID).map { $0 + 1 })
+        // Listed with the other unticked old versions, after the runtimes; other items may sit in between.
+        let index = try #require(ids.firstIndex(of: EditorExtensions.id))
+        #expect(try #require(ids.firstIndex(of: OldRuntimes.goID)) < index)
         let item = try #require(CleanerGroup.developer.items.first { $0.id == EditorExtensions.id })
         #expect(!item.selectedByDefault && item.selectableEntries && item.mode == .delete && !item.showsWhenEmpty)
         #expect(item.skipsOpenFiles && item.findEntries != nil && item.allowsEntry != nil && item.entryParts != nil)
