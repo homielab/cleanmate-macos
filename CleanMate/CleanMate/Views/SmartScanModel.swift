@@ -515,6 +515,7 @@ final class SmartScanModel: ObservableObject {
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
                                    size: result.freed, mode: item.mode, home: logHome)
             }
+            for url in result.changed { ActivityLog.recordSkipped(module: module.title, item: url.path, home: logHome) }
         }
         scans = [:]
         selected = []

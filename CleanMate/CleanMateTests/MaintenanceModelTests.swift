@@ -180,7 +180,8 @@ struct MaintenanceModelTests {
         let freed = ActivityLog.freed(home: home)
         #expect(freed.deleted == 0 && freed.trashed == 0 && freed.since == nil)
         #expect(ActivityLog.cleanups(now: Self.date, home: home) == ActivityLog.Cleanups())
-        #expect(ActivitySettings.isTask("ran") && ActivitySettings.isTask("failed") && !ActivitySettings.isTask("deleted"))
+        #expect(ActivitySettings.removedNothing("ran") && ActivitySettings.removedNothing("failed")
+                && ActivitySettings.removedNothing("skipped") && !ActivitySettings.removedNothing("deleted"))
         #expect(ActivitySettings.kindLabel("ran", locale: Locale(identifier: "en")).title == "Ran")
     }
 

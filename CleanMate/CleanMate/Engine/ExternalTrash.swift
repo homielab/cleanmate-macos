@@ -32,8 +32,8 @@ nonisolated enum ExternalTrash {
     }
 
     /// Empties each scanned Trash folder that is still one of `externalTrashFolders` and holds no open file: every item
-    /// in it is removed (never moved), each one checked with `allowsExternalTrash` and skipped when locked. The folder
-    /// itself stays. Freed = the scanned size less what is left.
+    /// in it is removed (never moved, through `SafeRemoval`), each one checked with `allowsExternalTrash` and skipped
+    /// when locked. The folder itself stays. Freed = the scanned size less what is left.
     static func empty(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy,
                       openPaths: OpenPaths) async -> CleanReport {
         let folders = Set(policy.externalTrashFolders().map(SafetyPolicy.normalize))
@@ -47,7 +47,8 @@ nonisolated enum ExternalTrash {
             else { report.skipped += 1; continue }
             for child in children {
                 guard policy.allowsExternalTrash(child), !Scanner.isLocked(child),
-                      (try? FileManager.default.removeItem(at: child)) != nil else { report.skipped += 1; continue }
+                      (try? SafeRemoval.remove(child, allows: policy.allowsExternalTrash)) != nil
+                else { report.skipped += 1; continue }
             }
             let left = await Scanner.entry(at: entry.url, olderThan: nil)?.size ?? 0
             report.freed += max(0, entry.size - left)

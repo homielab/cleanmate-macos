@@ -56,6 +56,8 @@ CleanMate is also available for Ubuntu: [homielab/cleanmate-linux](https://githu
 - **Hard blocklist**, checked when scanning and again right before every removal: only your home and temporary
   folder, never keys and sign-ins (`.ssh`, `.gnupg`, Keychains), your documents, iCloud Drive, Mail or Messages,
   passwords, bookmarks or settings.
+- **No symlink tricks**: each item is checked and deleted inside the same open folder, so a symlink swapped in
+  after the scan can't redirect a removal.
 - **Running apps are skipped**, and so are files another process has open.
 - **Exclusions**: folders and files you exclude are never listed or removed.
 - **Only your user account**: no administrator rights, no privileged helper, no system files.
@@ -130,7 +132,8 @@ Bug reports, ideas and pull requests are welcome.
 - **Strings**: every new user-facing string in `Localizable.xcstrings` needs a Vietnamese (`vi`) translation — a test
   checks this.
 - **New cleaning items**: declare them in a catalog, and make sure every path they remove passes `SafetyPolicy`. Opening
-  a blocked area means changing `SafetyPolicy` on purpose, with tests for it.
+  a blocked area means changing `SafetyPolicy` on purpose, with tests for it. Cleaning deletes only through
+  `SafeRemoval` (checks and deletes inside the same open folder), never `FileManager.removeItem`.
 - User-visible changes go in [CHANGELOG.md](CHANGELOG.md) under **Unreleased**; new or changed features also go in
   [docs/FEATURES.md](docs/FEATURES.md).
 

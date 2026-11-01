@@ -21,6 +21,9 @@ nonisolated struct ScanEntry: Identifiable, Hashable, Sendable {
     var shared: [SharedFile] = []
     /// Why the entry can't be ticked nor cleaned now (`CleanerItem.locksEntry`); nil when it can.
     var lockReason: String? = nil
+    /// What the scan saw at `url` (volume and inode, not following a symlink): the clean removes only that very item
+    /// (`SafeRemoval`). nil when not read (a database, a library whose parts are removed, an entry made by hand).
+    var fileID: SafeRemoval.FileID? = nil
     var id: URL { url }
 }
 
@@ -227,6 +230,8 @@ nonisolated enum Scanner {
                         return await measureParts(kept, of: url, cutoff: cutoff)
                     }
                     guard let database = item.database, database.applies(to: url) else {
+                        // Read before measuring: an item put in its place during the walk differs, so the clean leaves it.
+                        let fileID = SafeRemoval.FileID(url)
                         // Read before measuring: a change during the walk makes the next scan measure again.
                         let fingerprint = item.entrySizes != nil && cutoff == nil ? FolderSizeCache.Fingerprint(url) : nil
                         var found: ScanEntry
@@ -240,6 +245,7 @@ nonisolated enum Scanner {
                                 item.entrySizes?.remember(url, fingerprint, size: found.size, partlyUnreadable: found.partlyUnreadable)
                             }
                         }
+                        found.fileID = fileID
                         if let files = item.entryFiles?(url) {
                             found.filesSize = files.own.filter(policy.allows).reduce(0) { $0 + fileSize($1) }
                             found.size += found.filesSize

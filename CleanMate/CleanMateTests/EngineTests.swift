@@ -299,8 +299,8 @@ struct ScannerCleanerTests {
         #expect(FileManager.default.fileExists(atPath: outside.path))
     }
 
-    /// A folder replaced by a symlink between scan and clean (its scanned URL ends in `/`), or holding one:
-    /// only the links are removed, never their targets.
+    /// A folder replaced by a symlink between scan and clean (its scanned URL ends in `/`) is not what the scan saw:
+    /// left alone and reported as changed. A folder holding a symlink goes with the link, never its target.
     @Test func cleanRemovesLinksNotTargetsAfterSwap() async throws {
         let box = try Sandbox()
         defer { box.remove() }
@@ -316,9 +316,9 @@ struct ScannerCleanerTests {
         try fm.removeItem(at: app)
         try fm.createSymbolicLink(at: app, withDestinationURL: doc.deletingLastPathComponent())
         let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
-        #expect(report.skipped == 0)
+        #expect(report.skipped == 1 && report.changed.map(\.lastPathComponent) == ["app"])
         #expect(fm.fileExists(atPath: doc.path))
-        #expect(try fm.contentsOfDirectory(atPath: box.home.appending(path: "Library/Caches").path).isEmpty)
+        #expect(try fm.contentsOfDirectory(atPath: box.home.appending(path: "Library/Caches").path) == ["app"])
     }
 
     @Test func refusesBlockedEntriesAtCleanTime() async throws {

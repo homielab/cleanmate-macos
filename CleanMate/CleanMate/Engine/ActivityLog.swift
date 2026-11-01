@@ -36,6 +36,13 @@ nonisolated enum ActivityLog {
         log(module: module, item: item, count: 1, size: size, action: "restored", home: home, date: date, rotateAt: maxSize)
     }
 
+    /// An item left in place because it changed since it was checked (a symlink or another item put there,
+    /// `CleanReport.changed`): "skipped", size 0, so the user can see why it is still there.
+    static func recordSkipped(module: LocalizedStringResource, item: String,
+                              home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
+        log(module: module, item: item, count: 1, size: 0, action: "skipped", home: home, date: date, rotateAt: maxSize)
+    }
+
     /// A Maintenance task that was run: "ran" when every step succeeded, else "failed". Removes nothing, so size 0.
     static func recordTask(module: LocalizedStringResource, item: String, succeeded: Bool,
                            home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
@@ -110,7 +117,8 @@ nonisolated enum ActivityLog {
         /// Size as written (in the language of that time); `bytes` when the line has the raw column.
         var size = ""
         var bytes: Int64?
-        /// "deleted", "trashed" or "restored"; "ran" or "failed" for a Maintenance task.
+        /// "deleted", "trashed" or "restored"; "ran" or "failed" for a Maintenance task; "skipped" for an item that
+        /// changed since it was checked.
         var kind = ""
     }
 

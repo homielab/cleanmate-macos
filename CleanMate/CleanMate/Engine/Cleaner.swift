@@ -26,6 +26,9 @@ nonisolated struct CleanReport: Sendable {
     var undo: TrashUndo.Result?
     /// Homebrew casks whose app went to the Trash but whose record `brew uninstall --cask` didn't clear.
     var casksLeft: [String] = []
+    /// Skipped (in `skipped`) because the item or its folder changed since it was checked: a symlink or another item
+    /// in its place (`SafeRemoval.Failure.changed`). Logged as "skipped" so the user can see why.
+    var changed: [URL] = []
 
     static func += (lhs: inout CleanReport, rhs: CleanReport) {
         lhs.freed += rhs.freed
@@ -34,6 +37,7 @@ nonisolated struct CleanReport: Sendable {
         lhs.locked += rhs.locked
         lhs.trashed += rhs.trashed
         lhs.casksLeft += rhs.casksLeft
+        lhs.changed += rhs.changed
     }
 
     /// `FileManager.trashItem`, returning where the item now is inside the Trash.
@@ -242,36 +246,52 @@ nonisolated enum Cleaner {
             // between leaves unused files, never an entry missing its files. Only what no entry still on disk uses:
             // a shared blob goes with the last of its models removed here, and is kept while an unticked one uses it.
             let files = item.entryFiles?(entry.url).own ?? []
-            func remove(_ url: URL, size: Int64) throws {
-                switch item.mode {
-                case .delete: try FileManager.default.removeItem(at: url)
-                case .trash:
-                    if let inTrash = try trash(url) {
-                        report.trashed.append(TrashedItem(original: url, inTrash: inTrash, size: size))
+            // Checked again through its open folder (`SafeRemoval`): the real path must pass `allows`, and the item be
+            // what the scan saw when known. Deleted in that folder; a move to the Trash takes a path, so it follows
+            // the check. A change is skipped and listed in `changed`; any other failure (permission, SIP, in use) is
+            // skipped quietly, as before.
+            func remove(_ url: URL, size: Int64, expected: SafeRemoval.FileID? = nil, regularFileOnly: Bool = false,
+                        allows: (URL) -> Bool) -> Bool {
+                do {
+                    switch item.mode {
+                    case .delete:
+                        try SafeRemoval.remove(url, expected: expected, regularFileOnly: regularFileOnly, allows: allows)
+                    case .trash:
+                        try SafeRemoval.check(url, expected: expected, regularFileOnly: regularFileOnly, allows: allows)
+                        if let inTrash = try trash(url) {
+                            report.trashed.append(TrashedItem(original: url, inTrash: inTrash, size: size))
+                        }
                     }
-                }
+                    return true
+                } catch SafeRemoval.Failure.changed {
+                    report.changed.append(url)
+                } catch {}
+                report.skipped += 1
+                return false
             }
             // The entry stays (a video library): only its parts go, each listed again now and measured as it is.
-            // A part holding an open file is kept.
+            // A part holding an open file is kept. Its real path must be one of the parts just listed.
             if let parts = item.entryParts {
-                for part in parts(policy, entry.url) {
+                let listed = parts(policy, entry.url)
+                let allowed = Set(listed.map(SafetyPolicy.normalize))
+                for part in listed {
                     guard !Scanner.isLocked(part), open.isEmpty || !RunningProcesses.holdsOpenFile(part, openPaths: open),
-                          let size = await Scanner.entry(at: part, olderThan: nil)?.size,
-                          (try? remove(part, size: size)) != nil else { report.skipped += 1; continue }
-                    report.freed += size
+                          let size = await Scanner.entry(at: part, olderThan: nil)?.size
+                    else { report.skipped += 1; continue }
+                    if remove(part, size: size, allows: { allowed.contains(SafetyPolicy.normalize($0)) }) {
+                        report.freed += size
+                    }
                 }
                 continue
             }
-            do {
-                try remove(entry.url, size: entry.size - entry.filesSize)
-                report.freed += entry.size - entry.filesSize
-            } catch {
-                report.skipped += 1 // permission / SIP / in use: leave it
-                continue
-            }
+            guard remove(entry.url, size: entry.size - entry.filesSize, expected: entry.fileID,
+                         allows: { item.allowsEntry?(policy, $0) ?? policy.allows($0) })
+            else { continue }
+            report.freed += entry.size - entry.filesSize
             var parent = entry.url.deletingLastPathComponent()
             for _ in 0..<item.removesEmptyParents {
-                guard policy.allows(parent), rmdir(parent.path) == 0 else { break }
+                guard policy.allows(parent), (try? SafeRemoval.removeEmptyFolder(parent, allows: policy.allows)) != nil
+                else { break }
                 parent = parent.deletingLastPathComponent()
             }
             // Each file counts as it is now: one shared at scan and removed with the last of its models counts too.
@@ -279,12 +299,11 @@ nonisolated enum Cleaner {
                 var info = stat()
                 guard lstat(file.path, &info) == 0 else { continue } // already gone
                 let size = Int64(info.st_blocks) * 512
-                guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file), !Scanner.isLocked(file),
-                      (try? remove(file, size: size)) != nil else {
+                guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file), !Scanner.isLocked(file) else {
                     report.skipped += 1 // kept, so not freed
                     continue
                 }
-                report.freed += size
+                if remove(file, size: size, regularFileOnly: true, allows: policy.allows) { report.freed += size }
             }
         }
         return report

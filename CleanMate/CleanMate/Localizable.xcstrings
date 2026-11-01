@@ -7406,6 +7406,16 @@
         }
       }
     },
+    "Skipped: changed since the scan" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ qua: đã thay đổi sau khi quét"
+          }
+        }
+      }
+    },
     "%@ is missing or took too long and was stopped." : {
       "localizations" : {
         "vi" : {
