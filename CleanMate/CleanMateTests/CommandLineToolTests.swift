@@ -236,6 +236,11 @@ struct CommandLineToolTests {
         #expect(report.entries.first == HeadlessScan.Entry(path: "~/x/55", size: 55, reason: "In use"))
         #expect(report.size == (1...54).reduce(0, +) && !report.locked && report.group == "dev")
         #expect(HeadlessScan.displayPath(URL(filePath: "/Volumes/Drive/.Trashes/501"), home: home) == "/Volumes/Drive/.Trashes/501")
+        // An entry that is not a file (a Docker volume) carries the name the app shows.
+        let volume = ItemScan(entries: [ScanEntry(url: URL(string: "docker-volume:1")!, size: 9, title: "postgres-data · local")])
+        let volumes = HeadlessScan.report(item, group: "developer", scan: volume, blocked: false, running: nil, selected: false,
+                                          home: home)
+        #expect(volumes.entries.first?.name == "postgres-data · local" && report.entries.allSatisfy { $0.name == nil })
 
         let blocked = HeadlessScan.report(item, group: "developer", scan: scan, blocked: true, running: nil, selected: true, home: home)
         #expect(blocked.locked && blocked.reason == HeadlessScan.blockedReason)
@@ -258,6 +263,9 @@ struct CommandLineToolTests {
         let byID = Dictionary(uniqueKeysWithValues: list.items.map { ($0.id, $0) })
         #expect(byID["user-caches"]?.needsFullDiskAccess == false && byID["mail-downloads"]?.needsFullDiskAccess == true)
         #expect(byID["empty-trash"]?.needsFullDiskAccess == true && byID["empty-trash"]?.group == "user")
+        // Only the items that may hold data are marked, and both are in the catalog, deleted for good.
+        #expect(Set(list.items.filter(\.dataLoss).map(\.id)) == HeadlessScan.dataLossIDs)
+        #expect(HeadlessScan.dataLossIDs.allSatisfy { byID[$0]?.disposal == "delete" && byID[$0]?.group == "dev" })
     }
 
     // MARK: - clean
@@ -362,6 +370,66 @@ struct CommandLineToolTests {
         #expect(privacy.items.map(\.id) == ["cli-history"] && !fixture.exists("Library/Caches/cli-history/f.bin"))
         #expect(ActivityLog.read(home: fixture.home).contains("\tPrivacy\tBrowsing history\t"))
         #expect(fixture.exists("Library/Caches/cli-bait/keep.bin"))
+    }
+
+    /// An item that may hold data (Docker volumes) is cleaned only when named with --only: a tick in the app is not
+    /// enough. `list` and `scan` mark it.
+    @Test func itemsThatMayHoldDataAreCleanedOnlyWhenNamed() async throws {
+        let fixture = try Fixture()
+        let path = "Library/Caches/cli-volumes/db.bin"
+        let file = fixture.home.appending(path: path)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(repeating: 7, count: 8_192).write(to: file)
+        let volumes = CleanerItem(id: "docker-volumes", title: "Docker: unused volumes", paths: ["~/Library/Caches/cli-volumes"],
+                                  selectedByDefault: false)
+        let groups = fixture.groups.map { group in
+            group.id != "developer" ? group
+                : CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage, items: group.items + [volumes])
+        }
+        var sources = fixture.sources()
+        sources.smartScan = { _ in groups }
+        sources.overrides = { ["docker-volumes": true] } // ticked in the app
+
+        // Ticked but not named: reported, held, not counted.
+        let reason = HeadlessScan.dataLossReason("docker-volumes")
+        let held = HeadlessClean.Item(id: "docker-volumes", name: "Docker: unused volumes", freed: 0, trashed: 0, skipped: [],
+                                      dataLoss: true, locked: true, reason: reason)
+        let dryRun = try await Self.cleanReport(["--dry-run"], sources)
+        #expect(dryRun.items.first { $0.id == "docker-volumes" } == held)
+        #expect(dryRun.freed == 49_152 + 20_480 && dryRun.items.filter { $0.id != "docker-volumes" }.allSatisfy { !$0.dataLoss })
+        #expect(try await Self.cleanReport(["--dry-run", "--group", "dev"], sources).items.first { $0.id == "docker-volumes" } == held)
+        let (_, text) = await Self.run(["clean", "--dry-run"], sources)
+        #expect(text.stdout.contains("skipped: \(reason)"))
+        let (declined, asked) = await Self.run(["clean"], sources, answer: "n")
+        #expect(declined == 0 && asked.stderr.contains("About to clean 2 items"))
+        #expect(asked.stderr.contains("Not cleaned, may hold data (name with --only to clean): Docker: unused volumes"))
+
+        // Named: cleaned like any item.
+        let named = try await Self.cleanReport(["--dry-run", "--only", "docker-volumes"], sources)
+        #expect(named.items == [HeadlessClean.Item(id: "docker-volumes", name: "Docker: unused volumes", freed: 8_192, trashed: 0,
+                                                   skipped: [], dataLoss: true, locked: false, reason: nil)])
+
+        // list and scan mark it, in JSON (always present) and text.
+        let scan = try await Self.scanReport([], sources)
+        #expect(scan.items.filter(\.dataLoss).map(\.id) == ["docker-volumes"])
+        let (_, scanJSON) = await Self.run(["scan", "--json"], sources)
+        let raw = try #require(JSONSerialization.jsonObject(with: Data(scanJSON.stdout.utf8)) as? [String: Any])
+        #expect((raw["items"] as? [[String: Any]])?.allSatisfy { $0["dataLoss"] is Bool } == true)
+        let (_, listJSON) = await Self.run(["list", "--json"], sources)
+        let list = try JSONDecoder().decode(HeadlessScan.ListReport.self, from: Data(listJSON.stdout.utf8))
+        #expect(list.items.filter(\.dataLoss).map(\.id) == ["docker-volumes"])
+        for command in ["list", "scan"] {
+            let (_, printed) = await Self.run([command], sources)
+            let lines = printed.stdout.split(separator: "\n").filter { $0.contains(CommandLineTool.dataLossFlag) }
+            #expect(lines.count == 1 && lines.first?.contains("Docker: unused volumes") == true, "\(command)")
+        }
+
+        // A real clean of the ticked items leaves it; naming it cleans it.
+        let cleaned = try await Self.cleanReport(["--yes"], sources)
+        #expect(cleaned.items.first { $0.id == "docker-volumes" } == held && fixture.exists(path))
+        #expect(!fixture.exists("Library/Caches/cli-junk/a.bin"))
+        let removed = try await Self.cleanReport(["--yes", "--only", "docker-volumes"], sources)
+        #expect(removed.freed == 8_192 && !fixture.exists(path))
     }
 
     /// What the cleaner kept gets a path and a reason; a tool's item without a listed entry gets one line.

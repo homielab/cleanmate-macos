@@ -63,7 +63,7 @@ nonisolated enum CommandLineTool {
         \(usage)
         Commands:
           list            Every Smart Scan item: id, group, name, what it removes, ticked by default or not,
-                          deleted or moved to the Trash.
+                          deleted or moved to the Trash, may hold data or not.
           scan            Measures the items like Smart Scan in the app: the same items, safety rules,
                           Settings › Exclusions and Scan Groups. An item whose app or tool is running is
                           locked, with the reason; files in use are skipped.
@@ -73,6 +73,9 @@ nonisolated enum CommandLineTool {
                           `cleanmate list` go to the Trash. Locked items and files in use are skipped and
                           reported with the reason. On a terminal it asks before cleaning; anywhere
                           else it needs --yes.
+                          Items marked "may hold data" (Docker volumes, stopped containers) are deleted
+                          for good with what is inside: clean takes them only when named with --only,
+                          never because they are ticked in the app.
 
         Options:
           --json          Print one JSON object instead of text.
@@ -193,6 +196,10 @@ nonisolated enum CommandLineTool {
             text += "  \(target.report.name)  \(target.report.sizeIsUpperBound ? "up to " : "")\(size(target.report.size))"
                 + (target.report.disposal == "trash" ? " (to Trash)" : "") + "\n"
         }
+        if !plan.held.isEmpty {
+            text += "Not cleaned, may hold data (name with --only to clean): "
+                + plan.held.map(\.report.name).joined(separator: ", ") + "\n"
+        }
         return text + "No Undo here: put items back from the Trash in Finder.\nProceed? [y/N] "
     }
 
@@ -298,14 +305,17 @@ nonisolated enum CommandLineTool {
                 text += (group == nil ? "" : "\n") + style.bold("\(groupTitles[item.group] ?? item.group) (\(item.group))") + "\n"
                 group = item.group
             }
-            let flags = [item.disposal == "trash" ? "moves to Trash" : nil, item.needsFullDiskAccess ? "needs Full Disk Access" : nil]
-                .compactMap { $0 }
+            let flags = [item.disposal == "trash" ? "moves to Trash" : nil, item.dataLoss ? dataLossFlag : nil,
+                         item.needsFullDiskAccess ? "needs Full Disk Access" : nil].compactMap { $0 }
             text += "  \(item.selectedByDefault ? "[x]" : "[ ]") \(padded(item.id, width))  \(item.name)"
                 + (flags.isEmpty ? "" : style.dim(" (\(flags.joined(separator: ", ")))")) + "\n"
             if !item.description.isEmpty { text += "      " + style.dim(item.description) + "\n" }
         }
         return text + "\n[x] = ticked by default\n"
     }
+
+    /// Text flag of an item that may hold data (`HeadlessScan.dataLossIDs`).
+    static let dataLossFlag = "may hold data: cleaned only with --only"
 
     static func scanText(_ report: HeadlessScan.Report, color: Bool) -> String {
         let style = Style(color: color)
@@ -322,6 +332,7 @@ nonisolated enum CommandLineTool {
             let mark = item.locked ? "[-]" : item.selectedByDefault ? "[x]" : "[ ]"
             text += "  \(mark) \(padded(item.name, width))  \(String(repeating: " ", count: max(0, 12 - amount.count)) + amount)"
             if let reason = item.reason { text += "  " + style.yellow(reason) }
+            if item.dataLoss { text += "  " + style.dim("(\(dataLossFlag))") }
             text += "\n"
         }
         if report.items.isEmpty { text += "Nothing found.\n" }

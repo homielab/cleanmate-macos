@@ -32,6 +32,8 @@ nonisolated enum HeadlessScan {
         var selectedByDefault: Bool
         /// "delete" (removed permanently) or "trash" (moved to the Trash).
         var disposal: String
+        /// Deleted for good and may hold the user's data (`dataLossIDs`): `clean` takes it only when named with `--only`.
+        var dataLoss = false
         /// Not scanned (or only partly) without Full Disk Access.
         var needsFullDiskAccess: Bool
     }
@@ -45,6 +47,9 @@ nonisolated enum HeadlessScan {
         /// `~/…` inside the home folder.
         var path: String
         var size: Int64
+        /// What the entry is, as the app shows it above the path (a Docker volume's name and driver, a simulator…);
+        /// absent when the path says it.
+        var name: String? = nil
         /// Records to erase in a database entry (Privacy history); absent otherwise.
         var records: Int? = nil
         /// Why this entry is skipped (a running app uses it); absent when it is cleaned with its item.
@@ -62,6 +67,8 @@ nonisolated enum HeadlessScan {
         /// Ticked when the app scans: the item's default or the user's own tick.
         var selectedByDefault: Bool
         var disposal: String
+        /// May hold the user's data (`dataLossIDs`): `clean` takes it only when named with `--only`.
+        var dataLoss = false
         /// The app would not clean it now; `reason` says why.
         var locked: Bool
         var reason: String?
@@ -75,8 +82,8 @@ nonisolated enum HeadlessScan {
         var needsFullDiskAccess: Bool? = nil
 
         enum CodingKeys: String, CodingKey {
-            case id, group, name, size, sizeIsUpperBound, selectedByDefault, disposal, locked, reason, entries, moreEntries,
-                 records, needsFullDiskAccess
+            case id, group, name, size, sizeIsUpperBound, selectedByDefault, disposal, dataLoss, locked, reason, entries,
+                 moreEntries, records, needsFullDiskAccess
         }
 
         /// `reason` is written as `null` when there is none (the contract's field is always present).
@@ -89,6 +96,7 @@ nonisolated enum HeadlessScan {
             try container.encode(sizeIsUpperBound, forKey: .sizeIsUpperBound)
             try container.encode(selectedByDefault, forKey: .selectedByDefault)
             try container.encode(disposal, forKey: .disposal)
+            try container.encode(dataLoss, forKey: .dataLoss)
             try container.encode(locked, forKey: .locked)
             try container.encode(reason, forKey: .reason)
             try container.encode(entries, forKey: .entries)
@@ -187,6 +195,7 @@ nonisolated enum HeadlessScan {
                 ListItem(id: item.id, group: groupName(group.id), name: english(item.title),
                          description: item.note.map(english) ?? "",
                          selectedByDefault: overrides[item.id] ?? item.selectedByDefault, disposal: disposal(item),
+                         dataLoss: dataLossIDs.contains(item.id),
                          needsFullDiskAccess: !withoutAccess.contains(item.id) && !group.id.hasPrefix("privacy-")
                             || readsProtectedFolder(item))
             }
@@ -212,6 +221,15 @@ nonisolated enum HeadlessScan {
     }
 
     static func disposal(_ item: CleanerItem) -> String { item.mode == .trash ? "trash" : "delete" }
+
+    /// Items deleted for good whose content may be the user's own data, not junk: a Docker volume holds databases, a
+    /// stopped container the files written inside it. A tick in the app (seen there entry by entry) is not consent for
+    /// a script or an AI agent, so `cleanmate clean` takes them only when named with `--only`. Every other item that
+    /// is deleted outright holds only what its app or tool rebuilds or downloads again.
+    static let dataLossIDs: Set<String> = ["docker-containers", "docker-volumes"]
+
+    /// Why `clean` left an item that may hold data, with how to clean it.
+    static func dataLossReason(_ id: String) -> String { "May hold data: name it with --only \(id) to clean it" }
 
     // MARK: - scan
 
@@ -304,7 +322,8 @@ nonisolated enum HeadlessScan {
                     items.append(Item(id: item.id, group: groupName(group.id), name: english(item.title), size: 0,
                                       sizeIsUpperBound: item.sizeIsUpperBound,
                                       selectedByDefault: overrides[item.id] ?? item.selectedByDefault,
-                                      disposal: disposal(item), locked: true, reason: needsAccess, entries: [],
+                                      disposal: disposal(item), dataLoss: dataLossIDs.contains(item.id), locked: true,
+                                      reason: needsAccess, entries: [],
                                       needsFullDiskAccess: true))
                 }
             }
@@ -338,9 +357,9 @@ nonisolated enum HeadlessScan {
         let entries = scan.entries.sorted { $0.size > $1.size }
         return Item(id: item.id, group: groupName(group), name: english(item.title), size: size,
                     sizeIsUpperBound: item.sizeIsUpperBound, selectedByDefault: selected, disposal: disposal(item),
-                    locked: reason != nil, reason: reason,
+                    dataLoss: dataLossIDs.contains(item.id), locked: reason != nil, reason: reason,
                     entries: entries.prefix(maxEntries).map {
-                        Entry(path: displayPath($0.url, home: home), size: $0.size, records: $0.isDatabase ? $0.records : nil,
+                        Entry(path: displayPath($0.url, home: home), size: $0.size, name: $0.title, records: $0.isDatabase ? $0.records : nil,
                               reason: $0.lockReason)
                     },
                     moreEntries: entries.count > maxEntries ? entries.count - maxEntries : nil,

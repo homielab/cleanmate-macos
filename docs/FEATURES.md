@@ -181,7 +181,7 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 
 | Command | What it prints |
 | --- | --- |
-| `cleanmate list [--json] [--privacy]` | Every Smart Scan item: group, id, name, what it removes, ticked by default or not, deleted or moved to the Trash, whether it needs Full Disk Access. |
+| `cleanmate list [--json] [--privacy]` | Every Smart Scan item: group, id, name, what it removes, ticked by default or not, deleted or moved to the Trash, whether it may hold data, whether it needs Full Disk Access. |
 | `cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]` | What Smart Scan would find now: items by group with their size, the total ticked by default, and a note when Full Disk Access is missing. |
 | `cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]` | Scans again, then cleans; per item what was deleted, moved to the Trash or kept and why, then the totals. |
 | `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Undo, Full Disk Access and exit codes. |
@@ -192,6 +192,9 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 - Privacy items (browser history, cookies, recent items) are listed and scanned only with `--privacy`.
 - An item whose app or tool is running is **locked**, with the reason (`"Google Chrome is running"`), as in the app;
   files a program has open are skipped. Locked items are not counted in the total.
+- Docker volumes and stopped containers (`docker-volumes`, `docker-containers`) are deleted for good with what is
+  inside them (databases, files written in a container), so `list` and `scan` mark them `"dataLoss": true` (text:
+  "may hold data") and `clean` takes them only when named with `--only`.
 - Text output has colours only on a terminal and never when `NO_COLOR` is set; `--json` prints one JSON object.
   Names and descriptions are always in English.
 - Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments, `3` no Full Disk Access
@@ -204,6 +207,7 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
   "items" : [
     {
       "description" : "Skips caches of apps that are open",
+      "dataLoss" : false,
       "disposal" : "delete",
       "group" : "system",
       "id" : "user-caches",
@@ -224,6 +228,7 @@ size is only a maximum, `sizeIsUpperBound`):
   "fullDiskAccess" : true,
   "items" : [
     {
+      "dataLoss" : false,
       "disposal" : "delete",
       "entries" : [
         { "path" : "~/Library/Caches/com.spotify.client", "size" : 651546624 }
@@ -248,7 +253,8 @@ size is only a maximum, `sizeIsUpperBound`):
 
 Each item lists its 50 largest entries (paths in your home start with `~/`) and `moreEntries` counts the rest. An item
 may also have `records` (database rows a Privacy item erases) and `needsFullDiskAccess: true` (a folder could not be
-read); an entry may have `records` and a `reason` when it alone is locked. `selectedByDefault` follows your own ticks
+read); an entry may have `records`, a `reason` when it alone is locked, and a `name` when its path is not a file (a
+Docker volume's name and driver, a simulator). `selectedByDefault` follows your own ticks
 in Smart Scan.
 
 **Full Disk Access** belongs to the app that runs `cleanmate` (Terminal, iTerm, your AI agent's app), not to
@@ -262,7 +268,10 @@ Privacy & Security › Full Disk Access, turn on that app, then quit and reopen 
 
 - **What**: the items named with `--only`, ticked or not; otherwise the items ticked by default (your own ticks
   included), in the groups named with `--group` if any. Privacy items only when named, by id or with
-  `--group privacy`, and always with `--privacy`. Run `cleanmate scan` first to see them.
+  `--group privacy`, and always with `--privacy`. Items that may hold data (`"dataLoss": true`: Docker volumes and
+  stopped containers) only when named with `--only`: ticked in the app, they are reported `locked` with the reason
+  `"May hold data: name it with --only docker-volumes to clean it"` and left alone, because a tick you made while
+  looking at the list in the app is not an OK for a script or an agent. Run `cleanmate scan` first to see them.
 - **How**: junk apps rebuild (caches, logs, developer junk, privacy traces) is deleted; items `cleanmate list` marks
   `"disposal": "trash"` go to the Trash. Every path passes the same checks as in the app right before it goes: the
   safety rules, Exclusions, files in use and anything changed since the scan. Running apps are read again: an item
@@ -285,6 +294,7 @@ Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is
   "inTrash" : 16777216,
   "items" : [
     {
+      "dataLoss" : false,
       "freed" : 1472417280,
       "id" : "user-caches",
       "locked" : false,
@@ -296,6 +306,7 @@ Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is
       "trashed" : 0
     },
     {
+      "dataLoss" : false,
       "freed" : 16777216,
       "id" : "old-downloads",
       "locked" : false,
@@ -317,7 +328,8 @@ The [Agent Skill](https://agentskills.io) in [`skills/cleanmate/`](../skills/cle
 Codex, Cursor and other agents how to use `cleanmate`: find it, scan, show you the result by group (deleted or to the
 Trash, locked items and why, Full Disk Access), clean with `--yes --only` only the items you confirmed, then report what
 was freed, moved to the Trash and kept. It never installs anything, never adds Privacy items or items that are not
-ticked by default unless you ask, and points you to the app for what the command doesn't do (Large & Old Files,
+ticked by default unless you ask, cleans an item that may hold data (Docker volumes, stopped containers) only when you
+name it after seeing its list, and points you to the app for what the command doesn't do (Large & Old Files,
 Uninstaller, Space Lens, Maintenance). Install it with:
 
 ```sh

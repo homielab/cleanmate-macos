@@ -37,7 +37,8 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 The app includes a `cleanmate` command for scripts and AI agents (Claude Code, Codex…): `cleanmate list` shows every
 Smart Scan item, `cleanmate scan --json` measures them like Smart Scan, and `cleanmate clean` cleans them with the
 same safety rules, exclusions and activity log as the app (`--dry-run` to preview; without a terminal it needs
-`--yes`). It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
+`--yes`). Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
+if ticked in the app. It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
 link it into a folder on your PATH:
 
 ```sh

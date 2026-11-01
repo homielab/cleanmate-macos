@@ -16,10 +16,15 @@ apps are skipped. This skill drives it with `--json`.
 3. Clean only after the user confirms in this conversation, and only the item ids you showed: `--only ID,ID…`.
 4. Suggest only items with `"selectedByDefault": true`. Add an unticked item (AI models, `node_modules`, old Xcode
    versions, old downloads…) only when the user names it.
-5. Never pass `--privacy` (browser history, cookies, recent items) unless the user asked for privacy cleaning.
-6. Do not offer `locked` items: tell the user the `reason` (`"Google Chrome is running"`), to quit that app and rescan.
-7. When unsure, run the same clean with `--dry-run` first. Never delete files by hand instead of using `cleanmate`.
-8. After cleaning, report `freed`, what is in the Trash (`inTrash`: still on disk until the Trash is emptied) and every
+5. Items with `"dataLoss": true` (Docker volumes, stopped Docker containers) are deleted for good with whatever is
+   inside: databases, files written in a container. Never suggest them and never add them to a clean on your own,
+   even when `selectedByDefault` is true (the user ticked them in the app). Clean one only when the user names that
+   item after seeing its volumes or containers (`entries`), with its id in `--only`. A clean without `--only` never
+   takes them: it reports them `locked` with a `reason`.
+6. Never pass `--privacy` (browser history, cookies, recent items) unless the user asked for privacy cleaning.
+7. Do not offer `locked` items: tell the user the `reason` (`"Google Chrome is running"`), to quit that app and rescan.
+8. When unsure, run the same clean with `--dry-run` first. Never delete files by hand instead of using `cleanmate`.
+9. After cleaning, report `freed`, what is in the Trash (`inTrash`: still on disk until the Trash is emptied) and every
    `skipped` path with its `reason`.
 
 ## Find it
@@ -46,10 +51,12 @@ A scan reads the disk and can take a minute. `--json` prints one JSON object on 
 
 Each item has `id`, `group`, `name`, `size` (bytes), `sizeIsUpperBound` (the size is a maximum), `selectedByDefault`,
 `disposal` (`"delete"`: removed for good, apps rebuild it; `"trash"`: moved to the Trash, the user can put it back),
-`locked` + `reason`, and its largest `entries` (`path`, `size`). `total` is what the ticked, unlocked items hold.
+`dataLoss` (may hold the user's data, see rule 5), `locked` + `reason`, and its largest `entries` (`path`, `size`,
+`name` when the path is not a file: a Docker volume's name). `total` is what the ticked, unlocked items hold.
 
 Show the user the items with `size` > 0 (or `records`), grouped by `group`, sizes human readable (1 GB = 10⁹ bytes, as
-Finder counts), marking what goes to the Trash and what is locked and why. Suggest the ticked ones and give the total.
+Finder counts), marking what goes to the Trash, what may hold data and what is locked and why. Suggest the ticked ones
+without `dataLoss` and give their total.
 
 `"fullDiskAccess": false` means folders macOS protects (Desktop, Documents, Downloads, the Trash, Mail…) were skipped.
 Full Disk Access belongs to the app running `cleanmate` (Terminal, iTerm, your agent's app), not to CleanMate: System
@@ -67,7 +74,7 @@ Always pass `--only` with the confirmed ids. Without a terminal, `clean` needs `
 and the exit code is 4. `clean` scans again before cleaning, so sizes can differ a little from the scan.
 
 The result has `freed`, `inTrash`, `upTo` (part of `freed` that may stay shared on disk) and, per item, `freed`,
-`trashed`, `skipped` (`path` + `reason`: in use, changed since the scan…), `locked` + `reason`. `log` is the activity
+`trashed`, `skipped` (`path` + `reason`: in use, changed since the scan…), `dataLoss`, `locked` + `reason`. `log` is the activity
 log (`~/Library/Logs/CleanMate/activity.log`), also shown in the app's Settings › Activity.
 
 There is no Undo in the command: items moved to the Trash can be put back from the Trash in Finder (Put Back).

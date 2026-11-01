@@ -21,11 +21,14 @@ nonisolated enum HeadlessClean {
         var trashed: Int64
         /// What was kept, and why.
         var skipped: [Skipped]
+        /// May hold the user's data (`HeadlessScan.dataLossIDs`). Not named with `--only`, it is left `locked` with
+        /// `HeadlessScan.dataLossReason`.
+        var dataLoss = false
         /// Not cleaned at all; `reason` says why.
         var locked: Bool
         var reason: String?
 
-        enum CodingKeys: String, CodingKey { case id, name, freed, trashed, skipped, locked, reason }
+        enum CodingKeys: String, CodingKey { case id, name, freed, trashed, skipped, dataLoss, locked, reason }
 
         /// `reason` is written as `null` when there is none (the contract's field is always present).
         func encode(to encoder: any Encoder) throws {
@@ -35,6 +38,7 @@ nonisolated enum HeadlessClean {
             try container.encode(freed, forKey: .freed)
             try container.encode(trashed, forKey: .trashed)
             try container.encode(skipped, forKey: .skipped)
+            try container.encode(dataLoss, forKey: .dataLoss)
             try container.encode(locked, forKey: .locked)
             try container.encode(reason, forKey: .reason)
         }
@@ -74,6 +78,8 @@ nonisolated enum HeadlessClean {
             var report: HeadlessScan.Item
             /// Absent for an item that exists only with Full Disk Access (reported locked).
             var scanned: HeadlessScan.Scanned?
+            /// Ticked but not named, and it may hold data (`report.dataLoss`): reported, never cleaned.
+            var heldForData = false
             var isPrivacy: Bool { report.group == "privacy" }
         }
 
@@ -81,31 +87,35 @@ nonisolated enum HeadlessClean {
         var home: URL
         var targets: [Target]
 
-        /// Targets that will be cleaned (not locked, something found).
+        /// Targets that will be cleaned (not locked or held, something found).
         var cleanable: [Target] {
             targets.filter { target in
-                !target.report.locked && target.scanned.map { HeadlessScan.cleanable($0.item, $0.scan).hasData } == true
+                !target.report.locked && !target.heldForData && target.scanned.map { HeadlessScan.cleanable($0.item, $0.scan).hasData } == true
             }
         }
 
         /// Bytes the scan measured for the cleanable items deleted outright and moved to the Trash.
         var deleteSize: Int64 { cleanable.filter { $0.report.disposal != "trash" }.reduce(0) { $0 + $1.report.size } }
         var trashSize: Int64 { cleanable.filter { $0.report.disposal == "trash" }.reduce(0) { $0 + $1.report.size } }
+        /// Ticked items left because they may hold data.
+        var held: [Target] { targets.filter(\.heldForData) }
     }
 
     static let changedReason = "Changed since the scan"
     static let keptReason = "Kept by the safety checks: in use, modified since the scan or not permitted"
 
     /// Scans and picks the items to clean: the ones named with `--only`, else those ticked by default (the user's own
-    /// ticks included) in the groups asked for. A Privacy item only when named (by id, or the privacy group).
+    /// ticks included) in the groups asked for. A Privacy item only when named (by id, or the privacy group); an item
+    /// that may hold data only when named by id, never through a tick (it is listed, held).
     /// `options` must have passed `HeadlessScan.validate`.
     static func plan(_ options: HeadlessScan.Options, sources: HeadlessScan.Sources = HeadlessScan.Sources()) async -> Plan {
         let (report, scanned) = await HeadlessScan.scanned(options, sources: sources)
         let named = options.only.map(Set.init)
         let targets = report.items.compactMap { item -> Plan.Target? in
-            let target = Plan.Target(report: item, scanned: scanned[item.id])
+            var target = Plan.Target(report: item, scanned: scanned[item.id])
             if let named { return named.contains(item.id) ? target : nil }
             guard item.selectedByDefault, !target.isPrivacy || options.groups?.contains("privacy") == true else { return nil }
+            target.heldForData = item.dataLoss
             // What the app would clean, plus the ticked items it can't, so the caller learns why.
             return item.locked || target.scanned?.scan.hasData == true ? target : nil
         }
@@ -126,8 +136,13 @@ nonisolated enum HeadlessClean {
                             log: dryRun ? nil : HeadlessScan.displayPath(ActivityLog.url(home: home), home: home))
         for target in plan.targets {
             var result = Item(id: target.report.id, name: target.report.name, freed: 0, trashed: 0, skipped: [],
-                              locked: false, reason: nil)
+                              dataLoss: target.report.dataLoss, locked: false, reason: nil)
             defer { report.items.append(result) }
+            if target.heldForData {
+                result.locked = true
+                result.reason = HeadlessScan.dataLossReason(target.report.id)
+                continue
+            }
             let running = target.scanned?.item.runningBlocker(apps: apps.keys, processes: processes).map { apps[$0] ?? $0 }
             guard let scanned = target.scanned, !target.report.locked, running == nil else {
                 let reason = target.report.reason ?? running.map { "\($0) is running" } ?? HeadlessScan.needsAccess

@@ -4,7 +4,7 @@
 
 | Command | Does |
 | --- | --- |
-| `cleanmate list --json` | every Smart Scan item: `id`, `group`, `name`, `description`, `selectedByDefault`, `disposal`, `needsFullDiskAccess`; scans nothing |
+| `cleanmate list --json` | every Smart Scan item: `id`, `group`, `name`, `description`, `selectedByDefault`, `disposal`, `dataLoss`, `needsFullDiskAccess`; scans nothing |
 | `cleanmate scan --json` | measures the items like Smart Scan in the app; changes nothing |
 | `cleanmate clean --dry-run --json --only ID,ID` | what a clean would do; deletes nothing, logs nothing |
 | `cleanmate clean --yes --json --only ID,ID` | scans again, then cleans those items |
@@ -12,12 +12,16 @@
 
 Options for `scan` and `clean`:
 
-- `--only ID,ID`: these items (ids from `cleanmate list`). In `clean`, the items are cleaned even if unticked.
+- `--only ID,ID`: these items (ids from `cleanmate list`). In `clean`, the items are cleaned even if unticked. The only
+  way to clean an item with `"dataLoss": true`.
 - `--group G,G`: these groups: `system`, `user`, `dev`, `ai`, `apps`, `privacy`. `clean --group` cleans only the items
   ticked by default in them, never the whole group.
 - `--privacy`: include Privacy items (browser history, cookies, recent items). Needed to name a Privacy item or group.
 - `--require-fda`: exit with code 3 instead of scanning when Full Disk Access is missing.
 - `clean` without `--only` and `--group` cleans every item ticked by default. Prefer `--only` with the ids you showed.
+- `clean` without `--only` never cleans an item with `"dataLoss": true` (`docker-volumes`, `docker-containers`), even
+  ticked in the app: it lists it with `"locked": true` and the reason
+  `"May hold data: name it with --only docker-volumes to clean it"`.
 
 ## Example conversation
 
@@ -30,6 +34,8 @@ Options for `scan` and `clean`:
 > - Trash: 3.5 GB in the Trash (emptied for good)
 > - Locked: Google Chrome (Applications, 640 MB), because Google Chrome is running. Quit it and I can rescan.
 > - Not suggested: Ollama: downloaded models, 12 GB (you'd have to download them again). Say if you want them gone.
+> - Not suggested: Docker: unused volumes, 17.5 GB (`postgres-data`, `redis-data`). They may hold databases and are
+>   deleted for good. Name them if you are sure.
 >
 > Shall I clean the four suggested items?
 >
@@ -45,6 +51,7 @@ Options for `scan` and `clean`:
   "fullDiskAccess" : true,
   "items" : [
     {
+      "dataLoss" : false,
       "disposal" : "delete",
       "entries" : [ { "path" : "~/Library/Developer/Xcode/DerivedData/App-abc", "size" : 9100000000 } ],
       "group" : "dev",
@@ -58,6 +65,20 @@ Options for `scan` and `clean`:
       "sizeIsUpperBound" : false
     },
     {
+      "dataLoss" : true,
+      "disposal" : "delete",
+      "entries" : [ { "name" : "postgres-data · local", "path" : "1", "size" : 17500000000 } ],
+      "group" : "dev",
+      "id" : "docker-volumes",
+      "locked" : false,
+      "name" : "Docker: unused volumes",
+      "reason" : null,
+      "selectedByDefault" : true,
+      "size" : 17500000000,
+      "sizeIsUpperBound" : false
+    },
+    {
+      "dataLoss" : false,
       "disposal" : "delete",
       "entries" : [ { "path" : "~/Library/Caches/Google/Chrome/Default", "size" : 640000000, "reason" : "Google Chrome is running" } ],
       "group" : "apps",
@@ -77,7 +98,8 @@ Options for `scan` and `clean`:
 }
 ```
 
-An item may also have `records` (database rows a Privacy item erases) and `needsFullDiskAccess: true`.
+An item may also have `records` (database rows a Privacy item erases) and `needsFullDiskAccess: true`. An entry may
+have a `name` (a Docker volume or container, a simulator…): show it, its `path` is then only an index.
 
 ## `clean --yes --json` (shortened)
 
@@ -88,6 +110,7 @@ An item may also have `records` (database rows a Privacy item erases) and `needs
   "inTrash" : 0,
   "items" : [
     {
+      "dataLoss" : false,
       "freed" : 1500000000,
       "id" : "user-caches",
       "locked" : false,
@@ -97,6 +120,16 @@ An item may also have `records` (database rows a Privacy item erases) and `needs
         { "path" : "~/Library/Caches/com.example.editor", "reason" : "Kept by the safety checks: in use, modified since the scan or not permitted" }
       ],
       "trashed" : 0
+    },
+    {
+      "dataLoss" : true,
+      "freed" : 0,
+      "id" : "docker-volumes",
+      "locked" : true,
+      "name" : "Docker: unused volumes",
+      "reason" : "May hold data: name it with --only docker-volumes to clean it",
+      "skipped" : [ ],
+      "trashed" : 0
     }
   ],
   "log" : "~/Library/Logs/CleanMate/activity.log",
@@ -105,7 +138,8 @@ An item may also have `records` (database rows a Privacy item erases) and `needs
 }
 ```
 
-`trashed` is the part of an item's `freed` moved to the Trash. With `--dry-run`, `dryRun` is `true`, `log` is `null`
+`trashed` is the part of an item's `freed` moved to the Trash. `docker-volumes` shows what a clean without `--only`
+does with a ticked item that may hold data: nothing, reported `locked`. With `--dry-run`, `dryRun` is `true`, `log` is `null`
 and the numbers are what a clean would free.
 
 ## Safety
