@@ -268,11 +268,9 @@ extension CleanerGroup {
         dev("playwright-browsers", "Playwright browsers", note: "Downloaded again with playwright install",
             ["~/Library/Caches/ms-playwright"], selected: false),
 
-        // Docker: measured with `docker system df`, only when a daemon is already running.
-        // Unticked: `--all` also removes images built locally, which no registry can give back.
-        docker("docker-images", "Docker: unused images", note: "Images no container uses. Images built on this Mac must be built again; others are pulled again when needed",
-               type: "Images", ["image", "prune", "--all", "--force"], selected: false,
-               details: DeveloperTools.dockerUnusedImages),
+        // Docker: measured with `docker system df` or listed, only when a daemon is already running.
+        // Unticked: images built locally can't be pulled again; each tag is removed on its own.
+        dockerUnusedImages,
         // Ticked: leftovers of `docker build` (a rebuilt image replaced them), which a build makes again. Each one is
         // removed by its own ID, so an unticked one stays.
         dockerDangling,
@@ -396,6 +394,34 @@ extension CleanerGroup {
         item.entryCommand = { url in
             guard let id = DeveloperTools.dockerImageID(of: url) else { return nil }
             return ShellCommand(executable: "docker", arguments: ["rmi", id], timeout: .seconds(60), leadingArguments: host)
+        }
+        return item
+    }()
+
+    /// Tagged images no container uses, stopped ones included: one entry per tag from `docker images`, checked against
+    /// `docker ps -a`, removed with `docker rmi <repo:tag>` for the ticked ones. No `-f` and never by ID, so another tag
+    /// of the image stays, and docker refuses to remove an image a container started using since the scan.
+    /// Skipped while `docker build` (buildx) or `docker compose` runs: they may be about to use one.
+    nonisolated private static let dockerUnusedImages: CleanerItem = {
+        let host: @Sendable () -> [String]? = { DeveloperTools.localDockerHostArguments() }
+        let list = ShellCommand(executable: "docker", arguments: ["images", "--filter", "dangling=false", "--format", "{{json .}}"],
+                                timeout: .seconds(20), leadingArguments: host)
+        var probe = SizeProbe(command: list, precondition: DeveloperTools.dockerDaemonIsRunning,
+                              parse: { output in
+                                  let entries = DeveloperTools.dockerUnusedImages(in: output)
+                                  return entries.isEmpty ? nil : .bytes(entries.reduce(0) { $0 + $1.size })
+                              },
+                              details: (list, DeveloperTools.dockerUnusedImages))
+        probe.companion = ShellCommand(executable: "docker", arguments: ["ps", "--all", "--no-trunc", "--format", "{{.Image}}"],
+                                       timeout: .seconds(20), leadingArguments: host)
+        var item = dev("docker-images", "Docker: unused images",
+            note: "Tagged images no container uses, stopped ones included. Images built on this Mac must be built again; others are pulled again with docker pull. Sizes may count layers shared with other images",
+            [], command: ShellCommand(executable: "docker", arguments: ["image", "prune", "--all", "--force"], timeout: .seconds(300),
+                                      leadingArguments: host),
+            probe: probe, selected: false, processes: ["docker-buildx", "docker-compose"], selectableEntries: true)
+        item.entryCommand = { url in
+            guard let reference = DeveloperTools.dockerImageReference(of: url) else { return nil }
+            return ShellCommand(executable: "docker", arguments: ["rmi", reference], timeout: .seconds(60), leadingArguments: host)
         }
         return item
     }()
@@ -525,24 +551,78 @@ nonisolated enum DeveloperTools {
         return nil
     }
 
-    /// Images `docker image prune --all` removes, from `docker system df -v --format '{{json .}}'`: those no
-    /// container uses, stopped ones included ("Containers":"0", counted by image ID like prune does). One entry per
-    /// tag; `Size` counts layers shared with other images, so entries can add up to more than the item's size.
-    /// shortcut: untagged intermediate build images are not in this list though prune removes them; they are small.
+    /// Tagged images no container uses, from `docker images --format '{{json .}}'` and, after
+    /// `SizeProbe.companionSeparator`, `docker ps --all --no-trunc --format '{{.Image}}'` (see `SizeProbe.companion`).
     static func dockerUnusedImages(in output: String) -> [ScanEntry] {
-        struct Image: Decodable {
-            let Containers: String, CreatedAt: String, ID: String, Repository: String, Size: String, Tag: String
+        let parts = output.components(separatedBy: "\n" + SizeProbe.companionSeparator + "\n")
+        guard parts.count == 2 else { return [] } // no container list: nothing can be told unused
+        return dockerUnusedImages(images: parts[0], containers: parts[1])
+    }
+
+    /// One entry per tag (`docker-image:<repo:tag>`, title `repo:tag`, image size and creation date) of every image no
+    /// container uses, stopped ones included. A container names its image by the reference it was made from or, once
+    /// that tag moved, by ID; a digest reference (`repo@sha256:…`) keeps every image of that repository. Docker's own
+    /// count (`Containers`, filled by recent versions) counts too. Untagged rows, unreadable lines and references that
+    /// are not a valid `repo:tag` are left out, never removed. `Size` counts layers shared with other images.
+    static func dockerUnusedImages(images: String, containers: String) -> [ScanEntry] {
+        struct Image: Decodable { let ID: String, Repository: String, Tag: String, Size: String, CreatedAt: String; let Containers: String? }
+        let rows = images.split(whereSeparator: \.isNewline).compactMap { line -> (image: Image, id: String)? in
+            guard let image = try? JSONDecoder().decode(Image.self, from: Data(line.utf8)),
+                  let id = shortImageID(image.ID).map({ String($0.prefix(12)) }) else { return nil }
+            return (image, id)
         }
-        struct Report: Decodable { let Images: [Lenient<Image>]? }
-        guard let report = try? JSONDecoder().decode(Report.self, from: Data(output.utf8)) else { return [] }
-        return readable(report.Images, scheme: "docker-image") { index, image in
-            guard image.Containers == "0", let url = URL(string: "docker-image:\(index)") else { return nil }
-            let shortID = String(image.ID.replacingOccurrences(of: "sha256:", with: "").prefix(12))
-            let named = image.Repository != "<none>" && !image.Repository.isEmpty
-            let title = named ? image.Repository + (image.Tag == "<none>" ? "" : ":" + image.Tag) : shortID
-            return ScanEntry(url: url, size: bytes(fromDockerSize: image.Size) ?? 0, title: title,
+        var used = Set(rows.filter { Int($0.image.Containers ?? "") ?? 0 > 0 }.map(\.id))
+        for line in containers.split(whereSeparator: \.isNewline) {
+            let named = line.trimmingCharacters(in: .whitespaces)
+            guard !named.isEmpty else { continue }
+            if let id = shortImageID(named) { used.insert(String(id.prefix(12))) }
+            if let at = named.firstIndex(of: "@") {
+                let repository = normalizedImageReference(String(named[..<at]), tagged: false)
+                used.formUnion(rows.filter { normalizedImageReference($0.image.Repository, tagged: false) == repository }.map(\.id))
+            } else {
+                let reference = normalizedImageReference(named, tagged: true)
+                used.formUnion(rows.filter {
+                    normalizedImageReference($0.image.Repository + ":" + $0.image.Tag, tagged: true) == reference
+                }.map(\.id))
+            }
+        }
+        return rows.compactMap { image, id in
+            let reference = image.Repository + ":" + image.Tag
+            guard !used.contains(id), isImageReference(reference),
+                  let url = URL(string: "docker-image:" + reference) else { return nil }
+            return ScanEntry(url: url, size: bytes(fromDockerSize: image.Size) ?? 0, title: reference,
                              date: dockerDate(image.CreatedAt))
         }
+    }
+
+    /// The form `docker images` shows: no `docker.io/` or `library/` prefix; with `tagged`, `:latest` when there is
+    /// no tag, else the tag dropped (`nginx`, `docker.io/library/nginx:latest` → `nginx:latest` / `nginx`).
+    static func normalizedImageReference(_ reference: String, tagged: Bool) -> String {
+        var name = reference
+        for prefix in ["docker.io/", "index.docker.io/", "registry-1.docker.io/"] where name.hasPrefix(prefix) {
+            name.removeFirst(prefix.count)
+            if name.hasPrefix("library/") { name.removeFirst("library/".count) }
+        }
+        let lastSlash = name.lastIndex(of: "/").map { name.index(after: $0) } ?? name.startIndex
+        let colon = name[lastSlash...].firstIndex(of: ":")
+        if tagged { return colon == nil ? name + ":latest" : name }
+        return colon.map { String(name[..<$0]) } ?? name
+    }
+
+    /// A `repo:tag` as Docker's reference grammar allows it: an optional registry host (and port), lowercase path
+    /// components, a tag of letters, digits, `_`, `.`, `-`; at most 255 characters. Never starts with `-`, so it can't be
+    /// read as an option of `docker rmi`.
+    static func isImageReference(_ text: String) -> Bool {
+        text.count <= 255
+            && text.wholeMatch(of: #/(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}/#) != nil
+    }
+
+    /// The `repo:tag` in a `docker-image:<repo:tag>` entry URL; nil for any other URL or an invalid reference.
+    static func dockerImageReference(of url: URL) -> String? {
+        let text = url.absoluteString
+        guard text.hasPrefix("docker-image:") else { return nil }
+        let reference = String(text.dropFirst("docker-image:".count))
+        return isImageReference(reference) ? reference : nil
     }
 
     /// Untagged images from `docker images --filter dangling=true --format '{{json .}}'` (one JSON object per

@@ -4397,12 +4397,12 @@
         }
       }
     },
-    "Images no container uses. Images built on this Mac must be built again; others are pulled again when needed" : {
+    "Tagged images no container uses, stopped ones included. Images built on this Mac must be built again; others are pulled again with docker pull. Sizes may count layers shared with other images" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Image không container nào dùng. Image build trên máy này phải build lại; image khác sẽ được tải lại khi cần"
+            "value" : "Image có tag mà không container nào dùng, kể cả container đã dừng. Image build trên máy này phải build lại; image khác tải lại bằng docker pull. Kích thước có thể tính cả lớp dùng chung với image khác"
           }
         }
       }

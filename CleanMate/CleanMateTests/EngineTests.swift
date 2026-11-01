@@ -331,9 +331,9 @@ struct ScannerCleanerTests {
         #expect(FileManager.default.fileExists(atPath: key.path))
     }
 
-    /// Docker's listed images, containers, volumes are display-only: even with the
+    /// Docker's listed containers and volumes are display-only: even with the
     /// tool gone, the cleaner never removes an entry.
-    @Test(arguments: ["docker-images", "docker-containers", "docker-volumes"])
+    @Test(arguments: ["docker-containers", "docker-volumes"])
     func dockerEntriesAreNeverRemoved(id: String) async throws {
         let box = try Sandbox()
         defer { box.remove() }
@@ -939,20 +939,103 @@ struct DeveloperToolsTests {
         #expect(DeveloperTools.bytes(fromDockerSize: "12XB") == nil)
     }
 
-    @Test func dockerUnusedImages() {
-        let output = """
-        {"Images":[\
-        {"Containers":"0","CreatedAt":"2026-10-22 03:48:02 +0700 +07","ID":"sha256:8b1bc650def028e2a1","Repository":"app-dev","Size":"1.82GB","Tag":"latest"},\
-        {"Containers":"1","CreatedAt":"2026-10-06 08:36:10 +0700 +07","ID":"sha256:a470461db3d4079fb4","Repository":"postgres","Size":"477MB","Tag":"17"},\
-        {"Containers":"0","CreatedAt":"2026-09-18 05:11:30 +0000 UTC","ID":"sha256:6fecacab9f884dc313","Repository":"<none>","Size":"97.9MB","Tag":"<none>"}\
-        ],"Containers":[],"Volumes":[],"BuildCache":[]}
+    /// Unused tagged images from `docker images` + `docker ps -a`: an image a container uses (stopped too, by tag, by
+    /// ID once the tag moved, by digest, or counted by docker) is left out with all its tags; each tag of an unused image
+    /// is its own row; a name that is not a valid `repo:tag` is left out.
+    @Test func dockerUnusedImages() throws {
+        let images = """
+        {"Containers":"N/A","CreatedAt":"2026-10-22 03:48:02 +0700 +07","ID":"8b1bc650def0","Repository":"app-dev","Size":"1.82GB","Tag":"latest"}
+        {"Containers":"N/A","CreatedAt":"2026-10-22 03:48:02 +0700 +07","ID":"8b1bc650def0","Repository":"ghcr.io/me/app-dev","Size":"1.82GB","Tag":"v1.2"}
+        {"Containers":"N/A","CreatedAt":"2026-10-06 08:36:10 +0700 +07","ID":"a470461db3d4","Repository":"postgres","Size":"477MB","Tag":"17"}
+        {"Containers":"N/A","CreatedAt":"2026-10-06 08:36:10 +0700 +07","ID":"a470461db3d4","Repository":"postgres","Size":"477MB","Tag":"17-bookworm"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"1f1aeedbd16d","Repository":"ubuntu","Size":"101MB","Tag":"24.04"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"c32c794743db","Repository":"localhost:5000/tools","Size":"248MB","Tag":"old"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"f7bbaec1bd03","Repository":"redis","Size":"40MB","Tag":"8-alpine"}
+        {"Containers":"1","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"07ee628d2e71","Repository":"mysql","Size":"600MB","Tag":"9"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"2b1bc650def0","Repository":"-rf","Size":"1MB","Tag":"x"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"3b1bc650def0","Repository":"Upper","Size":"1MB","Tag":"x"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"4b1bc650def0","Repository":"pinned","Size":"1MB","Tag":"<none>"}
+        {"Containers":"N/A","CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"../../etc","Repository":"evil","Size":"1MB","Tag":"x"}
+        not json
         """
-        let images = DeveloperTools.dockerUnusedImages(in: output)
-        #expect(images.map(\.title) == ["app-dev:latest", "6fecacab9f88"]) // postgres:17 has a (stopped) container
-        #expect(images.map(\.size) == [1_820_000_000, 97_900_000])
-        #expect(images[0].date == Date(timeIntervalSince1970: 1_792_615_682))
-        #expect(Set(images.map(\.url)).count == 2 && images.allSatisfy { !$0.url.isFileURL })
+        let containers = """
+        docker.io/library/postgres:17
+        sha256:c32c794743db45d5ec67da0b89119d53c9099575981217015c7996ea43d2b25a
+        redis@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+        """
+        let entries = DeveloperTools.dockerUnusedImages(images: images, containers: containers)
+        #expect(entries.map(\.title) == ["app-dev:latest", "ghcr.io/me/app-dev:v1.2", "ubuntu:24.04"])
+        #expect(entries.map(\.size) == [1_820_000_000, 1_820_000_000, 101_000_000])
+        #expect(entries[0].date == Date(timeIntervalSince1970: 1_792_615_682))
+        #expect(entries.compactMap { DeveloperTools.dockerImageReference(of: $0.url) } == entries.map(\.title))
+        // Without a container list nothing is offered.
+        #expect(DeveloperTools.dockerUnusedImages(in: images).isEmpty)
+        let combined = images + "\n" + SizeProbe.companionSeparator + "\n" + containers
+        #expect(DeveloperTools.dockerUnusedImages(in: combined).map(\.title) == entries.map(\.title))
         #expect(DeveloperTools.dockerUnusedImages(in: "Cannot connect to the Docker daemon").isEmpty)
+
+        let item = try #require(CleanerGroup.developer.items.first { $0.id == "docker-images" })
+        #expect(!item.selectedByDefault && item.selectableEntries && item.paths.isEmpty && item.entryCommand != nil)
+        #expect(item.runningProcessNames == ["docker-buildx", "docker-compose"])
+        #expect(item.probe?.companion?.arguments == ["ps", "--all", "--no-trunc", "--format", "{{.Image}}"])
+        guard case .bytes(let total)? = item.probe?.parse(combined) else { Issue.record("no size"); return }
+        #expect(total == 3_741_000_000)
+        let ubuntu = #"{"CreatedAt":"2026-10-01 08:36:10 +0700 +07","ID":"1f1aeedbd16d","Repository":"ubuntu","Size":"101MB","Tag":"24.04"}"#
+        #expect(item.probe?.parse(ubuntu + "\n" + SizeProbe.companionSeparator + "\nubuntu:24.04\n") == nil) // all used: hidden
+    }
+
+    @Test func dockerImageReferences() {
+        for valid in ["nginx:latest", "me/app:1.0", "ghcr.io/me/app-dev:v1.2", "localhost:5000/a/b:old", "a__b.c-d:X_1.2-rc"] {
+            #expect(DeveloperTools.isImageReference(valid), "\(valid)")
+        }
+        for invalid in ["nginx", "-rf:x", "--force:x", "Upper:x", "nginx:<none>", "nginx:-x", "a b:x", "nginx:x;rm",
+                        "nginx@sha256:00", "6fecacab9f88", "a/:x", "é:x", "nginx:" + String(repeating: "t", count: 129)] {
+            #expect(!DeveloperTools.isImageReference(invalid), "\(invalid)")
+        }
+        #expect(DeveloperTools.normalizedImageReference("docker.io/library/nginx", tagged: true) == "nginx:latest")
+        #expect(DeveloperTools.normalizedImageReference("localhost:5000/app", tagged: true) == "localhost:5000/app:latest")
+        #expect(DeveloperTools.normalizedImageReference("localhost:5000/app:1", tagged: false) == "localhost:5000/app")
+        #expect(DeveloperTools.dockerImageReference(of: URL(string: "docker-image:localhost:5000/a/b:old")!) == "localhost:5000/a/b:old")
+        #expect(DeveloperTools.dockerImageReference(of: URL(string: "docker-image:0")!) == nil)
+        #expect(DeveloperTools.dockerImageReference(of: URL(string: "docker-image:-f:x")!) == nil)
+        #expect(DeveloperTools.dockerImageReference(of: URL(string: "docker-dangling:nginx:latest")!) == nil)
+    }
+
+    /// Cleaning one ticked tag runs exactly one `docker rmi <repo:tag>` (no `-f`, not by ID); an invalid one runs nothing.
+    @Test func unusedImagesAreRemovedPerTag() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let log = box.root.appending(path: "calls.txt")
+        let script = try box.file("fake-docker.sh")
+        try "#!/bin/sh\necho \"$@\" >> '\(log.path)'\n".write(to: script, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        var item = try #require(CleanerGroup.developer.items.first { $0.id == "docker-images" })
+        let real = try #require(item.entryCommand?(URL(string: "docker-image:ghcr.io/me/app:v1")!))
+        #expect(real.executable == "docker" && real.arguments == ["rmi", "ghcr.io/me/app:v1"])
+        #expect(item.entryCommand?(URL(string: "docker-image:--force:x")!) == nil)
+        item.command = ShellCommand(executable: script.path)
+        let entryCommand = try #require(item.entryCommand)
+        item.entryCommand = { url in entryCommand(url).map { ShellCommand(executable: script.path, arguments: $0.arguments) } }
+        item.probe?.precondition = { true }
+        let scan = ItemScan(entries: [
+            ScanEntry(url: URL(string: "docker-image:app-dev:latest")!, size: 10),
+            ScanEntry(url: URL(string: "docker-image:-rf:x")!, size: 1),
+        ], measuredSize: 11)
+        let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
+        #expect(report.freed == 10 && report.skipped == 1)
+        #expect(SmartScanModel.removedCount(item, scan, report) == 1)
+        #expect(try String(contentsOf: log, encoding: .utf8) == "rmi app-dev:latest\n")
+    }
+
+    /// A probe's companion command runs after it; its output follows a separator line. Either failing = no output.
+    @Test func probeCompanionOutput() async {
+        var probe = SizeProbe(command: ShellCommand(executable: "/bin/echo", arguments: ["one"]), parse: { _ in nil })
+        #expect(await probe.output() == "one\n")
+        probe.companion = ShellCommand(executable: "/bin/echo", arguments: ["two"])
+        #expect(await probe.output() == "one\n" + SizeProbe.companionSeparator + "\ntwo\n")
+        probe.companion = ShellCommand(executable: "/usr/bin/false")
+        #expect(await probe.output() == nil)
     }
 
     /// Stopped containers / unused volumes listed exactly as `container prune` / `volume prune --all` remove them.

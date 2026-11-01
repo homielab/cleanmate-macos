@@ -408,7 +408,7 @@ struct CleanerItemRow: View {
         return String(localized: text)
     }
 
-    /// A row with no checkbox and no file (a Docker image) has no control in it, so VoiceOver reads it as one
+    /// A row with no checkbox and no file (a Docker container) has no control in it, so VoiceOver reads it as one
     /// element "name, size"; nil leaves the row's children as they are.
     static func rowAccessibilityLabel(entry: ScanEntry, selectable: Bool, locale: Locale = .current) -> String? {
         selectable || entry.url.isFileURL ? nil : accessibilityLabel(entry: entry, locale: locale)
@@ -439,7 +439,7 @@ struct CleanerItemRow: View {
                                 }
                             }
                         }
-                        if entry.url.isFileURL { // not a Docker image: those have no file
+                        if entry.url.isFileURL { // not a Docker container: those have no file
                             Text(entry.url.path)
                                 .lineLimit(1)
                                 .truncationMode(.middle)

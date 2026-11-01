@@ -25,10 +25,14 @@ nonisolated struct SizeProbe: Sendable {
     var precondition: @Sendable () -> Bool = { true }
     /// Parses the command's standard output; nil = nothing to report.
     var parse: @Sendable (String) -> Result?
-    /// With `.bytes`: a second command whose parsed rows are listed in the expanded row (Docker's unused images).
-    /// Display only: the item's command does the cleaning, these entries are never removed (see `Cleaner.remove`).
+    /// With `.bytes`: a second command whose parsed rows are listed in the expanded row (Docker's stopped containers).
+    /// Display only unless the item has an `entryCommand`: the item's command does the cleaning, these entries are
+    /// never removed (see `Cleaner.remove`).
     /// The same command as `command` is not run again: the probe's output is parsed.
     var details: (command: ShellCommand, parse: @Sendable (String) -> [ScanEntry])? = nil
+    /// A second command run right after `command`: its output follows the command's, after a `companionSeparator`
+    /// line, so `parse` and `details` see both (`docker images` then `docker ps -a`). Either failing = no output.
+    var companion: ShellCommand? = nil
     /// What the command's output depends on (e.g. `folderDates`). Same value as the last run, less than `reuseLimit`
     /// ago → that run's output is reused from `Preferences.probeOutputs` instead of running the command (brew).
     var fingerprint: (@Sendable () -> String)? = nil
@@ -36,17 +40,27 @@ nonisolated struct SizeProbe: Sendable {
     /// Also covers what changes with time only (brew drops old logs and locks by age).
     static let reuseLimit: TimeInterval = 6 * 3600
 
+    static let companionSeparator = "--- companion ---"
+
     /// The command's output, or the saved one when `fingerprint` is unchanged (see above).
     func output(defaults: UserDefaults = .standard, now: Date = .now) async -> String? {
-        guard let fingerprint else { return await command.output() }
+        guard let fingerprint else { return await commandsOutput() }
         let current = fingerprint()
         if let saved = Self.reusable(defaults.dictionary(forKey: Preferences.probeOutputs)?[key] as? [String: Any],
                                      fingerprint: current, now: now) { return saved }
-        guard let output = await command.output() else { return nil }
+        guard let output = await commandsOutput() else { return nil }
         var all = defaults.dictionary(forKey: Preferences.probeOutputs) ?? [:]
         all[key] = ["fingerprint": current, "output": output, "date": now]
         defaults.set(all, forKey: Preferences.probeOutputs)
         return output
+    }
+
+    /// `command`'s output, then `companion`'s after the separator line.
+    private func commandsOutput() async -> String? {
+        guard let output = await command.output() else { return nil }
+        guard let companion else { return output }
+        guard let second = await companion.output() else { return nil }
+        return output + (output.hasSuffix("\n") || output.isEmpty ? "" : "\n") + Self.companionSeparator + "\n" + second
     }
 
     /// Drops the saved output: after the item's own command ran (`brew cleanup`), the next run must be real even when
