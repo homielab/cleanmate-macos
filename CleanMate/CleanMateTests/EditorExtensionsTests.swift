@@ -171,6 +171,7 @@ final class EditorExtensionsTests {
         smartScan.appBundleIDs = { [] }
         smartScan.runningApps = []
         smartScan.processNames = { ["Cursor Helper (Plugin)", "zsh"] }
+        smartScan.selectionOverrides = { [:] } // not this Mac's remembered ticks
         let policy = policy
         smartScan.logHome = home
         smartScan.readOpenFiles = noOpenFiles

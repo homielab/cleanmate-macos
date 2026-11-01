@@ -143,7 +143,8 @@ struct EditorWorkspacesTests {
         #expect(report.trashed.isEmpty && box.exists(entry))
     }
 
-    /// While an editor or its extension host runs, the row is locked, not ticked and not cleaned.
+    /// While an editor or its extension host runs, the row is locked, not ticked (not even when the user's remembered
+    /// tick says so) and not cleaned. Once it quits, the row is unticked by default and ticked by a remembered tick.
     @MainActor @Test func lockedWhileAnEditorRuns() async throws {
         let box = try Home()
         defer { box.remove() }
@@ -153,6 +154,7 @@ struct EditorWorkspacesTests {
         smartScan.appBundleIDs = { [] }
         smartScan.runningApps = []
         smartScan.processNames = { ["Cursor Helper (Plugin)", "zsh"] }
+        smartScan.selectionOverrides = { [item.id: true] } // not this Mac's remembered ticks
         let policy = box.policy // not this Mac's Exclusions, Trash or activity log
         let trash = box.moveToFakeTrash
         smartScan.logHome = box.home
@@ -171,6 +173,9 @@ struct EditorWorkspacesTests {
         smartScan.runningApps = ["com.microsoft.VSCode"]
         #expect(smartScan.isRunning(item))
         smartScan.runningApps = []
+        await smartScan.scan()
+        #expect(!smartScan.isRunning(item) && smartScan.selected == [item.id]) // the remembered tick
+        smartScan.selectionOverrides = { [:] }
         await smartScan.scan()
         #expect(!smartScan.isRunning(item) && smartScan.selected.isEmpty) // unticked by default
     }

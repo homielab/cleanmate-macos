@@ -42,6 +42,9 @@ final class SmartScanModel: ObservableObject {
     /// Injected by tests (a sandbox policy and a fake Trash).
     /// Saves exclusions ("Never Clean This"); tests inject a throwaway defaults domain.
     var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
+    /// Item ticks remembered across launches (`Preferences.overrides`), read at each scan; tests inject their own so
+    /// a tick made in the app on this Mac can't change their defaults.
+    var selectionOverrides: () -> [String: Bool] = { Preferences.overrides }
     /// Home whose activity log records each clean; tests pass a throwaway folder.
     var logHome = SafetyPolicy.current.homeURL
     var cleanItem: @Sendable (CleanerItem, ItemScan, @escaping OpenPaths) async -> CleanReport = {
@@ -423,7 +426,7 @@ final class SmartScanModel: ObservableObject {
         let newItems = items
         scannedItems = 0
         totalItems = newItems.count
-        let overrides = Preferences.overrides
+        let overrides = selectionOverrides()
         let scanItem = scanItem
         let blockedByExclusion = blockedByExclusion
         let openFiles = OpenFiles(read: readOpenFiles) // read when the first item needs it, if any does
