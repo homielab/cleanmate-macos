@@ -21,17 +21,77 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
             .appending(path: "\(AppIdentity.bundleID)/folder-sizes.json")
     }
 
-    /// What a folder was measured with: its modification time and link count, read with `lstat`.
+    /// What a folder was measured with: its modification time and link count, read with `lstat`. With a `depth`
+    /// (`CleanerItem.entrySizesDepth`), the newest modification time among the folder and everything up to `depth`
+    /// levels inside it, and how many items those levels hold: a file added, removed or
+    /// rewritten that deep changes it too, for caches a tool keeps writing into (Gradle).
     nonisolated struct Fingerprint: Equatable, Sendable {
         let seconds: Int
         let nanoseconds: Int
         let links: Int
 
         /// nil when `url` is not a folder (gone, a file, a symlink).
-        init?(_ url: URL) {
+        init?(_ url: URL, depth: Int = 0) {
+            if depth > 0 {
+                guard let newest = Self.newest(url.path, depth: depth) else { return nil }
+                (seconds, nanoseconds, links) = (newest.time.tv_sec, newest.time.tv_nsec, newest.items)
+                return
+            }
             var info = stat()
             guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return nil }
             (seconds, nanoseconds, links) = (info.st_mtimespec.tv_sec, info.st_mtimespec.tv_nsec, Int(info.st_nlink))
+        }
+
+        private static let bufferSize = 64 * 1024
+
+        /// The newest modification time among `path` and the items up to `depth` levels inside it, and how many items
+        /// those levels hold, listed with `getattrlistbulk` (one call per folder). nil when `path` is not a folder.
+        private static func newest(_ path: String, depth: Int) -> (time: timespec, items: Int)? {
+            var info = stat()
+            guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return nil }
+            var newest = info.st_mtimespec, items = 0
+            let buffer = UnsafeMutableRawPointer.allocate(byteCount: Self.bufferSize, alignment: 8)
+            defer { buffer.deallocate() }
+            var attributes = attrlist()
+            attributes.bitmapcount = u_short(ATTR_BIT_MAP_COUNT)
+            let common = attrgroup_t(ATTR_CMN_NAME | ATTR_CMN_OBJTYPE | ATTR_CMN_MODTIME)
+            attributes.commonattr = attrgroup_t(ATTR_CMN_RETURNED_ATTRS) | common
+            var level = [path]
+            for remaining in stride(from: depth, to: 0, by: -1) {
+                var next: [String] = []
+                for folder in level {
+                    let fd = open(folder, O_RDONLY | O_DIRECTORY | O_NOFOLLOW)
+                    guard fd >= 0 else { continue }
+                    defer { close(fd) }
+                    let prefix = folder.hasSuffix("/") ? folder : folder + "/"
+                    while true {
+                        let count = getattrlistbulk(fd, &attributes, buffer, Self.bufferSize, 0)
+                        guard count > 0 else { break }
+                        var entry = buffer
+                        for _ in 0..<count {
+                            let length = Int(entry.loadUnaligned(as: UInt32.self))
+                            defer { entry += length }
+                            let returned = entry.loadUnaligned(fromByteOffset: 4, as: attribute_set_t.self)
+                            guard returned.commonattr & common == common else { continue }
+                            var field = entry + 4 + MemoryLayout<attribute_set_t>.size
+                            let nameField = field
+                            let name = field.loadUnaligned(as: attrreference_t.self)
+                            field += MemoryLayout<attrreference_t>.size
+                            let type = field.loadUnaligned(as: fsobj_type_t.self)
+                            field += MemoryLayout<fsobj_type_t>.size
+                            let time = field.loadUnaligned(as: timespec.self)
+                            items += 1
+                            if (time.tv_sec, time.tv_nsec) > (newest.tv_sec, newest.tv_nsec) { newest = time }
+                            if remaining > 1, type == VDIR.rawValue {
+                                let namePointer = (nameField + Int(name.attr_dataoffset)).assumingMemoryBound(to: CChar.self)
+                                next.append(prefix + String(cString: namePointer))
+                            }
+                        }
+                    }
+                }
+                level = next
+            }
+            return (newest, items)
         }
     }
 

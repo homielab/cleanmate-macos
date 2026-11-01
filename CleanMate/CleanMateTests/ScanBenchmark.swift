@@ -54,12 +54,15 @@ struct ScanBenchmark {
         return try await work()
     }
 
-    /// Each item alone (to find the slow ones), then all in parallel like `SmartScanModel`.
+    /// All items in parallel like `SmartScanModel` (`first`: the size caches of this test process still empty, as on a
+    /// Mac's first scan), then each item alone (to find the slow ones), then all in parallel again (`next`: sizes kept
+    /// by `FolderSizeCache` and probe outputs reused, as on a later scan).
     /// Every entry each item would clean is also written to `$TMPDIR/cleanmate-entries-<name>.tsv` (for a safety
     /// review; never in the repo): item, mode, selected by default, bytes, records, entry label and its date
     /// (empty when the item has no `entryLabel`), path. A probe-measured item has one row with an empty path.
     func scanItems(_ name: String, _ groups: [CleanerGroup]) async {
         let items = groups.flatMap(\.items)
+        await parallel("\(name) first", items)
         var tsv = "item\tmode\tselected\tbytes\trecords\ttitle\tdate\tpath\n"
         for item in items {
             let (scan, seconds) = await timed { await Scanner.scan(item, policy: policy) }
@@ -73,8 +76,14 @@ struct ScanBenchmark {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("cleanmate-entries-\(name).tsv")
         do { try tsv.write(to: file, atomically: true, encoding: .utf8); print("BENCH entries -> \(file.path)") }
         catch { print("BENCH entries NOT written: \(error)") }
-        // Also when each item finished inside the parallel run: the last ones are the scan's critical path.
+        await parallel("\(name) next", items)
+    }
+
+    /// `items` scanned in parallel like `SmartScanModel`: wall and CPU time, and when each item finished, latest first
+    /// (the first ones are the scan's critical path).
+    func parallel(_ name: String, _ items: [CleanerItem]) async {
         let start = ContinuousClock.now
+        let cpuStart = clock_gettime_nsec_np(CLOCK_PROCESS_CPUTIME_ID)
         let (finished, seconds) = await timed { await peakMemory("\(name) parallel") {
             await withTaskGroup(of: (String, Int64, Duration).self) { group in
                 let openFiles = OpenFiles() // one open-file table for the pass, like `SmartScanModel`
@@ -87,10 +96,11 @@ struct ScanBenchmark {
                 return await group.reduce(into: []) { $0.append($1) }
             }
         } }
-        for (id, _, at) in finished.sorted(by: { $0.2 > $1.2 }).prefix(8) {
+        for (id, _, at) in finished.sorted(by: { $0.2 > $1.2 }) {
             report("\(name) parallel done \(id)", at / .seconds(1), 0)
         }
         report("\(name) TOTAL (parallel)", seconds, finished.reduce(0) { $0 + $1.1 })
+        report("\(name) CPU (parallel)", Double(clock_gettime_nsec_np(CLOCK_PROCESS_CPUTIME_ID) - cpuStart) / 1e9, 0)
     }
 
     @Test func smartScan() async {

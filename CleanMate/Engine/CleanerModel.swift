@@ -262,6 +262,9 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Sizes of the item's folder entries kept between scans (`FolderSizeCache`): an entry whose top level did not
     /// change since it was measured is not walked again. Only for items without `minAge` (a cached size has no date).
     var entrySizes: FolderSizeCache? = nil
+    /// How many levels inside an entry `entrySizes` looks for a change (`FolderSizeCache.Fingerprint`); 0 = the
+    /// entry's own date and link count.
+    var entrySizesDepth = 0
     /// Measures each folder entry as what removing it frees, with a new counter per entry (`FreeableBytes`): hard links
     /// into a store outside count 0, and APFS clones only their private bytes when the counter has `clones`.
     var freeableSize: (@Sendable (URL) -> FreeableBytes)? = nil

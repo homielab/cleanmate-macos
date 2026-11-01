@@ -205,8 +205,7 @@ extension CleanerGroup {
             shell: ["HF_HOME": ["hub"], "HF_HUB_CACHE": [""]], selected: false, selectableEntries: true),
         dev("prisma-engines", "Prisma engines", note: "Engine binaries of Prisma versions, downloaded again when needed",
             ["~/.cache/prisma"]),
-        dev("gradle-caches", "Gradle caches", note: "Dependency and build caches, downloaded again on the next build",
-            ["~/.gradle/caches"], shell: ["GRADLE_USER_HOME": ["caches"]], processes: ["GradleDaemon", "KotlinCompileDaemon"]),
+        gradleCaches(),
         // Unticked: every Gradle version a wrapper used; the next build downloads its version again (needs network).
         dev("gradle-wrapper", "Gradle wrapper", note: "Downloaded Gradle versions, downloaded again by the next build",
             ["~/.gradle/wrapper/dists"], shell: ["GRADLE_USER_HOME": ["wrapper/dists"]], selected: false, processes: ["GradleDaemon", "KotlinCompileDaemon"]),
@@ -372,6 +371,20 @@ extension CleanerGroup {
                     showsWhenEmpty: false,
                     runningAppBundleIDs: apps, runningProcessNames: processes, skipsOpenFiles: openFiles,
                     skipsEntry: skipsEntry, entryLabel: entryLabel, selectableEntries: selectableEntries)
+    }
+
+    /// Gradle's caches, one entry per folder in `caches` (a Gradle version's, `modules-2`, `jars-9`…): ~500 k files
+    /// on a busy machine, the last item of a Smart Scan. `sizes` keeps each entry's size between scans while nothing
+    /// up to 2 levels inside it changed: Gradle adds a folder per transform, jar, download or build-cache entry
+    /// there, and rewrites its index files (`modules-2/metadata-*/*.bin`) there, so a build that wrote anything new
+    /// is measured again; a Gradle version no build uses any more is read from the cache.
+    nonisolated static func gradleCaches(sizes: FolderSizeCache = .shared) -> CleanerItem {
+        var item = dev("gradle-caches", "Gradle caches", note: "Dependency and build caches, downloaded again on the next build",
+                       ["~/.gradle/caches"], shell: ["GRADLE_USER_HOME": ["caches"]],
+                       processes: ["GradleDaemon", "KotlinCompileDaemon"])
+        item.entrySizes = sizes
+        item.entrySizesDepth = 2
+        return item
     }
 
     /// Untagged images (`dangling=true`), listed one by one and removed with `docker rmi <id>` for the ticked ones.

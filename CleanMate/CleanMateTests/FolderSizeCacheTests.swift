@@ -96,4 +96,67 @@ struct FolderSizeCacheTests {
         sizes.remember(folder, fingerprint, size: 5, partlyUnreadable: false)
         #expect(sizes.size(of: folder, fingerprint)?.size == 5)
     }
+
+    /// With a depth, the fingerprint follows the newest date and the item count up to that many levels inside: a file
+    /// rewritten or added 2 levels down, or a folder removed, changes it; a change 3 levels down does not.
+    @Test func deepFingerprintSeesChangesUpToItsDepth() throws {
+        defer { try? fm.removeItem(at: root) }
+        let entry = home.appending(path: "caches/modules-2")
+        try write(entry.appending(path: "metadata/descriptor.bin"), bytes: 10, date: old)
+        try write(entry.appending(path: "files/group/artifact/lib.jar"), bytes: 10, date: old)
+        for folder in ["metadata", "files/group/artifact", "files/group", "files", ""] {
+            try fm.setAttributes([.modificationDate: old], ofItemAtPath: entry.appending(path: folder).path)
+        }
+        func fingerprint() throws -> FolderSizeCache.Fingerprint { try #require(FolderSizeCache.Fingerprint(entry, depth: 2)) }
+        let first = try fingerprint()
+        #expect(first == (try fingerprint()))
+        #expect(first.links == 4) // metadata, descriptor.bin, files, group
+
+        try write(entry.appending(path: "files/group/artifact/lib.jar"), bytes: 99) // 3 levels down
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: entry.appending(path: "files/group/artifact").path)
+        #expect(try fingerprint() == first)
+
+        try write(entry.appending(path: "metadata/descriptor.bin"), bytes: 20) // rewritten 2 levels down
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: entry.appending(path: "metadata").path)
+        let rewritten = try fingerprint()
+        #expect(rewritten != first && rewritten.links == first.links)
+
+        try write(entry.appending(path: "metadata/other.bin"), bytes: 1, date: old) // added 2 levels down
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: entry.appending(path: "metadata").path)
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: entry.appending(path: "metadata/descriptor.bin").path)
+        #expect(try fingerprint().links == first.links + 1)
+
+        try fm.removeItem(at: entry.appending(path: "files/group")) // removed 2 levels down
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: entry.appending(path: "files").path)
+        #expect(try fingerprint().links == first.links)
+        #expect(FolderSizeCache.Fingerprint(entry.appending(path: "metadata/descriptor.bin"), depth: 2) == nil)
+    }
+
+    /// Gradle caches keep each entry's size between scans until something up to 2 levels inside it changes.
+    @Test func gradleCachesReuseSizesUntilAChangeTwoLevelsDown() async throws {
+        defer { try? fm.removeItem(at: root) }
+        let caches = home.appending(path: ".gradle/caches"), transforms = caches.appending(path: "9.4.1/transforms")
+        try write(transforms.appending(path: "abc/output/classes.jar"), bytes: 40_000, date: old)
+        for folder in ["9.4.1/transforms/abc/output", "9.4.1/transforms/abc", "9.4.1/transforms", "9.4.1"] {
+            try fm.setAttributes([.modificationDate: old], ofItemAtPath: caches.appending(path: folder).path)
+        }
+        let sizes = FolderSizeCache(file: file)
+        var item = CleanerGroup.gradleCaches(sizes: sizes)
+        #expect(item.entrySizesDepth == 2)
+        item.paths = [caches.path]
+        item.shellFolders = [:]
+        let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"))
+        func scan() async -> Int64 { await Scanner.scan(item, policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths).size }
+        let first = await scan()
+        #expect(first == Scanner.fileSize(transforms.appending(path: "abc/output/classes.jar")) && sizes.count == 1)
+
+        try write(transforms.appending(path: "abc/output/classes.jar"), bytes: 400_000) // 4 levels down: unseen
+        #expect(await scan() == first)
+
+        try write(transforms.appending(path: "def/output/classes.jar"), bytes: 40_000) // a new transform, 2 levels down
+        let measured = await scan()
+        #expect(measured == Scanner.fileSize(transforms.appending(path: "abc/output/classes.jar"))
+            + Scanner.fileSize(transforms.appending(path: "def/output/classes.jar")))
+        #expect(await scan() == measured)
+    }
 }

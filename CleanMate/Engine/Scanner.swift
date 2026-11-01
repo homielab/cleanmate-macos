@@ -235,7 +235,8 @@ nonisolated enum Scanner {
                         // Read before measuring: an item put in its place during the walk differs, so the clean leaves it.
                         let fileID = SafeRemoval.FileID(url)
                         // Read before measuring: a change during the walk makes the next scan measure again.
-                        let fingerprint = item.entrySizes != nil && cutoff == nil ? FolderSizeCache.Fingerprint(url) : nil
+                        let fingerprint = item.entrySizes != nil && cutoff == nil
+                            ? FolderSizeCache.Fingerprint(url, depth: item.entrySizesDepth) : nil
                         var found: ScanEntry
                         if let fingerprint, let known = item.entrySizes?.size(of: url, fingerprint) {
                             found = ScanEntry(url: url, size: known.size, partlyUnreadable: known.partlyUnreadable)
