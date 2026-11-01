@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5] - 2026-11-01
+
 ### Added
 - **Privacy › System**: **Download history (Gatekeeper)** erases the name and web address macOS keeps of every file you downloaded (it never deletes them itself); the downloaded files are kept. **Recent items** now lists each app's Open Recent list on its own row with the app's name, skips apps that are open, and never touches the Finder sidebar lists. Both unticked.
 - **Smart Scan › Developer Junk**: **Old Android SDK components**, the NDK, build tools, SDK platform and CMake versions Android Studio leaves behind after updates (often 5–15 GB), one row per version. The newest of each kind and any version a project in your project folders pins (`ndkVersion`, `buildToolsVersion`, `compileSdk`, `ndk.dir`) are kept. Unticked and deleted, since the SDK Manager downloads them again; skipped while Android Studio, Gradle or the emulator runs.
