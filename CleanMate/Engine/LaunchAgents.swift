@@ -174,7 +174,16 @@ nonisolated enum LaunchAgents {
         let size = (try? agent.url.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0
         guard policy.allowsLaunchAgent(agent.url, label: agent.label) else { return false }
         let label = ownedLabel(agent) // read before the plist is gone
-        guard (try? FileManager.default.trashItem(at: agent.url, resultingItemURL: nil)) != nil else { return false }
+        // Only the plist checked moves (`SafeRemoval.trash`); one swapped in during the move is logged "failed".
+        do {
+            _ = try SafeRemoval.trash(agent.url, allows: { policy.allowsLaunchAgent($0, label: agent.label) },
+                                      move: CleanReport.moveToTrash)
+        } catch {
+            if case SafeRemoval.Failure.movedOther = error {
+                ActivityLog.recordFailed(module: "Login Items", item: agent.url.path, home: policy.homeURL)
+            }
+            return false
+        }
         ActivityLog.record(module: "Login Items", item: agent.url.path, size: Int64(size), mode: .trash, home: policy.homeURL)
         if let label { _ = await run(["bootout", service(label)]) } // by label, so it works once the plist is gone
         return true

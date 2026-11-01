@@ -43,6 +43,13 @@ nonisolated enum ActivityLog {
         log(module: module, item: item, count: 1, size: 0, action: "skipped", home: home, date: date, rotateAt: maxSize)
     }
 
+    /// A move to the Trash that took something else than the item checked (swapped in during the move,
+    /// `CleanReport.failed`): "failed", size 0, so the user knows to look in the Trash.
+    static func recordFailed(module: LocalizedStringResource, item: String,
+                             home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
+        log(module: module, item: item, count: 1, size: 0, action: "failed", home: home, date: date, rotateAt: maxSize)
+    }
+
     /// A Maintenance task that was run: "ran" when every step succeeded, else "failed". Removes nothing, so size 0.
     static func recordTask(module: LocalizedStringResource, item: String, succeeded: Bool,
                            home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
@@ -118,7 +125,7 @@ nonisolated enum ActivityLog {
         var size = ""
         var bytes: Int64?
         /// "deleted", "trashed" or "restored"; "ran" or "failed" for a Maintenance task; "skipped" for an item that
-        /// changed since it was checked.
+        /// changed since it was checked; "failed" also for a move to the Trash that took something else.
         var kind = ""
     }
 

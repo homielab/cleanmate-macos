@@ -547,7 +547,6 @@ final class UninstallerTests {
         let appURL = try app("Applications/Rooted.app", bundleID: "com.foo.Rooted")
         let cache = try make("Library/Caches/com.foo.Rooted")
         let item = InstalledApp(url: appURL, name: "Rooted", bundleID: "com.foo.Rooted", version: nil, lastUsed: nil)
-        let trashDir = root.appending(path: "Trash")
         let moved = Moved()
         let policy = policy
         let model = UninstallerModel()
@@ -556,9 +555,9 @@ final class UninstallerTests {
         func run(_ recycle: @escaping @Sendable (URL) async throws -> URL?) async {
             model.trash = { app, data throws(Uninstaller.AppTrashError) in
                 try await Uninstaller.trash(app: app, data: data, policy: policy, launchctl: { _ in true }, moveToTrash: { url in
-                    if url == appURL { throw CocoaError(.fileWriteNoPermission) }
+                    if Self.unresolved(url) == appURL { throw CocoaError(.fileWriteNoPermission) }
                     moved.add(url)
-                    return trashDir.appending(path: url.lastPathComponent)
+                    return url // left in place: the same item, as the check after a move wants
                 }, recycle: recycle)
             }
             model.selection = .app(appURL)
@@ -571,7 +570,7 @@ final class UninstallerTests {
         guard case .appNotTrashed = model.outcome else { Issue.record("\(String(describing: model.outcome))"); return }
         #expect(moved.all.isEmpty && model.apps.count == 1)
         let recycled = Moved()
-        await run { url in recycled.add(url); return trashDir.appending(path: "Rooted.app") }
+        await run { url in recycled.add(url); return url }
         #expect(recycled.all == [appURL] && moved.all == [cache])
         guard case .removed(let report) = model.outcome else { Issue.record("\(String(describing: model.outcome))"); return }
         #expect(report.trashed.map(\.original) == [appURL, cache] && model.apps.isEmpty)
@@ -585,7 +584,12 @@ final class UninstallerTests {
     /// Calls are sequential in the test, so no lock is needed.
     final class Moved: @unchecked Sendable {
         var all: [URL] = []
-        func add(_ url: URL) { all.append(url) }
+        func add(_ url: URL) { all.append(UninstallerTests.unresolved(url)) }
+    }
+
+    /// The move gets the real path (`$TMPDIR` lies under the `/var` symlink): back to the form the test built.
+    static func unresolved(_ url: URL) -> URL {
+        URL(filePath: url.resolvingSymlinksInPath().path, directoryHint: .notDirectory)
     }
 
     @discardableResult

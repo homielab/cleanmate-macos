@@ -123,7 +123,9 @@ final class SafeRemovalTests {
         try fm.removeItem(at: ancestor)
         try fm.createSymbolicLink(at: ancestor, withDestinationURL: home.appending(path: "Documents/A"))
         #expect(throws: SafeRemoval.Failure.changed) { try SafeRemoval.remove(entry, allows: self.policy.allows) }
-        #expect(throws: SafeRemoval.Failure.changed) { try SafeRemoval.check(entry, allows: self.policy.allows) }
+        #expect(throws: SafeRemoval.Failure.changed) {
+            try SafeRemoval.trash(entry, allows: self.policy.allows) { _ in Issue.record("moved"); return nil }
+        }
         #expect(exists(docs))
     }
 
@@ -143,7 +145,117 @@ final class SafeRemovalTests {
         // Unchanged since the scan: moved as before.
         let again = await Scanner.scan(item, policy: policy)
         _ = await Cleaner.clean(item, scan: again, policy: policy) { url in moved.withLock { $0.append(url) }; return nil }
-        #expect(moved.withLock { $0 } == [entry.url])
+        #expect(moved.withLock { $0 }.map(\.path) == [real(entry.url).path])
+    }
+
+    // MARK: - Move to the Trash (check and move on the same item)
+
+    /// `url` with every symlink above it resolved (`$TMPDIR` lies under the `/var` symlink): the path the move gets.
+    func real(_ url: URL) -> URL {
+        guard let parent = realpath(url.deletingLastPathComponent().path, nil) else { return url }
+        defer { free(parent) }
+        return URL(fileURLWithPath: String(cString: parent)).appending(path: url.lastPathComponent)
+    }
+
+    var fakeTrash: URL { root.appending(path: "home/.Trash") }
+
+    /// Moves into a fake Trash like `trashItem` (a rename on the same volume), returning the new place.
+    func moveToFakeTrash(_ url: URL) throws -> URL? {
+        try fm.createDirectory(at: fakeTrash, withIntermediateDirectories: true)
+        let target = fakeTrash.appending(path: UUID().uuidString + "-" + url.lastPathComponent)
+        try fm.moveItem(at: url, to: target)
+        return target
+    }
+
+    func trashing(_ url: URL, beforeMove: @escaping (URL) -> Void = { _ in },
+                  move: ((URL) throws -> URL?)? = nil) -> CleanReport {
+        CleanReport.trashing([(url, 4_096)], module: "Large & Old Files", home: home, allows: policy.allowsUserFile,
+                             trash: move ?? moveToFakeTrash, beforeMove: beforeMove)
+    }
+
+    /// Lines of the throwaway activity log with this action ("trashed", "skipped", "failed").
+    func logged(_ action: String) -> [String] {
+        ActivityLog.readAll(home: home).split(separator: "\n").map(String.init)
+            .filter { $0.split(separator: "\t", omittingEmptySubsequences: false).dropFirst(5).first == Substring(action) }
+    }
+
+    /// Nothing swapped: the file goes to the Trash, counts as freed, and "Undo" puts it back.
+    @Test func trashMovesTheCheckedItemAndUndoPutsItBack() async throws {
+        let video = try file("Projects/big.mov")
+        let report = trashing(video)
+        #expect(report.freed == 4_096 && report.skipped == 0 && report.changed.isEmpty && report.failed.isEmpty)
+        #expect(report.trashed.map(\.original) == [video] && !exists(video) && logged("trashed").count == 1)
+        let undo = await TrashUndo.restore(report.trashed, module: "Large & Old Files", home: home)
+        #expect(undo.restored == 1 && exists(video))
+    }
+
+    /// Between the check and the move the file is replaced by a symlink to the user's documents: nothing moves.
+    @Test func itemSwappedForSymlinkBeforeTheMoveIsNotMoved() throws {
+        let video = try file("Projects/big.mov")
+        let docs = try userDocs()
+        let report = trashing(video, beforeMove: { url in
+            try? self.fm.removeItem(at: url)
+            try? self.fm.createSymbolicLink(at: url, withDestinationURL: docs.folder)
+        }, move: { url in Issue.record("moved \(url.path)"); return url })
+        #expect(report.freed == 0 && report.skipped == 1 && report.changed == [video] && report.trashed.isEmpty)
+        #expect(docs.files.allSatisfy(exists) && logged("skipped").count == 1 && logged("trashed").isEmpty)
+    }
+
+    /// Another file renamed into its place between the check and the move: nothing moves, the other file stays.
+    @Test func itemSwappedForAnotherFileBeforeTheMoveIsNotMoved() throws {
+        let video = try file("Projects/big.mov")
+        let other = try file("Projects/other.mov")
+        let report = trashing(video, beforeMove: { url in _ = rename(other.path, url.path) },
+                              move: { url in Issue.record("moved \(url.path)"); return url })
+        #expect(report.skipped == 1 && report.changed == [video] && report.freed == 0 && exists(video))
+    }
+
+    /// Its folder is replaced by a symlink to a folder holding a file of the same name: neither one moves.
+    @Test func folderSwappedForSymlinkBeforeTheMoveMovesNothing() throws {
+        let video = try file("Projects/big.mov")
+        let decoy = try file("Work/big.mov")
+        let folder = video.deletingLastPathComponent()
+        let report = trashing(video, beforeMove: { _ in
+            _ = rename(folder.path, self.home.appending(path: "Moved").path)
+            try? self.fm.createSymbolicLink(at: folder, withDestinationURL: decoy.deletingLastPathComponent())
+        }, move: { url in Issue.record("moved \(url.path)"); return url })
+        #expect(report.skipped == 1 && report.changed == [video] && exists(decoy))
+        #expect(exists(home.appending(path: "Moved/big.mov")))
+    }
+
+    /// The item is swapped while the move runs: what reached the Trash is not what was checked, so it is not counted
+    /// as freed, has no "Undo" and is logged "failed".
+    @Test func itemSwappedDuringTheMoveIsReportedFailed() throws {
+        let video = try file("Projects/big.mov")
+        let other = try file("Projects/other.mov")
+        let report = trashing(video, move: { url in
+            _ = rename(other.path, url.path)
+            return try self.moveToFakeTrash(url)
+        })
+        #expect(report.freed == 0 && report.skipped == 1 && report.failed == [video] && report.trashed.isEmpty)
+        #expect(logged("failed").count == 1 && logged("trashed").isEmpty)
+    }
+
+    /// Opened without following a symlink and compared by volume and inode: a file the user can't read still moves,
+    /// a Finder-locked one counts as locked, and the move gets the real path.
+    @Test func trashChecksTheItemItself() throws {
+        let unreadable = try file("Projects/private.bin")
+        #expect(chmod(unreadable.path, 0) == 0)
+        let moved = Locked<[URL]>([])
+        let place = try SafeRemoval.trash(unreadable, allows: policy.allowsUserFile) { url in
+            moved.withLock { $0.append(url) }
+            return try self.moveToFakeTrash(url)
+        }
+        #expect(moved.withLock { $0 }.map(\.path) == [real(unreadable).path] && place.map(exists) == true)
+        let locked = try file("Projects/locked.mov")
+        #expect(chflags(locked.path, UInt32(UF_IMMUTABLE)) == 0)
+        #expect(throws: SafeRemoval.Failure.locked) {
+            try SafeRemoval.trash(locked, allows: self.policy.allowsUserFile) { _ in Issue.record("moved"); return nil }
+        }
+        let wrong = try file("Projects/a.mov")
+        #expect(throws: SafeRemoval.Failure.changed) {
+            try SafeRemoval.trash(wrong, expected: SafeRemoval.FileID(device: 0, inode: 0), allows: { _ in true }) { _ in nil }
+        }
     }
 
     /// Recursive removal stays on the entry's volume: a folder on another device inside is never walked nor removed.

@@ -312,7 +312,11 @@ nonisolated enum Scanner {
     static func isLocked(_ url: URL) -> Bool {
         var info = stat()
         guard lstat(url.path, &info) == 0 else { return false }
-        return info.st_flags & UInt32(UF_IMMUTABLE | SF_IMMUTABLE | SF_NOUNLINK | SF_RESTRICTED) != 0
+        return isLocked(info)
+    }
+
+    static func isLocked(_ info: stat) -> Bool {
+        info.st_flags & UInt32(UF_IMMUTABLE | SF_IMMUTABLE | SF_NOUNLINK | SF_RESTRICTED) != 0
     }
 
     /// A database entry with its record count; nil when it is not a file or has nothing to erase.

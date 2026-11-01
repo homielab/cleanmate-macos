@@ -177,6 +177,7 @@ nonisolated enum HeadlessClean {
                                        size: cleaned.freed, mode: item.mode, home: home)
                 }
                 for url in cleaned.changed { ActivityLog.recordSkipped(module: module, item: url.path, home: home) }
+                for url in cleaned.failed { ActivityLog.recordFailed(module: module, item: url.path, home: home) }
             }
             result.freed = freed
             result.trashed = item.mode == .trash ? freed : 0

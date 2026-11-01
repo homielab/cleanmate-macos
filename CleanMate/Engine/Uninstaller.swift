@@ -635,12 +635,19 @@ nonisolated enum Uninstaller {
             let size = await size(of: app)
             guard !isRunning(app) else { throw .notTrashed }
             let inTrash: URL?
-            do { inTrash = try moveToTrash(app) } catch where isPermissionError(error) {
+            // Through `SafeRemoval.trash`: only the app checked moves; one swapped in during the move is logged "failed".
+            do { inTrash = try SafeRemoval.trash(app, allows: policy.allowsApp, move: moveToTrash) } catch where isPermissionError(error) {
                 guard policy.allowsApp(app), !isRunning(app) else { throw .notTrashed }
-                do { inTrash = try await recycle(app) } catch {
+                do { inTrash = try await SafeRemoval.trash(app, allows: policy.allowsApp, moveAsync: recycle) } catch {
+                    if case SafeRemoval.Failure.movedOther = error { failedMove(app, home: policy.homeURL) }
                     throw (error as? CocoaError)?.code == .userCancelled ? .cancelled : .notTrashed
                 }
-            } catch { throw .notTrashed }
+            } catch SafeRemoval.Failure.locked {
+                throw .locked
+            } catch {
+                if case SafeRemoval.Failure.movedOther = error { failedMove(app, home: policy.homeURL) }
+                throw .notTrashed
+            }
             report.freed += size
             if let inTrash { report.trashed.append(TrashedItem(original: app, inTrash: inTrash, size: size)) }
             ActivityLog.record(module: "Uninstaller", item: app.path, size: size, mode: .trash, home: policy.homeURL)
@@ -655,6 +662,10 @@ nonisolated enum Uninstaller {
         report += CleanReport.trashing(data.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
                                        allows: { policy.allowsAppData($0) || policy.allowsAppConfig($0) }, trash: moveToTrash)
         return report
+    }
+
+    private static func failedMove(_ app: URL, home: URL) {
+        ActivityLog.recordFailed(module: "Uninstaller", item: app.path, home: home)
     }
 
     /// No write permission (Cocoa or POSIX EACCES/EPERM, also as the underlying error).

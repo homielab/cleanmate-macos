@@ -29,6 +29,9 @@ nonisolated struct CleanReport: Sendable {
     /// Skipped (in `skipped`) because the item or its folder changed since it was checked: a symlink or another item
     /// in its place (`SafeRemoval.Failure.changed`). Logged as "skipped" so the user can see why.
     var changed: [URL] = []
+    /// Skipped (in `skipped`) because what reached the Trash is not the item checked: swapped in during the move
+    /// (`SafeRemoval.Failure.movedOther`). Not freed, no "Undo"; logged as "failed".
+    var failed: [URL] = []
 
     static func += (lhs: inout CleanReport, rhs: CleanReport) {
         lhs.freed += rhs.freed
@@ -38,6 +41,7 @@ nonisolated struct CleanReport: Sendable {
         lhs.trashed += rhs.trashed
         lhs.casksLeft += rhs.casksLeft
         lhs.changed += rhs.changed
+        lhs.failed += rhs.failed
     }
 
     /// `FileManager.trashItem`, returning where the item now is inside the Trash.
@@ -47,20 +51,31 @@ nonisolated struct CleanReport: Sendable {
         return result as URL?
     }
 
-    /// Moves each item to the Trash (never deletes) if `allows` it right before, logging each one moved.
-    /// `trash` is injectable so tests use a fake Trash folder.
+    /// Moves each item to the Trash (never deletes) if `allows` its real path right before, through
+    /// `SafeRemoval.trash`: only the item checked is moved. Logs each one moved, each one that changed since the check
+    /// ("skipped") and each move that took something else ("failed"). `trash` is injectable so tests use a fake
+    /// Trash folder; `beforeMove` lets them swap an item between check and move.
     static func trashing(_ items: [(url: URL, size: Int64)], module: LocalizedStringResource, home: URL,
-                         allows: (URL) -> Bool, trash: (URL) throws -> URL? = moveToTrash) -> CleanReport {
+                         allows: (URL) -> Bool, trash: (URL) throws -> URL? = moveToTrash,
+                         beforeMove: (URL) -> Void = { _ in }) -> CleanReport {
         var report = CleanReport()
         for (url, size) in items {
-            guard allows(url) else { report.skipped += 1; continue }
-            // A folder that only contains a locked file still moves; the locked item itself can't.
-            if Scanner.isLocked(url) { report.locked += 1; continue }
             do {
-                let inTrash = try trash(url)
+                let inTrash = try SafeRemoval.trash(url, allows: allows, beforeMove: { beforeMove(url) }, move: trash)
                 report.freed += size
                 if let inTrash { report.trashed.append(TrashedItem(original: url, inTrash: inTrash, size: size)) }
                 ActivityLog.record(module: module, item: url.path, size: size, mode: .trash, home: home)
+            } catch SafeRemoval.Failure.locked {
+                // A folder that only contains a locked file still moves; the locked item itself can't.
+                report.locked += 1
+            } catch SafeRemoval.Failure.changed {
+                report.skipped += 1
+                report.changed.append(url)
+                ActivityLog.recordSkipped(module: module, item: url.path, home: home)
+            } catch SafeRemoval.Failure.movedOther {
+                report.skipped += 1
+                report.failed.append(url)
+                ActivityLog.recordFailed(module: module, item: url.path, home: home)
             } catch {
                 report.skipped += 1
             }
@@ -257,9 +272,10 @@ nonisolated enum Cleaner {
             // a shared blob goes with the last of its models removed here, and is kept while an unticked one uses it.
             let files = item.entryFiles?(entry.url).own ?? []
             // Checked again through its open folder (`SafeRemoval`): the real path must pass `allows`, and the item be
-            // what the scan saw when known. Deleted in that folder; a move to the Trash takes a path, so it follows
-            // the check. A change is skipped and listed in `changed`; any other failure (permission, SIP, in use) is
-            // skipped quietly, as before.
+            // what the scan saw when known. Deleted in that folder; a move to the Trash takes a path, so the item is
+            // held open and must still be at its real path right before, and in the Trash after. A change is skipped
+            // and listed in `changed`, a move that took something else in `failed`; any other failure (permission,
+            // SIP, in use) is skipped quietly, as before.
             func remove(_ url: URL, size: Int64, expected: SafeRemoval.FileID? = nil, regularFileOnly: Bool = false,
                         allows: (URL) -> Bool) -> Bool {
                 do {
@@ -267,14 +283,15 @@ nonisolated enum Cleaner {
                     case .delete:
                         try SafeRemoval.remove(url, expected: expected, regularFileOnly: regularFileOnly, allows: allows)
                     case .trash:
-                        try SafeRemoval.check(url, expected: expected, regularFileOnly: regularFileOnly, allows: allows)
-                        if let inTrash = try trash(url) {
-                            report.trashed.append(TrashedItem(original: url, inTrash: inTrash, size: size))
-                        }
+                        let inTrash = try SafeRemoval.trash(url, expected: expected, regularFileOnly: regularFileOnly,
+                                                            allows: allows, move: trash)
+                        if let inTrash { report.trashed.append(TrashedItem(original: url, inTrash: inTrash, size: size)) }
                     }
                     return true
-                } catch SafeRemoval.Failure.changed {
+                } catch SafeRemoval.Failure.changed, SafeRemoval.Failure.refused {
                     report.changed.append(url)
+                } catch SafeRemoval.Failure.movedOther {
+                    report.failed.append(url)
                 } catch {}
                 report.skipped += 1
                 return false
