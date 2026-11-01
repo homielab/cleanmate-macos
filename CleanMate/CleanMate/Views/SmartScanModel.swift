@@ -69,9 +69,15 @@ final class SmartScanModel: ObservableObject {
     /// Set when a clean finishes: the done screen animates in the first time it shows that report, then clears it,
     /// so coming back to the module shows it still.
     var revealsDone = false
-    /// Items scanned so far / items to scan, for the progress bar.
+    /// Items scanned so far / items to scan, for the progress bar: an item counts once its scan returns, whatever it
+    /// found (nothing, unreadable, its app running).
     @Published var scannedItems = 0
     @Published var totalItems = 0
+    /// The items scanning longest, for the "Scanning: …" line; sampled every `scanningRefresh`, so it changes at most
+    /// twice a second however fast items finish.
+    @Published private(set) var scanningNow = ScanningLine()
+    /// When each item whose scan has started and not returned yet started; read by the sampler, never by views.
+    private var scanningSince: [String: ContinuousClock.Instant] = [:]
     /// Title of the item being cleaned; progress while cleaning reuses scannedItems/totalItems.
     @Published var cleaningItem: LocalizedStringResource?  // optional, not "": an empty literal adds a "" key to the catalog
     private var scanTask: Task<Void, Never>?
@@ -81,8 +87,6 @@ final class SmartScanModel: ObservableObject {
     private var beforeScan: (Phase, [CleanerGroup], [String: ItemScan], Set<String>, [String: Set<URL>], Set<String>)?
     private var observers: [NSObjectProtocol] = []
     private let catalog: () -> [CleanerGroup]
-    /// Where each item's scan time from the last finished scan is kept; nil (custom catalogs, tests) = not kept.
-    var durationsKey: String?
     /// Group ids turned off in Settings › Scan Groups; only the real Smart Scan catalog reads them, so Privacy and
     /// tests' custom catalogs are never filtered unless a test injects a throwaway defaults domain.
     var disabledGroups: () -> Set<String> = { [] }
@@ -91,8 +95,6 @@ final class SmartScanModel: ObservableObject {
     /// Groups off right now: a group turned off after its scan is hidden, left out of the totals and not cleaned;
     /// turned back on, its already scanned results come back (no rescan needed: they are still in `scans`).
     @Published private(set) var offGroups: Set<String> = []
-    /// Item id → seconds from the last finished scan, read when a scan starts.
-    private var estimates: [String: Double] = [:]
     /// Called when a scan finishes; the real Smart Scan records it for the menu bar item, records the free space for the
     /// Overview chart, moves the scan reminder and checks for the low-disk warning.
     var scanFinished: (SmartScanModel) -> Void = { _ in }
@@ -103,7 +105,6 @@ final class SmartScanModel: ObservableObject {
     /// `catalog` defaults to the module's own (Privacy or Smart Scan).
     init(module: Module, catalog: (() -> [CleanerGroup])? = nil) {
         self.module = module
-        durationsKey = catalog == nil ? Preferences.smartScanLastDurations : nil
         self.catalog = catalog ?? (module == .privacy ? { CleanerGroup.privacy } : { CleanerGroup.smartScan })
         let realSmartScan = catalog == nil && module == .smartScan
         if realSmartScan {
@@ -315,22 +316,38 @@ final class SmartScanModel: ObservableObject {
 
     private var items: [CleanerItem] { activeGroups.flatMap(\.items) }
 
-    /// Scan progress 0…1: weighted by each item's time in the last finished scan, else items done / items.
-    var scanFraction: Double {
-        Self.fraction(done: Set(scans.keys), all: items.map(\.id), estimates: estimates)
-            ?? Double(scannedItems) / Double(max(totalItems, 1))
+    /// An item still being scanned as the "Scanning: …" line shows it: its time once it passes `slowAfter`.
+    nonisolated struct ScanningItem: Equatable { let id: String; var seconds: Int? }
+    /// The items shown, longest first, and how many more are being scanned.
+    nonisolated struct ScanningLine: Equatable { var items: [ScanningItem] = []; var more = 0 }
+
+    nonisolated static let scanningRefresh = Duration.milliseconds(500)
+    /// An item scanning longer than this shows its time.
+    nonisolated static let slowAfter = Duration.seconds(10)
+
+    /// The `limit` items scanning longest (ties in `order`, the catalog's), each with its whole seconds once over
+    /// `slowAfter`.
+    nonisolated static func scanningLine(since: [String: ContinuousClock.Instant], order: [String],
+                                         now: ContinuousClock.Instant, limit: Int = 2) -> ScanningLine {
+        let running = order.enumerated().compactMap { index, id in since[id].map { (id, $0, index) } }
+            .sorted { ($0.1, $0.2) < ($1.1, $1.2) }
+        let shown = running.prefix(limit).map { id, start, _ in
+            let elapsed = start.duration(to: now)
+            return ScanningItem(id: id, seconds: elapsed > slowAfter ? Int(elapsed.components.seconds) : nil)
+        }
+        return ScanningLine(items: shown, more: running.count - shown.count)
     }
 
-    /// Estimated time of the items done / of all items, capped at 99% until the scan finishes;
-    /// an item without an estimate (new) counts as the average. nil when no item has one (first scan).
-    static func fraction(done: Set<String>, all: [String], estimates: [String: Double]) -> Double? {
-        let known = all.compactMap { estimates[$0] }
-        guard !known.isEmpty else { return nil }
-        let average = known.reduce(0, +) / Double(known.count)
-        let weight = { (id: String) in estimates[id] ?? average }
-        let total = all.reduce(0) { $0 + weight($1) }
-        guard total > 0 else { return nil }
-        return min(all.filter(done.contains).reduce(0) { $0 + weight($1) } / total, 0.99)
+    /// Title of a scanned item, for the "Scanning: …" line.
+    func title(ofItem id: String) -> LocalizedStringResource? { items.first { $0.id == id }?.title }
+
+    private func itemStarted(_ id: String, generation scan: Int) {
+        if scan == generation { scanningSince[id] = .now }
+    }
+
+    private func sampleScanning() {
+        let line = Self.scanningLine(since: scanningSince, order: items.map(\.id), now: .now)
+        if line != scanningNow { scanningNow = line }
     }
 
     /// Groups as shown after a scan: items with nothing to clean are hidden unless `showsWhenEmpty`
@@ -411,21 +428,28 @@ final class SmartScanModel: ObservableObject {
         let blockedByExclusion = blockedByExclusion
         let openFiles = OpenFiles(read: readOpenFiles) // read when the first item needs it, if any does
         let openPaths: OpenPaths = { await openFiles.paths(under: $0) }
-        estimates = durationsKey.map { Preferences.dictionary($0) } ?? [:]
-        var durations: [String: Double] = [:]
-        await withTaskGroup(of: (CleanerItem, ItemScan, Duration, Bool).self) { group in
+        scanningSince = [:]
+        scanningNow = ScanningLine()
+        let sampler = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.scanningRefresh)
+                guard let self, current == self.generation, !Task.isCancelled else { return }
+                self.sampleScanning()
+            }
+        }
+        defer { sampler.cancel() }
+        await withTaskGroup(of: (CleanerItem, ItemScan, Bool).self) { group in
             for item in newItems {
                 group.addTask {
-                    let start = ContinuousClock.now
+                    await self.itemStarted(item.id, generation: current)
                     let scan = await scanItem(item, openPaths)
-                    let took = start.duration(to: .now)
-                    return (item, scan, took, await blockedByExclusion(item))
+                    return (item, scan, await blockedByExclusion(item))
                 }
             }
-            for await (item, scan, took, isBlocked) in group where !Task.isCancelled && current == generation {
+            for await (item, scan, isBlocked) in group where !Task.isCancelled && current == generation {
                 scans[item.id] = scan
+                scanningSince[item.id] = nil
                 if isBlocked { blocked.insert(item.id) }
-                durations[item.id] = took / .seconds(1)
                 if (overrides[item.id] ?? item.selectedByDefault) && !isLocked(item) && scan.hasData {
                     selected.insert(item.id)
                 }
@@ -433,12 +457,12 @@ final class SmartScanModel: ObservableObject {
             }
         }
         guard current == generation else { return } // a newer scan owns the state now
+        scanningSince = [:]
+        scanningNow = ScanningLine()
         if Task.isCancelled, let beforeScan {
             (phase, groups, scans, selected, excludedEntries, blocked) = beforeScan
             return
         }
-        // Re-read so a Privacy scan finished meanwhile keeps its own items' times (one shared key).
-        if let durationsKey { Preferences.update(durationsKey) { (all: inout [String: Double]) in all.merge(durations) { $1 } } }
         phase = .results
         Attention.finished()
         scanFinished(self)

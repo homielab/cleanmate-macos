@@ -5291,6 +5291,16 @@
         }
       }
     },
+    "Scanning: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang quét: %@"
+          }
+        }
+      }
+    },
     "Scanning…" : {
       "localizations" : {
         "vi" : {

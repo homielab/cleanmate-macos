@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Not under tests: they must never reach the real notification center.
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        Preferences.obsolete.forEach(UserDefaults.standard.removeObject(forKey:))
         // Set at launch: a click on the reminder that launched CleanMate is delivered right after.
         UNUserNotificationCenter.current().delegate = self
         Task { await ScanReminderScheduler.shared.postpone() } // CleanMate was used: next reminder one period from now

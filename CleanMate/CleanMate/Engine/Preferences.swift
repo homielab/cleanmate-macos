@@ -24,8 +24,8 @@ nonisolated enum Preferences {
     static let largeFilesScope = "largeFilesScope"
     /// String: folders last chosen in Space Lens › Location, same format as `largeFilesRecentFolders`.
     static let spaceLensRecentFolders = "spaceLensRecentFolders"
-    /// [String: Double]: Smart Scan/Privacy item id → seconds its scan took in the last finished scan (progress weights).
-    static let smartScanLastDurations = "smartScanLastDurations"
+    /// Keys older versions wrote and nothing reads any more; removed at launch.
+    static let obsolete = ["smartScanLastDurations"]
     /// String (`UninstallerModel.AppSort` raw value): order of the Uninstaller's app list, Name by default.
     static let uninstallerSort = "uninstallerSort"
     /// String (`UninstallerModel.UnusedFilter` raw value): "not used for" filter of the Uninstaller's app list, All by default.

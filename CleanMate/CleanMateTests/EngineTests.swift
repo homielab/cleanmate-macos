@@ -2032,37 +2032,66 @@ struct AppCatalogTests {
         #expect(model.selected == ["fast", "slow"])
     }
 
-    @Test func scanProgressIsWeightedByLastScanTimes() {
-        let all = ["a", "b", "c"]
-        // First scan: no estimates → nil, the model falls back to items done / items.
-        #expect(SmartScanModel.fraction(done: ["a"], all: all, estimates: [:]) == nil)
-        #expect(SmartScanModel.fraction(done: ["a"], all: all, estimates: ["gone": 5]) == nil)
-        // a took 8 s, b 1 s, c 1 s: finishing a is 80%.
-        #expect(SmartScanModel.fraction(done: ["a"], all: all, estimates: ["a": 8, "b": 1, "c": 1]) == 0.8)
-        // c is new: counts as the average (2 s) → a = 2 / 6.
-        #expect(SmartScanModel.fraction(done: ["a"], all: all, estimates: ["a": 2, "b": 2]) == 2.0 / 6)
-        // Capped at 99% until the scan finishes, even with every item done.
-        #expect(SmartScanModel.fraction(done: Set(all), all: all, estimates: ["a": 1]) == 0.99)
-        #expect(SmartScanModel.fraction(done: [], all: all, estimates: ["a": 0, "b": 0, "c": 0]) == nil)
+    @MainActor @Test func scanProgressCountsEveryItemThatReturned() async throws {
+        let items = [
+            CleanerItem(id: "empty", title: "Empty", paths: ["/nonexistent"]),
+            CleanerItem(id: "open", title: "Open", paths: ["/nonexistent"], runningAppBundleIDs: ["com.example.open"]),
+            CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"]),
+        ]
+        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
+        model.processNames = { [] }
+        model.appBundleIDs = { ["com.example.open"] }
+        model.runningApps = ["com.example.open"]
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        model.scanItem = { item, _ in
+            if item.id == "slow" { for await _ in gate { break } }
+            return item.id == "empty" ? ItemScan() : ItemScan(measuredSize: 1000)
+        }
+        let scan = Task { await model.scan() }
+        for _ in 0..<3000 where model.scannedItems < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        guard case .scanning = model.phase else { Issue.record("phase \(model.phase)"); return }
+        // Nothing found and skipped because its app is open still count as scanned.
+        #expect(model.scannedItems == 2 && model.totalItems == 3)
+        #expect(model.isLocked(items[1]) && !model.selected.contains("open"))
+        open.yield()
+        await scan.value
+        guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(model.scannedItems == 3 && model.scanningNow == SmartScanModel.ScanningLine())
     }
 
-    @MainActor @Test func finishedScanStoresEachItemsTimeOnlyWithAKey() async {
-        let item = CleanerItem(id: "timed", title: "Timed", paths: [])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
-        #expect(model.durationsKey == nil) // custom catalog: never touches the real key
-        #expect(SmartScanModel(module: .privacy).durationsKey == Preferences.smartScanLastDurations)
-        let key = "test.smartScanLastDurations.\(UUID())"
-        defer { UserDefaults.standard.removeObject(forKey: key) }
-        UserDefaults.standard.set(["other": 3.0], forKey: key)
-        model.durationsKey = key
+    @Test func scanningLineShowsTheLongestRunningItems() {
+        let now = ContinuousClock.now
+        let order = ["a", "b", "c", "d"]
+        // Nothing started: empty line.
+        #expect(SmartScanModel.scanningLine(since: [:], order: order, now: now) == .init())
+        // Longest first; a time only past 10 s, in whole seconds; the rest counted.
+        let since = ["b": now - .seconds(3), "c": now - .milliseconds(12_400), "d": now - .seconds(1)]
+        #expect(SmartScanModel.scanningLine(since: since, order: order, now: now)
+            == .init(items: [.init(id: "c", seconds: 12), .init(id: "b")], more: 1))
+        // Started together: catalog order.
+        let same = ["d": now, "a": now, "c": now]
+        #expect(SmartScanModel.scanningLine(since: same, order: order, now: now, limit: 3).items.map(\.id) == ["a", "c", "d"])
+        // Exactly 10 s is not slow yet.
+        #expect(SmartScanModel.scanningLine(since: ["a": now - .seconds(10)], order: order, now: now).items == [.init(id: "a")])
+    }
+
+    @MainActor @Test func scanningLineIsSampledWhileAnItemIsSlow() async throws {
+        let fast = CleanerItem(id: "fast", title: "Fast", paths: ["/nonexistent"])
+        let slow = CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"])
+        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [fast, slow])] }
         model.processNames = { [] }
-        model.scanItem = { _, _ in try? await Task.sleep(for: .milliseconds(50)); return ItemScan(measuredSize: 1) }
-        await model.scan()
-        let saved = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
-        #expect(saved["other"] == 3 && (saved["timed"] ?? 0) >= 0.04)
-        #expect(model.scanFraction == 1) // no estimate for "timed" yet: items done / items
-        await model.scan()
-        #expect(model.scanFraction == 0.99) // now weighted (capped); the bar is hidden once phase is .results
+        let (gate, open) = AsyncStream<Void>.makeStream()
+        model.scanItem = { item, _ in
+            if item.id == "slow" { for await _ in gate { break } }
+            return ItemScan(measuredSize: 1)
+        }
+        let scan = Task { await model.scan() }
+        for _ in 0..<3000 where model.scanningNow.items.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(model.scanningNow == .init(items: [.init(id: "slow")]))
+        #expect(model.title(ofItem: "slow")?.key == "Slow")
+        open.yield()
+        await scan.value
+        #expect(model.scanningNow == .init())
     }
 
     @MainActor @Test func upperBoundSizeIsKeptOutOfTheSelectedTotal() async {

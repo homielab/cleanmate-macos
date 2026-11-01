@@ -176,12 +176,12 @@ struct SmartScanView: View {
                     .monospacedDigit()
                 Spacer()
                 if isScanning {
-                    ProgressView(value: model.scanFraction) {
-                        Text("Scanning…")
+                    ProgressView(value: Double(model.scannedItems), total: Double(max(model.totalItems, 1))) {
+                        scanningText.lineLimit(1).truncationMode(.tail)
                     } currentValueLabel: {
                         Text(verbatim: "\(model.scannedItems)/\(model.totalItems)")
                     }
-                    .frame(maxWidth: 240)
+                    .frame(maxWidth: 300)
                     Button("Stop") { model.cancelScan() }
                 } else {
                     scanButton("Scan Again")
@@ -214,6 +214,21 @@ struct SmartScanView: View {
 
     private var isScanning: Bool {
         if case .scanning = model.phase { true } else { false }
+    }
+
+    /// "Scanning: Docker (12s), Xcode +5": the items scanning longest, with their time once slow, and how many more.
+    private var scanningText: Text {
+        let line = model.scanningNow
+        let names = line.items.compactMap { item -> Text? in
+            guard let title = model.title(ofItem: item.id) else { return nil }
+            guard let seconds = item.seconds else { return Text(title) }
+            let time = Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .narrow))
+            return Text(title) + Text(verbatim: " (\(time))")
+        }
+        guard let first = names.first else { return Text("Scanning…") }
+        let list = names.dropFirst().reduce(first) { $0 + Text(verbatim: ", ") + $1 }
+        let more = line.more > 0 ? Text(verbatim: " +\(line.more)") : Text(verbatim: "")
+        return Text("Scanning: \(list + more)")
     }
 
     private var selectedTotal: Text {
