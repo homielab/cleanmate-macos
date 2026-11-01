@@ -49,6 +49,8 @@ After a scan the sidebar shows a badge next to Smart Scan and Privacy (size sele
 Items locked in Finder can't be moved to the Trash: Large & Old Files, Space Lens and Extensions count them separately as **Locked in Finder (turn off Locked in Get Info): N** (a folder that only contains locked files still moves). Uninstalling a locked app says so — select it, choose File > Get Info, turn off Locked, then try again — and nothing is moved, its data included.
 CleanMate has a single main window; closing it keeps the app running — click the Dock icon (or **Open CleanMate** in the menu bar item) to bring it back. Quitting (⌘Q or the menu bar's Quit) while cleaning, moving items to or back from the Trash, or changing a login item asks first (**Quit Anyway**; Esc or Return cancels): what was done stays done, the rest is left, and there is no Undo.
 
+The **Help** menu: **Report a Bug…** shows the details a bug report needs — CleanMate version and build, macOS version, the Mac's chip (Apple Silicon or Intel, and Rosetta), whether Full Disk Access is on, the app language, whether CleanMate was installed with Homebrew, and the last 5 lines of the activity log (date, module, item name, size; a file path shows as "(file or folder)", an app as its name, and the user name and home folder are hidden). **Open GitHub** opens a new issue in your browser with them filled in under **System details**; describe the problem there and submit it yourself. **Copy** copies them instead; if they are too long for a link, they are copied and CleanMate says to paste them. **Suggest a Feature…** opens the feature request form, **CleanMate on GitHub** opens the repository (give it a Star), and **Share CleanMate** copies the website link, `https://cleanmate.homielab.com`. None of these send anything from CleanMate: they only open your browser or copy text.
+
 Every scan shows its progress and can be stopped with **Stop**, which ends it right away even deep inside a large folder tree; cleaning, once started, is never interrupted. If CleanMate is in the background when a scan or clean finishes, its Dock icon bounces once (no notification, no sound; not after Stop). In Smart Scan and Privacy the progress bar counts the items whose scan has finished (an item whose app is open counts too), and its label **Scanning:** names the two items running longest, with their time once past 10 seconds, and how many more are still running (updated twice a second). In Large & Old Files it is based on how many files the previous scan of that scope checked.
 
 ## Smart Scan in detail
@@ -166,6 +168,9 @@ CleanMate collects no data: no analytics, no telemetry. Its only network connect
   signature and notarization as for the first install.
 
 The scan reminder and the low disk warning are local notifications posted by macOS on your Mac: they use no network.
+
+**Help › Report a Bug…** sends nothing either: it shows you the report first, then opens GitHub in your browser, where
+you choose whether to submit it.
 
 Settings are stored in the app's own preferences on your Mac.
 

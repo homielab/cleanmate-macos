@@ -123,8 +123,9 @@ release notes come from the version's section in [CHANGELOG.md](CHANGELOG.md).
 
 Bug reports, ideas and pull requests are welcome.
 
-- **Issues**: describe what you expected, what happened, and your macOS version. For a cleaning problem, the matching
-  lines of `~/Library/Logs/CleanMate/activity.log` help.
+- **Issues**: in CleanMate, **Help › Report a Bug…** opens a new issue with your CleanMate and macOS versions, Mac
+  and recent activity filled in (you see them first; no paths or user name). Describe what you expected and what
+  happened. **Help › Suggest a Feature…** opens the feature request form.
 - **Pull requests**: keep them focused, and run the build and tests above before opening one.
 - **Strings**: every new user-facing string in `Localizable.xcstrings` needs a Vietnamese (`vi`) translation — a test
   checks this.

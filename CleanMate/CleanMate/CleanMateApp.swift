@@ -17,7 +17,10 @@ struct CleanMateApp: App {
         Window(appName, id: "main") {
             ContentView()
         }
-        .commands { AppCommands() }
+        .commands {
+            AppCommands()
+            HelpCommands()
+        }
         MenuBarExtra(appName, systemImage: "internaldrive", isInserted: $showMenuBarExtra) {
             MenuBarContent()
         }

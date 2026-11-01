@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Help** menu: **Report a Bug…** shows your CleanMate and macOS versions, Mac chip, Full Disk Access, app language and last 5 activity log lines (no file paths or user name), then opens a new GitHub issue with them filled in; nothing is sent from CleanMate. Also **Suggest a Feature…**, **CleanMate on GitHub** and **Share CleanMate**, which copies the website link.
 - **Privacy › System**: **Terminal saved state** and **iTerm2 saved state**, which keep previous session window text and scrollback on disk. Unticked and permanently deleted; skipped while Terminal or iTerm2 is running, and iTerm2 is hidden when not installed or empty. Profiles and preferences are kept untouched.
 - **Smart Scan › Developer Junk**: **Test device clones**, the copies of simulators Xcode makes in `~/Library/Developer/XCTestDevices` to run tests in parallel (often 5–20 GB), one row per clone. Unticked and deleted; Xcode makes them again on the next parallel test run.
 - **Smart Scan › System Junk**: **macOS installers** lists the `Install macOS` apps left in Applications after an upgrade or after making a USB installer (12–15 GB each), one by one with their version. None are ticked, they go to the Trash so Undo can put them back, and only installers you can move without a password are listed; skipped while an installer runs.

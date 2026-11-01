@@ -435,6 +435,16 @@
         }
       }
     },
+    "CleanMate on GitHub" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate trên GitHub"
+          }
+        }
+      }
+    },
     "CleanMate only cleans inside your user account and collects no data." : {
       "localizations" : {
         "vi" : {
@@ -481,6 +491,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản sao simulator Xcode tạo để chạy test song song, được tạo lại ở lần chạy test song song tiếp theo"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sao chép"
           }
         }
       }
@@ -951,6 +971,16 @@
         }
       }
     },
+    "Give CleanMate a Star on GitHub so more people find it" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tặng CleanMate một Star trên GitHub để nhiều người biết đến hơn"
+          }
+        }
+      }
+    },
     "Go versions in ~/sdk other than the go you use, downloaded again with go<version> download" : {
       "localizations" : {
         "vi" : {
@@ -1225,6 +1255,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Do ollama pull bị ngắt để lại; tải lại mô hình sẽ bắt đầu từ đầu"
+          }
+        }
+      }
+    },
+    "Link copied: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã sao chép liên kết: %@"
           }
         }
       }
@@ -1597,6 +1637,26 @@
         }
       }
     },
+    "Open GitHub" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở GitHub"
+          }
+        }
+      }
+    },
+    "Open GitHub opens a new issue in your browser with the details below filled in; describe the problem there. Nothing is sent until you submit the issue, and no user name or personal file path is included." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở GitHub sẽ mở một issue mới trong trình duyệt, đã điền sẵn thông tin bên dưới; hãy mô tả lỗi ở đó. Không có gì được gửi cho đến khi bạn gửi issue, và nội dung không chứa tên người dùng hay đường dẫn tệp cá nhân."
+          }
+        }
+      }
+    },
     "Open in Space Lens" : {
       "localizations" : {
         "vi" : {
@@ -1673,6 +1733,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đọc từ macOS. CleanMate không thay đổi các cài đặt này."
+          }
+        }
+      }
+    },
+    "Report a Bug" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Báo lỗi"
+          }
+        }
+      }
+    },
+    "Report a Bug…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Báo lỗi…"
+          }
+        }
+      }
+    },
+    "Report copied" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã sao chép báo cáo"
+          }
+        }
+      }
+    },
+    "Report details" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nội dung báo cáo"
           }
         }
       }
@@ -1755,6 +1855,16 @@
         }
       }
     },
+    "Share CleanMate" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chia sẻ CleanMate"
+          }
+        }
+      }
+    },
     "Shows here after a few days of use." : {
       "localizations" : {
         "vi" : {
@@ -1823,6 +1933,16 @@
         }
       }
     },
+    "Suggest a Feature…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Góp ý tính năng…"
+          }
+        }
+      }
+    },
     "System Integrity Protection" : {
       "localizations" : {
         "vi" : {
@@ -1887,6 +2007,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ứng dụng đang mở. Hãy thoát trước khi gỡ hoặc đặt lại."
+          }
+        }
+      }
+    },
+    "The details are too long for the link. Paste them into “System details” on the GitHub page." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thông tin quá dài để đưa vào liên kết. Hãy dán vào ô “System details” trên trang GitHub."
           }
         }
       }
