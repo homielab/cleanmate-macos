@@ -16,6 +16,7 @@ cask "cleanmate" do
   depends_on macos: :ventura
 
   app "CleanMate.app"
+  binary "#{appdir}/CleanMate.app/Contents/Helpers/cleanmate"
 
   zap trash: [
     "~/Library/Application Support/com.homielab.CleanMate",

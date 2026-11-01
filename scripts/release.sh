@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Build a signed, notarized CleanMate .dmg for GitHub Releases, and its Sparkle update feed.
-# Steps: release notes from CHANGELOG.md -> archive -> check the EdDSA key -> export (Developer ID) -> notarize app
-# -> staple -> dmg -> notarize dmg -> staple -> sha256 -> EdDSA signature -> appcast.xml.
+# Steps: release notes from CHANGELOG.md -> archive -> check the EdDSA key -> export (Developer ID) -> sign the
+# cleanmate helper, then the app -> notarize app -> staple -> dmg -> notarize dmg -> staple -> sha256
+# -> EdDSA signature -> appcast.xml -> Homebrew cask version.
 # No secrets here: notarytool and Sparkle's sign_update read their keys from the login keychain (see --help).
 set -euo pipefail
 
@@ -143,15 +144,34 @@ EOF
 xcodebuild -exportArchive -archivePath "$ARCHIVE" -exportPath "$EXPORT" \
   -exportOptionsPlist "$OUT/ExportOptions.plist" -quiet
 
-echo "==> Verify signature"
-codesign --verify --deep --strict "$APP"
+# The cleanmate command line tool (Homebrew links it into PATH). Not in Contents/MacOS: on a case-insensitive
+# disk "cleanmate" would replace the app's own "CleanMate" executable.
+HELPER="$APP/Contents/Helpers/cleanmate"
+[[ -f "$HELPER" ]] || { echo "Command line tool missing: $HELPER" >&2; exit 1; }
+
+echo "==> Sign helper, then app"
+# The export signs nested code too; signing the helper here makes sure it has the app's own Developer ID
+# certificate, Hardened Runtime and a secure timestamp, which notarization requires of every executable.
+# The app is signed again afterwards (outer bundle only) so its seal covers the helper's new signature.
 # Capture first: `cmd | grep -q` can SIGPIPE cmd, which pipefail turns into a failure.
 SIGN_INFO="$(codesign -dv --verbose=2 "$APP" 2>&1)"
-[[ "$SIGN_INFO" == *"flags="*"runtime"* ]] || { echo "Hardened runtime missing" >&2; exit 1; }
-[[ "$SIGN_INFO" == *"Authority=Developer ID Application"* ]] || { echo "Not signed with Developer ID" >&2; exit 1; }
-if [[ "$(codesign -d --entitlements - "$APP" 2>/dev/null)" == *get-task-allow* ]]; then
-  echo "get-task-allow present: notarization would reject this build" >&2; exit 1
-fi
+IDENTITY="$(awk -F= '/^Authority=/ { print $2; exit }' <<<"$SIGN_INFO")"
+[[ "$IDENTITY" == "Developer ID Application:"* ]] || { echo "Export is not signed with Developer ID" >&2; exit 1; }
+codesign --force --sign "$IDENTITY" --options runtime --timestamp --preserve-metadata=identifier "$HELPER"
+codesign --force --sign "$IDENTITY" --options runtime --timestamp \
+  --preserve-metadata=identifier,entitlements,requirements,flags "$APP"
+
+echo "==> Verify signature"
+codesign --verify --deep --strict "$APP"
+for code in "$APP" "$HELPER"; do
+  SIGN_INFO="$(codesign -dv --verbose=2 "$code" 2>&1)"
+  [[ "$SIGN_INFO" == *"flags="*"runtime"* ]] || { echo "Hardened runtime missing: $code" >&2; exit 1; }
+  [[ "$SIGN_INFO" == *"Authority=$IDENTITY"* ]] || { echo "Not signed with $IDENTITY: $code" >&2; exit 1; }
+  [[ "$SIGN_INFO" == *"Timestamp="* ]] || { echo "No secure timestamp: $code" >&2; exit 1; }
+  if [[ "$(codesign -d --entitlements - "$code" 2>/dev/null)" == *get-task-allow* ]]; then
+    echo "get-task-allow present in $code: notarization would reject this build" >&2; exit 1
+  fi
+done
 
 if [[ $SKIP_NOTARIZE -eq 0 ]]; then
   echo "==> Notarize app"
@@ -159,6 +179,7 @@ if [[ $SKIP_NOTARIZE -eq 0 ]]; then
   notarize "$OUT/$APP_NAME.zip"
   xcrun stapler staple "$APP"
   rm "$OUT/$APP_NAME.zip"
+  spctl -a -t exec -v "$APP"
 fi
 
 echo "==> DMG"

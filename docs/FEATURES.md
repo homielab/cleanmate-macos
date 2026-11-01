@@ -169,7 +169,9 @@ uses the same items, safety rules, **Settings › Exclusions** and **Scan Groups
 It is read-only: it deletes nothing, writes no activity log, changes no setting, never reads stdin and never connects
 to the network. To clean, open CleanMate.
 
-The command is in the app bundle; link it into a folder on your PATH (no administrator password needed):
+The command is in the app bundle. Installed with Homebrew (`brew install --cask`), it is already on your PATH: the
+cask links it into Homebrew's `bin`, and `brew uninstall` removes the link. Otherwise link it into a folder on your
+PATH (no administrator password needed):
 
 ```sh
 mkdir -p ~/.local/bin   # add it to PATH in your shell profile if it isn't there

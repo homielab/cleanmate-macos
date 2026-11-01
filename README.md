@@ -36,7 +36,8 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 
 The app includes a `cleanmate` command for scripts and AI agents (Claude Code, Codex…): `cleanmate list` shows every
 Smart Scan item and `cleanmate scan --json` measures them like Smart Scan, with the same safety rules and your
-exclusions. It is read-only: it deletes nothing and never connects to the network. To put it on your PATH:
+exclusions. It is read-only: it deletes nothing and never connects to the network. Installed with Homebrew,
+`cleanmate` is already on your PATH. Otherwise link it into a folder on your PATH:
 
 ```sh
 mkdir -p ~/.local/bin
@@ -55,8 +56,8 @@ Commands, options, the JSON format and Full Disk Access: [docs/FEATURES.md › C
 3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks
    whether to check automatically; change it any time in Settings › General › Updates.
 
-Homebrew (coming soon, once the tap is published): `brew install --cask homielab/tap/cleanmate`.
-The cask is in `packaging/Casks/cleanmate.rb`.
+Homebrew (coming soon, once the tap is published): `brew install --cask homielab/tap/cleanmate`. It also links
+the `cleanmate` command into Homebrew's `bin`. The cask is in `packaging/Casks/cleanmate.rb`.
 
 Requires **macOS 13** or later.
 
