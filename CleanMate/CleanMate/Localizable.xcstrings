@@ -5143,6 +5143,26 @@
         }
       }
     },
+    "Old Xcode versions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản Xcode cũ"
+          }
+        }
+      }
+    },
+    "Xcode apps other than the one xcode-select uses and the newest release. Download them again from developer.apple.com or the App Store. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các app Xcode khác bản xcode-select đang dùng và bản phát hành mới nhất. Tải lại từ developer.apple.com hoặc App Store. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
     "Only files that match the filters" : {
       "localizations" : {
         "vi" : {

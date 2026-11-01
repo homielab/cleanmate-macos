@@ -1720,7 +1720,8 @@ struct CatalogTests {
         let policy = SafetyPolicy(home: URL(fileURLWithPath: "/Users/test"), temp: URL(fileURLWithPath: "/var/folders/xx/T"))
         for item in [CleanerGroup.developer, .aiTools(), .applications(hasFullDiskAccess: true)].flatMap(\.items) {
             #expect(!item.showsWhenEmpty, "\(item.id)")
-            #expect(!item.paths.isEmpty || item.probe != nil, "\(item.id)")
+            // Folders to scan, a size probe, or entries it finds itself (old Xcode apps in Applications).
+            #expect(!item.paths.isEmpty || item.probe != nil || item.findEntries != nil, "\(item.id)")
             // An item finding its entries itself has its own rule (`allowsEntry`), tested with the item.
             for path in item.paths where item.allowsEntry == nil {
                 // Contents must pass the safety policy, otherwise the item could never clean anything.

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Smart Scan › Developer Junk**: **Old Xcode versions**, the Xcode apps left in Applications after an upgrade or a beta (15–30 GB each), one row per version with its build, such as "Xcode 15.4 (15F31d)". The version `xcode-select` uses and the newest release are always kept. Unticked and moved to the Trash so Undo puts them back; a version owned by root is a locked row (delete it with Finder), and one Xcode, `xcodebuild` or Simulator runs from is locked.
+
 ## [1.5] - 2026-11-01
 
 ### Added

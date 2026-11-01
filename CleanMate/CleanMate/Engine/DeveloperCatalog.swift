@@ -19,6 +19,8 @@ extension CleanerGroup {
         dev("xcode-archives", "Old Xcode archives",
             note: "Not modified for 90 days. Moved to the Trash; needed to symbolicate crash reports of those builds",
             ["~/Library/Developer/Xcode/Archives"], minAge: 90 * 86_400, mode: .trash, selected: false, selectableEntries: true),
+        // Old Xcode apps in /Applications and ~/Applications, one row each, kept: the selected one and the newest release.
+        XcodeVersions.item(),
         dev("unavailable-simulators", "Unavailable simulators", note: "Simulators whose runtime is no longer installed",
             [simulatorDevices],
             command: ShellCommand(executable: "/usr/bin/xcrun", arguments: ["simctl", "delete", "unavailable"],

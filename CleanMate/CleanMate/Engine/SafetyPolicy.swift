@@ -492,10 +492,28 @@ nonisolated struct SafetyPolicy: Sendable {
     /// without a password: not owned by root (`owner`, injected by tests), the app and its folder writable. On the home
     /// folder's volume, no other volume mounted inside, not excluded.
     func allowsMacOSInstaller(_ url: URL, writableOnly: Bool = true, owner: OwnerID = SafetyPolicy.ownerID) -> Bool {
+        allowsAppleApp(url, writableOnly: writableOnly, owner: owner, named: MacOSInstallers.isInstallerName) {
+            $0.hasPrefix(MacOSInstallers.bundleIDPrefix)
+        }
+    }
+
+    /// Smart Scan rule for an Xcode app (`XcodeVersions`), only ever moved to the Trash: a real (not symlinked) `*.app`
+    /// folder of any name directly in /Applications or ~/Applications whose `Contents/Info.plist` names Xcode's bundle id
+    /// (`com.apple.dt.Xcode`) — the same exception to "never Apple's" as `allowsMacOSInstaller`, with the same checks.
+    /// Which versions are kept (the selected one, the newest release) is `XcodeVersions.allows`.
+    func allowsXcodeApp(_ url: URL, writableOnly: Bool = true, owner: OwnerID = SafetyPolicy.ownerID) -> Bool {
+        allowsAppleApp(url, writableOnly: writableOnly, owner: owner,
+                       named: { $0.lowercased().hasSuffix(".app") && !$0.hasPrefix(".") }) { $0 == XcodeVersions.bundleID }
+    }
+
+    /// An Apple app bundle directly in one of `applicationFolders` whose name `named` accepts and whose bundle id `id`
+    /// accepts: a real folder on the home folder's volume, no other volume mounted inside, not excluded; with
+    /// `writableOnly`, not owned by root (`owner`) and the app and its folder writable.
+    private func allowsAppleApp(_ url: URL, writableOnly: Bool, owner: OwnerID, named: (String) -> Bool,
+                                id accepts: (String) -> Bool) -> Bool {
         let path = Self.normalize(url)
         let parent = (path as NSString).deletingLastPathComponent
-        guard applicationFolders.contains(where: { $0.path == parent }),
-              MacOSInstallers.isInstallerName((path as NSString).lastPathComponent),
+        guard applicationFolders.contains(where: { $0.path == parent }), named((path as NSString).lastPathComponent),
               !isExcluded(path), !holdsMount(path) else { return false }
         var info = stat()
         guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
@@ -506,7 +524,7 @@ nonisolated struct SafetyPolicy: Sendable {
         let plist = path + "/Contents/Info.plist"
         guard lstat(plist, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
               let id = NSDictionary(contentsOfFile: plist)?["CFBundleIdentifier"] as? String else { return false }
-        return id.hasPrefix(MacOSInstallers.bundleIDPrefix)
+        return accepts(id)
     }
 
     /// Uninstaller rule for an app's data, only ever moved to the Trash: one entry directly inside one of
