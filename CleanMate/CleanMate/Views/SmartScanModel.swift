@@ -146,7 +146,7 @@ final class SmartScanModel: ObservableObject {
 
     /// `pattern` is a bundle id (or process name) or ends with `*` (`com.jetbrains.*`: every JetBrains IDE).
     nonisolated static func bundleID(_ id: String, matches pattern: String) -> Bool {
-        pattern.hasSuffix("*") ? id.hasPrefix(pattern.dropLast()) : id == pattern
+        CleanerItem.matches(id, pattern: pattern)
     }
 
     /// The item's app is open: it is not selected by default and is skipped when cleaning.
@@ -157,9 +157,7 @@ final class SmartScanModel: ObservableObject {
     }
 
     /// The scan lists entries and each one is locked (`ScanEntry.lockReason`).
-    nonisolated static func allEntriesLocked(_ scan: ItemScan) -> Bool {
-        !scan.entries.isEmpty && scan.entries.allSatisfy { $0.lockReason != nil }
-    }
+    nonisolated static func allEntriesLocked(_ scan: ItemScan) -> Bool { scan.allEntriesLocked }
 
     /// Entries listed locked: never ticked, counted nor cleaned.
     func lockedEntries(_ item: CleanerItem) -> Set<URL> {
@@ -167,11 +165,7 @@ final class SmartScanModel: ObservableObject {
     }
 
     func isRunning(_ item: CleanerItem) -> Bool {
-        runningApps.contains { id in item.runningAppBundleIDs.contains { Self.bundleID(id, matches: $0) } }
-            || item.runningProcessNames.contains { name in
-                name.hasSuffix("*") ? runningProcesses.contains { Self.bundleID($0, matches: name) }
-                    : runningProcesses.contains(name)
-            }
+        item.runningBlocker(apps: runningApps, processes: runningProcesses) != nil
     }
 
     /// The catalog without the groups turned off in Settings.

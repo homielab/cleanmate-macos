@@ -32,6 +32,20 @@ no account, no telemetry; its only network connection is the update check, which
 Undo (⌘Z) puts back what a module just moved to the Trash, and an activity log records every removal.
 See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and shortcut in detail.
 
+## Command line
+
+The app includes a `cleanmate` command for scripts and AI agents (Claude Code, Codex…): `cleanmate list` shows every
+Smart Scan item and `cleanmate scan --json` measures them like Smart Scan, with the same safety rules and your
+exclusions. It is read-only: it deletes nothing and never connects to the network. To put it on your PATH:
+
+```sh
+mkdir -p ~/.local/bin
+ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanmate
+cleanmate --help
+```
+
+Commands, options, the JSON format and Full Disk Access: [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
+
 ## Install
 
 1. Download the latest `CleanMate-<version>.dmg` from
@@ -112,9 +126,10 @@ release notes come from the version's section in [CHANGELOG.md](CHANGELOG.md).
 
 ## Project layout
 
-- `CleanMate/CleanMate/Engine/` — scanning, cleaning and safety rules (`SafetyPolicy`), declarative catalogs
+- `CleanMate/Engine/` — shared by the app and the command line tool: scanning, cleaning and safety rules (`SafetyPolicy`), declarative catalogs
   (`SmartScanCatalog`, `DeveloperCatalog`, `AppCatalog`, `PrivacyCatalog`), `ActivityLog`, `Preferences`.
 - `CleanMate/CleanMate/Views/` — one view and model per module, plus Settings.
+- `CleanMate/CLI/` — entry point of the `cleanmate` command line tool (target `CleanMateCLI`, built with the app).
 - `CleanMate/CleanMate/AppIcon.icon` — the app icon (open it in Icon Composer).
 - `CleanMate/Info.plist` — Sparkle settings merged into the generated Info.plist: update feed URL and public EdDSA key.
 - `CleanMate/CleanMateTests/` — unit and end-to-end tests.

@@ -2,14 +2,17 @@ import AppKit
 
 extension CleanerGroup {
     /// Smart Scan with the age thresholds set in Settings, the current Full Disk Access state and running apps.
-    nonisolated static var smartScan: [CleanerGroup] {
+    nonisolated static var smartScan: [CleanerGroup] { smartScan(hasFullDiskAccess: FullDiskAccess.isGranted) }
+
+    /// Smart Scan with the age thresholds set in Settings and running apps, as if Full Disk Access were `hasFullDiskAccess`.
+    nonisolated static func smartScan(hasFullDiskAccess: Bool) -> [CleanerGroup] {
         // NSWorkspace documents `runningApplications` as safe to read from any thread.
-        smartScan(ages: .current, hasFullDiskAccess: FullDiskAccess.isGranted, screenshotFolder: OldScreenshots.folder(),
+        smartScan(ages: .current, hasFullDiskAccess: hasFullDiskAccess, screenshotFolder: OldScreenshots.folder(),
                   runningAppNames: {
             Set(NSWorkspace.shared.runningApplications.flatMap { app in
                 [app.localizedName, app.bundleURL?.deletingPathExtension().lastPathComponent].compactMap { $0 }
             })
-        }, runningAppTeams: CodeSignature.runningAppTeams, isUpdating: { AppUpdater.isUpdating }) {
+        }, runningAppTeams: CodeSignature.runningAppTeams, isUpdating: { SparkleDownloads.isUpdatingSelf }) {
             Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         }
     }
@@ -217,6 +220,6 @@ extension CleanerGroup {
         "rclone", "TemporaryItems",
         "com.apple.bird", "CloudKit", "com.apple.akd", "com.apple.nsurlsessiond", "com.apple.homed",
         "FamilyCircle", "com.apple.containermanagerd", "com.apple.ap.adprivacyd",
-        Bundle.main.bundleIdentifier ?? "com.homielab.CleanMate",
+        AppIdentity.bundleID,
     ]
 }

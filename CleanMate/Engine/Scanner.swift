@@ -62,6 +62,8 @@ nonisolated struct ItemScan: Sendable {
     var hasData: Bool { size > 0 || unmeasured || entries.contains(where: \.isDatabase) }
     /// Some entry has a folder that could not be read: `size` may be smaller than the real size.
     var partlyUnreadable: Bool { entries.contains(where: \.partlyUnreadable) }
+    /// The scan lists entries and each one is locked (`ScanEntry.lockReason`).
+    var allEntriesLocked: Bool { !entries.isEmpty && entries.allSatisfy { $0.lockReason != nil } }
 }
 
 nonisolated enum Scanner {

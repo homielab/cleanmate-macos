@@ -475,7 +475,7 @@ nonisolated struct SafetyPolicy: Sendable {
         let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
         guard values?.isDirectory == true, values?.isSymbolicLink != true,
               let id = Bundle(url: url)?.bundleIdentifier else { return false }
-        return !Self.isApple(id) && id != Bundle.main.bundleIdentifier
+        return !Self.isApple(id) && id != AppIdentity.bundleID
     }
 
     /// Owner (uid) of a path, without following a last-component symlink; nil when it does not exist.

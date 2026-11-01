@@ -11,12 +11,14 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
     static let limit = 1_000
     /// Bumped when entries are measured another way: older records are measured again (2: `FreeableBytes`).
     static let version = 2
-    /// The app's cache file; memory only under tests, which never touch the real one.
+    /// The app's cache file; memory only under tests, which never touch the real one. The command line tool reads
+    /// it but never writes it.
     static let shared = FolderSizeCache(
-        file: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? defaultURL : nil)
+        file: ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? defaultURL : nil,
+        readOnly: AppIdentity.isCommandLineTool)
     static var defaultURL: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appending(path: "\(Bundle.main.bundleIdentifier ?? "com.homielab.CleanMate")/folder-sizes.json")
+            .appending(path: "\(AppIdentity.bundleID)/folder-sizes.json")
     }
 
     /// What a folder was measured with: its modification time and link count, read with `lstat`.
@@ -46,13 +48,16 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
     }
 
     let file: URL?
+    /// `file` is read, never written.
+    let readOnly: Bool
     let limit: Int
     /// Path → record; nil until first read from `file`.
     private let records = Locked<[String: Record]?>(nil)
 
     /// `file`: where the sizes persist; nil = this run only.
-    init(file: URL?, limit: Int = limit) {
+    init(file: URL?, readOnly: Bool = false, limit: Int = limit) {
         self.file = file
+        self.readOnly = readOnly
         self.limit = limit
     }
 
@@ -92,7 +97,7 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
                     .map { ($0.key, $0.value) })
                 records = all
             }
-            guard let file else { return }
+            guard let file, !readOnly else { return }
             try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? JSONEncoder().encode(all).write(to: file, options: .atomic)
         }

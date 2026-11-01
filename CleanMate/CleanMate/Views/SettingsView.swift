@@ -2,12 +2,7 @@ import SwiftUI
 import Combine
 import UniformTypeIdentifiers
 
-enum FullDiskAccess {
-    /// ~/.Trash is only readable with Full Disk Access on recent macOS.
-    nonisolated static var isGranted: Bool {
-        (try? FileManager.default.contentsOfDirectory(atPath: NSHomeDirectory() + "/.Trash")) != nil
-    }
-
+extension FullDiskAccess {
     static func openSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
             NSWorkspace.shared.open(url)

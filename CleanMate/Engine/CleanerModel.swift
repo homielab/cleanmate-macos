@@ -284,3 +284,17 @@ nonisolated struct CleanerGroup: Identifiable, Sendable {
     let systemImage: String
     let items: [CleanerItem]
 }
+
+nonisolated extension CleanerItem {
+    /// `pattern` is a bundle id (or process name) or ends with `*` (`com.jetbrains.*`: every JetBrains IDE).
+    static func matches(_ id: String, pattern: String) -> Bool {
+        pattern.hasSuffix("*") ? id.hasPrefix(pattern.dropLast()) : id == pattern
+    }
+
+    /// The bundle id of a running app (`runningAppBundleIDs`), else the name of a running tool (`runningProcessNames`),
+    /// that keeps the item from being cleaned now; nil when none runs.
+    func runningBlocker(apps: some Collection<String>, processes: some Collection<String>) -> String? {
+        apps.first { app in runningAppBundleIDs.contains { Self.matches(app, pattern: $0) } }
+            ?? processes.first { name in runningProcessNames.contains { Self.matches(name, pattern: $0) } }
+    }
+}

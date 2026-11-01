@@ -21,12 +21,12 @@ nonisolated enum LowDiskWarning {
     }
 
     /// Free space under `percent` of the disk's size; never for an unreadable disk or while off.
-    static func isLow(_ volume: SpaceLensModel.Volume, below percent: Int) -> Bool {
+    static func isLow(_ volume: DiskVolume, below percent: Int) -> Bool {
         percent > 0 && volume.total > 0 && volume.available * 100 < volume.total * Int64(percent)
     }
 
     /// Whole percent free, rounded down: 9.8 % free under a 10 % threshold reads "9%", never "10%".
-    static func freePercent(_ volume: SpaceLensModel.Volume) -> Int {
+    static func freePercent(_ volume: DiskVolume) -> Int {
         volume.total > 0 ? Int(volume.available * 100 / volume.total) : 0
     }
 
@@ -35,7 +35,7 @@ nonisolated enum LowDiskWarning {
         (Double(percent) / 100).formatted(.percent.precision(.fractionLength(0)))
     }
 
-    static func request(_ volume: SpaceLensModel.Volume) -> ScanReminder.Request {
+    static func request(_ volume: DiskVolume) -> ScanReminder.Request {
         let size = volume.available.formatted(.byteCount(style: .file))
         let free = share(freePercent(volume))
         let body = volume.name.isEmpty
@@ -56,13 +56,13 @@ final class LowDiskWarningChecker {
     private let defaults: UserDefaults
     private let now: () -> Date
     private let calendar: Calendar
-    private let volume: () -> SpaceLensModel.Volume
+    private let volume: () -> DiskVolume
     /// A check waiting for the notification center: another one (timer, scan) must not post a second warning.
     private var checking = false
 
     init(center: (any ReminderCenter)?, defaults: UserDefaults = .standard, now: @escaping () -> Date = { .now },
          calendar: Calendar = .current,
-         volume: @escaping () -> SpaceLensModel.Volume = { .read(SafetyPolicy.current.homeURL) }) {
+         volume: @escaping () -> DiskVolume = { .read(SafetyPolicy.current.homeURL) }) {
         self.center = center
         self.defaults = defaults
         self.now = now

@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 /// Updates downloaded by apps that update themselves with Sparkle: each keeps them in
 /// `~/Library/Caches/<bundle id>/org.sparkle-project.Sparkle` (the downloaded archive, the extracted copy and the
@@ -13,10 +14,23 @@ nonisolated enum SparkleDownloads {
     static let cachePattern = "*/" + folderName
     /// Sparkle's installer (`Autoupdate`) and its progress window (`Updater.app`), run from the folder while installing.
     static let processNames = ["Autoupdate", "Updater"]
-    static let ownBundleID = Bundle.main.bundleIdentifier ?? "com.homielab.CleanMate"
+    static let ownBundleID = AppIdentity.bundleID
+
+    /// An update of CleanMate was found in this run: it is being downloaded, installed, or waits to be installed, so
+    /// its files in CleanMate's Sparkle cache folder must stay. Set by the app's updater; readable from any thread.
+    /// The command line tool can't know, so it keeps them while the app is open.
+    static var isUpdatingSelf: Bool {
+        guard !AppIdentity.isCommandLineTool else {
+            return !NSRunningApplication.runningApplications(withBundleIdentifier: AppIdentity.bundleID).isEmpty
+        }
+        return updatingSelf.withLock { $0 }
+    }
+    /// Not reset in this run: a postponed update stays in the cache.
+    static func updateFound() { updatingSelf.withLock { $0 = true } }
+    private static let updatingSelf = OSAllocatedUnfairLock(initialState: false)
 
     /// `runningApps`: bundle ids of the open apps; `isUpdating`: whether CleanMate is downloading or installing an
-    /// update of itself (`AppUpdater.isUpdating`). Both are read once per scan and again before each removal.
+    /// update of itself (`isUpdatingSelf`). Both are read once per scan and again before each removal.
     static func item(runningApps: @escaping @Sendable () -> Set<String> = { [] },
                      isUpdating: @escaping @Sendable () -> Bool = { false },
                      appURL: @escaping @Sendable (String) -> URL? = {

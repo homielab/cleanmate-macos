@@ -8,6 +8,7 @@ For a short overview, see the [README](../README.md). CleanMate requires macOS 1
 - [Smart Scan in detail](#smart-scan-in-detail)
 - [Safety](#safety)
 - [Permissions](#permissions)
+- [Command line](#command-line)
 - [Privacy](#privacy) · [Languages](#languages)
 
 ## Modules
@@ -155,11 +156,100 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
   Full Disk Access.
 - Without Full Disk Access, Large & Old Files and Space Lens do not look inside the folders macOS guards with a
   per-folder prompt (Desktop, Documents, Downloads, Movies, Music, Pictures, iCloud Drive, CloudStorage, other apps'
-  containers — list in [`ProtectedFolders.swift`](../CleanMate/CleanMate/Engine/ProtectedFolders.swift)), so no access dialogs pop up; a note with an Open Settings
+  containers — list in [`ProtectedFolders.swift`](../CleanMate/Engine/ProtectedFolders.swift)), so no access dialogs pop up; a note with an Open Settings
   button says some folders were skipped.
 - **App Sandbox is off**: a cleaner must read and remove caches of other apps and developer tools across your home
   folder, which a sandboxed app cannot do. Hardened Runtime is on. CleanMate is distributed outside the Mac App Store
   (Developer ID, notarized).
+
+## Command line
+
+CleanMate.app includes `cleanmate`, a command with no window for scripts and AI agents (Claude Code, Codex…). It
+uses the same items, safety rules, **Settings › Exclusions** and **Scan Groups** as Smart Scan, and reads your ticks.
+It is read-only: it deletes nothing, writes no activity log, changes no setting, never reads stdin and never connects
+to the network. To clean, open CleanMate.
+
+The command is in the app bundle; link it into a folder on your PATH (no administrator password needed):
+
+```sh
+mkdir -p ~/.local/bin   # add it to PATH in your shell profile if it isn't there
+ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanmate
+```
+
+| Command | What it prints |
+| --- | --- |
+| `cleanmate list [--json] [--privacy]` | Every Smart Scan item: group, id, name, what it removes, ticked by default or not, deleted or moved to the Trash, whether it needs Full Disk Access. |
+| `cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]` | What Smart Scan would find now: items by group with their size, the total ticked by default, and a note when Full Disk Access is missing. |
+| `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Full Disk Access and exit codes. |
+
+- `--only` scans only the named items (ids from `cleanmate list`); `--group` only the named groups: `system`, `user`
+  (the Trash), `dev`, `ai`, `apps`, `privacy`. Both take comma-separated values, may repeat, and accept `--only=…`.
+  A group turned off in Scan Groups is scanned only when named.
+- Privacy items (browser history, cookies, recent items) are listed and scanned only with `--privacy`.
+- An item whose app or tool is running is **locked**, with the reason (`"Google Chrome is running"`), as in the app;
+  files a program has open are skipped. Locked items are not counted in the total.
+- Text output has colours only on a terminal and never when `NO_COLOR` is set; `--json` prints one JSON object.
+  Names and descriptions are always in English.
+- Exit codes: `0` OK, `1` error, `2` invalid arguments, `3` no Full Disk Access with `--require-fda`.
+
+`cleanmate list --json`:
+
+```json
+{
+  "items" : [
+    {
+      "description" : "Skips caches of apps that are open",
+      "disposal" : "delete",
+      "group" : "system",
+      "id" : "user-caches",
+      "name" : "User caches",
+      "needsFullDiskAccess" : false,
+      "selectedByDefault" : true
+    }
+  ],
+  "version" : "1.5"
+}
+```
+
+`cleanmate scan --json` (sizes in bytes; `total` counts the unlocked items ticked by default, `totalUpTo` those whose
+size is only a maximum, `sizeIsUpperBound`):
+
+```json
+{
+  "fullDiskAccess" : true,
+  "items" : [
+    {
+      "disposal" : "delete",
+      "entries" : [
+        { "path" : "~/Library/Caches/com.spotify.client", "size" : 651546624 }
+      ],
+      "group" : "system",
+      "id" : "user-caches",
+      "locked" : false,
+      "moreEntries" : 14,
+      "name" : "User caches",
+      "reason" : null,
+      "selectedByDefault" : true,
+      "size" : 1472417792,
+      "sizeIsUpperBound" : false
+    }
+  ],
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "total" : 1472417792,
+  "totalUpTo" : 0,
+  "version" : "1.5"
+}
+```
+
+Each item lists its 50 largest entries (paths in your home start with `~/`) and `moreEntries` counts the rest. An item
+may also have `records` (database rows a Privacy item erases) and `needsFullDiskAccess: true` (a folder could not be
+read); an entry may have `records` and a `reason` when it alone is locked. `selectedByDefault` follows your own ticks
+in Smart Scan.
+
+**Full Disk Access** belongs to the app that runs `cleanmate` (Terminal, iTerm, your AI agent's app), not to
+CleanMate. Without it the scan still runs, skips the folders macOS protects (as the app does), prints a note in text
+and reports `"fullDiskAccess": false`; `--require-fda` exits with code 3 instead. To grant it: System Settings ›
+Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
 ## Privacy
 

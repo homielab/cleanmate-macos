@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		C0FFEE00000000000000000E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C0FFEE00000000000000000D /* Sparkle */; };
+		C0FFEE00000000000000001C /* cleanmate in Embed Command Line Tool */ = {isa = PBXBuildFile; fileRef = C0FFEE000000000000000012 /* cleanmate */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -18,11 +19,33 @@
 			remoteGlobalIDString = B4E7D5D23087BCB600917B8E;
 			remoteInfo = CleanMate;
 		};
+		C0FFEE00000000000000001A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B4E7D5CB3087BCB600917B8E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0FFEE000000000000000013;
+			remoteInfo = CleanMateCLI;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C0FFEE00000000000000001B /* Embed Command Line Tool */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				C0FFEE00000000000000001C /* cleanmate in Embed Command Line Tool */,
+			);
+			name = "Embed Command Line Tool";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		B4E7D5D33087BCB600917B8E /* CleanMate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CleanMate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0FFEE000000000000000001 /* CleanMateTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanMateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0FFEE000000000000000012 /* cleanmate */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cleanmate; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +57,16 @@
 		C0FFEE000000000000000002 /* CleanMateTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CleanMateTests;
+			sourceTree = "<group>";
+		};
+		C0FFEE000000000000000010 /* Engine */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Engine;
+			sourceTree = "<group>";
+		};
+		C0FFEE000000000000000011 /* CLI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CLI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -50,6 +83,11 @@
 			files = (
 			);
 		};
+		C0FFEE000000000000000015 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -57,6 +95,8 @@
 			isa = PBXGroup;
 			children = (
 				B4E7D5D53087BCB600917B8E /* CleanMate */,
+				C0FFEE000000000000000010 /* Engine */,
+				C0FFEE000000000000000011 /* CLI */,
 				C0FFEE000000000000000002 /* CleanMateTests */,
 				B4E7D5D43087BCB600917B8E /* Products */,
 			);
@@ -67,6 +107,7 @@
 			children = (
 				B4E7D5D33087BCB600917B8E /* CleanMate.app */,
 				C0FFEE000000000000000001 /* CleanMateTests.xctest */,
+				C0FFEE000000000000000012 /* cleanmate */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -81,11 +122,16 @@
 				B4E7D5CF3087BCB600917B8E /* Sources */,
 				B4E7D5D03087BCB600917B8E /* Frameworks */,
 				B4E7D5D13087BCB600917B8E /* Resources */,
+				C0FFEE00000000000000001B /* Embed Command Line Tool */,
 			);
 			buildRules = (
 			);
+			dependencies = (
+				C0FFEE000000000000000019 /* PBXTargetDependency */,
+			);
 			fileSystemSynchronizedGroups = (
 				B4E7D5D53087BCB600917B8E /* CleanMate */,
+				C0FFEE000000000000000010 /* Engine */,
 			);
 			name = CleanMate;
 			packageProductDependencies = (
@@ -116,6 +162,26 @@
 			productReference = C0FFEE000000000000000001 /* CleanMateTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C0FFEE000000000000000013 /* CleanMateCLI */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0FFEE000000000000000016 /* Build configuration list for PBXNativeTarget "CleanMateCLI" */;
+			buildPhases = (
+				C0FFEE000000000000000014 /* Sources */,
+				C0FFEE000000000000000015 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C0FFEE000000000000000010 /* Engine */,
+				C0FFEE000000000000000011 /* CLI */,
+			);
+			name = CleanMateCLI;
+			productName = cleanmate;
+			productReference = C0FFEE000000000000000012 /* cleanmate */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -132,6 +198,9 @@
 					C0FFEE000000000000000003 = {
 						CreatedOnToolsVersion = 27.1;
 						TestTargetID = B4E7D5D23087BCB600917B8E;
+					};
+					C0FFEE000000000000000013 = {
+						CreatedOnToolsVersion = 27.1;
 					};
 				};
 			};
@@ -155,6 +224,7 @@
 			targets = (
 				B4E7D5D23087BCB600917B8E /* CleanMate */,
 				C0FFEE000000000000000003 /* CleanMateTests */,
+				C0FFEE000000000000000013 /* CleanMateCLI */,
 			);
 		};
 /* End PBXProject section */
@@ -183,6 +253,11 @@
 			files = (
 			);
 		};
+		C0FFEE000000000000000014 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -190,6 +265,11 @@
 			isa = PBXTargetDependency;
 			target = B4E7D5D23087BCB600917B8E /* CleanMate */;
 			targetProxy = C0FFEE000000000000000008 /* PBXContainerItemProxy */;
+		};
+		C0FFEE000000000000000019 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C0FFEE000000000000000013 /* CleanMateCLI */;
+			targetProxy = C0FFEE00000000000000001A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -420,6 +500,46 @@
 			};
 			name = Release;
 		};
+		C0FFEE000000000000000017 /* Debug configuration for PBXNativeTarget "CleanMateCLI" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEVELOPMENT_TEAM = 79LQ4MHVMG;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.homielab.CleanMate.cli;
+				PRODUCT_MODULE_NAME = CleanMateCLI;
+				PRODUCT_NAME = cleanmate;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C0FFEE000000000000000018 /* Release configuration for PBXNativeTarget "CleanMateCLI" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				DEVELOPMENT_TEAM = 79LQ4MHVMG;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.homielab.CleanMate.cli;
+				PRODUCT_MODULE_NAME = CleanMateCLI;
+				PRODUCT_NAME = cleanmate;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -445,6 +565,15 @@
 				C0FFEE00000000000000000A /* Debug configuration for PBXNativeTarget "CleanMateTests" */,
 				C0FFEE00000000000000000B /* Release configuration for PBXNativeTarget "CleanMateTests" */,
 			);
+			defaultConfigurationName = Release;
+		};
+		C0FFEE000000000000000016 /* Build configuration list for PBXNativeTarget "CleanMateCLI" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0FFEE000000000000000017 /* Debug configuration for PBXNativeTarget "CleanMateCLI" */,
+				C0FFEE000000000000000018 /* Release configuration for PBXNativeTarget "CleanMateCLI" */,
+			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */

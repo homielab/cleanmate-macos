@@ -73,7 +73,7 @@ nonisolated final class DiskHistory: @unchecked Sendable {
 
     /// Reads the disk holding `home` now; nothing is recorded when it can't be read.
     func recordNow(home: URL = SafetyPolicy.current.homeURL, now: Date = .now) {
-        let volume = SpaceLensModel.Volume.read(home)
+        let volume = DiskVolume.read(home)
         guard volume.total > 0 else { return }
         record(Point(date: now, available: volume.available, total: volume.total))
     }
