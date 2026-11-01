@@ -39,6 +39,8 @@ nonisolated enum RunningProcesses {
         ("/.yarn/releases/yarn-", "yarn"), ("/node_modules/yarn/bin/", "yarn"),
         // Homebrew: `bin/brew` runs `bash …/Library/Homebrew/brew.sh`, which runs `ruby … …/Library/Homebrew/brew.rb`.
         ("/Library/Homebrew/brew.sh", "brew"), ("/Library/Homebrew/brew.rb", "brew"),
+        // asdf before 0.16 is a bash script (`bash ~/.asdf/bin/asdf install`; Homebrew: `…/libexec/bin/asdf`).
+        ("/.asdf/bin/asdf", "asdf"), ("/asdf/libexec/bin/asdf", "asdf"),
         // Firebase emulators: `java -jar ~/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.jar`, or a
         // downloaded binary run from that folder; the unpacked `ui-v*` folder is not kept open, so a path is the only sign.
         (CleanerGroup.firebaseEmulatorsPath, "firebase-emulators"),

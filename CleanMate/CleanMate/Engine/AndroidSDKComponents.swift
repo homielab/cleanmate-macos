@@ -190,36 +190,12 @@ nonisolated enum AndroidSDKComponents {
         return pins(in: roots, skipping: skipped)
     }
 
-    /// `pins(policy:hasFullDiskAccess:)` from `roots`, walked like `StaleProjects.find`: up to `depth` levels, never
-    /// a symlink, a hidden folder, one of `StaleProjects.unwalked`, a bundle, a folder of `skipping` or another
-    /// volume, at most `folderLimit` folders in all.
+    /// `pins(policy:hasFullDiskAccess:)` from `roots`, walked by `StaleProjects.visit`.
     static func pins(in roots: [URL], skipping: Set<String> = [], depth: Int = StaleProjects.depth,
                      folderLimit: Int = StaleProjects.folderLimit) -> Pins {
-        var pins = Pins(), budget = folderLimit
-        for root in roots {
-            let rootPath = root.standardizedFileURL.path
-            var info = stat()
-            guard lstat(rootPath, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { continue }
-            let device = info.st_dev
-            var level = [rootPath]
-            for current in 0...depth where !level.isEmpty {
-                var next: [String] = []
-                for folder in level {
-                    guard budget > 0 else { return pins }
-                    budget -= 1
-                    let children = StaleProjects.entries(of: folder)
-                    read(folder, children: children, into: &pins)
-                    guard current < depth else { continue }
-                    for (name, type) in children where type == UInt8(DT_DIR) && !name.hasPrefix(".")
-                        && !StaleProjects.unwalked.contains(name)
-                        && !StaleProjects.bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
-                        let path = folder + "/" + name
-                        guard !skipping.contains(path), lstat(path, &info) == 0, info.st_dev == device else { continue }
-                        next.append(path)
-                    }
-                }
-                level = next.sorted()
-            }
+        var pins = Pins()
+        StaleProjects.visit(roots, skipping: skipping, depth: depth, folderLimit: folderLimit) { folder, children in
+            read(folder, children: children, into: &pins)
         }
         return pins
     }

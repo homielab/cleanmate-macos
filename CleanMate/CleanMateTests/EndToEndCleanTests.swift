@@ -23,6 +23,10 @@ struct EndToEndCleanTests {
         ".windsurf/extensions/junk.ext-2.0.0/package.json", ".vscode/extensions/extensions.json",
         // The newest NDK of the Android SDKs set in the profile, kept next to the old one (the default SDK's is below)
         "Developer/tools/ANDROID_HOME/ndk/99.0.0/source.properties", "Developer/tools/ANDROID_SDK_ROOT/ndk/99.0.0/source.properties",
+        // The newest version of an asdf / mise tool, kept next to the old one
+        ".asdf/installs/junk/9.0.0/bin/junk", "Developer/tools/ASDF_DATA_DIR/installs/junk/9.0.0/bin/junk",
+        ".local/share/mise/installs/junk/9.0.0/bin/junk", "Developer/tools/MISE_DATA_DIR/installs/junk/9.0.0/bin/junk",
+        "Developer/tools/XDG_DATA_HOME/mise/installs/junk/9.0.0/bin/junk",
         // The simulator sets' own lists next to the simulators and test device clones
         "Library/Developer/CoreSimulator/Devices/device_set.plist", "Library/Developer/XCTestDevices/device_set.plist",
         // Browser bookmarks, passwords, extensions
@@ -250,6 +254,10 @@ struct EndToEndCleanTests {
                 if item.id == AndroidSDKComponents.id { // an NDK older than the bait version next to it (27.1 or 99.0.0)
                     try write(folder.appending(path: "ndk/1.0.0/source.properties"), Data("Pkg.Revision=1.0.0\n".utf8))
                     try write(folder.appending(path: "ndk/1.0.0/payload.bin"), Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if [ToolVersionManagers.asdfID, ToolVersionManagers.miseID].contains(item.id) { // older than the bait 9.0.0
+                    try write(folder.appending(path: "junk/1.0.0/bin/junk"), Data(repeating: 1, count: 4096))
                     continue
                 }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes

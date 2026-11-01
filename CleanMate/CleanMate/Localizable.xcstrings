@@ -1707,6 +1707,26 @@
         }
       }
     },
+    "Old runtime versions (asdf)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản runtime cũ (asdf)"
+          }
+        }
+      }
+    },
+    "Old runtime versions (mise)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản runtime cũ (mise)"
+          }
+        }
+      }
+    },
     "Old Rust toolchains (rustup)" : {
       "localizations" : {
         "vi" : {
@@ -2427,6 +2447,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản cũ còn lại sau khi cập nhật extension trong VS Code, Cursor, Windsurf và VSCodium; bản đang dùng được giữ"
+          }
+        }
+      }
+    },
+    "Versions other than the newest of each tool and those pinned in mise's settings or by a project in your project folders, installed again with mise install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản không phải bản mới nhất của mỗi tool và không được ghim trong cài đặt của mise hay bởi dự án trong thư mục dự án của bạn; cài lại bằng mise install"
+          }
+        }
+      }
+    },
+    "Versions other than the newest of each tool and those pinned in ~/.tool-versions or by a project in your project folders, installed again with asdf install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản không phải bản mới nhất của mỗi tool và không được ghim trong ~/.tool-versions hay bởi dự án trong thư mục dự án của bạn; cài lại bằng asdf install"
           }
         }
       }

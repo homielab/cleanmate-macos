@@ -166,6 +166,10 @@ extension CleanerGroup {
         OldRuntimes.rubyItem(),
         OldRuntimes.rustItem(),
         OldRuntimes.goItem(),
+        // Unticked, deleted: versions installed by asdf and mise other than the newest of each tool and pinned ones,
+        // one entry per tool and version; skipped while asdf / mise runs (`ToolVersionManagers`).
+        ToolVersionManagers.asdfItem(),
+        ToolVersionManagers.miseItem(),
         // Unticked, deleted: versions of VS Code, Cursor, Windsurf and VSCodium extensions replaced by an update, one
         // entry per extension; the version in use is never listed (`EditorExtensions`).
         EditorExtensions.item(),

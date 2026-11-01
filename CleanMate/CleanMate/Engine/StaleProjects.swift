@@ -139,6 +139,39 @@ nonisolated enum StaleProjects {
         return found
     }
 
+    /// Calls `visit` with each folder below `roots` and its `readdir` names and types, one level at a time, up to
+    /// `depth` levels: never a symlink, a hidden folder, one of `unwalked`, a bundle, a folder of `skipping` or another
+    /// volume, at most `folderLimit` folders in all. Where tools' settings files that pin versions are looked for
+    /// (`AndroidSDKComponents`, `ToolVersionManagers`).
+    static func visit(_ roots: [URL], skipping: Set<String> = [], depth: Int = depth, folderLimit: Int = folderLimit,
+                      _ visit: (String, [String: UInt8]) -> Void) {
+        var budget = folderLimit
+        for root in roots {
+            let rootPath = root.standardizedFileURL.path
+            var info = stat()
+            guard lstat(rootPath, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { continue }
+            let device = info.st_dev
+            var level = [rootPath]
+            for current in 0...depth where !level.isEmpty {
+                var next: [String] = []
+                for folder in level {
+                    guard budget > 0 else { return }
+                    budget -= 1
+                    let children = entries(of: folder)
+                    visit(folder, children)
+                    guard current < depth else { continue }
+                    for (name, type) in children where type == UInt8(DT_DIR) && !name.hasPrefix(".")
+                        && !unwalked.contains(name) && !bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
+                        let path = folder + "/" + name
+                        guard !skipping.contains(path), lstat(path, &info) == 0, info.st_dev == device else { continue }
+                        next.append(path)
+                    }
+                }
+                level = next.sorted()
+            }
+        }
+    }
+
     /// Names in `folder` with their `readdir` type (`DT_DIR`, `DT_REG`, `DT_LNK`…): no stat per entry.
     static func entries(of folder: String) -> [String: UInt8] {
         guard let dir = opendir(folder) else { return [:] }
