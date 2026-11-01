@@ -1,13 +1,15 @@
 import Foundation
 
-/// The `cleanmate` command line tool inside CleanMate.app: `list` and a read-only `scan`, as text or JSON.
-/// No stdin, no network; colours only on a terminal without `NO_COLOR`.
+/// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, as text or JSON.
+/// Stdin only for `clean`'s confirmation on a terminal; no network; colours only on a terminal without `NO_COLOR`.
 nonisolated enum CommandLineTool {
     enum Exit: Int32 {
         case ok = 0
         case failure = 1
         case usage = 2
         case noFullDiskAccess = 3
+        /// `clean` without `--yes` and without a terminal to confirm on: nothing was deleted.
+        case notConfirmed = 4
     }
 
     /// Where the tool writes; tests collect the text.
@@ -18,13 +20,18 @@ nonisolated enum CommandLineTool {
         var color: Bool
         /// A "Scanning…" line on stderr while a text scan runs.
         var progress: Bool
+        /// Stdin is a terminal: `clean` without `--yes` asks there.
+        var interactive = false
+        /// One line typed on stdin; nil at its end.
+        var readLine: @Sendable () -> String? = { nil }
 
         static var standard: Output {
             let environment = ProcessInfo.processInfo.environment
             let plain = environment["NO_COLOR"].map { !$0.isEmpty } == true || environment["TERM"] == "dumb"
             return Output(out: { FileHandle.standardOutput.write(Data($0.utf8)) },
                           err: { FileHandle.standardError.write(Data($0.utf8)) },
-                          color: !plain && isatty(STDOUT_FILENO) == 1, progress: isatty(STDERR_FILENO) == 1)
+                          color: !plain && isatty(STDOUT_FILENO) == 1, progress: isatty(STDERR_FILENO) == 1,
+                          interactive: isatty(STDIN_FILENO) == 1, readLine: { Swift.readLine() })
         }
     }
 
@@ -33,6 +40,7 @@ nonisolated enum CommandLineTool {
         case version
         case list(json: Bool, privacy: Bool)
         case scan(HeadlessScan.Options, json: Bool, requireFullDiskAccess: Bool)
+        case clean(HeadlessScan.Options, json: Bool, requireFullDiskAccess: Bool, dryRun: Bool, yes: Bool)
     }
 
     struct UsageError: Error, Equatable { let message: String }
@@ -41,15 +49,16 @@ nonisolated enum CommandLineTool {
         Usage:
           cleanmate list [--json] [--privacy]
           cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]
+          cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]
           cleanmate --version
           cleanmate --help
 
         """
 
     static let help = """
-        cleanmate: what CleanMate's Smart Scan would clean on this Mac, for scripts and AI agents.
-        Read-only: it deletes nothing, writes no activity log and never connects to the network.
-        To clean, open CleanMate.
+        cleanmate: CleanMate's Smart Scan on the command line, for scripts and AI agents.
+        list and scan are read-only. clean removes what scan finds with the app's safety rules and
+        writes the app's activity log. It never connects to the network.
 
         \(usage)
         Commands:
@@ -58,13 +67,21 @@ nonisolated enum CommandLineTool {
           scan            Measures the items like Smart Scan in the app: the same items, safety rules,
                           Settings › Exclusions and Scan Groups. An item whose app or tool is running is
                           locked, with the reason; files in use are skipped.
+          clean           Scans again, then cleans like the app: the items named with --only, else the
+                          items ticked by default (in the groups named with --group). Privacy items only
+                          when named. Junk that apps rebuild is deleted; items marked "moves to Trash" in
+                          `cleanmate list` go to the Trash. Locked items and files in use are skipped and
+                          reported with the reason. On a terminal it asks before cleaning; anywhere
+                          else it needs --yes.
 
         Options:
           --json          Print one JSON object instead of text.
-          --only IDS      Scan only these items (ids from `cleanmate list`), comma-separated.
-          --group GROUPS  Scan only these groups, comma-separated: system, user, dev, ai, apps, privacy.
+          --only IDS      Only these items (ids from `cleanmate list`), comma-separated.
+          --group GROUPS  Only these groups, comma-separated: system, user, dev, ai, apps, privacy.
                           A group turned off in Settings is scanned when named here.
           --privacy       Include the Privacy items (browser history, cookies, recent items).
+          --dry-run       clean: report what would be cleaned; delete nothing, log nothing.
+          --yes           clean: don't ask. Required when not run in a terminal (scripts, AI agents).
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
           -h, --help      Show this help.
           --version       Show the version.
@@ -75,11 +92,16 @@ nonisolated enum CommandLineTool {
           the Trash, Mail, other apps' data) and reports "fullDiskAccess": false. To grant it: System
           Settings › Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
+        Undo:
+          clean has no Undo. What went to the Trash can be put back from the Trash in Finder (Put Back);
+          deleted junk is rebuilt by the apps that use it. Check first with `cleanmate clean --dry-run`.
+
         Exit codes:
-          0  OK
+          0  OK (also when some items or files were skipped)
           1  Error
           2  Invalid arguments
           3  No Full Disk Access with --require-fda
+          4  clean without --yes and without a terminal: nothing was deleted
 
         """
 
@@ -90,6 +112,7 @@ nonisolated enum CommandLineTool {
         do {
             command = try parse(arguments)
             if case .scan(let options, _, _) = command { try HeadlessScan.validate(options, sources: sources) }
+            if case .clean(let options, _, _, _, _) = command { try HeadlessScan.validate(options, sources: sources) }
         } catch let error as UsageError {
             output.err("cleanmate: \(error.message)\nRun `cleanmate --help` for usage.\n")
             return Exit.usage.rawValue
@@ -110,19 +133,67 @@ nonisolated enum CommandLineTool {
             guard let text = json ? encode(report) : listText(report, color: output.color) else { return Exit.failure.rawValue }
             output.out(text)
         case .scan(let options, let json, let requireAccess):
-            if requireAccess && !sources.hasFullDiskAccess() {
-                output.err("cleanmate: no Full Disk Access. Grant it to the app that runs cleanmate in System Settings › "
-                           + "Privacy & Security › Full Disk Access, then reopen that app.\n")
-                return Exit.noFullDiskAccess.rawValue
-            }
+            if requireAccess && !sources.hasFullDiskAccess() { return noFullDiskAccess(output) }
             let showsProgress = output.progress && !json
             if showsProgress { output.err("Scanning…") }
             let report = await HeadlessScan.scan(options, sources: sources)
             if showsProgress { output.err("\r\u{1B}[K") }
             guard let text = json ? encode(report) : scanText(report, color: output.color) else { return Exit.failure.rawValue }
             output.out(text)
+        case .clean(let options, let json, let requireAccess, let dryRun, let yes):
+            return await clean(options, json: json, requireFullDiskAccess: requireAccess, dryRun: dryRun, yes: yes,
+                               sources: sources, output: output)
         }
         return Exit.ok.rawValue
+    }
+
+    private static func noFullDiskAccess(_ output: Output) -> Int32 {
+        output.err("cleanmate: no Full Disk Access. Grant it to the app that runs cleanmate in System Settings › "
+                   + "Privacy & Security › Full Disk Access, then reopen that app.\n")
+        return Exit.noFullDiskAccess.rawValue
+    }
+
+    private static func clean(_ options: HeadlessScan.Options, json: Bool, requireFullDiskAccess: Bool, dryRun: Bool,
+                              yes: Bool, sources: HeadlessScan.Sources, output: Output) async -> Int32 {
+        let asks = !dryRun && !yes
+        if asks && !output.interactive {
+            output.err("cleanmate: nothing was deleted. Without a terminal, clean needs --yes: check the items with "
+                       + "`cleanmate scan` (or `cleanmate clean --dry-run`), then run `cleanmate clean --yes` with the same options.\n")
+            return Exit.notConfirmed.rawValue
+        }
+        if requireFullDiskAccess && !sources.hasFullDiskAccess() { return noFullDiskAccess(output) }
+        let showsProgress = output.progress && !json
+        if showsProgress { output.err("Scanning…") }
+        let plan = await HeadlessClean.plan(options, sources: sources)
+        if showsProgress { output.err("\r\u{1B}[K") }
+        if asks && !plan.cleanable.isEmpty {
+            output.err(confirmation(plan))
+            let answer = output.readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
+            guard answer == "y" || answer == "yes" else {
+                output.err("Nothing was deleted.\n")
+                return Exit.ok.rawValue
+            }
+        }
+        if showsProgress && !dryRun { output.err("Cleaning…") }
+        let report = await HeadlessClean.clean(plan, dryRun: dryRun, sources: sources)
+        if showsProgress && !dryRun { output.err("\r\u{1B}[K") }
+        guard let text = json ? encode(report) : cleanText(report, color: output.color) else { return Exit.failure.rawValue }
+        output.out(text)
+        return Exit.ok.rawValue
+    }
+
+    /// The question asked on a terminal before cleaning.
+    static func confirmation(_ plan: HeadlessClean.Plan) -> String {
+        let count = plan.cleanable.count
+        var text = "About to clean \(count) item\(count == 1 ? "" : "s"): "
+        let parts = [plan.deleteSize > 0 || plan.trashSize == 0 ? "\(size(plan.deleteSize)) deleted (junk apps rebuild)" : nil,
+                     plan.trashSize > 0 ? "\(size(plan.trashSize)) moved to the Trash" : nil].compactMap { $0 }
+        text += parts.joined(separator: ", ") + ".\n"
+        for target in plan.cleanable {
+            text += "  \(target.report.name)  \(target.report.sizeIsUpperBound ? "up to " : "")\(size(target.report.size))"
+                + (target.report.disposal == "trash" ? " (to Trash)" : "") + "\n"
+        }
+        return text + "No Undo here: put items back from the Trash in Finder.\nProceed? [y/N] "
     }
 
     static func parse(_ arguments: [String]) throws -> Command {
@@ -134,8 +205,8 @@ nonisolated enum CommandLineTool {
         case "--version", "version":
             guard rest.isEmpty else { throw UsageError(message: "unexpected argument `\(rest.first!)`") }
             return .version
-        case "list", "scan":
-            var json = false, privacy = false, requireAccess = false
+        case "list", "scan", "clean":
+            var json = false, privacy = false, requireAccess = false, dryRun = false, yes = false
             var options = HeadlessScan.Options()
             while let argument = rest.popFirst() {
                 let (name, inline) = split(argument)
@@ -151,17 +222,23 @@ nonisolated enum CommandLineTool {
                 case ("-h", _), ("--help", _): return .help
                 case ("--json", _) where inline == nil: json = true
                 case ("--privacy", _) where inline == nil: privacy = true
-                case ("--only", "scan"): options.only = (options.only ?? []) + (try value())
-                case ("--group", "scan"): options.groups = (options.groups ?? []) + (try value())
-                case ("--require-fda", "scan") where inline == nil: requireAccess = true
+                case ("--only", "scan"), ("--only", "clean"): options.only = (options.only ?? []) + (try value())
+                case ("--group", "scan"), ("--group", "clean"): options.groups = (options.groups ?? []) + (try value())
+                case ("--require-fda", "scan") where inline == nil, ("--require-fda", "clean") where inline == nil:
+                    requireAccess = true
+                case ("--dry-run", "clean") where inline == nil: dryRun = true
+                case ("--yes", "clean") where inline == nil, ("-y", "clean"): yes = true
                 default:
                     throw UsageError(message: argument.hasPrefix("-") ? "unknown option `\(name)` for \(first)"
                                                                       : "unexpected argument `\(argument)`")
                 }
             }
             options.privacy = privacy
-            return first == "list" ? .list(json: json, privacy: privacy)
-                                   : .scan(options, json: json, requireFullDiskAccess: requireAccess)
+            switch first {
+            case "list": return .list(json: json, privacy: privacy)
+            case "scan": return .scan(options, json: json, requireFullDiskAccess: requireAccess)
+            default: return .clean(options, json: json, requireFullDiskAccess: requireAccess, dryRun: dryRun, yes: yes)
+            }
         default:
             throw UsageError(message: first.hasPrefix("-") ? "unknown option `\(first)`" : "unknown command `\(first)`")
         }
@@ -254,6 +331,35 @@ nonisolated enum CommandLineTool {
         if !report.fullDiskAccess {
             text += style.yellow("Note: no Full Disk Access, so folders macOS protects were skipped (see `cleanmate --help`).") + "\n"
         }
+        return text
+    }
+
+    static func cleanText(_ report: HeadlessClean.Report, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = report.dryRun ? style.bold("Dry run: nothing was deleted.") + "\n" : ""
+        let width = min(40, report.items.map(\.name.count).max() ?? 0)
+        for item in report.items {
+            let what: String
+            if item.locked {
+                what = style.yellow("skipped: \(item.reason ?? "locked")")
+            } else if item.freed == 0 && item.skipped.isEmpty {
+                what = style.dim("nothing to clean")
+            } else {
+                let verb = report.dryRun ? (item.trashed > 0 ? "to move to the Trash" : "to delete")
+                                         : (item.trashed > 0 ? "moved to the Trash" : "deleted")
+                what = "\(size(item.freed)) \(verb)"
+            }
+            text += "  \(padded(item.name, width))  \(what)\n"
+            let shown = item.locked ? [] : item.skipped
+            for skipped in shown.prefix(5) { text += style.dim("      kept \(skipped.path): \(skipped.reason)") + "\n" }
+            if shown.count > 5 { text += style.dim("      … \(shown.count - 5) more kept") + "\n" }
+        }
+        if report.items.isEmpty { text += "Nothing to clean.\n" }
+        let total = (report.dryRun ? "Would free " : "Freed ") + size(report.freed)
+            + (report.upTo > 0 ? " (up to \(size(report.upTo)) of it may stay shared)" : "")
+            + (report.inTrash > 0 ? ", \(size(report.inTrash)) of it in the Trash until you empty it" : "") + "."
+        text += "\n" + style.bold(total) + "\n"
+        if let log = report.log { text += style.dim("Logged in \(log). No Undo here: put items back from the Trash in Finder.") + "\n" }
         return text
     }
 }

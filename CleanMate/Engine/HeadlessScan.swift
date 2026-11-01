@@ -128,7 +128,7 @@ nonisolated enum HeadlessScan {
         case needsPrivacy(String)
     }
 
-    /// Where the scan reads the Mac's state; tests inject a fake home and fixed apps, processes and settings.
+    /// Where the scan (and `HeadlessClean`) reads the Mac's state; tests inject a fake home and fixed apps, processes and settings.
     struct Sources: Sendable {
         var policy: @Sendable () -> SafetyPolicy = { .current }
         var hasFullDiskAccess: @Sendable () -> Bool = { FullDiskAccess.isGranted }
@@ -150,6 +150,8 @@ nonisolated enum HeadlessScan {
         }
         var now: @Sendable () -> Date = { .now }
         var version: @Sendable () -> String = { HeadlessScan.appVersion }
+        /// Moves an item to the Trash for `cleanmate clean`; tests use a fake Trash folder.
+        var trash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash
     }
 
     /// The app's version (`appBundle`).
@@ -232,6 +234,17 @@ nonisolated enum HeadlessScan {
 
     /// Scans like the app's Smart Scan, read-only. `options` must have passed `validate`.
     static func scan(_ options: Options = Options(), sources: Sources = Sources()) async -> Report {
+        await scanned(options, sources: sources).report
+    }
+
+    /// A scanned catalog item, for `HeadlessClean`.
+    struct Scanned: Sendable {
+        var item: CleanerItem
+        var scan: ItemScan
+    }
+
+    /// `scan`, with each reported item's catalog item and scan (by id; absent for the Full Disk Access placeholders).
+    static func scanned(_ options: Options, sources: Sources) async -> (report: Report, items: [String: Scanned]) {
         let hasAccess = sources.hasFullDiskAccess()
         let policy = sources.policy()
         let only = options.only.map(Set.init)
@@ -264,6 +277,7 @@ nonisolated enum HeadlessScan {
         }
 
         var items: [Item] = []
+        var details: [String: Scanned] = [:]
         for group in groups {
             let scanned = group.items.compactMap { item -> (Item, Int)? in
                 guard let (scan, blocked) = results[item.id],
@@ -272,6 +286,7 @@ nonisolated enum HeadlessScan {
                 let running = item.runningBlocker(apps: apps.keys, processes: processes).map { apps[$0] ?? $0 }
                 let report = report(item, group: group.id, scan: scan, blocked: blocked, running: running,
                                     selected: overrides[item.id] ?? item.selectedByDefault, home: policy.homeURL)
+                details[item.id] = Scanned(item: item, scan: scan)
                 return (report, scan.records ?? 0)
             }
             // Biggest first, as the app sorts results; ties keep catalog order.
@@ -296,10 +311,11 @@ nonisolated enum HeadlessScan {
         }
 
         let counted = items.filter { $0.selectedByDefault && !$0.locked }
-        return Report(version: sources.version(), fullDiskAccess: hasAccess,
+        let report = Report(version: sources.version(), fullDiskAccess: hasAccess,
                       scannedAt: sources.now().formatted(.iso8601),
                       total: counted.filter { !$0.sizeIsUpperBound }.reduce(0) { $0 + $1.size },
                       totalUpTo: counted.filter(\.sizeIsUpperBound).reduce(0) { $0 + $1.size }, items: items)
+        return (report, details)
     }
 
     static let needsAccess = "Needs Full Disk Access"

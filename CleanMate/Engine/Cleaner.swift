@@ -147,6 +147,16 @@ nonisolated enum Cleaner {
         return report
     }
 
+    /// Entries removed, for the activity log. A run command (e.g. `docker image prune`) succeeds or fails as a
+    /// whole: its `skipped` is 0 or 1 for the item, not per entry, and its entries may be display-only.
+    static func removedCount(_ item: CleanerItem, _ scan: ItemScan, _ result: CleanReport) -> Int {
+        if item.entryCommand != nil { return max(0, scan.entries.count - result.skipped) } // one command per entry
+        guard let command = item.command, item.paths.isEmpty || command.resolvedPath != nil else {
+            return max(0, scan.entries.count - result.skipped)
+        }
+        return result.skipped > 0 ? 0 : max(result.freed > 0 ? 1 : 0, scan.entries.count)
+    }
+
     /// The item runs an installed tool whose folder overlaps Settings › Exclusions, so it is never cleaned: the tool
     /// removes what it likes in its folder, ignoring exclusions. Checked by the scan too, to lock the row.
     /// Raw roots and printed folder: refused ones are still the tool's.

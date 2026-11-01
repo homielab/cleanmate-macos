@@ -166,8 +166,9 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 
 CleanMate.app includes `cleanmate`, a command with no window for scripts and AI agents (Claude Code, Codex…). It
 uses the same items, safety rules, **Settings › Exclusions** and **Scan Groups** as Smart Scan, and reads your ticks.
-It is read-only: it deletes nothing, writes no activity log, changes no setting, never reads stdin and never connects
-to the network. To clean, open CleanMate.
+`list` and `scan` are read-only. `clean` removes what Smart Scan would, through the app's own cleaning code, and writes
+the app's activity log. The command changes no setting, reads stdin only to ask before a clean on a terminal, and never
+connects to the network.
 
 The command is in the app bundle. Installed with Homebrew (`brew install --cask`), it is already on your PATH: the
 cask links it into Homebrew's `bin`, and `brew uninstall` removes the link. Otherwise link it into a folder on your
@@ -182,7 +183,8 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 | --- | --- |
 | `cleanmate list [--json] [--privacy]` | Every Smart Scan item: group, id, name, what it removes, ticked by default or not, deleted or moved to the Trash, whether it needs Full Disk Access. |
 | `cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]` | What Smart Scan would find now: items by group with their size, the total ticked by default, and a note when Full Disk Access is missing. |
-| `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Full Disk Access and exit codes. |
+| `cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]` | Scans again, then cleans; per item what was deleted, moved to the Trash or kept and why, then the totals. |
+| `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Undo, Full Disk Access and exit codes. |
 
 - `--only` scans only the named items (ids from `cleanmate list`); `--group` only the named groups: `system`, `user`
   (the Trash), `dev`, `ai`, `apps`, `privacy`. Both take comma-separated values, may repeat, and accept `--only=…`.
@@ -192,7 +194,8 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
   files a program has open are skipped. Locked items are not counted in the total.
 - Text output has colours only on a terminal and never when `NO_COLOR` is set; `--json` prints one JSON object.
   Names and descriptions are always in English.
-- Exit codes: `0` OK, `1` error, `2` invalid arguments, `3` no Full Disk Access with `--require-fda`.
+- Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments, `3` no Full Disk Access
+  with `--require-fda`, `4` `clean` without `--yes` and without a terminal (nothing was deleted).
 
 `cleanmate list --json`:
 
@@ -247,6 +250,61 @@ Each item lists its 50 largest entries (paths in your home start with `~/`) and 
 may also have `records` (database rows a Privacy item erases) and `needsFullDiskAccess: true` (a folder could not be
 read); an entry may have `records` and a `reason` when it alone is locked. `selectedByDefault` follows your own ticks
 in Smart Scan.
+
+### Cleaning
+
+`cleanmate clean` cleans like **Clean** in Smart Scan:
+
+- **What**: the items named with `--only`, ticked or not; otherwise the items ticked by default (your own ticks
+  included), in the groups named with `--group` if any. Privacy items only when named, by id or with
+  `--group privacy`, and always with `--privacy`. Run `cleanmate scan` first to see them.
+- **How**: junk apps rebuild (caches, logs, developer junk, privacy traces) is deleted; items `cleanmate list` marks
+  `"disposal": "trash"` go to the Trash. Every path passes the same checks as in the app right before it goes: the
+  safety rules, Exclusions, files in use and anything changed since the scan. Running apps are read again: an item
+  whose app is running is not cleaned and is reported `locked` with the reason.
+- **Confirmation**: on a terminal, `clean` lists the items with their size (deleted or to the Trash) and asks
+  `Proceed? [y/N]`. Without a terminal (scripts, AI agents) it deletes nothing and exits with code `4` unless you pass
+  `--yes`. `--dry-run` needs neither: it prints the same report, deletes nothing and logs nothing.
+- **Activity log**: each cleaned item gets the same line as a clean in the app (module Smart Scan, or Privacy), so
+  **Settings › Activity** and the Overview count it.
+- **No Undo**: put items back from the Trash in Finder (**Put Back**). Deleted junk is rebuilt by the apps that use it.
+
+`cleanmate clean --yes --only user-caches,old-downloads --json` (bytes; `freed` counts what was deleted or moved to the
+Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is only a maximum; `log` is `null` with
+`--dry-run`):
+
+```json
+{
+  "dryRun" : false,
+  "freed" : 1489194496,
+  "inTrash" : 16777216,
+  "items" : [
+    {
+      "freed" : 1472417280,
+      "id" : "user-caches",
+      "locked" : false,
+      "name" : "User caches",
+      "reason" : null,
+      "skipped" : [
+        { "path" : "~/Library/Caches/com.example.editor", "reason" : "Kept by the safety checks: in use, modified since the scan or not permitted" }
+      ],
+      "trashed" : 0
+    },
+    {
+      "freed" : 16777216,
+      "id" : "old-downloads",
+      "locked" : false,
+      "name" : "Old downloads",
+      "reason" : null,
+      "skipped" : [],
+      "trashed" : 16777216
+    }
+  ],
+  "log" : "~/Library/Logs/CleanMate/activity.log",
+  "upTo" : 0,
+  "version" : "1.5"
+}
+```
 
 **Full Disk Access** belongs to the app that runs `cleanmate` (Terminal, iTerm, your AI agent's app), not to
 CleanMate. Without it the scan still runs, skips the folders macOS protects (as the app does), prints a note in text

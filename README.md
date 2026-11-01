@@ -35,9 +35,10 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 ## Command line
 
 The app includes a `cleanmate` command for scripts and AI agents (Claude Code, Codex…): `cleanmate list` shows every
-Smart Scan item and `cleanmate scan --json` measures them like Smart Scan, with the same safety rules and your
-exclusions. It is read-only: it deletes nothing and never connects to the network. Installed with Homebrew,
-`cleanmate` is already on your PATH. Otherwise link it into a folder on your PATH:
+Smart Scan item, `cleanmate scan --json` measures them like Smart Scan, and `cleanmate clean` cleans them with the
+same safety rules, exclusions and activity log as the app (`--dry-run` to preview; without a terminal it needs
+`--yes`). It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
+link it into a folder on your PATH:
 
 ```sh
 mkdir -p ~/.local/bin

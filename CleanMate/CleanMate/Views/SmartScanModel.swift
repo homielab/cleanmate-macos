@@ -465,16 +465,6 @@ final class SmartScanModel: ObservableObject {
         scanFinished(self)
     }
 
-    /// Entries removed, for the activity log. A run command (e.g. `docker image prune`) succeeds or fails as a
-    /// whole: its `skipped` is 0 or 1 for the item, not per entry, and its entries may be display-only.
-    nonisolated static func removedCount(_ item: CleanerItem, _ scan: ItemScan, _ result: CleanReport) -> Int {
-        if item.entryCommand != nil { return max(0, scan.entries.count - result.skipped) } // one command per entry
-        guard let command = item.command, item.paths.isEmpty || command.resolvedPath != nil else {
-            return max(0, scan.entries.count - result.skipped)
-        }
-        return result.skipped > 0 ? 0 : max(result.freed > 0 ? 1 : 0, scan.entries.count)
-    }
-
     /// Only from results: a second call, or one after a new scan started (⌘R behind the dialog), does nothing.
     func clean() async {
         guard case .results = phase else { return }
@@ -507,7 +497,7 @@ final class SmartScanModel: ObservableObject {
                 if item.mode == .trash { byGroup[index].trashed += result.freed }
             }
             for moved in result.trashed { trashedItemNames[moved.original] = ActivityLog.english(item.title) }
-            let removed = SmartScanModel.removedCount(item, scan, result)
+            let removed = Cleaner.removedCount(item, scan, result)
             if result.freed > 0 || removed > 0 {
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
                                    size: result.freed, mode: item.mode, home: logHome)

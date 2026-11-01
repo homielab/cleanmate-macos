@@ -392,7 +392,7 @@ struct ScannerCleanerTests {
         ], measuredSize: 16)
         let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
         #expect(report.freed == 10 && report.skipped == 2)
-        #expect(SmartScanModel.removedCount(item, scan, report) == 1)
+        #expect(Cleaner.removedCount(item, scan, report) == 1)
         #expect(try String(contentsOf: log, encoding: .utf8) == "rmi 8b1bc650def0\nrmi 6fecacab9f88\n")
     }
 
@@ -1024,7 +1024,7 @@ struct DeveloperToolsTests {
         ], measuredSize: 11)
         let report = await Cleaner.clean(item, scan: scan, policy: box.policy)
         #expect(report.freed == 10 && report.skipped == 1)
-        #expect(SmartScanModel.removedCount(item, scan, report) == 1)
+        #expect(Cleaner.removedCount(item, scan, report) == 1)
         #expect(try String(contentsOf: log, encoding: .utf8) == "rmi app-dev:latest\n")
     }
 
@@ -2352,7 +2352,7 @@ struct AppCatalogTests {
         #expect(await run([], CleanReport(freed: 3_000)) == ["3", "1"]) // image list failed: the item itself
         // Plain file items still count entries minus skipped ones.
         let files = CleanerItem(id: "f", title: "f", paths: ["~/x"])
-        #expect(SmartScanModel.removedCount(files, ItemScan(entries: images), CleanReport(freed: 2_000, skipped: 1)) == 2)
+        #expect(Cleaner.removedCount(files, ItemScan(entries: images), CleanReport(freed: 2_000, skipped: 1)) == 2)
     }
 
     /// Entry ticks only work when cleaning removes the scanned entries: a command, a database erase or a probe
