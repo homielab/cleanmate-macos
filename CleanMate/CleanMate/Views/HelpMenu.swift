@@ -1,11 +1,16 @@
 import AppKit
 import SwiftUI
 
-/// Help menu: report a bug or suggest a feature on GitHub, open the repository, copy the website link to share.
-/// Each one only opens the browser or copies text: CleanMate itself sends nothing.
+/// Help menu: the welcome guide, report a bug or suggest a feature on GitHub, open the repository, copy the website
+/// link to share. The GitHub items only open the browser or copy text: CleanMate itself sends nothing.
 struct HelpCommands: Commands {
+    @FocusedValue(\.confirming) private var confirming
+
     var body: some Commands {
         CommandGroup(replacing: .help) {
+            Button("Getting Started…") { ModuleRouter.shared.showWelcome() }
+                .disabled(confirming == true)
+            Divider()
             Button("Report a Bug…") { BugReportPreview.show() }
             Button("Suggest a Feature…") {
                 NSWorkspace.shared.open(ProjectLinks.newIssue(template: BugReport.featureTemplate))

@@ -64,6 +64,8 @@ final class ModuleRouter: ObservableObject {
     @Published var spaceLensFolder: URL?
     /// Menu bar "Scan Now": ContentView switches to Smart Scan and starts a scan, also on first appearance.
     @Published var scanRequested = false
+    /// Help › Getting Started…: ContentView opens the welcome guide, also on first appearance.
+    @Published var welcomeRequested = false
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
     var openMainWindow: OpenWindowAction?
 
@@ -80,6 +82,12 @@ final class ModuleRouter: ObservableObject {
         guard canScanNow else { return }
         scanRequested = true
         show(.smartScan, openWindow: openWindow)
+    }
+
+    /// Opens the welcome guide on the main window (reopened if closed); settings are not changed by opening it.
+    func showWelcome() {
+        welcomeRequested = true
+        show(nil)
     }
 
     /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
@@ -107,8 +115,7 @@ struct ContentView: View {
     @StateObject private var spaceLens = SpaceLensModel()
     @StateObject private var loginItems = LaunchAgentsModel()
     @StateObject private var maintenance = MaintenanceModel()
-    @AppStorage(Preferences.fullDiskAccessPrompted) private var fullDiskAccessPrompted = false
-    @State private var showsFullDiskAccess = false
+    @State private var showsWelcome = false
     @Environment(\.openWindow) private var openWindow
 
     init() {}
@@ -165,14 +172,18 @@ struct ContentView: View {
         .onAppearAndChange(of: router.spaceLensFolder) { _ in
             if let url = router.spaceLensFolder { spaceLens.start(at: url); selection = .spaceLens; router.spaceLensFolder = nil }
         }
+        .onAppearAndChange(of: router.welcomeRequested) { _ in
+            guard router.welcomeRequested else { return }
+            router.welcomeRequested = false
+            // A confirmation already open keeps the window: no sheet over a sheet.
+            if ModuleRouter.mainWindow?.attachedSheet == nil { showsWelcome = true } else { NSSound.beep() }
+        }
         .onAppear {
-            // Once, and only when missing; remembered even if the user picks Not Now.
-            if !fullDiskAccessPrompted && !FullDiskAccess.isGranted { showsFullDiskAccess = true }
-            fullDiskAccessPrompted = true
+            if WelcomeModel.showsAtLaunch() { showsWelcome = true }
             AppUpdater.shared.start()  // after the window: see `start`
             router.openMainWindow = openWindow
         }
-        .sheet(isPresented: $showsFullDiskAccess) { FullDiskAccessSheet() }
+        .sheet(isPresented: $showsWelcome) { WelcomeView { selection = .overview } }
     }
 
     private func badgeText(_ module: Module) -> Text? {
@@ -304,35 +315,6 @@ extension FocusedValues {
     var module: Binding<Module?>? {
         get { self[ModuleKey.self] }
         set { self[ModuleKey.self] = newValue }
-    }
-}
-
-/// Shown once at first launch when Full Disk Access is missing; it can be skipped.
-private struct FullDiskAccessSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield").font(.system(size: 40)).foregroundStyle(.tint)
-            Text("Allow Full Disk Access").font(.title2).bold()
-            Text("CleanMate works without it, but some items can't be read: the Trash, Safari data and app containers. Turn on CleanMate in System Settings > Privacy & Security > Full Disk Access, then scan again.")
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("CleanMate only cleans inside your user account and collects no data.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            HStack {
-                Button("Not Now") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Open System Settings") {
-                    FullDiskAccess.openSettings()
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
-            }
-        }
-        .padding(24)
-        .frame(width: 440)
     }
 }
 

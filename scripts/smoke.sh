@@ -84,11 +84,11 @@ FAIL=0
 fail() { echo "FAIL: $*"; FAIL=1; }
 
 # One launch configuration: $1 = label, rest = extra launch arguments.
-# Launch arguments only shadow defaults for this run: no Full Disk Access sheet, no restored windows,
+# Launch arguments only shadow defaults for this run: no welcome guide, no restored windows,
 # and no update checks (Sparkle neither asks for permission on a later launch nor goes online).
 run_config() {
   local label="$1"; shift
-  local args=(--args -fullDiskAccessPrompted YES -ApplePersistenceIgnoreState YES -SUEnableAutomaticChecks NO "$@")
+  local args=(--args -welcomeShown YES -ApplePersistenceIgnoreState YES -SUEnableAutomaticChecks NO "$@")
   local before n extra
   echo "== $label"
   before="$(pids)"

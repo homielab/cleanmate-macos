@@ -73,8 +73,8 @@ Settings stay in the app's own preferences on your Mac.
 
 ## Permissions
 
-- **Full Disk Access** is optional. It is needed to read the Trash, Safari data and some app containers. CleanMate
-  offers it once at first launch; you can grant it later in System Settings › Privacy & Security › Full Disk Access.
+- **Full Disk Access** is optional. It is needed to read the Trash, Safari data and some app containers. The welcome
+  guide offers it at first launch; you can grant it later in System Settings › Privacy & Security › Full Disk Access.
   Without it, folders macOS protects are skipped and you are told so.
 - **App Sandbox is off**: a cleaner must read and remove caches of other apps and developer tools across your home
   folder, which a sandboxed app cannot do. Hardened Runtime is on, and CleanMate is distributed outside the Mac App

@@ -11,8 +11,11 @@ nonisolated enum Preferences {
     static let sessionDays = "sessionDays"
     static let installerDays = "installerDays"
     static let downloadDays = "downloadDays"
-    /// The one-time Full Disk Access sheet was shown.
+    /// Bool: set at every launch by versions before the welcome guide, which showed a Full Disk Access sheet
+    /// instead; no longer written. True means CleanMate was used before, so the guide is not shown at launch.
     static let fullDiskAccessPrompted = "fullDiskAccessPrompted"
+    /// Bool: the welcome guide was closed (Skip, Get Started or Restart); it is not shown at launch any more.
+    static let welcomeShown = "welcomeShown"
     /// Bool, off by default: free-space item in the menu bar.
     static let showMenuBarExtra = "showMenuBarExtra"
     /// [String: Int]: scan scope → entries checked by the last finished Large & Old Files scan (progress estimate),

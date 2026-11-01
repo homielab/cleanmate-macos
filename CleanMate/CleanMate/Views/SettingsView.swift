@@ -221,7 +221,7 @@ struct GeneralSettings: View {
 }
 
 /// Shown next to a notification setting that is on while notifications from CleanMate are off.
-private struct TurnOnNotificationsButton: View {
+struct TurnOnNotificationsButton: View {
     var body: some View {
         Button { ScanReminder.openNotificationSettings() } label: {
             Label("Turn On Notifications…", systemImage: "exclamationmark.triangle.fill")

@@ -71,6 +71,86 @@
         }
       }
     },
+    "A notification reminds you to run Smart Scan; it never cleans by itself." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một thông báo nhắc bạn chạy Quét thông minh; CleanMate không bao giờ tự dọn."
+          }
+        }
+      }
+    },
+    "All of these can be changed later in Settings." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn có thể đổi tất cả những mục này sau trong Cài đặt."
+          }
+        }
+      }
+    },
+    "Browsing history, cookies and other traces, browser by browser." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lịch sử duyệt web, cookie và các dấu vết khác, theo từng trình duyệt."
+          }
+        }
+      }
+    },
+    "Continue" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tiếp"
+          }
+        }
+      }
+    },
+    "Full Disk Access granted" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã cấp Truy cập toàn bộ ổ đĩa"
+          }
+        }
+      }
+    },
+    "Get Started" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bắt đầu"
+          }
+        }
+      }
+    },
+    "Getting Started…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hướng dẫn bắt đầu…"
+          }
+        }
+      }
+    },
+    "In Privacy & Security › Full Disk Access, turn on CleanMate, then come back here." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trong Quyền riêng tư & Bảo mật › Truy cập toàn bộ ổ đĩa, bật CleanMate rồi quay lại đây."
+          }
+        }
+      }
+    },
     "%lld copies" : {
       "localizations" : {
         "vi" : {
@@ -451,16 +531,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate trên GitHub"
-          }
-        }
-      }
-    },
-    "CleanMate only cleans inside your user account and collects no data." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CleanMate chỉ dọn trong tài khoản người dùng của bạn và không thu thập dữ liệu."
           }
         }
       }
@@ -1317,6 +1387,16 @@
         }
       }
     },
+    "macOS keeps some folders private until you allow Full Disk Access. Without it, Smart Scan skips the Trash, app containers and Group Containers (Telegram, Podcasts, Office…), old files in Downloads, old screenshots, Mail attachments, iPhone backups and Safari data." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS giữ riêng một số thư mục cho tới khi bạn cho phép Truy cập toàn bộ ổ đĩa. Khi chưa có quyền này, Quét thông minh bỏ qua Thùng rác, container ứng dụng và Group Containers (Telegram, Podcasts, Office…), tệp cũ trong Tải về, ảnh chụp màn hình cũ, tệp đính kèm Mail, bản sao lưu iPhone và dữ liệu Safari."
+          }
+        }
+      }
+    },
     "Microsoft AutoUpdate cache" : {
       "localizations" : {
         "vi" : {
@@ -1453,6 +1533,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không dùng hơn 1 năm"
+          }
+        }
+      }
+    },
+    "Nothing goes without your OK" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không xoá gì khi bạn chưa đồng ý"
           }
         }
       }
@@ -1677,12 +1767,32 @@
         }
       }
     },
+    "Open source. CleanMate collects no data: its only network connection is the update check, which you can turn off." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mã nguồn mở. CleanMate không thu thập dữ liệu: kết nối mạng duy nhất là kiểm tra cập nhật, và bạn có thể tắt nó."
+          }
+        }
+      }
+    },
     "Open System Settings…" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở Cài đặt hệ thống…"
+          }
+        }
+      }
+    },
+    "Optional: CleanMate works without it and cleans everything else. You can grant it later from Settings › General." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không bắt buộc: CleanMate vẫn chạy khi không có quyền này và dọn mọi thứ khác. Bạn có thể cấp sau trong Cài đặt › Chung."
           }
         }
       }
@@ -1743,6 +1853,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đọc từ macOS. CleanMate không thay đổi các cài đặt này."
+          }
+        }
+      }
+    },
+    "Removes apps together with the files they leave behind." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gỡ ứng dụng cùng các tệp chúng để lại."
           }
         }
       }
@@ -1895,12 +2015,32 @@
         }
       }
     },
+    "Shows what takes up space on your disk, folder by folder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cho thấy thứ gì chiếm dung lượng ổ đĩa, theo từng thư mục."
+          }
+        }
+      }
+    },
     "Simulator data" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dữ liệu simulator"
+          }
+        }
+      }
+    },
+    "Skip" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ qua"
           }
         }
       }
@@ -1933,6 +2073,16 @@
         }
       }
     },
+    "Step %lld of %lld" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bước %1$lld/%2$lld"
+          }
+        }
+      }
+    },
     "Stops any app, even with admin rights, from changing macOS system files." : {
       "localizations" : {
         "vi" : {
@@ -1959,6 +2109,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bảo vệ toàn vẹn hệ thống (SIP)"
+          }
+        }
+      }
+    },
+    "System junk, developer leftovers, AI tool data and app caches in one scan." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác hệ thống, rác của công cụ lập trình, dữ liệu công cụ AI và bộ nhớ đệm ứng dụng trong một lần quét."
           }
         }
       }
@@ -2177,6 +2337,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản cũ còn lại sau khi cập nhật extension trong VS Code, Cursor, Windsurf và VSCodium; bản đang dùng được giữ"
+          }
+        }
+      }
+    },
+    "Welcome to CleanMate" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chào mừng bạn đến với CleanMate"
+          }
+        }
+      }
+    },
+    "You see everything first, and nothing is removed until you confirm. Caches and junk that rebuild themselves are deleted; your own files and apps go to the Trash, and Undo puts them back." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn xem trước mọi thứ, và không gì bị xoá cho tới khi bạn xác nhận. Bộ nhớ đệm và rác tự tạo lại được thì xoá thẳng; tệp và ứng dụng của bạn vào Thùng rác, và Hoàn tác trả chúng về."
+          }
+        }
+      }
+    },
+    "Your Preferences" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chọn của bạn"
           }
         }
       }
@@ -3225,16 +3415,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate vẫn chạy trên thanh menu sau khi đóng cửa sổ. Ứng dụng không tự mở khi đăng nhập."
-          }
-        }
-      }
-    },
-    "CleanMate works without it, but some items can't be read: the Trash, Safari data and app containers. Turn on CleanMate in System Settings > Privacy & Security > Full Disk Access, then scan again." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CleanMate vẫn chạy khi không có quyền này, nhưng một số mục không đọc được: Thùng rác, dữ liệu Safari và container của ứng dụng. Bật CleanMate trong Cài đặt hệ thống > Quyền riêng tư & Bảo mật > Truy cập toàn bộ ổ đĩa, rồi quét lại."
           }
         }
       }
@@ -4763,16 +4943,6 @@
         }
       }
     },
-    "Not Now" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Để sau"
-          }
-        }
-      }
-    },
     "Not recognized" : {
       "localizations" : {
         "vi" : {
@@ -4949,16 +5119,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở Cài đặt…"
-          }
-        }
-      }
-    },
-    "Open System Settings" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mở Cài đặt hệ thống"
           }
         }
       }
