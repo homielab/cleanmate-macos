@@ -12,7 +12,7 @@ nonisolated enum ShellEnvironment {
         "FVM_CACHE_PATH", "PYENV_ROOT", "RBENV_ROOT",
         // Where PyTorch, Whisper, sentence-transformers and Keras keep downloaded models (`AIModelCaches`).
         "TORCH_HOME", "SENTENCE_TRANSFORMERS_HOME", "KERAS_HOME", "XDG_CACHE_HOME",
-        // Android SDK folders (scanned for system images) and where AVDs are kept (only read: which images they use).
+        // Android SDK folders (scanned for system images and old components) and where AVDs are kept (only read: which images they use).
         "ANDROID_HOME", "ANDROID_SDK_ROOT", "ANDROID_USER_HOME", "ANDROID_SDK_HOME", "ANDROID_PREFS_ROOT",
         // Build tool caches (`DeveloperCatalog`).
         "DENO_DIR", "ZIG_GLOBAL_CACHE_DIR", "CCACHE_DIR", "SCCACHE_DIR", "POETRY_CACHE_DIR", "PRE_COMMIT_HOME", "PIPX_HOME",

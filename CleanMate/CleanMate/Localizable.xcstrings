@@ -1607,6 +1607,16 @@
         }
       }
     },
+    "Old Android SDK components" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thành phần Android SDK bản cũ"
+          }
+        }
+      }
+    },
     "Old downloads" : {
       "localizations" : {
         "vi" : {
@@ -1633,6 +1643,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Go SDK cũ (golang.org/dl)"
+          }
+        }
+      }
+    },
+    "Old NDK, build-tools, platform and CMake versions no project in your project folders pins. A project elsewhere may need one; Android Studio's SDK Manager downloads it again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản NDK, build-tools, platform và CMake cũ không dự án nào trong thư mục dự án của bạn ghim. Dự án ở nơi khác có thể cần; SDK Manager của Android Studio sẽ tải lại"
           }
         }
       }

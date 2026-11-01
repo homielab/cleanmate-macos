@@ -218,6 +218,9 @@ extension CleanerGroup {
         // Unticked, deleted: emulator system images no AVD uses, one entry per image (`AndroidSystemImages`).
         // Locked while Android Studio, the emulator, sdkmanager or avdmanager runs.
         AndroidSystemImages.item(),
+        // Unticked, deleted: NDK, build-tools, platform and CMake versions older than the newest of their kind that no
+        // project pins, one entry per version (`AndroidSDKComponents`). Locked while Android Studio, Gradle or the emulator runs.
+        AndroidSDKComponents.item(),
         // Unticked, to the Trash: each JetBrains IDE / Android Studio version keeps its own settings, plugins,
         // caches and logs folder (`GoLand2025.3`, `AndroidStudio2026.1.1`), left behind by upgrades. Only versions older
         // than the newest of the same product found in these folders are listed (their settings were migrated);

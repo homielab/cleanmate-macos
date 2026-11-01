@@ -114,6 +114,10 @@ nonisolated enum RunningProcesses {
         for (path, name) in installPaths + extra where strings.contains(where: { $0.contains(path) }) { names.insert(name) }
         // The Gradle daemon is `java … org.gradle.launcher.daemon.bootstrap.GradleDaemon <version>`.
         if strings.contains("org.gradle.launcher.daemon.bootstrap.GradleDaemon") { names.insert("GradleDaemon") }
+        // A Gradle build's client is `java … org.gradle.wrapper.GradleWrapperMain` (`./gradlew`) or `… org.gradle.launcher.GradleMain`.
+        if strings.contains("org.gradle.wrapper.GradleWrapperMain") || strings.contains("org.gradle.launcher.GradleMain") {
+            names.insert("gradle")
+        }
         // The Kotlin compile daemon is `java … org.jetbrains.kotlin.daemon.KotlinCompileDaemon …`.
         if strings.contains("org.jetbrains.kotlin.daemon.KotlinCompileDaemon") { names.insert("KotlinCompileDaemon") }
         // sdkmanager and avdmanager are scripts that run `java … com.android.sdklib.tool.…Cli`.

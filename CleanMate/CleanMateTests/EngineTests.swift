@@ -1363,11 +1363,12 @@ struct DeveloperToolsTests {
         #expect(!FileManager.default.fileExists(atPath: box.home.appending(path: "dev/cargo/registry/b").path))
     }
 
-    /// A profile variable's folder itself is a scan root only when the item filters names (`included`);
-    /// otherwise roots are tool-specific subfolders (`registry`, `.cache`, `*.avd/snapshots`).
+    /// A profile variable's folder itself is a scan root only when the item filters names (`included`) or finds its
+    /// own entries in it (`findEntries`: the Android SDK's old components); otherwise roots are tool-specific
+    /// subfolders (`registry`, `.cache`, `*.avd/snapshots`).
     @Test func shellFolderValueIsRootOnlyWithNameFilter() {
         for item in CleanerGroup.developer.items where item.shellFolders.values.contains(where: { $0.contains("") }) {
-            #expect(item.included != nil, "\(item.id)")
+            #expect(item.included != nil || item.findEntries != nil, "\(item.id)")
         }
     }
 
@@ -2431,6 +2432,13 @@ struct AppCatalogTests {
                                 "org.jetbrains.kotlin.daemon.KotlinCompileDaemon", "--daemon-runFilesPath"])
         #expect(RunningProcesses.argumentNames(kotlin).contains("KotlinCompileDaemon"))
         #expect(!RunningProcesses.argumentNames(kotlin).contains("GradleDaemon"))
+        // A Gradle build's client: `./gradlew` or Gradle's own launcher.
+        let wrapper = buffer(5, ["/jdk/bin/java", "", "/jdk/bin/java", "-Xmx64m", "-classpath", "/p/gradle/wrapper/gradle-wrapper.jar",
+                                 "org.gradle.wrapper.GradleWrapperMain", "assembleDebug"])
+        #expect(RunningProcesses.argumentNames(wrapper).contains("gradle"))
+        let launcher = buffer(4, ["/jdk/bin/java", "", "/jdk/bin/java", "-cp", "/g/lib/gradle-launcher.jar", "org.gradle.launcher.GradleMain"])
+        #expect(RunningProcesses.argumentNames(launcher).contains("gradle"))
+        #expect(!RunningProcesses.argumentNames(gradle).contains("gradle"))
         #expect(RunningProcesses.argumentNames([]).isEmpty)
         #expect(CleanerGroup.developer.items.first { $0.id == "gradle-caches" }?.runningProcessNames == ["GradleDaemon", "KotlinCompileDaemon"])
         #expect(!RunningProcesses.names().isEmpty) // reads the real process list without `ps`

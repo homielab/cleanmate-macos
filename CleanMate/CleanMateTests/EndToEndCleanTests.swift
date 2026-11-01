@@ -21,6 +21,8 @@ struct EndToEndCleanTests {
         ".vscode/extensions/junk.ext-2.0.0/package.json", ".vscode-insiders/extensions/junk.ext-2.0.0/package.json",
         ".vscode-oss/extensions/junk.ext-2.0.0/package.json", ".cursor/extensions/junk.ext-2.0.0/package.json",
         ".windsurf/extensions/junk.ext-2.0.0/package.json", ".vscode/extensions/extensions.json",
+        // The newest NDK of the Android SDKs set in the profile, kept next to the old one (the default SDK's is below)
+        "Developer/tools/ANDROID_HOME/ndk/99.0.0/source.properties", "Developer/tools/ANDROID_SDK_ROOT/ndk/99.0.0/source.properties",
         // The simulator sets' own lists next to the simulators and test device clones
         "Library/Developer/CoreSimulator/Devices/device_set.plist", "Library/Developer/XCTestDevices/device_set.plist",
         // Browser bookmarks, passwords, extensions
@@ -243,6 +245,11 @@ struct EndToEndCleanTests {
                 }
                 if item.id == EditorExtensions.id { // a version replaced by the bait version 2.0.0 of the same extension
                     try write(folder.appending(path: "junk.ext-1.0.0/package.json"), Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if item.id == AndroidSDKComponents.id { // an NDK older than the bait version next to it (27.1 or 99.0.0)
+                    try write(folder.appending(path: "ndk/1.0.0/source.properties"), Data("Pkg.Revision=1.0.0\n".utf8))
+                    try write(folder.appending(path: "ndk/1.0.0/payload.bin"), Data(repeating: 1, count: 4096))
                     continue
                 }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes
