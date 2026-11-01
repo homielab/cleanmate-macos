@@ -251,6 +251,11 @@ may also have `records` (database rows a Privacy item erases) and `needsFullDisk
 read); an entry may have `records` and a `reason` when it alone is locked. `selectedByDefault` follows your own ticks
 in Smart Scan.
 
+**Full Disk Access** belongs to the app that runs `cleanmate` (Terminal, iTerm, your AI agent's app), not to
+CleanMate. Without it the scan still runs, skips the folders macOS protects (as the app does), prints a note in text
+and reports `"fullDiskAccess": false`; `--require-fda` exits with code 3 instead. To grant it: System Settings ›
+Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
+
 ### Cleaning
 
 `cleanmate clean` cleans like **Clean** in Smart Scan:
@@ -306,10 +311,22 @@ Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is
 }
 ```
 
-**Full Disk Access** belongs to the app that runs `cleanmate` (Terminal, iTerm, your AI agent's app), not to
-CleanMate. Without it the scan still runs, skips the folders macOS protects (as the app does), prints a note in text
-and reports `"fullDiskAccess": false`; `--require-fda` exits with code 3 instead. To grant it: System Settings ›
-Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
+### For AI agents
+
+The [Agent Skill](https://agentskills.io) in [`skills/cleanmate/`](../skills/cleanmate/SKILL.md) tells Claude Code,
+Codex, Cursor and other agents how to use `cleanmate`: find it, scan, show you the result by group (deleted or to the
+Trash, locked items and why, Full Disk Access), clean with `--yes --only` only the items you confirmed, then report what
+was freed, moved to the Trash and kept. It never installs anything, never adds Privacy items or items that are not
+ticked by default unless you ask, and points you to the app for what the command doesn't do (Large & Old Files,
+Uninstaller, Space Lens, Maintenance). Install it with:
+
+```sh
+bunx skills add homielab/cleanmate-macos
+```
+
+or copy the `skills/cleanmate` folder into your agent's skills folder (`~/.claude/skills/`, `.cursor/skills/`…). A test
+(`AgentSkillTests`) checks that every command in the skill parses, uses options `cleanmate --help` lists and real item
+ids, and that its JSON samples decode as the command's reports.
 
 ## Privacy
 

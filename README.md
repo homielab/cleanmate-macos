@@ -48,6 +48,9 @@ cleanmate --help
 
 Commands, options, the JSON format and Full Disk Access: [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
 
+**AI agents.** An [Agent Skill](https://agentskills.io) in `skills/cleanmate/` teaches Claude Code, Codex, Cursor and
+others to scan first, show you the result and clean only what you confirm: `bunx skills add homielab/cleanmate-macos`.
+
 ## Install
 
 1. Download the latest `CleanMate-<version>.dmg` from
