@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 // Privacy module: browsing traces per browser and system/shell histories. Separate from Smart Scan.
 // Every item is unticked by default and deleted permanently (the point is to erase traces).
@@ -6,7 +6,13 @@ import Foundation
 // Firefox's places.sqlite only has its history records erased), extensions, saved addresses/cards — see `privacyNeverTouchesCredentialsBookmarksExtensions`.
 
 extension CleanerGroup {
-    nonisolated static let privacy: [CleanerGroup] = [
+    /// Privacy with the apps running now (read once per scan and again before each removal).
+    nonisolated static var privacy: [CleanerGroup] {
+        // NSWorkspace documents `runningApplications` as safe to read from any thread.
+        privacy { Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)) }
+    }
+
+    nonisolated static func privacy(runningApps: @escaping @Sendable () -> Set<String> = { [] }) -> [CleanerGroup] { [
         CleanerGroup(id: "privacy-safari", title: "Safari", systemImage: "safari", items: [
             safariHistory,
             trace("safari-downloads", "Download history", note: "The list of downloads; downloaded files are kept",
@@ -26,10 +32,8 @@ extension CleanerGroup {
         chromium("vivaldi", "Vivaldi", support: "Vivaldi", bundle: "com.vivaldi.Vivaldi"),
     ] + browserChannels.map { chromium($0.id, $0.name, support: $0.folder, bundle: $0.bundle) } + [
         CleanerGroup(id: "privacy-system", title: "System", systemImage: "desktopcomputer", items: [
-            trace("recent-items", "Recent items",
-                  note: "Recent documents, apps and servers in Finder, the Apple menu and apps",
-                  ["~/Library/Application Support/com.apple.sharedfilelist"],
-                  ["com.apple.LSSharedFileList.Recent*", "com.apple.LSSharedFileList.ApplicationRecentDocuments"]),
+            RecentItems.item(runningApps: runningApps),
+            quarantineHistory,
             CleanerItem(id: "quicklook-cache", title: "QuickLook thumbnail cache",
                         note: "Previews of files you have viewed. Size can't be measured (private to macOS)",
                         paths: [], selectedByDefault: false,
@@ -54,7 +58,18 @@ extension CleanerGroup {
                         selectedByDefault: false, showsWhenEmpty: false,
                         runningAppBundleIDs: ["com.googlecode.iterm2"], skipsOpenFiles: true),
         ]),
-    ]
+    ] }
+
+    /// Gatekeeper's record of every file downloaded (name, web address, the app that downloaded it), never pruned by
+    /// macOS. Only the records are erased: the database, its journal files and the files' quarantine flags are kept,
+    /// and so is the database while a process has it open (LaunchServices writing a new download).
+    nonisolated private static let quarantineHistory = CleanerItem(
+        id: "quarantine-history", title: "Download history (Gatekeeper)",
+        note: "Names and web addresses of the files you downloaded, kept by macOS; downloaded files are kept",
+        paths: ["~/Library/Preferences"], included: [quarantineEvents],
+        database: DatabaseErase(count: "SELECT count(*) FROM LSQuarantineEvent;", tables: ["LSQuarantineEvent"]),
+        selectedByDefault: false, showsWhenEmpty: false, skipsOpenFiles: true)
+    nonisolated static let quarantineEvents = "com.apple.LaunchServices.QuarantineEventsV2"
 
     /// History.db, -wal and -shm go together or not at all: a macOS service (history sync) may keep the
     /// database open after Safari quits, and removing only some of them, or under a writer, corrupts it. Checked at

@@ -296,6 +296,12 @@ struct EndToEndCleanTests {
                     try write(folder.appending(path: "junk-\(item.id)/system.img"), Data(repeating: 1, count: 4096))
                     continue
                 }
+                if item.id == RecentItems.id { // an Apple menu list, and an app's Open Recent list
+                    let name = folder.lastPathComponent == RecentItems.appFolderName ? "com.example.junk.sfl4"
+                        : RecentItems.systemListPrefix + "Documents.sfl4"
+                    try write(folder.appending(path: name), Data(repeating: 1, count: 4096))
+                    continue
+                }
                 if item.id == "vscode-stale-workspaces" { // workspace data of a project folder that is gone
                     let gone = URL(fileURLWithPath: home.appending(path: "gone-project").path).absoluteString
                     try write(folder.appending(path: "junk-\(item.id)/workspace.json"), Data(#"{"folder":"\#(gone)"}"#.utf8))
@@ -317,7 +323,10 @@ struct EndToEndCleanTests {
                 }
                 for pattern in included {
                     let url = folder.appending(path: pattern.replacingOccurrences(of: "*", with: "x"))
-                    if item.database != nil, pattern == "places.sqlite" {
+                    if item.database != nil, pattern == CleanerGroup.quarantineEvents {
+                        try? fm.removeItem(at: url)
+                        _ = try await sqlite(url, "CREATE TABLE LSQuarantineEvent(LSQuarantineEventIdentifier); INSERT INTO LSQuarantineEvent VALUES('a');")
+                    } else if item.database != nil, pattern == "places.sqlite" {
                         try? fm.removeItem(at: url)
                         _ = try await sqlite(url, Self.firefoxPlaces)
                     } else if item.database?.applies(to: url) == true {

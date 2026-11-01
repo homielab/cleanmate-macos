@@ -111,6 +111,16 @@
         }
       }
     },
+    "Download history (Gatekeeper)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lịch sử tải xuống (Gatekeeper)"
+          }
+        }
+      }
+    },
     "Full Disk Access granted" : {
       "localizations" : {
         "vi" : {
@@ -1447,6 +1457,16 @@
         }
       }
     },
+    "Names and web addresses of the files you downloaded, kept by macOS; downloaded files are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tên và địa chỉ web của các tệp bạn đã tải xuống, do macOS lưu; các tệp đã tải vẫn được giữ"
+          }
+        }
+      }
+    },
     "No Duplicate Files" : {
       "localizations" : {
         "vi" : {
@@ -1873,6 +1893,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đọc từ macOS. CleanMate không thay đổi các cài đặt này."
+          }
+        }
+      }
+    },
+    "Recent applications" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng gần đây"
+          }
+        }
+      }
+    },
+    "Recent documents" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài liệu gần đây"
+          }
+        }
+      }
+    },
+    "Recent documents, apps and servers in the Apple menu and each app's Open Recent menu. Skips apps that are open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài liệu, ứng dụng và máy chủ gần đây trong menu Apple và menu Mở gần đây của từng ứng dụng. Bỏ qua ứng dụng đang mở"
+          }
+        }
+      }
+    },
+    "Recent network hosts" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy trong mạng gần đây"
+          }
+        }
+      }
+    },
+    "Recent servers" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy chủ gần đây"
           }
         }
       }
@@ -5397,16 +5467,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gần đây"
-          }
-        }
-      }
-    },
-    "Recent documents, apps and servers in Finder, the Apple menu and apps" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tài liệu, ứng dụng và máy chủ gần đây trong Finder, menu Apple và các ứng dụng"
           }
         }
       }
