@@ -506,6 +506,30 @@ nonisolated struct SafetyPolicy: Sendable {
                        named: { $0.lowercased().hasSuffix(".app") && !$0.hasPrefix(".") }) { $0 == XcodeVersions.bundleID }
     }
 
+    /// Smart Scan rule for a Unity Editor version folder (`UnityEditors`), only ever moved to the Trash: a real (not
+    /// symlinked), not hidden folder named like a Unity version (`2022.3.10f1`) directly in one of `folders` (Hub's
+    /// editor folders), holding a real `Unity.app` whose `Contents/Info.plist` names the Unity Editor's bundle id. On the
+    /// home folder's volume, no other volume mounted inside, not excluded; with `writableOnly` (default), not owned by
+    /// root (`owner`, injected by tests) and the folder and its parent writable. Which versions are kept (the newest,
+    /// the pinned ones) is `UnityEditors.allows`.
+    func allowsUnityEditor(_ url: URL, in folders: [URL], writableOnly: Bool = true, owner: OwnerID = SafetyPolicy.ownerID) -> Bool {
+        let path = Self.normalize(url)
+        let parent = (path as NSString).deletingLastPathComponent, name = (path as NSString).lastPathComponent
+        guard path != "/", folders.contains(where: { Self.normalize($0) == parent }), !name.hasPrefix("."),
+              UnityEditors.Version(name) != nil, !isExcluded(path), !holdsMount(path) else { return false }
+        var info = stat()
+        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              let home = rootDevices[0], device(path) == home else { return false }
+        if writableOnly {
+            guard let uid = owner(path), uid != 0, access(parent, W_OK) == 0, access(path, W_OK) == 0 else { return false }
+        }
+        let app = path + "/Unity.app", plist = app + "/Contents/Info.plist"
+        guard lstat(app, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+              lstat(plist, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+              let id = NSDictionary(contentsOfFile: plist)?["CFBundleIdentifier"] as? String else { return false }
+        return id.hasPrefix(UnityEditors.editorBundleIDPrefix)
+    }
+
     /// An Apple app bundle directly in one of `applicationFolders` whose name `named` accepts and whose bundle id `id`
     /// accepts: a real folder on the home folder's volume, no other volume mounted inside, not excluded; with
     /// `writableOnly`, not owned by root (`owner`) and the app and its folder writable.

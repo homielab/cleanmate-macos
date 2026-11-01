@@ -5183,6 +5183,66 @@
         }
       }
     },
+    "Old Unity Editor versions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản Unity Editor cũ"
+          }
+        }
+      }
+    },
+    "Unity Hub editors other than the newest and those your projects use. Install them again from Unity Hub. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các bản editor của Unity Hub ngoài bản mới nhất và các bản dự án của bạn dùng. Cài lại từ Unity Hub. Được chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "Unity caches" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Unity"
+          }
+        }
+      }
+    },
+    "Unity's package and build cache and downloaded Asset Store packages, downloaded again when a project needs them" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm gói và build của Unity cùng các gói Asset Store đã tải, được tải lại khi dự án cần"
+          }
+        }
+      }
+    },
+    "Package and build cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm gói và build"
+          }
+        }
+      }
+    },
+    "Downloaded Asset Store packages" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói Asset Store đã tải"
+          }
+        }
+      }
+    },
     "Old Xcode versions" : {
       "localizations" : {
         "vi" : {
