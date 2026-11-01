@@ -139,6 +139,16 @@
         }
       }
     },
+    "Administrator privileges required — delete with Finder" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cần quyền quản trị — xoá bằng Finder"
+          }
+        }
+      }
+    },
     "AI sessions: %lld days" : {
       "localizations" : {
         "en" : {

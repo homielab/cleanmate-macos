@@ -36,9 +36,13 @@ final class MacOSInstallersTests {
     }
 
     func installer(_ name: String, in folder: URL? = nil, id: String = "com.apple.InstallAssistant.macOSSequoia",
-                   version: String = "20.1.01", installInfo: String? = nil) throws {
+                   version: String = "20.1.01", dtPlatformVersion: String? = nil, dtsdkBuild: String? = nil,
+                   installInfo: String? = nil) throws {
+        var info = ["CFBundleIdentifier": id, "CFBundleShortVersionString": version]
+        if let dtPlatformVersion { info["DTPlatformVersion"] = dtPlatformVersion }
+        if let dtsdkBuild { info["DTSDKBuild"] = dtsdkBuild }
         try bundle((folder ?? applications).appending(path: name + ".app"),
-                   info: ["CFBundleIdentifier": id, "CFBundleShortVersionString": version], installInfo: installInfo)
+                   info: info, installInfo: installInfo)
     }
 
     var moveToFakeTrash: @Sendable (URL) throws -> URL? {
@@ -69,7 +73,7 @@ final class MacOSInstallersTests {
 
     /// Only real installer bundles directly in Applications, each one row named after it with its version and size.
     @Test func listsOnlyInstallerBundles() async throws {
-        try installer("Install macOS Sequoia")
+        try installer("Install macOS Sequoia", dtPlatformVersion: "15.0")
         try installer("Install OS X El Capitan", id: "com.apple.InstallAssistant.ElCapitan", installInfo: "10.11.6")
         try installer("install macos sonoma beta", id: "com.apple.InstallAssistant.macOSSonoma") // any case
         try installer("Install macOS Fake", id: "com.example.fake") // same name, not Apple's installer
@@ -94,8 +98,25 @@ final class MacOSInstallersTests {
                  == ["Install OS X El Capitan.app", "Install macOS Sequoia.app", "install macos sonoma beta.app"])
         #expect(scan.entries.allSatisfy { $0.size >= 65_536 })
         let labels = Dictionary(uniqueKeysWithValues: scan.entries.map { ($0.url.lastPathComponent, $0.title) })
-        #expect(labels["Install macOS Sequoia.app"] == "Install macOS Sequoia · 20.1.01")
+        #expect(labels["Install macOS Sequoia.app"] == "macOS Sequoia 15.0")
         #expect(labels["Install OS X El Capitan.app"] == "Install OS X El Capitan · 10.11.6") // the macOS version when recorded
+        #expect(labels["install macos sonoma beta.app"] == "macos sonoma beta")
+    }
+
+    /// Big Sur+ installers read the real macOS version from Info.plist DTPlatformVersion (e.g. "macOS Sonoma 14.6");
+    /// older installers (Mojave 10.14) read from SharedSupport/InstallInfo.plist.
+    @Test func correctVersionDisplay() async throws {
+        try installer("Install macOS Sonoma", id: "com.apple.InstallAssistant.macOSSonoma",
+                      version: "19.6.03", dtPlatformVersion: "14.6")
+        try installer("Install macOS Mojave", id: "com.apple.InstallAssistant.Mojave",
+                      version: "14.6.01", installInfo: "10.14.6")
+        try installer("Install macOS Ventura", id: "com.apple.InstallAssistant.macOSVentura",
+                      version: "18.7.02", dtsdkBuild: "22G91") // Darwin 22 = macOS 13
+        let scan = await Scanner.scan(item(), policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+        let labels = Dictionary(uniqueKeysWithValues: scan.entries.map { ($0.url.lastPathComponent, $0.title) })
+        #expect(labels["Install macOS Sonoma.app"] == "macOS Sonoma 14.6")
+        #expect(labels["Install macOS Mojave.app"] == "Install macOS Mojave · 10.14.6")
+        #expect(labels["Install macOS Ventura.app"] == "macOS Ventura 13")
     }
 
     @Test func installerNames() {
@@ -108,22 +129,41 @@ final class MacOSInstallersTests {
         #expect(!MacOSInstallers.isInstallerName("My Install macOS Sequoia.app"))
     }
 
-    /// Never a password prompt: an installer owned by root, or one in a folder the user can't write to, is not listed,
-    /// and one that became so after the scan is skipped at clean.
-    @Test func onlyWhatTheUserCanMoveWithoutAPassword() async throws {
+    /// Never a password prompt: an installer owned by root, or one in a folder the user can't write to, is listed
+    /// as a locked row with reason "Administrator privileges required — delete with Finder", excluded from selected total,
+    /// and skipped at clean.
+    @MainActor @Test func lockedRowForRootOwnedOrUnwritableInstallers() async throws {
         try installer("Install macOS Sequoia")
-        #expect(await listed(item(owner: { _ in 0 })).isEmpty)
+        let itemRoot = item(owner: { _ in 0 })
+        let scanRoot = await Scanner.scan(itemRoot, policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(scanRoot.entries.count == 1)
+        #expect(scanRoot.entries[0].size >= 65_536)
+        let reason = String(localized: "Administrator privileges required — delete with Finder")
+        #expect(scanRoot.entries[0].lockReason == reason)
         #expect(!policy.allowsMacOSInstaller(applications.appending(path: "Install macOS Sequoia.app"), owner: { _ in 0 }))
 
-        let scan = await Scanner.scan(item(), policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths)
-        #expect(scan.entries.count == 1)
-        let report = await Cleaner.clean(item(owner: { _ in 0 }), scan: scan, policy: policy, trash: moveToFakeTrash,
+        // In SmartScanModel: locked entry cannot be selected, selectedScan has 0 entries
+        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [itemRoot])] }
+        model.scans[itemRoot.id] = scanRoot
+        #expect(model.isLocked(itemRoot))
+        #expect(model.selectedScan(itemRoot)?.entries.isEmpty == true)
+        #expect(model.lockedEntries(itemRoot).contains(scanRoot.entries[0].url))
+
+        // Cleaning skips locked entries: nothing trashed
+        let report = await Cleaner.clean(itemRoot, scan: scanRoot, policy: policy, trash: moveToFakeTrash,
                                          openPaths: EndToEndCleanTests.ownOpenPaths)
         #expect(report.skipped == 1 && report.trashed.isEmpty)
+        #expect(fm.fileExists(atPath: applications.appending(path: "Install macOS Sequoia.app").path))
 
+        // Non-writable parent folder (chmod 0o555)
         try #require(chmod(applications.path, 0o555) == 0)
         defer { chmod(applications.path, 0o755) }
-        #expect(await listed(item()).isEmpty)
+        let scanUnwritable = await Scanner.scan(item(), policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(scanUnwritable.entries.count == 1)
+        #expect(scanUnwritable.entries[0].lockReason == reason)
+        let reportUnwritable = await Cleaner.clean(item(), scan: scanUnwritable, policy: policy, trash: moveToFakeTrash,
+                                                   openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(reportUnwritable.skipped == 1 && reportUnwritable.trashed.isEmpty)
     }
 
     @Test func excludedInstallerIsKept() async throws {

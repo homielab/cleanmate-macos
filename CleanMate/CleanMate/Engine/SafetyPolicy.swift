@@ -488,10 +488,10 @@ nonisolated struct SafetyPolicy: Sendable {
     /// Smart Scan rule for a macOS installer app (`MacOSInstallers`), only ever moved to the Trash: a real (not
     /// symlinked) `Install macOS *.app` / `Install OS X *.app` folder directly in /Applications or ~/Applications, whose
     /// `Contents/Info.plist` names Apple's installer bundle id (`com.apple.InstallAssistant…`) — a deliberate exception
-    /// to "never Apple's" for this one kind of app. The user must be able to move it without a password: not owned by
-    /// root (`owner`, injected by tests), the app and its folder writable. On the home folder's volume, no other volume
-    /// mounted inside, not excluded.
-    func allowsMacOSInstaller(_ url: URL, owner: OwnerID = SafetyPolicy.ownerID) -> Bool {
+    /// to "never Apple's" for this one kind of app. With `writableOnly: true` (default), the user must be able to move it
+    /// without a password: not owned by root (`owner`, injected by tests), the app and its folder writable. On the home
+    /// folder's volume, no other volume mounted inside, not excluded.
+    func allowsMacOSInstaller(_ url: URL, writableOnly: Bool = true, owner: OwnerID = SafetyPolicy.ownerID) -> Bool {
         let path = Self.normalize(url)
         let parent = (path as NSString).deletingLastPathComponent
         guard applicationFolders.contains(where: { $0.path == parent }),
@@ -499,8 +499,10 @@ nonisolated struct SafetyPolicy: Sendable {
               !isExcluded(path), !holdsMount(path) else { return false }
         var info = stat()
         guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
-              let home = rootDevices[0], device(path) == home,
-              let uid = owner(path), uid != 0, access(parent, W_OK) == 0, access(path, W_OK) == 0 else { return false }
+              let home = rootDevices[0], device(path) == home else { return false }
+        if writableOnly {
+            guard let uid = owner(path), uid != 0, access(parent, W_OK) == 0, access(path, W_OK) == 0 else { return false }
+        }
         let plist = path + "/Contents/Info.plist"
         guard lstat(plist, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
               let id = NSDictionary(contentsOfFile: plist)?["CFBundleIdentifier"] as? String else { return false }
