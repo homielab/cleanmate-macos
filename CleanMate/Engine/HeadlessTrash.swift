@@ -89,9 +89,10 @@ nonisolated enum HeadlessTrash {
         var size: Int64
         /// "folder" or "file".
         var kind: String
-        /// When it was moved (ISO 8601); nil for a record written before dates were kept.
+        /// When it was moved (ISO 8601); nil for a record written before dates were kept (text shows "–").
         var date: String?
-        /// What moved it: the activity log's module, like "Command Line", "Large & Old Files" or "Smart Scan".
+        /// What moved it: the activity log's module, like "Command Line", "Large & Old Files", "Smart Scan" or
+        /// "Login Items"; "unknown" for a record written before it was kept.
         var source: String
 
         enum CodingKeys: String, CodingKey { case trashed, path, size, kind, date, source }
@@ -108,9 +109,9 @@ nonisolated enum HeadlessTrash {
         }
     }
 
-    /// `cleanmate restore --list`, the same on macOS and Linux: `version` is this format's, not the app's.
+    /// `cleanmate restore --list`. `version` is the app's, like every other command's.
     struct ListReport: Codable, Equatable, Sendable {
-        var version: Int
+        var version: String
         /// Items listed.
         var count: Int
         /// Newest first.
@@ -249,9 +250,9 @@ nonisolated enum HeadlessTrash {
             var info = stat()
             let isFolder = lstat(record.trashed, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
             return ListItem(trashed: record.trashed, path: record.original, size: record.size,
-                            kind: isFolder ? "folder" : "file", date: record.date, source: record.moduleName)
+                            kind: isFolder ? "folder" : "file", date: record.date, source: record.source)
         }
-        return ListReport(version: 1, count: items.count, items: Array(items))
+        return ListReport(version: sources.version(), count: items.count, items: Array(items))
     }
 
     /// Puts back each item CleanMate moved and `TrashRecords` knows (the app's moves too), by its path in the Trash:

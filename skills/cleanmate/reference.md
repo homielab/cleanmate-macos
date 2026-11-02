@@ -309,13 +309,14 @@ are put back with Put Back in Finder; deleted junk can't be put back.
     { "date" : "2026-11-02T09:41:12+07:00", "kind" : "file", "path" : "/Users/me/Downloads/trip copy.mov", "size" : 1200000000, "source" : "Command Line", "trashed" : "/Users/me/.Trash/trip copy.mov" },
     { "date" : "2026-11-01T18:03:55+07:00", "kind" : "folder", "path" : "/Users/me/Projects/old-app", "size" : 734003200, "source" : "Space Lens", "trashed" : "/Users/me/.Trash/old-app" }
   ],
-  "version" : 1
+  "version" : "1.5"
 }
 ```
 
 Newest first, at most 200 (`--limit N`). `date` is when it was moved, `source` what moved it (`Command Line`,
-`Smart Scan`, `Large & Old Files`, `Space Lens`, `Uninstaller`), `size` its bytes then. Items no longer in the Trash
-are not listed. Each `trashed` is an argument for `restore`. `version` is this format's version (1), not the app's.
+`Smart Scan`, `Large & Old Files`, `Space Lens`, `Uninstaller`, `Login Items`; `unknown` for an older record, whose
+`date` may be `null`), `size` its bytes then. Items no longer in the Trash
+are not listed. Each `trashed` is an argument for `restore`. `version` is the app's version, like every other command's.
 
 ## Safety
 

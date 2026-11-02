@@ -138,7 +138,7 @@ struct LaunchAgentsTests {
             #expect(await !LaunchAgents.disable(agent, policy: policy) { await calls.add($0); return true })
             #expect(await !LaunchAgents.enable(agent, policy: policy) { await calls.add($0); return true })
         }
-        #expect(await LaunchAgents.remove(copy, policy: policy) { await calls.add($0); return true })
+        #expect(await LaunchAgents.remove(copy, policy: policy, run: { await calls.add($0); return true }))
         #expect(!FileManager.default.fileExists(atPath: copy.url.path))
         #expect(await calls.all.isEmpty)
     }
@@ -147,8 +147,54 @@ struct LaunchAgentsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let agent = try plist("com.foo.solo.plist", label: "com.foo.solo")
         let calls = Calls()
-        #expect(await LaunchAgents.remove(agent, policy: policy) { await calls.add($0); return false })
+        #expect(await LaunchAgents.remove(agent, policy: policy, run: { await calls.add($0); return false }))
         #expect(!FileManager.default.fileExists(atPath: agent.url.path))
         #expect(await calls.all == [["bootout", "gui/\(getuid())/com.foo.solo"]])
+    }
+
+    /// Remove keeps a record: `restore --list` shows it under Login Items and `restore` puts the plist back.
+    @Test func removedAgentIsListedAndRestored() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let agent = try plist("com.foo.undo.plist", label: "com.foo.undo")
+        let trashFolder = root.appending(path: "Trash")
+        try FileManager.default.createDirectory(at: trashFolder, withIntermediateDirectories: true)
+        let fakeTrash: (URL) throws -> URL? = { url in
+            let target = trashFolder.appending(path: url.lastPathComponent)
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
+        }
+        let policy = policy
+        #expect(await LaunchAgents.remove(agent, policy: policy, trash: fakeTrash) { _ in true })
+        #expect(!FileManager.default.fileExists(atPath: agent.url.path))
+        var sources = HeadlessScan.Sources()
+        sources.policy = { policy }
+        let list = HeadlessTrash.list(sources: sources)
+        #expect(list.version == sources.version() && list.count == 1)
+        #expect(list.items.first?.source == "Login Items" && list.items.first?.date != nil)
+        #expect(list.items.first?.path == SafetyPolicy.normalize(agent.url))
+        let trashed = try #require(list.items.first?.trashed)
+        let restored = HeadlessTrash.restore([trashed], sources: sources)
+        #expect(restored.count == 1)
+        #expect(FileManager.default.fileExists(atPath: agent.url.path))
+        #expect(HeadlessTrash.list(sources: sources).items.isEmpty)
+    }
+
+    /// A record written before modules and dates were kept is listed as "unknown" with no date, never guessed.
+    @Test func oldRecordIsListedAsUnknown() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = home.appending(path: "Trash/old.zip")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: file)
+        let id = try #require(SafeRemoval.FileID(file))
+        var record = TrashRecords.Record(TrashedItem(original: home.appending(path: "old.zip"), inTrash: file, size: 1), id: id)
+        record.date = nil
+        TrashRecords.update(home: home) { $0 = [record] }
+        var sources = HeadlessScan.Sources()
+        let policy = policy
+        sources.policy = { policy }
+        let item = try #require(HeadlessTrash.list(sources: sources).items.first)
+        #expect(item.source == "unknown" && item.date == nil)
+        let text = CommandLineTool.restoreListText(HeadlessTrash.list(sources: sources), home: home, color: false)
+        #expect(text.contains("unknown") && !text.contains("Command Line") && text.hasPrefix("  –"))
     }
 }

@@ -169,15 +169,18 @@ nonisolated enum LaunchAgents {
 
     /// Moves the agent's plist to the Trash, then stops it (put it back and log in again to restore it). A plist whose
     /// label isn't its own (`ownedLabel`) is only trashed: booting out that label would stop another agent.
+    /// The move is kept in `TrashRecords`, so `cleanmate restore` can put it back later. `trash`: tests use a fake Trash.
     @concurrent static func remove(_ agent: LaunchAgent, policy: SafetyPolicy = .current,
+                                   trash: (URL) throws -> URL? = CleanReport.moveToTrash,
                                    run: Runner = launchctlRunner) async -> Bool {
         let size = (try? agent.url.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0
         guard policy.allowsLaunchAgent(agent.url, label: agent.label) else { return false }
         let label = ownedLabel(agent) // read before the plist is gone
         // Only the plist checked moves (`SafeRemoval.trash`); one swapped in during the move is logged "failed".
+        let inTrash: URL?
         do {
-            _ = try SafeRemoval.trash(agent.url, allows: { policy.allowsLaunchAgent($0, label: agent.label) },
-                                      move: CleanReport.moveToTrash)
+            inTrash = try SafeRemoval.trash(agent.url, allows: { policy.allowsLaunchAgent($0, label: agent.label) },
+                                            move: trash)
         } catch {
             if case SafeRemoval.Failure.movedOther = error {
                 ActivityLog.recordFailed(module: "Login Items", item: agent.url.path, home: policy.homeURL)
@@ -185,6 +188,10 @@ nonisolated enum LaunchAgents {
             return false
         }
         ActivityLog.record(module: "Login Items", item: agent.url.path, size: Int64(size), mode: .trash, home: policy.homeURL)
+        if let inTrash {
+            TrashRecords.add([TrashedItem(original: agent.url, inTrash: inTrash, size: Int64(size))],
+                             module: "Login Items", home: policy.homeURL)
+        }
         if let label { _ = await run(["bootout", service(label)]) } // by label, so it works once the plist is gone
         return true
     }

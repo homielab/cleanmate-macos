@@ -106,7 +106,7 @@ struct AgentSkillTests {
         // The trashed path trash prints is what restore takes.
         #expect(restore.items.first?.trashed == moved.first?.trashed)
         let list = try JSONDecoder().decode(HeadlessTrash.ListReport.self, from: Data(blocks[7].utf8))
-        #expect(list.version == 1 && list.count == list.items.count && list.items.first?.trashed == moved.first?.trashed)
+        #expect(list.version == trash.version && list.count == list.items.count && list.items.first?.trashed == moved.first?.trashed)
         #expect(list.items.allSatisfy { $0.date != nil } && list.items.map(\.date) == list.items.map(\.date).sorted(by: { ($0 ?? "") > ($1 ?? "") }))
     }
 }

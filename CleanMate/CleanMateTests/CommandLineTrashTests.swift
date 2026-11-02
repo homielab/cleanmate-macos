@@ -185,7 +185,7 @@ extension CommandLineToolTests {
         let policy = sources.policy()
         // No record yet: an empty list, and no file made.
         let none = try await Self.restoreList([], sources)
-        #expect(none.version == 1 && none.count == 0 && none.items.isEmpty)
+        #expect(none.version == sources.version() && none.count == 0 && none.items.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: TrashRecords.url(home: fixture.home).path))
         let (_, emptyText) = await Self.run(["restore", "--list"], sources)
         #expect(emptyText.stdout == "Nothing CleanMate moved to the Trash is still there.\n")
@@ -202,7 +202,7 @@ extension CommandLineToolTests {
         try #require(cli.count == 1)
 
         let list = try await Self.restoreList([], sources)
-        #expect(list.version == 1 && list.count == 3)
+        #expect(list.version == sources.version() && list.count == 3)
         #expect(list.items.map(\.source) == ["Command Line", "Space Lens", "Large & Old Files"])
         #expect(list.items.map(\.trashed) == [cli.items[0].trashed, lens.trashed[0].inTrash.path, large.trashed[0].inTrash.path])
         #expect(list.items.map(\.path) == [SafetyPolicy.normalize(fixture.home.appending(path: "Media/old.zip")), app.path, movie.path])
@@ -212,7 +212,7 @@ extension CommandLineToolTests {
         // --limit keeps the newest; JSON writes every field.
         #expect(try await Self.restoreList(["--limit", "1"], sources).items.map(\.source) == ["Command Line"])
         let (_, json) = await Self.run(["restore", "--list", "--json"], sources)
-        #expect(json.stdout.contains("\"version\" : 1\n") && json.stdout.contains("\"source\" : \"Space Lens\""))
+        #expect(json.stdout.contains("\"version\" : \"\(sources.version())\"") && json.stdout.contains("\"source\" : \"Space Lens\""))
         let (_, text) = await Self.run(["restore", "--list"], sources)
         let lines = text.stdout.split(separator: "\n")
         #expect(lines.count == 4 && lines[0].contains("~/Media/old.zip") && lines[0].contains("Command Line"))

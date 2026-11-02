@@ -3,7 +3,7 @@ import Foundation
 /// What CleanMate moved to the Trash, kept in `~/Library/Application Support/CleanMate/trashed.json` so that
 /// `cleanmate restore` can list it and put it back after CleanMate quit: every move of the app and the command line
 /// that "Undo" could put back (Large & Old Files, Space Lens, the Uninstaller, Smart Scan items that go to the Trash,
-/// `cleanmate trash`). Only the record is kept, never the item: an entry goes once its item is no longer in the Trash.
+/// Login Items, `cleanmate trash`). Only the record is kept, never the item: an entry goes once its item is no longer in the Trash.
 nonisolated enum TrashRecords {
     /// One move to the Trash, kept until it is put back or no longer in the Trash.
     struct Record: Codable, Equatable, Sendable {
@@ -19,7 +19,8 @@ nonisolated enum TrashRecords {
         /// When it was moved (ISO 8601, local time zone).
         var date: String?
         /// The activity log's module (English) and item column of the move, so putting it back logs "restored" under
-        /// the same name and `ActivityLog.freed` takes back what that move added. nil: "Command Line" and `original`.
+        /// the same name and `ActivityLog.freed` takes back what that move added. nil: a record written before modules were
+        /// kept (shown as "unknown", logged back as "Command Line"), and `original`.
         var module: String?
         var logItem: String?
 
@@ -41,7 +42,11 @@ nonisolated enum TrashRecords {
             TrashedItem(original: URL(fileURLWithPath: original), inTrash: URL(fileURLWithPath: trashed), size: size,
                         folder: folder, volume: volume)
         }
+        /// The module the move was logged under; an older record without one is put back under "Command Line", the
+        /// only thing that wrote records then.
         var moduleName: String { module ?? "Command Line" }
+        /// What moved it, as listed: "unknown" for an older record without a module (never guessed).
+        var source: String { module ?? "unknown" }
         /// The item is still at its place in the Trash.
         var isInTrash: Bool { SafeRemoval.FileID(URL(fileURLWithPath: trashed)) == id }
 
