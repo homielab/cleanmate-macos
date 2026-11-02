@@ -26,6 +26,8 @@ struct EndToEndCleanTests {
         // The newest version of an asdf / mise tool, kept next to the old one
         ".asdf/installs/junk/9.0.0/bin/junk", "Developer/tools/ASDF_DATA_DIR/installs/junk/9.0.0/bin/junk",
         ".local/share/mise/installs/junk/9.0.0/bin/junk", "Developer/tools/MISE_DATA_DIR/installs/junk/9.0.0/bin/junk",
+        // The newest version of a Vagrant box, kept next to the old one
+        ".vagrant.d/boxes/junk/9.0.0/virtualbox/box.vmdk", "Developer/tools/VAGRANT_HOME/boxes/junk/9.0.0/virtualbox/box.vmdk",
         "Developer/tools/XDG_DATA_HOME/mise/installs/junk/9.0.0/bin/junk",
         // The simulator sets' own lists next to the simulators and test device clones
         "Library/Developer/CoreSimulator/Devices/device_set.plist", "Library/Developer/XCTestDevices/device_set.plist",
@@ -256,6 +258,10 @@ struct EndToEndCleanTests {
                 if item.id == AndroidSDKComponents.id { // an NDK older than the bait version next to it (27.1 or 99.0.0)
                     try write(folder.appending(path: "ndk/1.0.0/source.properties"), Data("Pkg.Revision=1.0.0\n".utf8))
                     try write(folder.appending(path: "ndk/1.0.0/payload.bin"), Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if item.id == VagrantBoxes.id { // a box version older than the bait 9.0.0
+                    try write(folder.appending(path: "junk/1.0.0/virtualbox/box.vmdk"), Data(repeating: 1, count: 4096))
                     continue
                 }
                 if [ToolVersionManagers.asdfID, ToolVersionManagers.miseID].contains(item.id) { // older than the bait 9.0.0

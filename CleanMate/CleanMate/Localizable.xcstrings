@@ -8339,6 +8339,26 @@
           }
         }
       }
+    },
+    "Old Vagrant boxes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản box Vagrant cũ"
+          }
+        }
+      }
+    },
+    "Box versions other than the newest and those a Vagrant machine uses, downloaded again with vagrant box add" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản box trừ bản mới nhất và bản máy ảo Vagrant đang dùng, tải lại bằng vagrant box add"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -233,6 +233,9 @@ extension CleanerGroup {
         // (`UnityEditors`). Then Unity's package cache and Asset Store downloads, unticked, deleted; never Licenses.
         UnityEditors.item(),
         UnityEditors.cachesItem(),
+        // Unticked, deleted: Vagrant box versions other than the newest of each box and those a machine uses, one row
+        // each (`VagrantBoxes`). Skipped while vagrant runs.
+        VagrantBoxes.item(),
         // Unticked, to the Trash: each JetBrains IDE / Android Studio version keeps its own settings, plugins,
         // caches and logs folder (`GoLand2025.3`, `AndroidStudio2026.1.1`), left behind by upgrades. Only versions older
         // than the newest of the same product found in these folders are listed (their settings were migrated);

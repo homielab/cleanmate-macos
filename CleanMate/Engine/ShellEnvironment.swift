@@ -19,7 +19,7 @@ nonisolated enum ShellEnvironment {
         // Build tool caches (`DeveloperCatalog`).
         "DENO_DIR", "ZIG_GLOBAL_CACHE_DIR", "CCACHE_DIR", "SCCACHE_DIR", "POETRY_CACHE_DIR", "PRE_COMMIT_HOME", "PIPX_HOME",
         "TF_PLUGIN_CACHE_DIR", "HELM_CACHE_HOME", "CABAL_DIR", "STACK_ROOT", "GHCUP_INSTALL_BASE_PREFIX", "COURSIER_CACHE",
-        "OPAMROOT",
+        "OPAMROOT", "VAGRANT_HOME",
     ]
     /// zsh's load order (later wins); the bash files only fill variables no zsh file sets.
     /// shortcut: ZDOTDIR, `source`d files, /etc/zshenv and .zlogin are not read; add them if users ask.
