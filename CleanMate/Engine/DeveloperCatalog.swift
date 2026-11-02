@@ -262,6 +262,30 @@ extension CleanerGroup {
             command: ShellCommand(executable: "brew", arguments: ["autoremove"], timeout: .seconds(300)),
             probe: DeveloperTools.brewAutoremoveProbe(), selected: false, processes: ["brew"]),
         dev("composer-cache", "Composer cache", ["~/Library/Caches/composer", "~/.composer/cache", "~/.cache/composer"]),
+        // Haskell, Scala and OCaml package caches, each skipped while its tools run, deleted (downloaded again).
+        // Only these folders: never the compilers and tools they install (`~/.stack/programs`, `~/.ghcup/ghc|bin`,
+        // `~/.cabal/bin`, `~/.cabal/config`), Ivy's locally published artifacts (`~/.ivy2/local`) nor opam switches.
+        dev("cabal-packages", "Cabal packages", note: "Downloaded Hackage packages, downloaded again by the next build",
+            ["~/.cabal/packages", "~/.cache/cabal/packages"],
+            shell: ["CABAL_DIR": ["packages"], "XDG_CACHE_HOME": ["cabal/packages"]], processes: haskellTools),
+        // Unticked: `snapshots` holds packages built for each resolver, slow to build again.
+        dev("stack-cache", "Stack package cache", note: "Downloaded package sources and built snapshot packages, made again by the next build",
+            ["~/.stack/pantry", "~/.stack/snapshots"], shell: ["STACK_ROOT": ["pantry", "snapshots"]], selected: false,
+            processes: haskellTools),
+        dev("ghcup-cache", "GHCup downloads", note: "Downloaded GHC and tool archives",
+            ["~/.ghcup/cache"], shell: ["GHCUP_INSTALL_BASE_PREFIX": [".ghcup/cache"]], processes: haskellTools),
+        // Unticked: also holds the JVMs and launchers installed with cs; `cs setup` / the next build downloads them again.
+        // Only Coursier's own folders (`v1`, `arc`, `jvm`; `https`/`http` when COURSIER_CACHE names the `v1` folder),
+        // so a mistaken COURSIER_CACHE lists nothing else.
+        dev("coursier-cache", "Coursier cache", note: "Downloaded Scala and Java libraries and JVMs, downloaded again when needed",
+            ["~/Library/Caches/Coursier"], included: ["v1", "arc", "jvm", "https", "http"],
+            shell: ["COURSIER_CACHE": [""]], selected: false, processes: scalaTools),
+        dev("ivy-cache", "Ivy cache", note: "Downloaded libraries; locally published ones (~/.ivy2/local) are kept",
+            ["~/.ivy2/cache"], processes: scalaTools),
+        dev("sbt-boot", "sbt launcher cache", note: "sbt and Scala versions, downloaded again by the next sbt run",
+            ["~/.sbt/boot"], processes: scalaTools),
+        dev("opam-download-cache", "opam download cache", note: "Downloaded package archives; switches are kept",
+            ["~/.opam/download-cache"], shell: ["OPAMROOT": ["download-cache"]], processes: ["opam"]),
         // Unticked like Playwright: since Puppeteer 19 this is where its browsers are installed; an existing
         // node_modules does not download them again, so launch() fails until `npx puppeteer browsers install`.
         dev("puppeteer-browsers", "Puppeteer browsers", note: "Downloaded again with npx puppeteer browsers install",
@@ -370,6 +394,9 @@ extension CleanerGroup {
                                         timeout: .seconds(30)),
                   parse: { DeveloperTools.simulatorIDs(in: $0, available: available).map(SizeProbe.Result.only) })
     }
+
+    nonisolated private static let haskellTools = ["cabal", "ghc", "ghc-*", "stack", "ghcup"]
+    nonisolated private static let scalaTools = ["sbt", "coursier", "cs", "bloop", "metals"]
 
     /// Top-level folders of a ccache or sccache cache.
     nonisolated private static let compilerCacheNames = (0..<16).map { String($0, radix: 16) }

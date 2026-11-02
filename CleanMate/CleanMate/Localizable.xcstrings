@@ -8199,6 +8199,146 @@
           }
         }
       }
+    },
+    "Cabal packages" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói Cabal"
+          }
+        }
+      }
+    },
+    "Downloaded Hackage packages, downloaded again by the next build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói Hackage đã tải, lần build sau tải lại"
+          }
+        }
+      }
+    },
+    "Stack package cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache gói Stack"
+          }
+        }
+      }
+    },
+    "Downloaded package sources and built snapshot packages, made again by the next build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mã nguồn gói đã tải và gói snapshot đã build, lần build sau tạo lại"
+          }
+        }
+      }
+    },
+    "GHCup downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản tải về của GHCup"
+          }
+        }
+      }
+    },
+    "Downloaded GHC and tool archives" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp nén GHC và công cụ đã tải"
+          }
+        }
+      }
+    },
+    "Coursier cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache Coursier"
+          }
+        }
+      }
+    },
+    "Downloaded Scala and Java libraries and JVMs, downloaded again when needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư viện Scala, Java và JVM đã tải, tải lại khi cần"
+          }
+        }
+      }
+    },
+    "Ivy cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache Ivy"
+          }
+        }
+      }
+    },
+    "Downloaded libraries; locally published ones (~/.ivy2/local) are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư viện đã tải; thư viện publish cục bộ (~/.ivy2/local) được giữ lại"
+          }
+        }
+      }
+    },
+    "sbt launcher cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache trình khởi chạy sbt"
+          }
+        }
+      }
+    },
+    "sbt and Scala versions, downloaded again by the next sbt run" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các phiên bản sbt và Scala, lần chạy sbt sau tải lại"
+          }
+        }
+      }
+    },
+    "opam download cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache tải về của opam"
+          }
+        }
+      }
+    },
+    "Downloaded package archives; switches are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp nén gói đã tải; các switch được giữ lại"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
