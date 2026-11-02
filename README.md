@@ -38,7 +38,9 @@ The app includes a `cleanmate` command for scripts and AI agents (Claude Code, C
 Smart Scan item, `cleanmate scan --json` measures them like Smart Scan, and `cleanmate clean` cleans them with the
 same safety rules, exclusions and activity log as the app (`--dry-run` to preview; without a terminal it needs
 `--yes`). `cleanmate space [PATH]` shows what fills a folder, like Space Lens, `cleanmate large` lists large files,
-like Large & Old Files, and `cleanmate dupes` finds duplicate files among them; all three only read. Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
+like Large & Old Files, and `cleanmate dupes` finds duplicate files among them; all three only read.
+`cleanmate trash PATH…` moves exactly the files and folders you name to the Trash, with the same safety rules as
+Space Lens (never `~/Library`, hidden files or anything excluded), and `cleanmate restore` puts them back. Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
 if ticked in the app. It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
 link it into a folder on your PATH:
 
@@ -51,8 +53,8 @@ cleanmate --help
 Commands, options, the JSON format and Full Disk Access: [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
 
 **AI agents.** An [Agent Skill](https://agentskills.io) in `skills/cleanmate/` teaches Claude Code, Codex, Cursor and
-others to scan first, show you the result and clean only what you confirm, and to answer "what takes space?" with
-`space` and `large`: `bunx skills add homielab/cleanmate-macos`.
+others to scan first, show you the result and clean only what you confirm, to answer "what takes space?" with
+`space`, `large` and `dupes`, and to move to the Trash only the files you confirm: `bunx skills add homielab/cleanmate-macos`.
 
 ## Install
 

@@ -3729,6 +3729,17 @@
         }
       }
     },
+    "Command Line" : {
+      "comment" : "Activity log module of the cleanmate trash and restore commands",
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dòng lệnh"
+          }
+        }
+      }
+    },
     "Composer cache" : {
       "localizations" : {
         "vi" : {

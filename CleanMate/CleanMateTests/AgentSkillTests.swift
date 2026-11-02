@@ -76,7 +76,8 @@ struct AgentSkillTests {
         let skill = try Self.text("SKILL.md")
         for rule in ["Never install anything yourself", "Always scan first", "--privacy", "selectedByDefault",
                      "clean --yes", "Contents/Helpers/cleanmate", "~/Library/Logs/CleanMate/activity.log",
-                     "cleanmate space --json", "cleanmate large --json", "cleanmate dupes --json", "Never delete or move these files yourself"] {
+                     "cleanmate space --json", "cleanmate large --json", "cleanmate dupes --json", "Never delete or move these files yourself",
+                     "cleanmate trash --yes", "only with the exact paths they confirmed", "cleanmate restore"] {
             #expect(skill.contains(rule), "\(rule)")
         }
     }
@@ -84,7 +85,7 @@ struct AgentSkillTests {
     @Test func jsonSamplesDecodeAsReports() throws {
         let text = try Self.text("reference.md")
         let blocks = text.components(separatedBy: "```json\n").dropFirst().map { $0.components(separatedBy: "```").first ?? "" }
-        try #require(blocks.count == 5)
+        try #require(blocks.count == 7)
         let scan = try JSONDecoder().decode(HeadlessScan.Report.self, from: Data(blocks[0].utf8))
         #expect(scan.items.contains { $0.locked })
         let clean = try JSONDecoder().decode(HeadlessClean.Report.self, from: Data(blocks[1].utf8))
@@ -95,5 +96,13 @@ struct AgentSkillTests {
         #expect(large.files.count == large.count && large.files.contains { $0.lastUsed == nil })
         let dupes = try JSONDecoder().decode(HeadlessFiles.DupesReport.self, from: Data(blocks[4].utf8))
         #expect(dupes.groups.count == dupes.count && dupes.wasted == dupes.groups.reduce(0) { $0 + $1.wasted })
+        let trash = try JSONDecoder().decode(HeadlessTrash.TrashReport.self, from: Data(blocks[5].utf8))
+        let moved = trash.items.filter { !$0.skipped }
+        #expect(moved.count == trash.count && trash.size == moved.compactMap(\.size).reduce(0, +))
+        #expect(moved.allSatisfy { $0.trashed != nil } && trash.items.filter(\.skipped).allSatisfy { $0.reason != nil && $0.trashed == nil })
+        let restore = try JSONDecoder().decode(HeadlessTrash.RestoreReport.self, from: Data(blocks[6].utf8))
+        #expect(restore.items.filter { !$0.skipped }.count == restore.count && restore.items.contains { $0.path == nil })
+        // The trashed path trash prints is what restore takes.
+        #expect(restore.items.first?.trashed == moved.first?.trashed)
     }
 }

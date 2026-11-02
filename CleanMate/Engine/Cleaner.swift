@@ -95,11 +95,17 @@ nonisolated struct TrashedItem: Sendable, Equatable {
     let volume: dev_t?
 
     init(original: URL, inTrash: URL, size: Int64) {
+        self.init(original: original, inTrash: inTrash, size: size,
+                  folder: TrashUndo.resolved(original.deletingLastPathComponent()), volume: nil)
+    }
+
+    /// An item moved earlier, with its old folder and volume as read then (`volume` nil: read now from `folder`).
+    init(original: URL, inTrash: URL, size: Int64, folder: String, volume: dev_t?) {
         self.original = original
         self.inTrash = inTrash
         self.size = size
-        folder = TrashUndo.resolved(original.deletingLastPathComponent())
-        volume = SafetyPolicy.deviceID(folder)
+        self.folder = folder
+        self.volume = volume ?? SafetyPolicy.deviceID(folder)
     }
 }
 
@@ -124,23 +130,48 @@ nonisolated enum TrashUndo {
                                     device: SafetyPolicy.DeviceID = SafetyPolicy.deviceID) async -> Result {
         var result = Result()
         for item in items {
-            var info = stat()
-            var isFolder: ObjCBool = false
-            guard lstat(item.inTrash.path, &info) == 0, lstat(item.original.path, &info) != 0, errno == ENOENT,
-                  FileManager.default.fileExists(atPath: item.original.deletingLastPathComponent().path, isDirectory: &isFolder),
-                  isFolder.boolValue, resolved(item.original.deletingLastPathComponent()) == item.folder,
-                  device(item.folder) == item.volume
-            else { result.skipped += 1; continue }
-            do {
-                // moveItem never replaces an existing item, so a file appearing meanwhile is not overwritten.
-                try FileManager.default.moveItem(at: item.inTrash, to: item.original)
+            if putBack(item, module: module, home: home, logName: logName, device: device) == .restored {
                 result.restored += 1
-                ActivityLog.recordRestored(module: module, item: logName(item.original), size: item.size, home: home)
-            } catch {
+            } else {
                 result.skipped += 1
             }
         }
         return result
+    }
+
+    /// Why one item was or wasn't put back by `putBack`.
+    enum Outcome: Sendable, Equatable {
+        case restored
+        /// Nothing at its place in the Trash any more (emptied, or put back already).
+        case notInTrash
+        /// Something is at the old place: never overwritten.
+        case occupied
+        /// The old folder is gone, not a folder, leads elsewhere now or is on another volume.
+        case folderChanged
+        /// The move itself failed.
+        case failed
+    }
+
+    /// `restore` for one item, saying why it wasn't put back.
+    static func putBack(_ item: TrashedItem, module: LocalizedStringResource, home: URL = SafetyPolicy.current.homeURL,
+                        logName: (URL) -> String = { $0.path },
+                        device: SafetyPolicy.DeviceID = SafetyPolicy.deviceID) -> Outcome {
+        var info = stat()
+        var isFolder: ObjCBool = false
+        guard lstat(item.inTrash.path, &info) == 0 else { return .notInTrash }
+        guard lstat(item.original.path, &info) != 0, errno == ENOENT else { return .occupied }
+        guard FileManager.default.fileExists(atPath: item.original.deletingLastPathComponent().path, isDirectory: &isFolder),
+              isFolder.boolValue, resolved(item.original.deletingLastPathComponent()) == item.folder,
+              device(item.folder) == item.volume
+        else { return .folderChanged }
+        do {
+            // moveItem never replaces an existing item, so a file appearing meanwhile is not overwritten.
+            try FileManager.default.moveItem(at: item.inTrash, to: item.original)
+        } catch {
+            return lstat(item.original.path, &info) == 0 ? .occupied : .failed
+        }
+        ActivityLog.recordRestored(module: module, item: logName(item.original), size: item.size, home: home)
+        return .restored
     }
 
     static func resolved(_ folder: URL) -> String { (folder.path as NSString).resolvingSymlinksInPath }

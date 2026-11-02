@@ -170,9 +170,10 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 
 CleanMate.app includes `cleanmate`, a command with no window for scripts and AI agents (Claude Code, Codex…). It
 uses the same items, safety rules, **Settings › Exclusions** and **Scan Groups** as Smart Scan, and reads your ticks.
-`list`, `scan`, `space` and `large` are read-only. `clean` removes what Smart Scan would, through the app's own cleaning code, and writes
-the app's activity log. The command changes no setting, reads stdin only to ask before a clean on a terminal, and never
-connects to the network.
+`list`, `scan`, `space`, `large` and `dupes` are read-only. `clean` removes what Smart Scan would, through the app's own
+cleaning code, and writes the app's activity log. `trash` moves the files and folders you name to the Trash and
+`restore` puts them back. The command changes no setting, reads stdin only to ask before a clean or a move on a
+terminal, and never connects to the network.
 
 The command is in the app bundle. Installed with Homebrew (`brew install --cask`), it is already on your PATH: the
 cask links it into Homebrew's `bin`, and `brew uninstall` removes the link. Otherwise link it into a folder on your
@@ -191,6 +192,8 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 | `cleanmate space [PATH] [--limit N] [--json]` | What fills a folder, like Space Lens: its children (folders and files) by size, biggest first, the folder's total, and the folders not read without Full Disk Access. PATH defaults to your home folder. |
 | `cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]` | Duplicate files among those `large` finds, like the Duplicates Only filter of Large & Old Files: groups by space wasted, each copy with its last change and what removing it frees. |
 | `cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]` | Large files, like Large & Old Files: biggest first, with kind, last change, last use and whether other hard links exist, then the count and total found. |
+| `cleanmate trash [--yes] [--json] [--] PATH…` | Moves exactly those files and folders to the Trash, with the safety rules of Space Lens; per path where it went in the Trash, or why it was skipped, then the total. |
+| `cleanmate restore [--json] [--] TRASHED…` | Puts back items `trash` moved, named by their place in the Trash, at their old place; never overwrites. |
 | `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Undo, Full Disk Access and exit codes. |
 
 - `--only` scans only the named items (ids from `cleanmate list`); `--group` only the named groups: `system`, `user`
@@ -208,7 +211,8 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
   Names and descriptions are always in English.
 - Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments or a PATH that does not
   exist, is not a folder or can't be read, `3` no Full Disk Access with `--require-fda`, or a `space` / `large` PATH in a
-  folder macOS protects without it, `4` `clean` without `--yes` and without a terminal (nothing was deleted).
+  folder macOS protects without it, `4` `clean` or `trash` without `--yes` and without a terminal (nothing was
+  deleted or moved).
 
 `cleanmate list --json`:
 
@@ -275,8 +279,8 @@ Privacy & Security › Full Disk Access, turn on that app, then quit and reopen 
 ### What takes space
 
 `cleanmate space`, `cleanmate large` and `cleanmate dupes` answer "what fills my disk?" with the engines of **Space
-Lens** and **Large & Old Files**, so a script or an agent doesn't need `du`, `find` or `md5`. All three only read: to remove what they find, use Space
-Lens or Large & Old Files in the app (they move items to the Trash).
+Lens** and **Large & Old Files**, so a script or an agent doesn't need `du`, `find` or `md5`. All three only read: to
+remove what they find, use `cleanmate trash` (below), or Space Lens or Large & Old Files in the app.
 
 - `space` measures each child of PATH (default: the home folder; `~/…` and relative paths work) like Space Lens: hard
   links counted once, files on other volumes not counted. `--limit N` (default 20) shows the N biggest; `moreItems`
@@ -291,7 +295,8 @@ Lens or Large & Old Files in the app (they move items to the Trash).
   Duplicates Only filter: files of equal size compared by SHA-256, a hard-linked file counted once (never a copy of
   itself), APFS clones that share their blocks freeing nothing. Groups come most `wasted` first (what moving every copy
   but the oldest to the Trash frees); each copy has `path`, `modified`, `freeable` and `oldest`. `--limit N` (default
-  20) groups; `count` and `wasted` cover all. To remove copies, use the Duplicates Only filter of Large & Old Files.
+  20) groups; `count` and `wasted` cover all. To remove copies, pass the ones to drop to `cleanmate trash`, or use
+  the Duplicates Only filter of Large & Old Files.
 - Without Full Disk Access, the folders macOS protects (Desktop, Documents, Downloads, Mail…) are never opened, so no
   permission prompt appears: they are listed in `skipped` (text: a note) and, in `space`, as items with `"skipped": true`
   and `size` `null`. A PATH inside one exits with code 3.
@@ -398,17 +403,73 @@ Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is
 }
 ```
 
+### Moving files to the Trash
+
+`cleanmate trash PATH…` moves exactly the files and folders named to the Trash (`~/…` and relative paths work; no
+wildcards, no recursion beyond a folder named whole). Nothing is ever deleted.
+
+- **Rules**: the same as moving an item to the Trash in Space Lens. Each path must be inside your home folder (also with
+  the symlinks of its folders resolved), not in `~/Library`, not hidden or inside a hidden folder (`~/.ssh`,
+  `~/.gnupg`), not inside an app or package, not a top-level folder of the home (`~/Documents` itself) nor the home
+  folder, on the home's volume, not excluded in **Settings › Exclusions** (nor a folder holding an exclusion), and not
+  a symlink itself (name the file it points to). Without Full Disk Access, a path in a folder macOS protects is
+  skipped without being read. Anything refused is reported `"skipped": true` with the `reason` and not moved.
+- **How**: each item is checked again right before it moves, through the same open folder, so an item swapped for a
+  symlink or another item since the check is not moved ("Changed while it was checked"). A folder is measured like
+  Space Lens (hard links once). A file locked in Finder is skipped.
+- **Confirmation**: on a terminal, `trash` lists the paths with their size and asks `Proceed? [y/N]`. Without a
+  terminal (scripts, AI agents) it moves nothing and exits with code `4` unless you pass `--yes`.
+- **Activity log**: each item moved is logged `trashed` under the module **Command Line**; `restore` logs `restored`,
+  which **Settings › Activity** takes off the total in the Trash.
+- **Restore**: `cleanmate restore TRASHED…` takes the paths in the Trash that `trash` printed (`trashed`) and puts each
+  item back at its old place, only when nothing is there now (never overwrites), its folder is still the same folder
+  (not moved, removed or replaced by a symlink, on the same volume) and it is still the item `trash` moved. What
+  `trash` moved is kept in `~/Library/Application Support/CleanMate/trashed.json` until it is put back or leaves the
+  Trash (the last 1,000). Items moved in Finder or by the app are put back with **Put Back** in Finder.
+- `--` ends the options: every argument after it is a path, even one starting with `-`.
+
+`cleanmate trash --yes --json "~/Downloads/trip copy.mov" ~/.ssh` (bytes; `count` and `size` cover what moved; `kind`
+is `file`, `folder` or `null` when not found; absent values are `null`):
+
+```json
+{
+  "count" : 1,
+  "items" : [
+    { "kind" : "file", "path" : "/Users/me/Downloads/trip copy.mov", "reason" : null, "size" : 1200000000, "skipped" : false, "trashed" : "/Users/me/.Trash/trip copy.mov" },
+    { "kind" : "folder", "path" : "/Users/me/.ssh", "reason" : "Hidden (like ~/.ssh): CleanMate never moves hidden files or folders", "size" : null, "skipped" : true, "trashed" : null }
+  ],
+  "log" : "~/Library/Logs/CleanMate/activity.log",
+  "size" : 1200000000,
+  "version" : "1.5"
+}
+```
+
+`cleanmate restore --json "/Users/me/.Trash/trip copy.mov"` (`path` is the old place, `null` when `trash` did not move
+that item):
+
+```json
+{
+  "count" : 1,
+  "items" : [
+    { "path" : "/Users/me/Downloads/trip copy.mov", "reason" : null, "skipped" : false, "trashed" : "/Users/me/.Trash/trip copy.mov" }
+  ],
+  "log" : "~/Library/Logs/CleanMate/activity.log",
+  "version" : "1.5"
+}
+```
+
 ### For AI agents
 
 The [Agent Skill](https://agentskills.io) in [`skills/cleanmate/`](../skills/cleanmate/SKILL.md) tells Claude Code,
 Codex, Cursor and other agents how to use `cleanmate`: find it, scan, show you the result by group (deleted or to the
 Trash, locked items and why, Full Disk Access), clean with `--yes --only` only the items you confirmed, then report what
 was freed, moved to the Trash and kept. Asked what takes space, it runs `cleanmate space` (then again on the biggest
-folder), `cleanmate large` or `cleanmate dupes` and shows the result, and sends you to Space Lens or Large & Old Files to remove anything.
-It never installs anything, never adds Privacy items or items that are not
-ticked by default unless you ask, cleans an item that may hold data (Docker volumes, stopped containers) only when you
-name it after seeing its list, never deletes the files `space` or `large` found, and points you to the app for what
-the command doesn't do (removing those files, Uninstaller, Maintenance). Install it with:
+folder), `cleanmate large` or `cleanmate dupes` and shows the result. To remove what it found, it runs
+`cleanmate trash --yes` only with the exact paths you confirmed in the conversation, and tells you `cleanmate restore`
+puts them back. It never installs anything, never adds Privacy items or items that are not ticked by default unless
+you ask, cleans an item that may hold data (Docker volumes, stopped containers) only when you name it after seeing its
+list, never deletes or moves files by hand, and points you to the app for what the command doesn't do (Uninstaller,
+Maintenance). Install it with:
 
 ```sh
 bunx skills add homielab/cleanmate-macos

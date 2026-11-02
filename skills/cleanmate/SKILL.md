@@ -1,6 +1,6 @@
 ---
 name: cleanmate
-description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space or which files are large or duplicated, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans only what the user confirms.
+description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space or which files are large or duplicated, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans or moves to the Trash only what the user confirms.
 ---
 
 # CleanMate for macOS
@@ -25,6 +25,8 @@ apps are skipped. This skill drives it with `--json`.
 6. Never pass `--privacy` (browser history, cookies, recent items) unless the user asked for privacy cleaning.
 7. Do not offer `locked` items: tell the user the `reason` (`"Google Chrome is running"`), to quit that app and rescan.
 8. When unsure, run the same clean with `--dry-run` first. Never delete files by hand instead of using `cleanmate`.
+   Move a file `space`, `large` or `dupes` found to the Trash only with `cleanmate trash --yes PATH…`, only the exact paths
+   the user confirmed (see "Move to the Trash").
 9. After cleaning, report `freed`, what is in the Trash (`inTrash`: still on disk until the Trash is emptied) and every
    `skipped` path with its `reason`.
 
@@ -81,7 +83,7 @@ log (`~/Library/Logs/CleanMate/activity.log`), also shown in the app's Settings 
 There is no Undo in the command: items moved to the Trash can be put back from the Trash in Finder (Put Back).
 
 Exit codes: 0 OK (also when something was skipped), 1 error, 2 bad arguments (stderr says why), 3 no Full Disk Access
-with `--require-fda`, 4 `clean` without `--yes` and without a terminal.
+with `--require-fda`, 4 `clean` or `trash` without `--yes` and without a terminal.
 
 ## What takes space
 
@@ -111,11 +113,35 @@ APFS clone or has other hard links: removing it frees nothing. Show sizes human 
 All three report `skipped` folders (no Full Disk Access): say they were not measured. A path inside one exits with code 3,
 a path that does not exist or is not a folder with code 2.
 
-None of them deletes anything. Never delete or move these files yourself, with `cleanmate` or by hand: `cleanmate clean`
-only takes Smart Scan items. To remove what you found, send the user to the app (`open -a CleanMate`): Space Lens for
-folders, Large & Old Files for files (its Duplicates Only filter for copies; or the user moves the copies they pick to
-the Trash in Finder), both moving them to the Trash so they can be put back. If it is junk Smart Scan
-covers (DerivedData, caches, `node_modules`), scan and clean that item instead.
+None of them deletes anything. If it is junk Smart Scan covers (DerivedData, caches, `node_modules`), scan and clean
+that item instead.
+
+## Move to the Trash
+
+To remove files or folders that `space`, `large` or `dupes` found, move them to the Trash with `cleanmate trash PATH…`.
+Never delete or move these files yourself, by hand or with `rm`, `mv` or Finder scripting.
+
+1. Show the user the exact paths and sizes you propose (for duplicates: every copy but the one they keep, by default
+   the `oldest`). Never pick files on your own beyond what you showed.
+2. Run `trash` only after the user confirmed in this conversation, and only with the exact paths they confirmed, one
+   argument each, quoted. No wildcards, no parent folder instead of the files.
+3. Say the items are in the Trash and can be put back with `cleanmate restore TRASHED…`, until the Trash is emptied.
+
+```bash
+cleanmate trash --yes --json "/Users/me/Downloads/trip copy.mov" /Users/me/Movies/old-render.mov
+cleanmate restore --json "/Users/me/.Trash/trip copy.mov"   # put one back, by the trashed path trash printed
+```
+
+Each path must be in the home folder and not in `~/Library`, not hidden (`~/.ssh`), not inside an app or package, not
+a top-level home folder itself (`~/Documents`), not excluded in Settings › Exclusions and not a symlink. Anything else
+is not moved: its item has `"skipped": true` and a `reason`; tell the user. A path in a folder macOS protects needs
+Full Disk Access. The result lists, per path, `path`, `size`, `kind`, `trashed` (where it is now in the Trash: keep it
+for `restore`), `skipped` and `reason`; `count` and `size` (bytes) cover what moved. Without a terminal `trash` needs
+`--yes`: without it nothing moves and the exit code is 4.
+
+`restore` takes the `trashed` paths and puts each item back at its old place. It never overwrites: an item whose place
+is taken again, or whose folder was moved or replaced by a symlink, is `skipped` with a `reason`. Both commands write
+the activity log.
 
 ## Beyond Smart Scan
 

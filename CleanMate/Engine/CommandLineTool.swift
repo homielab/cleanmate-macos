@@ -1,15 +1,16 @@
 import Foundation
 
-/// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, and the read-only
-/// `space`, `large` and `dupes` (what takes the disk space), as text or JSON.
-/// Stdin only for `clean`'s confirmation on a terminal; no network; colours only on a terminal without `NO_COLOR`.
+/// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, the read-only
+/// `space`, `large` and `dupes` (what takes the disk space), and `trash` / `restore` for exactly the paths named, as
+/// text or JSON. Stdin only for the confirmation of `clean` and `trash` on a terminal; no network; colours only on a
+/// terminal without `NO_COLOR`.
 nonisolated enum CommandLineTool {
     enum Exit: Int32 {
         case ok = 0
         case failure = 1
         case usage = 2
         case noFullDiskAccess = 3
-        /// `clean` without `--yes` and without a terminal to confirm on: nothing was deleted.
+        /// `clean` or `trash` without `--yes` and without a terminal to confirm on: nothing was deleted or moved.
         case notConfirmed = 4
     }
 
@@ -21,7 +22,7 @@ nonisolated enum CommandLineTool {
         var color: Bool
         /// A "Scanning…" line on stderr while a text scan runs.
         var progress: Bool
-        /// Stdin is a terminal: `clean` without `--yes` asks there.
+        /// Stdin is a terminal: `clean` and `trash` without `--yes` ask there.
         var interactive = false
         /// One line typed on stdin; nil at its end.
         var readLine: @Sendable () -> String? = { nil }
@@ -45,6 +46,8 @@ nonisolated enum CommandLineTool {
         case space(HeadlessFiles.SpaceOptions, json: Bool)
         case large(HeadlessFiles.LargeOptions, json: Bool)
         case dupes(HeadlessFiles.DupesOptions, json: Bool)
+        case trash(paths: [String], json: Bool, yes: Bool)
+        case restore(paths: [String], json: Bool)
     }
 
     struct UsageError: Error, Equatable { let message: String }
@@ -57,6 +60,8 @@ nonisolated enum CommandLineTool {
           cleanmate space [PATH] [--limit N] [--json]
           cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]
           cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]
+          cleanmate trash [--yes] [--json] [--] PATH…
+          cleanmate restore [--json] [--] TRASHED…
           cleanmate --version
           cleanmate --help
 
@@ -65,7 +70,8 @@ nonisolated enum CommandLineTool {
     static let help = """
         cleanmate: CleanMate's Smart Scan, Space Lens and Large & Old Files on the command line, for scripts
         and AI agents. list, scan, space, large and dupes are read-only. clean removes what scan finds with the
-        app's safety rules and writes the app's activity log. It never connects to the network.
+        app's safety rules; trash moves exactly the files and folders you name to the Trash, and restore puts
+        them back. Both write the app's activity log. It never connects to the network.
 
         \(usage)
         Commands:
@@ -85,16 +91,26 @@ nonisolated enum CommandLineTool {
                           never because they are ticked in the app.
           space           What takes the space in a folder (default: your home folder), like Space Lens: its
                           size and its biggest files and folders, sizes as `du -x` counts them (a hard-linked
-                          file once). Read-only: to remove something, use Space Lens in CleanMate.
+                          file once). Read-only: to move something to the Trash, use `cleanmate trash`.
           large           Your largest files, like Large & Old Files: in your home folder (not ~/Library or
                           hidden folders; node_modules, Pods and DerivedData skipped) or the folder named with
                           --in, Settings › Exclusions left out. Read-only: to move files to the Trash, use
-                          Large & Old Files in CleanMate.
+                          `cleanmate trash`.
           dupes           Duplicate files among the files large finds (same folders, --min-size and
                           exclusions), like the Duplicates Only filter of Large & Old Files: same content,
                           a hard-linked file counted once, APFS clones freeing nothing. Groups by space
                           wasted (what moving every copy but the oldest would free). Read-only: to move
-                          copies to the Trash, use Large & Old Files in CleanMate.
+                          copies to the Trash, use `cleanmate trash`.
+          trash           Moves the files and folders named, and only those, to the Trash: no wildcards,
+                          nothing deleted. Each must be in your home folder, not in ~/Library, not hidden
+                          (like ~/.ssh), not inside an app or package, not a top-level folder of your home
+                          (like ~/Documents itself), not excluded in Settings › Exclusions, and not a symlink;
+                          anything else is skipped with the reason. On a terminal it asks first; anywhere
+                          else it needs --yes. Prints where each item went in the Trash.
+          restore         Puts back items `cleanmate trash` moved, named by their path in the Trash (as trash
+                          printed it), to the exact place they came from. Never overwrites: skipped when
+                          something is at that place now, or its folder was moved, removed or replaced by
+                          a symlink.
 
         Options:
           --json          Print one JSON object instead of text.
@@ -103,7 +119,7 @@ nonisolated enum CommandLineTool {
                           A group turned off in Settings is scanned when named here.
           --privacy       Include the Privacy items (browser history, cookies, recent items).
           --dry-run       clean: report what would be cleaned; delete nothing, log nothing.
-          --yes           clean: don't ask. Required when not run in a terminal (scripts, AI agents).
+          --yes, -y       clean, trash: don't ask. Required when not run in a terminal (scripts, AI agents).
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
           --limit N       space, large: list the N biggest (default 20 for space, 50 for large);
                           dupes: the N groups wasting the most space (default 20).
@@ -112,6 +128,7 @@ nonisolated enum CommandLineTool {
           --older-than DAYS
                           large: only files not opened or changed for DAYS days.
           --in PATH       large, dupes: search this folder (in your home folder or on an external drive) instead.
+          --              trash, restore: every argument after it is a path, even one starting with -.
           -h, --help      Show this help.
           --version       Show the version.
 
@@ -125,13 +142,14 @@ nonisolated enum CommandLineTool {
         Undo:
           clean has no Undo. What went to the Trash can be put back from the Trash in Finder (Put Back);
           deleted junk is rebuilt by the apps that use it. Check first with `cleanmate clean --dry-run`.
+          trash: `cleanmate restore TRASHED…` puts the items back, until the Trash is emptied.
 
         Exit codes:
           0  OK (also when some items or files were skipped)
           1  Error
           2  Invalid arguments (also a PATH that is missing, not a folder or can't be read)
           3  No Full Disk Access with --require-fda, or space, large or dupes asked for a folder macOS protects
-          4  clean without --yes and without a terminal: nothing was deleted
+          4  clean or trash without --yes and without a terminal: nothing was deleted or moved
 
         """
 
@@ -211,6 +229,13 @@ nonisolated enum CommandLineTool {
             guard let text = json ? encode(report) : dupesText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
+        case .trash(let paths, let json, let yes):
+            return await trash(paths, json: json, yes: yes, sources: sources, output: output)
+        case .restore(let paths, let json):
+            let report = HeadlessTrash.restore(paths, sources: sources)
+            guard let text = json ? encode(report) : restoreText(report, home: sources.policy().homeURL, color: output.color)
+            else { return Exit.failure.rawValue }
+            output.out(text)
         }
         return Exit.ok.rawValue
     }
@@ -257,6 +282,44 @@ nonisolated enum CommandLineTool {
         guard let text = json ? encode(report) : cleanText(report, color: output.color) else { return Exit.failure.rawValue }
         output.out(text)
         return Exit.ok.rawValue
+    }
+
+    private static func trash(_ paths: [String], json: Bool, yes: Bool, sources: HeadlessScan.Sources,
+                              output: Output) async -> Int32 {
+        if !yes && !output.interactive {
+            output.err("cleanmate: nothing was moved. Without a terminal, trash needs --yes: run it only with the "
+                       + "paths the user confirmed, as `cleanmate trash --yes PATH…`.\n")
+            return Exit.notConfirmed.rawValue
+        }
+        let targets = await HeadlessTrash.targets(paths, sources: sources)
+        let home = sources.policy().homeURL
+        if !yes && targets.contains(where: \.movable) {
+            output.err(trashConfirmation(targets, home: home))
+            let answer = output.readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
+            guard answer == "y" || answer == "yes" else {
+                output.err("Nothing was moved.\n")
+                return Exit.ok.rawValue
+            }
+        }
+        let report = HeadlessTrash.trash(targets, sources: sources)
+        guard let text = json ? encode(report) : trashText(report, home: home, color: output.color) else {
+            return Exit.failure.rawValue
+        }
+        output.out(text)
+        return Exit.ok.rawValue
+    }
+
+    /// The question asked on a terminal before `trash` moves anything.
+    static func trashConfirmation(_ targets: [HeadlessTrash.Target], home: URL) -> String {
+        let movable = targets.filter(\.movable)
+        let total = movable.reduce(Int64(0)) { $0 + ($1.item.size ?? 0) }
+        var text = "About to move \(movable.count) item\(movable.count == 1 ? "" : "s") (\(size(total))) to the Trash:\n"
+        for target in targets {
+            let path = shown(target.item.path, home: home)
+            text += target.movable ? "  \(rightAligned(size(target.item.size ?? 0), 10))  \(path)\n"
+                : "  \(rightAligned("–", 10))  \(path)  skipped: \(target.item.reason ?? "")\n"
+        }
+        return text + "Undo afterwards with `cleanmate restore`.\nProceed? [y/N] "
     }
 
     /// The question asked on a terminal before cleaning.
@@ -366,6 +429,25 @@ nonisolated enum CommandLineTool {
             case "large": return .large(large, json: json)
             default: return .dupes(dupes, json: json)
             }
+        case "trash", "restore":
+            var json = false, yes = false, paths: [String] = []
+            while let argument = rest.popFirst() {
+                switch argument {
+                case "--":
+                    paths += rest
+                    rest = []
+                case "-h", "--help": return .help
+                case "--json": json = true
+                case "--yes" where first == "trash", "-y" where first == "trash": yes = true
+                case _ where !argument.hasPrefix("-") || argument == "-": paths.append(argument)
+                default: throw UsageError(message: "unknown option `\(split(argument).0)` for \(first)")
+                }
+            }
+            guard !paths.isEmpty else {
+                throw UsageError(message: first == "trash" ? "trash needs the PATH of each file or folder to move"
+                                                           : "restore needs the TRASHED path of each item, as trash printed it")
+            }
+            return first == "trash" ? .trash(paths: paths, json: json, yes: yes) : .restore(paths: paths, json: json)
         default:
             throw UsageError(message: first.hasPrefix("-") ? "unknown option `\(first)`" : "unknown command `\(first)`")
         }
@@ -519,7 +601,7 @@ nonisolated enum CommandLineTool {
             text += style.dim("  … \(report.moreItems) more, \(size(report.moreSize))") + "\n"
         }
         text += skippedNote(report.skipped, home: home, style: style)
-        return text + style.dim("Nothing was deleted. To remove something, use Space Lens in CleanMate.") + "\n"
+        return text + style.dim("Nothing was deleted. To move something to the Trash, use `cleanmate trash PATH…`.") + "\n"
     }
 
     static func largeText(_ report: HeadlessFiles.LargeReport, home: URL, color: Bool) -> String {
@@ -541,7 +623,7 @@ nonisolated enum CommandLineTool {
             text += style.dim("(hard link): another link keeps the file on disk; moving this one frees nothing.") + "\n"
         }
         text += skippedNote(report.skipped, home: home, style: style)
-        return text + style.dim("Nothing was deleted. To move files to the Trash, use Large & Old Files in CleanMate.") + "\n"
+        return text + style.dim("Nothing was deleted. To move files to the Trash, use `cleanmate trash PATH…`.") + "\n"
     }
 
     static func dupesText(_ report: HeadlessFiles.DupesReport, home: URL, color: Bool) -> String {
@@ -562,7 +644,51 @@ nonisolated enum CommandLineTool {
         text += "\n" + style.bold("\(report.count) group\(report.count == 1 ? "" : "s"), \(size(report.wasted)) wasted")
             + " (files of \(size(report.minSize)) or larger) in \(shown(report.root, home: home))\n"
         text += skippedNote(report.skipped, home: home, style: style)
-        return text + style.dim("Nothing was deleted. To move copies to the Trash, use Large & Old Files in CleanMate.") + "\n"
+        return text + style.dim("Nothing was deleted. To move copies to the Trash, use `cleanmate trash PATH…`.") + "\n"
+    }
+
+    static func trashText(_ report: HeadlessTrash.TrashReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = ""
+        for item in report.items {
+            let path = shown(item.path, home: home)
+            if let reason = item.reason, item.skipped {
+                text += "  \(rightAligned("–", 10))  \(path)  " + style.yellow("skipped: \(reason)") + "\n"
+            } else {
+                text += "  \(rightAligned(size(item.size ?? 0), 10))  \(path)"
+                    + (item.trashed.map { "  " + style.dim("→ \(shown($0, home: home))") } ?? "") + "\n"
+            }
+        }
+        text += "\n" + style.bold("Moved \(report.count) item\(report.count == 1 ? "" : "s"), \(size(report.size)), to the Trash")
+            + " (on disk until you empty the Trash).\n"
+        let trashed = report.items.compactMap(\.trashed)
+        if !trashed.isEmpty {
+            text += style.dim("Logged in \(report.log). Undo: cleanmate restore " + trashed.map(quoted).joined(separator: " ")) + "\n"
+        }
+        return text
+    }
+
+    static func restoreText(_ report: HeadlessTrash.RestoreReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = ""
+        for item in report.items {
+            let path = shown(item.path ?? item.trashed, home: home)
+            if item.skipped {
+                text += "  \(shown(item.trashed, home: home))  " + style.yellow("skipped: \(item.reason ?? "")") + "\n"
+            } else {
+                text += "  \(path)  " + style.dim("put back") + "\n"
+            }
+        }
+        text += "\n" + style.bold("Put back \(report.count) item\(report.count == 1 ? "" : "s").") + "\n"
+        if report.count > 0 { text += style.dim("Logged in \(report.log).") + "\n" }
+        return text
+    }
+
+    /// `path` quoted for a shell when it needs it.
+    static func quoted(_ path: String) -> String {
+        let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-+,:@%~")
+        guard path.unicodeScalars.contains(where: { !plain.contains($0) }) || path.isEmpty else { return path }
+        return "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private static func skippedNote(_ skipped: [HeadlessFiles.Skipped], home: URL, style: Style) -> String {

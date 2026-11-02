@@ -515,6 +515,8 @@ extension CommandLineToolTests {
         /// `home` with its symlinks resolved (/var → /private/var): the form the reports print.
         var real: String { HeadlessFiles.realPath(home.path) ?? home.path }
         var excluded: URL { home.appending(path: "Media/Excluded") }
+        /// The fake Trash `trash` moves to (never the real one).
+        var trash: URL { root.appending(path: "Trash") }
         /// Path in the fake home → bytes (whole 4 KB blocks, so the allocated size is the byte count).
         let files = ["Projects/app/build.bin": 3_002_368, "Projects/app/data.bin": 2_498_560,
                      "Media/movie.mov": 2_002_944, "Media/old.zip": 1_200_128, "Media/small.bin": 409_600,
@@ -534,6 +536,7 @@ extension CommandLineToolTests {
             }
             try fm.createDirectory(at: home.appending(path: "Library/Caches"), withIntermediateDirectories: true)
             try fm.createDirectory(at: root.appending(path: "tmp"), withIntermediateDirectories: true)
+            try fm.createDirectory(at: trash, withIntermediateDirectories: true)
             // A second link to build.bin in another folder: counted once by space, flagged by large.
             try fm.linkItem(at: home.appending(path: "Projects/app/build.bin"), to: home.appending(path: "Media/build-link.bin"))
         }
@@ -542,12 +545,24 @@ extension CommandLineToolTests {
 
         func sources(fullDiskAccess: Bool = false) -> HeadlessScan.Sources {
             let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"), excluded: [excluded.path])
-            let now = now, opened = home.appending(path: "Media/old.zip").path
+            let now = now, opened = home.appending(path: "Media/old.zip").path, trash = trash
             var sources = HeadlessScan.Sources()
             sources.policy = { policy }
             sources.hasFullDiskAccess = { fullDiskAccess }
             sources.now = { now }
             sources.version = { "9.9" }
+            // Like Finder: a name already in the Trash gets a number.
+            sources.trash = { url in
+                var target = trash.appending(path: url.lastPathComponent)
+                var number = 2
+                while FileManager.default.fileExists(atPath: target.path) {
+                    target = trash.appending(path: "\(url.deletingPathExtension().lastPathComponent) \(number)")
+                        .appendingPathExtension(url.pathExtension)
+                    number += 1
+                }
+                try FileManager.default.moveItem(at: url, to: target)
+                return target
+            }
             // Spotlight knows only old.zip, opened 10 days before "now".
             sources.spotlightLastUsed = { url in
                 HeadlessFiles.realPath(url.path) == HeadlessFiles.realPath(opened) ? now.addingTimeInterval(-10 * 86_400) : nil

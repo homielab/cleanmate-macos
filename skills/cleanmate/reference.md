@@ -11,6 +11,8 @@
 | `cleanmate space [PATH] --json` | a folder's children by size, like Space Lens (default: the home folder); read-only |
 | `cleanmate large --json` | large files, like Large & Old Files (default: 50 MB or more in the home folder); read-only |
 | `cleanmate dupes --json` | duplicate files among those `large` finds, like the Duplicates Only filter; read-only |
+| `cleanmate trash --yes --json PATH…` | moves exactly those files and folders to the Trash, after the user confirmed them |
+| `cleanmate restore --json TRASHED…` | puts items `trash` moved back at their old place, never overwriting |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
 Options for `scan` and `clean`:
@@ -170,8 +172,13 @@ and the numbers are what a clean would free.
 > `~/Developer/web/node_modules` (3.2 GB). Then Movies 38 GB and Library 31 GB. Documents and Downloads were not
 > measured: the app running me has no Full Disk Access.
 >
-> To remove builds you no longer need, open Space Lens in CleanMate: it moves them to the Trash so you can put them
-> back. `node_modules` folders you have not touched for months are also in Smart Scan; shall I scan for them?
+> Shall I move `~/Developer/game/Builds` to the Trash? You can put it back. `node_modules` folders you have not
+> touched for months are also in Smart Scan; shall I scan for them?
+>
+> **User:** Yes, the builds.
+>
+> **Agent:** *(runs `cleanmate trash --yes --json /Users/me/Developer/game/Builds`)* Moved Builds (41 GB) to the
+> Trash. It frees the space once you empty the Trash; until then I can put it back.
 
 ## `space --json` (shortened)
 
@@ -253,9 +260,48 @@ opened, from Spotlight, `null` when Spotlight does not know.
 `count` and `wasted` cover every group found, `groups` the `--limit` wasting the most. `wasted` is what moving every
 copy but the oldest to the Trash frees; `freeable` 0 marks an APFS clone or a file with other hard links.
 
+## `trash --yes --json` (shortened)
+
+```json
+{
+  "count" : 1,
+  "items" : [
+    { "kind" : "file", "path" : "/Users/me/Downloads/trip copy.mov", "reason" : null, "size" : 1200000000, "skipped" : false, "trashed" : "/Users/me/.Trash/trip copy.mov" },
+    { "kind" : "folder", "path" : "/Users/me/.ssh", "reason" : "Hidden (like ~/.ssh): CleanMate never moves hidden files or folders", "size" : null, "skipped" : true, "trashed" : null },
+    { "kind" : null, "path" : "/Users/me/Movies/gone.mov", "reason" : "Not found", "size" : null, "skipped" : true, "trashed" : null }
+  ],
+  "log" : "~/Library/Logs/CleanMate/activity.log",
+  "size" : 1200000000,
+  "version" : "1.5"
+}
+```
+
+One item per path, in the order given (a path given twice once). `count` and `size` cover what moved; it stays on disk
+until the Trash is emptied. `trashed` is the argument for `restore` (Finder may add a number when the name is taken).
+
+## `restore --json` (shortened)
+
+```json
+{
+  "count" : 1,
+  "items" : [
+    { "path" : "/Users/me/Downloads/trip copy.mov", "reason" : null, "skipped" : false, "trashed" : "/Users/me/.Trash/trip copy.mov" },
+    { "path" : "/Users/me/Movies/trip.mov", "reason" : "Something is already at its place: nothing was overwritten", "skipped" : true, "trashed" : "/Users/me/.Trash/trip.mov" },
+    { "path" : null, "reason" : "Not moved to the Trash by `cleanmate trash` (or put back already)", "skipped" : true, "trashed" : "/Users/me/.Trash/other.mov" }
+  ],
+  "log" : "~/Library/Logs/CleanMate/activity.log",
+  "version" : "1.5"
+}
+```
+
+`path` is the old place. `restore` only knows what `trash` moved (kept in
+`~/Library/Application Support/CleanMate/trashed.json`); items moved to the Trash in Finder or by the app are put back
+with Put Back in Finder.
+
 ## Safety
 
 `cleanmate` cleans only the locations of CleanMate's catalog, with the app's safety rules and the user's exclusions
 (Settings › Exclusions). It never runs as root, never touches system files macOS protects, and never connects to the
-network. Every clean is written to the activity log. `space`, `large` and `dupes` only read: to remove what they find, the
-user opens Space Lens or Large & Old Files in the app.
+network. Every clean is written to the activity log. `space`, `large` and `dupes` only read. `trash` only moves to the
+Trash, never deletes, and only the paths named that pass the same rules as Space Lens in the app; `trash` and `restore`
+are written to the activity log too.
