@@ -76,7 +76,7 @@ struct AgentSkillTests {
         let skill = try Self.text("SKILL.md")
         for rule in ["Never install anything yourself", "Always scan first", "--privacy", "selectedByDefault",
                      "clean --yes", "Contents/Helpers/cleanmate", "~/Library/Logs/CleanMate/activity.log",
-                     "cleanmate space --json", "cleanmate large --json", "Never delete or move these files yourself"] {
+                     "cleanmate space --json", "cleanmate large --json", "cleanmate dupes --json", "Never delete or move these files yourself"] {
             #expect(skill.contains(rule), "\(rule)")
         }
     }
@@ -84,7 +84,7 @@ struct AgentSkillTests {
     @Test func jsonSamplesDecodeAsReports() throws {
         let text = try Self.text("reference.md")
         let blocks = text.components(separatedBy: "```json\n").dropFirst().map { $0.components(separatedBy: "```").first ?? "" }
-        try #require(blocks.count == 4)
+        try #require(blocks.count == 5)
         let scan = try JSONDecoder().decode(HeadlessScan.Report.self, from: Data(blocks[0].utf8))
         #expect(scan.items.contains { $0.locked })
         let clean = try JSONDecoder().decode(HeadlessClean.Report.self, from: Data(blocks[1].utf8))
@@ -93,5 +93,7 @@ struct AgentSkillTests {
         #expect(space.items.contains { $0.skipped && $0.size == nil } && space.skipped.count == 1)
         let large = try JSONDecoder().decode(HeadlessFiles.LargeReport.self, from: Data(blocks[3].utf8))
         #expect(large.files.count == large.count && large.files.contains { $0.lastUsed == nil })
+        let dupes = try JSONDecoder().decode(HeadlessFiles.DupesReport.self, from: Data(blocks[4].utf8))
+        #expect(dupes.groups.count == dupes.count && dupes.wasted == dupes.groups.reduce(0) { $0 + $1.wasted })
     }
 }

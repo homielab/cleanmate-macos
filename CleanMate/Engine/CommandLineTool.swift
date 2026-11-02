@@ -1,7 +1,7 @@
 import Foundation
 
 /// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, and the read-only
-/// `space` and `large` (what takes the disk space), as text or JSON.
+/// `space`, `large` and `dupes` (what takes the disk space), as text or JSON.
 /// Stdin only for `clean`'s confirmation on a terminal; no network; colours only on a terminal without `NO_COLOR`.
 nonisolated enum CommandLineTool {
     enum Exit: Int32 {
@@ -44,6 +44,7 @@ nonisolated enum CommandLineTool {
         case clean(HeadlessScan.Options, json: Bool, requireFullDiskAccess: Bool, dryRun: Bool, yes: Bool)
         case space(HeadlessFiles.SpaceOptions, json: Bool)
         case large(HeadlessFiles.LargeOptions, json: Bool)
+        case dupes(HeadlessFiles.DupesOptions, json: Bool)
     }
 
     struct UsageError: Error, Equatable { let message: String }
@@ -55,6 +56,7 @@ nonisolated enum CommandLineTool {
           cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]
           cleanmate space [PATH] [--limit N] [--json]
           cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]
+          cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]
           cleanmate --version
           cleanmate --help
 
@@ -62,7 +64,7 @@ nonisolated enum CommandLineTool {
 
     static let help = """
         cleanmate: CleanMate's Smart Scan, Space Lens and Large & Old Files on the command line, for scripts
-        and AI agents. list, scan, space and large are read-only. clean removes what scan finds with the
+        and AI agents. list, scan, space, large and dupes are read-only. clean removes what scan finds with the
         app's safety rules and writes the app's activity log. It never connects to the network.
 
         \(usage)
@@ -88,6 +90,11 @@ nonisolated enum CommandLineTool {
                           hidden folders; node_modules, Pods and DerivedData skipped) or the folder named with
                           --in, Settings › Exclusions left out. Read-only: to move files to the Trash, use
                           Large & Old Files in CleanMate.
+          dupes           Duplicate files among the files large finds (same folders, --min-size and
+                          exclusions), like the Duplicates Only filter of Large & Old Files: same content,
+                          a hard-linked file counted once, APFS clones freeing nothing. Groups by space
+                          wasted (what moving every copy but the oldest would free). Read-only: to move
+                          copies to the Trash, use Large & Old Files in CleanMate.
 
         Options:
           --json          Print one JSON object instead of text.
@@ -98,19 +105,20 @@ nonisolated enum CommandLineTool {
           --dry-run       clean: report what would be cleaned; delete nothing, log nothing.
           --yes           clean: don't ask. Required when not run in a terminal (scripts, AI agents).
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
-          --limit N       space, large: list the N biggest (default 20 for space, 50 for large).
-          --min-size SIZE large: only files of at least SIZE, like 100MB or 1.5GB (1 MB = 1,000,000 bytes).
+          --limit N       space, large: list the N biggest (default 20 for space, 50 for large);
+                          dupes: the N groups wasting the most space (default 20).
+          --min-size SIZE large, dupes: only files of at least SIZE, like 100MB or 1.5GB (1 MB = 1,000,000 bytes).
                           Default and minimum 50MB for the home folder; 1MB minimum with --in.
           --older-than DAYS
                           large: only files not opened or changed for DAYS days.
-          --in PATH       large: search this folder (in your home folder or on an external drive) instead.
+          --in PATH       large, dupes: search this folder (in your home folder or on an external drive) instead.
           -h, --help      Show this help.
           --version       Show the version.
 
         Full Disk Access:
           macOS grants it to the app that runs cleanmate (Terminal, iTerm, your AI agent's app), not to
           CleanMate. Without it the scan skips the folders macOS protects (Desktop, Documents, Downloads,
-          the Trash, Mail, other apps' data) and reports "fullDiskAccess": false; space and large list
+          the Trash, Mail, other apps' data) and reports "fullDiskAccess": false; space, large and dupes list
           them as skipped, and refuse a PATH inside one (exit code 3). To grant it: System
           Settings › Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
@@ -122,7 +130,7 @@ nonisolated enum CommandLineTool {
           0  OK (also when some items or files were skipped)
           1  Error
           2  Invalid arguments (also a PATH that is missing, not a folder or can't be read)
-          3  No Full Disk Access with --require-fda, or space or large asked for a folder macOS protects
+          3  No Full Disk Access with --require-fda, or space, large or dupes asked for a folder macOS protects
           4  clean without --yes and without a terminal: nothing was deleted
 
         """
@@ -187,6 +195,20 @@ nonisolated enum CommandLineTool {
                 return Exit.failure.rawValue
             }
             guard let text = json ? encode(report) : largeText(report, home: sources.policy().homeURL, color: output.color)
+            else { return Exit.failure.rawValue }
+            output.out(text)
+        case .dupes(let options, let json):
+            let root: URL
+            do { root = try HeadlessFiles.dupesFolder(options, sources: sources) } catch { return pathError(error, output) }
+            let showsProgress = output.progress && !json
+            if showsProgress { output.err("Searching…") }
+            let found = try? await HeadlessFiles.dupes(root, options: options, sources: sources)
+            if showsProgress { output.err("\r\u{1B}[K") }
+            guard let report = found else {
+                output.err("cleanmate: could not search \(options.root ?? "~")\n")
+                return Exit.failure.rawValue
+            }
+            guard let text = json ? encode(report) : dupesText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
         }
@@ -298,9 +320,9 @@ nonisolated enum CommandLineTool {
             case "scan": return .scan(options, json: json, requireFullDiskAccess: requireAccess)
             default: return .clean(options, json: json, requireFullDiskAccess: requireAccess, dryRun: dryRun, yes: yes)
             }
-        case "space", "large":
+        case "space", "large", "dupes":
             var json = false
-            var space = HeadlessFiles.SpaceOptions(), large = HeadlessFiles.LargeOptions()
+            var space = HeadlessFiles.SpaceOptions(), large = HeadlessFiles.LargeOptions(), dupes = HeadlessFiles.DupesOptions()
             while let argument = rest.popFirst() {
                 let (name, inline) = split(argument)
                 func value() throws -> String {
@@ -321,24 +343,29 @@ nonisolated enum CommandLineTool {
                 case ("--json", _) where inline == nil: json = true
                 case ("--limit", _):
                     let limit = try number(minimum: 1)
-                    (space.limit, large.limit) = (limit, limit)
-                case ("--min-size", "large"):
+                    (space.limit, large.limit, dupes.limit) = (limit, limit, limit)
+                case ("--min-size", "large"), ("--min-size", "dupes"):
                     let text = try value()
                     guard let size = HeadlessFiles.parseSize(text) else {
                         throw UsageError(message: "--min-size needs a size like 100MB or 1.5GB, not `\(text)`")
                     }
-                    large.minSize = size
+                    (large.minSize, dupes.minSize) = (size, size)
                 case ("--older-than", "large"): large.olderThanDays = try number(minimum: 1)
-                case ("--in", "large"):
+                case ("--in", "large"), ("--in", "dupes"):
                     guard large.root == nil else { throw UsageError(message: "--in takes one folder") }
                     large.root = try value()
+                    dupes.root = large.root
                 case (_, "space") where !argument.hasPrefix("-") && space.path == nil: space.path = argument
                 default:
                     throw UsageError(message: argument.hasPrefix("-") ? "unknown option `\(name)` for \(first)"
                                                                       : "unexpected argument `\(argument)`")
                 }
             }
-            return first == "space" ? .space(space, json: json) : .large(large, json: json)
+            switch first {
+            case "space": return .space(space, json: json)
+            case "large": return .large(large, json: json)
+            default: return .dupes(dupes, json: json)
+            }
         default:
             throw UsageError(message: first.hasPrefix("-") ? "unknown option `\(first)`" : "unknown command `\(first)`")
         }
@@ -515,6 +542,27 @@ nonisolated enum CommandLineTool {
         }
         text += skippedNote(report.skipped, home: home, style: style)
         return text + style.dim("Nothing was deleted. To move files to the Trash, use Large & Old Files in CleanMate.") + "\n"
+    }
+
+    static func dupesText(_ report: HeadlessFiles.DupesReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = ""
+        let day = Date.ISO8601FormatStyle(timeZone: .current).year().month().day()
+        for group in report.groups {
+            text += style.bold("\(rightAligned(size(group.wasted), 10))  wasted: \(group.count) copies of \(size(group.size))") + "\n"
+            for file in group.files {
+                let modified = ((try? Date(file.modified, strategy: .iso8601)) ?? .distantPast).formatted(day)
+                text += "              \(shown(file.path, home: home))  " + style.dim("modified \(modified)")
+                    + (file.oldest ? "  " + style.dim("(oldest)") : "")
+                    + (!file.oldest && file.freeable == 0 ? "  " + style.yellow("(frees nothing)") : "") + "\n"
+            }
+        }
+        if report.groups.isEmpty { text += "No duplicates found.\n" }
+        if report.moreGroups > 0 { text += style.dim("  … \(report.moreGroups) more groups") + "\n" }
+        text += "\n" + style.bold("\(report.count) group\(report.count == 1 ? "" : "s"), \(size(report.wasted)) wasted")
+            + " (files of \(size(report.minSize)) or larger) in \(shown(report.root, home: home))\n"
+        text += skippedNote(report.skipped, home: home, style: style)
+        return text + style.dim("Nothing was deleted. To move copies to the Trash, use Large & Old Files in CleanMate.") + "\n"
     }
 
     private static func skippedNote(_ skipped: [HeadlessFiles.Skipped], home: URL, style: Style) -> String {

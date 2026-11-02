@@ -189,6 +189,7 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 | `cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]` | What Smart Scan would find now: items by group with their size, the total ticked by default, and a note when Full Disk Access is missing. |
 | `cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]` | Scans again, then cleans; per item what was deleted, moved to the Trash or kept and why, then the totals. |
 | `cleanmate space [PATH] [--limit N] [--json]` | What fills a folder, like Space Lens: its children (folders and files) by size, biggest first, the folder's total, and the folders not read without Full Disk Access. PATH defaults to your home folder. |
+| `cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]` | Duplicate files among those `large` finds, like the Duplicates Only filter of Large & Old Files: groups by space wasted, each copy with its last change and what removing it frees. |
 | `cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]` | Large files, like Large & Old Files: biggest first, with kind, last change, last use and whether other hard links exist, then the count and total found. |
 | `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Undo, Full Disk Access and exit codes. |
 
@@ -273,8 +274,8 @@ Privacy & Security › Full Disk Access, turn on that app, then quit and reopen 
 
 ### What takes space
 
-`cleanmate space` and `cleanmate large` answer "what fills my disk?" with the engines of **Space Lens** and **Large &
-Old Files**, so a script or an agent doesn't need `du` or `find`. Both only read: to remove what they find, use Space
+`cleanmate space`, `cleanmate large` and `cleanmate dupes` answer "what fills my disk?" with the engines of **Space
+Lens** and **Large & Old Files**, so a script or an agent doesn't need `du`, `find` or `md5`. All three only read: to remove what they find, use Space
 Lens or Large & Old Files in the app (they move items to the Trash).
 
 - `space` measures each child of PATH (default: the home folder; `~/…` and relative paths work) like Space Lens: hard
@@ -286,6 +287,11 @@ Lens or Large & Old Files in the app (they move items to the Trash).
   external drive works. `--min-size` is at least 50 MB for the whole home folder and 1 MB for a folder.
   `--older-than DAYS` keeps files not opened (per Spotlight) or changed for that long. `--limit N` (default 50) shows
   the N biggest; `count` and `size` cover all.
+- `dupes` finds identical files among the files `large` finds (same `--in`, `--min-size` and rules), like the
+  Duplicates Only filter: files of equal size compared by SHA-256, a hard-linked file counted once (never a copy of
+  itself), APFS clones that share their blocks freeing nothing. Groups come most `wasted` first (what moving every copy
+  but the oldest to the Trash frees); each copy has `path`, `modified`, `freeable` and `oldest`. `--limit N` (default
+  20) groups; `count` and `wasted` cover all. To remove copies, use the Duplicates Only filter of Large & Old Files.
 - Without Full Disk Access, the folders macOS protects (Desktop, Documents, Downloads, Mail…) are never opened, so no
   permission prompt appears: they are listed in `skipped` (text: a note) and, in `space`, as items with `"skipped": true`
   and `size` `null`. A PATH inside one exits with code 3.
@@ -398,7 +404,7 @@ The [Agent Skill](https://agentskills.io) in [`skills/cleanmate/`](../skills/cle
 Codex, Cursor and other agents how to use `cleanmate`: find it, scan, show you the result by group (deleted or to the
 Trash, locked items and why, Full Disk Access), clean with `--yes --only` only the items you confirmed, then report what
 was freed, moved to the Trash and kept. Asked what takes space, it runs `cleanmate space` (then again on the biggest
-folder) or `cleanmate large` and shows the result, and sends you to Space Lens or Large & Old Files to remove anything.
+folder), `cleanmate large` or `cleanmate dupes` and shows the result, and sends you to Space Lens or Large & Old Files to remove anything.
 It never installs anything, never adds Privacy items or items that are not
 ticked by default unless you ask, cleans an item that may hold data (Docker volumes, stopped containers) only when you
 name it after seeing its list, never deletes the files `space` or `large` found, and points you to the app for what

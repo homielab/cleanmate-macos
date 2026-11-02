@@ -10,6 +10,7 @@
 | `cleanmate clean --yes --json --only ID,ID` | scans again, then cleans those items |
 | `cleanmate space [PATH] --json` | a folder's children by size, like Space Lens (default: the home folder); read-only |
 | `cleanmate large --json` | large files, like Large & Old Files (default: 50 MB or more in the home folder); read-only |
+| `cleanmate dupes --json` | duplicate files among those `large` finds, like the Duplicates Only filter; read-only |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
 Options for `scan` and `clean`:
@@ -29,14 +30,14 @@ Options for `scan` and `clean`:
   app's Smart Scan stay in the app: `clean` does not see them, so it takes all of them. To keep some (a database), the
   user cleans them in the app instead, ticking only the ones to remove.
 
-Options for `space` and `large`:
+Options for `space`, `large` and `dupes`:
 
-- `--limit N`: show the N biggest (`space` 20, `large` 50); the rest is counted in `moreItems` / `moreSize` or
-  `moreFiles`.
-- `large --min-size SIZE`: `50MB` by default, `1GB`, `500MB`… (1 MB = 10⁶ bytes). At least 50 MB for the whole home
+- `--limit N`: show the N biggest (`space` 20, `large` 50, `dupes` 20 groups); the rest is counted in `moreItems` /
+  `moreSize`, `moreFiles` or `moreGroups`.
+- `large` / `dupes --min-size SIZE`: `50MB` by default, `1GB`, `500MB`… (1 MB = 10⁶ bytes). At least 50 MB for the whole home
   folder, 1 MB with `--in`.
 - `large --older-than DAYS`: only files not opened or changed for that many days.
-- `large --in PATH`: search this folder (in the home folder but not in `~/Library`, or an external drive).
+- `large` / `dupes --in PATH`: search this folder (in the home folder but not in `~/Library`, or an external drive).
 - Without Full Disk Access, the folders macOS protects are listed in `skipped` and never read; a PATH inside one exits
   with code 3. A PATH that does not exist, is not a folder or can't be read exits with code 2.
 
@@ -222,9 +223,39 @@ ones, with `size` `null`.
 `count` and `size` cover every file found, `files` the biggest `--limit` of them. `lastUsed` is when the file was last
 opened, from Spotlight, `null` when Spotlight does not know.
 
+## `dupes --json` (shortened)
+
+```json
+{
+  "count" : 1,
+  "groups" : [
+    {
+      "count" : 2,
+      "files" : [
+        { "freeable" : 1200000000, "modified" : "2024-05-02T10:00:00Z", "oldest" : true, "path" : "/Users/me/Movies/trip.mov" },
+        { "freeable" : 1200000000, "modified" : "2025-01-10T09:00:00Z", "oldest" : false, "path" : "/Users/me/Downloads/trip copy.mov" }
+      ],
+      "size" : 1200000000,
+      "wasted" : 1200000000
+    }
+  ],
+  "fullDiskAccess" : true,
+  "minSize" : 50000000,
+  "moreGroups" : 0,
+  "root" : "/Users/me",
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "skipped" : [ ],
+  "version" : "1.5",
+  "wasted" : 1200000000
+}
+```
+
+`count` and `wasted` cover every group found, `groups` the `--limit` wasting the most. `wasted` is what moving every
+copy but the oldest to the Trash frees; `freeable` 0 marks an APFS clone or a file with other hard links.
+
 ## Safety
 
 `cleanmate` cleans only the locations of CleanMate's catalog, with the app's safety rules and the user's exclusions
 (Settings › Exclusions). It never runs as root, never touches system files macOS protects, and never connects to the
-network. Every clean is written to the activity log. `space` and `large` only read: to remove what they find, the
+network. Every clean is written to the activity log. `space`, `large` and `dupes` only read: to remove what they find, the
 user opens Space Lens or Large & Old Files in the app.

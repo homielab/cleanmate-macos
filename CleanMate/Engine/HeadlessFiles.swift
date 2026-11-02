@@ -1,6 +1,6 @@
 import Foundation
 
-/// What `cleanmate space` and `cleanmate large` report: Space Lens and Large & Old Files without a window, read-only.
+/// What `cleanmate space`, `cleanmate large` and `cleanmate dupes` report: Space Lens and Large & Old Files without a window, read-only.
 /// Same engines, scope and rules as the app (`SpaceLens.measure`, `LargeFileScanner.scan`): sizes like `du -x` with a
 /// hard link counted once, Settings › Exclusions for large files, and without Full Disk Access the folders macOS
 /// protects (`ProtectedFolders`) are never entered, so no "allow access" dialog appears. Nothing is moved or deleted.
@@ -23,6 +23,15 @@ nonisolated enum HeadlessFiles {
         var olderThanDays: Int? = nil
         /// Files listed, biggest first.
         var limit = 50
+    }
+
+    struct DupesOptions: Equatable, Sendable {
+        /// `--in`: the folder to search, as typed; nil = the home folder.
+        var root: String? = nil
+        /// Bytes; nil = `defaultMinSize`.
+        var minSize: Int64? = nil
+        /// Groups listed, most wasted space first.
+        var limit = 20
     }
 
     /// The default `--min-size`, also the smallest allowed for the whole home folder (as the app's Size menu).
@@ -152,6 +161,45 @@ nonisolated enum HeadlessFiles {
             try container.encode(moreFiles, forKey: .moreFiles)
             try container.encode(skipped, forKey: .skipped)
         }
+    }
+
+    struct DuplicateFile: Codable, Equatable, Sendable {
+        var path: String
+        /// ISO 8601, UTC.
+        var modified: String
+        /// Bytes moving this copy to the Trash frees: 0 for an APFS clone sharing its blocks or a file with other
+        /// hard links, less than `size` for a partial clone.
+        var freeable: Int64
+        /// The oldest copy (earliest modified): the one kept when the others go.
+        var oldest: Bool
+    }
+
+    struct DuplicateGroup: Codable, Equatable, Sendable {
+        /// Bytes of each copy.
+        var size: Int64
+        var count: Int
+        /// Bytes freed by moving every copy but the oldest to the Trash.
+        var wasted: Int64
+        /// Oldest first.
+        var files: [DuplicateFile]
+    }
+
+    struct DupesReport: Codable, Equatable, Sendable {
+        var version: String
+        var fullDiskAccess: Bool
+        /// ISO 8601, UTC.
+        var scannedAt: String
+        /// The folder searched, absolute, symlinks resolved.
+        var root: String
+        var minSize: Int64
+        /// Every group found and their wasted bytes, also those past the limit.
+        var count: Int
+        var wasted: Int64
+        /// Most wasted space first, at most the limit.
+        var groups: [DuplicateGroup]
+        var moreGroups: Int
+        /// Folders macOS protects inside `root` that were not searched (no Full Disk Access).
+        var skipped: [Skipped]
     }
 
     // MARK: - Folders
@@ -317,6 +365,40 @@ nonisolated enum HeadlessFiles {
                            moreFiles: matches.count - shown.count,
                            skipped: skipped(skipping, inside: URL(fileURLWithPath: real))
                             .filter { skipped in !library.contains { skipped.path.hasPrefix($0) } })
+    }
+
+    // MARK: - dupes
+
+    /// The folder `dupes` searches: the same rules as `large` (`largeFolder`).
+    static func dupesFolder(_ options: DupesOptions, sources: HeadlessScan.Sources) throws(PathError) -> URL {
+        try largeFolder(LargeOptions(root: options.root, minSize: options.minSize), sources: sources)
+    }
+
+    /// Duplicates among the files `large` finds, as the Duplicates Only filter of Large & Old Files finds them
+    /// (`DuplicateFinder`: same content by SHA-256, a hard-linked file counted once, APFS clones free nothing).
+    /// Throws when the scan fails.
+    static func dupes(_ root: URL, options: DupesOptions, sources: HeadlessScan.Sources) async throws -> DupesReport {
+        let large = try await large(root, options: LargeOptions(root: options.root, minSize: options.minSize,
+                                                                limit: Int.max), sources: sources)
+        let found = try await DuplicateFinder.find(large.files.map { URL(fileURLWithPath: $0.path) })
+        let byPath = Dictionary(large.files.map { ($0.path, $0) }) { a, _ in a }
+        let groups = found.groups.compactMap { urls -> DuplicateGroup? in
+            let files = urls.compactMap { byPath[$0.path] }
+            guard files.count >= 2 else { return nil }
+            let ordered = files.sorted { ($0.modified, $0.path) < ($1.modified, $1.path) }
+            let copies = ordered.enumerated().map { index, file in
+                DuplicateFile(path: file.path, modified: file.modified,
+                              freeable: file.hardLinked ? 0 : found.privateSizes[URL(fileURLWithPath: file.path)] ?? file.size,
+                              oldest: index == 0)
+            }
+            return DuplicateGroup(size: files[0].size, count: copies.count,
+                                  wasted: copies.dropFirst().reduce(0) { $0 + $1.freeable }, files: copies)
+        }.sorted { ($0.wasted, $0.size, $1.files[0].path) > ($1.wasted, $1.size, $0.files[0].path) }
+        let shown = groups.prefix(options.limit)
+        return DupesReport(version: large.version, fullDiskAccess: large.fullDiskAccess, scannedAt: large.scannedAt,
+                           root: large.root, minSize: large.minSize, count: groups.count,
+                           wasted: groups.reduce(0) { $0 + $1.wasted }, groups: Array(shown),
+                           moreGroups: groups.count - shown.count, skipped: large.skipped)
     }
 
     // MARK: - Arguments

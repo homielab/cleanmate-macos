@@ -694,4 +694,61 @@ extension CommandLineToolTests {
         let (_, help) = await Self.run(["--help"], fixture.sources())
         for flag in ["space [PATH]", "--limit", "--min-size", "--older-than", "--in PATH"] { #expect(help.stdout.contains(flag), "\(flag)") }
     }
+
+    static func dupesReport(_ arguments: [String], _ sources: HeadlessScan.Sources) async throws -> HeadlessFiles.DupesReport {
+        let (code, printed) = await run(["dupes", "--json"] + arguments, sources)
+        try #require(code == 0, "\(printed.stderr)")
+        return try JSONDecoder().decode(HeadlessFiles.DupesReport.self, from: Data(printed.stdout.utf8))
+    }
+
+    /// Two groups of copies and a hard link in `Dupes`: the hard link is one file, never a copy; groups by wasted bytes.
+    @Test func dupesGroupsCopiesAndCountsAHardLinkOnce() async throws {
+        let fixture = try FilesFixture()
+        let fm = FileManager.default
+        let dupes = fixture.home.appending(path: "Dupes")
+        try fm.createDirectory(at: dupes, withIntermediateDirectories: true)
+        let a = Data(repeating: 1, count: 2_002_944), b = Data(repeating: 2, count: 1_200_128)
+        for (name, data, age) in [("a1.bin", a, 30.0), ("a2.bin", a, 20), ("a3.bin", a, 10), ("b1.bin", b, 5), ("b2.bin", b, 50),
+                                  ("solo.bin", Data(repeating: 3, count: 2_002_944), 1)] {
+            let url = dupes.appending(path: name)
+            try data.write(to: url)
+            try fm.setAttributes([.modificationDate: Date.now.addingTimeInterval(-age * 86_400)], ofItemAtPath: url.path)
+        }
+        try fm.linkItem(at: dupes.appending(path: "solo.bin"), to: dupes.appending(path: "solo-link.bin"))
+        let report = try await Self.dupesReport(["--in", dupes.path, "--min-size", "1MB"], fixture.sources())
+        #expect(report.count == 2 && report.moreGroups == 0 && report.minSize == 1_000_000 && report.version == "9.9")
+        let names = report.groups.map { $0.files.map { URL(filePath: $0.path).lastPathComponent } }
+        #expect(names == [["a1.bin", "a2.bin", "a3.bin"], ["b2.bin", "b1.bin"]], "\(names)")
+        #expect(report.groups.map(\.wasted) == [2 * 2_002_944, 1_200_128] && report.wasted == 2 * 2_002_944 + 1_200_128)
+        #expect(report.groups.map(\.count) == [3, 2] && report.groups[0].size == 2_002_944)
+        #expect(report.groups.allSatisfy { $0.files[0].oldest && !$0.files.dropFirst().contains(where: \.oldest) })
+
+        let limited = try await Self.dupesReport(["--in", dupes.path, "--min-size", "1MB", "--limit", "1"], fixture.sources())
+        #expect(limited.groups.count == 1 && limited.moreGroups == 1 && limited.count == 2 && limited.wasted == report.wasted)
+        let big = try await Self.dupesReport(["--in", dupes.path, "--min-size", "1.5MB"], fixture.sources())
+        #expect(big.count == 1)
+
+        let (code, text) = await Self.run(["dupes", "--in", dupes.path, "--min-size", "1MB"], fixture.sources())
+        #expect(code == 0 && text.stdout.contains("2 groups, ") && text.stdout.contains("wasted: 3 copies of 2 MB"))
+        #expect(text.stdout.contains("(oldest)") && text.stdout.contains("Nothing was deleted"))
+    }
+
+    @Test func dupesArgumentsAndExitCodes() async throws {
+        let fixture = try FilesFixture()
+        let home = fixture.home.path
+        for arguments in [["dupes", "extra"], ["dupes", "--in", home + "/nope"], ["dupes", "--in", home + "/Library"],
+                          ["dupes", "--min-size", "10MB"], ["dupes", "--min-size", "abc"], ["dupes", "--limit", "0"],
+                          ["dupes", "--older-than", "3"], ["dupes", "--in", home, "--in", home]] {
+            let (code, printed) = await Self.run(arguments, fixture.sources(fullDiskAccess: true))
+            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.hasPrefix("cleanmate: "), "\(arguments)")
+        }
+        let (code, _) = await Self.run(["dupes", "--in", home + "/Documents"], fixture.sources())
+        #expect(code == 3)
+        #expect(try CommandLineTool.parse(["dupes", "--limit=5", "--in", "x"])
+                == .dupes(HeadlessFiles.DupesOptions(root: "x", limit: 5), json: false))
+        let (_, help) = await Self.run(["--help"], fixture.sources())
+        #expect(help.stdout.contains("cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]"))
+        let (_, dupesHelp) = await Self.run(["dupes", "--help"], fixture.sources())
+        #expect(dupesHelp.stdout.contains("dupes           Duplicate files"))
+    }
 }
