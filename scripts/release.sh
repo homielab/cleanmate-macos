@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-SETTINGS="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -showBuildSettings 2>/dev/null)"
+SETTINGS="$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release -derivedDataPath "$DERIVED" -showBuildSettings 2>/dev/null)"
 setting() { awk -F' = ' -v key=" $1 = " 'index($0, key) { print $2; exit }' <<<"$SETTINGS"; }
 VERSION="$(setting MARKETING_VERSION)"
 BUILD="$(setting CURRENT_PROJECT_VERSION)"
