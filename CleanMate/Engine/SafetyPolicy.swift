@@ -184,6 +184,38 @@ nonisolated struct SafetyPolicy: Sendable {
         return values?.isRegularFile == true && values?.isSymbolicLink != true
     }
 
+    /// Large & Old Files › Remove Download (`ICloudDownloads.remove`): a regular file, not a symlink, where
+    /// `allowsUserFile` lists files in the home folder (Desktop & Documents in iCloud) or in iCloud Drive itself
+    /// (`iCloudDriveLocation`). Removing a download never deletes: the file stays in iCloud. Its iCloud state is
+    /// checked by the caller.
+    func allowsICloudDownload(_ url: URL) -> Bool {
+        guard let path = userLocation(url) ?? iCloudDriveLocation(url) else { return false }
+        let values = try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        return values?.isRegularFile == true && values?.isSymbolicLink != true
+    }
+
+    /// Normalized path of `url` when it is in iCloud Drive as Finder shows it: inside
+    /// `~/Library/Mobile Documents/com~apple~CloudDocs` or an app's `~/Library/Mobile Documents/<app>/Documents`
+    /// (never the app's private folders), not hidden nor under a hidden folder, not in a package, not excluded, on the
+    /// home's volume. iCloud Drive stays a never-touch tree for every other rule: nothing in it is moved or deleted.
+    func iCloudDriveLocation(_ url: URL) -> String? {
+        let path = Self.normalize(url)
+        guard let home = allowedRoots.first, !isExcluded(path) else { return nil }
+        let base = home + "/Library/Mobile Documents/"
+        guard path.lowercased().hasPrefix(base.lowercased()) else { return nil }
+        let parts = path.dropFirst(base.count).split(separator: "/")
+        guard parts.count >= 2, !parts.contains(where: { $0.hasPrefix(".") }),
+              parts[0].lowercased() == "com~apple~clouddocs" || (parts.count >= 3 && parts[1] == "Documents")
+        else { return nil }
+        if let homeDevice = rootDevices[0], device(path) != homeDevice { return nil }
+        var folder = URL(fileURLWithPath: base)
+        for part in parts.dropLast() {
+            folder.append(path: String(part))
+            if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return nil }
+        }
+        return path
+    }
+
     /// The subset of `urls` that `allowsSpaceLensItem` accepts, with one policy for the whole batch.
     func allowedSpaceLensItems(_ urls: Set<URL>) -> Set<URL> { urls.filter { allowsSpaceLensItem($0) } }
 

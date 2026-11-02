@@ -32,6 +32,8 @@ struct LargeFilesView: View {
     @State private var selection: Set<URL> = []
     @State private var previewURL: URL?
     @State private var confirming = false
+    /// Files whose download the confirmation asks to remove; empty = not asking.
+    @State private var removingDownloads: [LargeFile] = []
     @State private var excludedCount = 0
     @State private var choosingFolder = false
     @State private var unsupportedFolder = false
@@ -162,6 +164,8 @@ struct LargeFilesView: View {
                 Toggle(isOn: checked(file.url)) { EmptyView() }
                     .toggleStyle(SelectionCheckboxStyle())
                     .accessibilityLabel(Text(verbatim: file.name))
+                    .disabled(!file.trashable)
+                    .help(file.trashable ? Text(verbatim: "") : Text("Files in iCloud Drive never go to the Trash. Remove the download to free the space."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(model.checked.contains(file.url) ? Color.accentColor.opacity(0.08) : .clear,
                                 in: .rect(cornerRadius: 6))
@@ -171,6 +175,7 @@ struct LargeFilesView: View {
                 Label {
                     VStack(alignment: .leading, spacing: 0) {
                         Text(file.name).help(file.url.path)
+                        if let icloud = file.icloud { iCloudLine(file, icloud) }
                         if file.hardLinked {
                             Text("Hard link — moving it frees no space").font(.caption).foregroundStyle(.secondary)
                         } else if let freed = model.cloneFreedSize(of: file) {
@@ -232,6 +237,10 @@ struct LargeFilesView: View {
             Button("Quick Look") { previewURL = urls.first }
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(Array(urls)) }
             if let url = urls.first { Button("Show in Space Lens") { ModuleRouter.shared.spaceLensItem = url } }
+            let removable = model.removableDownloads(urls)
+            if !removable.isEmpty {
+                Button("Remove Download") { removingDownloads = removable }.disabled(model.removingDownloads)
+            }
             if urls.contains(where: Preferences.canExclude) {
                 Divider()
                 Button("Never Clean This") {
@@ -247,6 +256,9 @@ struct LargeFilesView: View {
         }
         .quickLookPreview($previewURL, in: files.map(\.url))
         .exclusionNotice(excludedCount)
+        .overlay(alignment: .bottom) {
+            DownloadsRemovedNotice(report: model.downloadsRemoved, count: model.downloadRemovals)
+        }
         .overlay {
             if model.duplicatesOnly, let fraction = model.duplicateProgress {
                 VStack(spacing: 12) {
@@ -345,7 +357,17 @@ struct LargeFilesView: View {
             .padding()
             .background(.bar)
         }
-        .focusedSceneValue(\.confirming, confirming)
+        .focusedSceneValue(\.confirming, confirming || !removingDownloads.isEmpty)
+        .confirmationDialog(removeDownloadTitle, isPresented: Binding(
+            get: { !removingDownloads.isEmpty }, set: { if !$0 { removingDownloads = [] } })
+        ) {
+            Button("Remove Download") {
+                let files = removingDownloads
+                Task { await model.removeDownloads(of: files) }
+            }
+        } message: {
+            Text("The files stay in iCloud Drive and download again when you open them.")
+        }
         .confirmationDialog(
             Text("Move \(model.checkedFiles.count) files (\(model.checkedSize, format: .fileSize)) to the Trash?"),
             isPresented: $confirming
@@ -361,6 +383,37 @@ struct LargeFilesView: View {
         }
     }
 
+    private var removeDownloadTitle: Text {
+        let size = removingDownloads.reduce(Int64(0)) { $0 + $1.size }
+        if removingDownloads.count == 1, let file = removingDownloads.first {
+            return Text("Remove the download of “\(file.name)” (\(size, format: .fileSize))?")
+        }
+        return Text("Remove the downloads of \(removingDownloads.count) files (\(size, format: .fileSize))?")
+    }
+
+    /// iCloud line under the name: Remove Download when every change is uploaded, else why it can't be removed.
+    @ViewBuilder private func iCloudLine(_ file: LargeFile, _ status: ICloudStatus) -> some View {
+        HStack(spacing: 6) {
+            switch status {
+            case .uploaded:
+                Label { Text(verbatim: "iCloud") } icon: { Image(systemName: "icloud") }
+                Button("Remove Download") { removingDownloads = [file] }
+                    .buttonStyle(.link)
+                    .disabled(model.removingDownloads)
+                    .help("Free the space: the file stays in iCloud Drive and downloads again when you open it.")
+            case .notUploaded:
+                Label("iCloud — not uploaded yet", systemImage: "icloud.slash")
+            case .syncing:
+                Label("iCloud — syncing", systemImage: "arrow.triangle.2.circlepath.icloud")
+            case .conflict:
+                Label("iCloud — conflicting versions", systemImage: "exclamationmark.icloud")
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+        .help(status.allowsRemovingDownload ? Text(verbatim: "")
+              : Text("Only a file fully uploaded to iCloud can have its download removed."))
+    }
+
     /// Icon by file type (no disk read), looked up once per extension so 50k rows don't hit LaunchServices on every redraw.
     // shortcut: a file with a custom icon shows its type's icon instead.
     @MainActor private static func icon(forExtension ext: String) -> NSImage {
@@ -372,5 +425,49 @@ struct LargeFilesView: View {
         Binding(
             get: { model.checked.contains(url) },
             set: { if $0 { model.checked.insert(url) } else { model.checked.remove(url) } })
+    }
+}
+
+/// Shown for a few seconds after Remove Download: the space freed, and how many files were kept and why.
+private struct DownloadsRemovedNotice: View {
+    let report: ICloudDownloads.Report?
+    let count: Int
+    @State private var shown = false
+
+    var body: some View {
+        Group {
+            if shown, let report {
+                VStack(spacing: 2) {
+                    Label {
+                        if report.removed.isEmpty {
+                            Text("No download removed")
+                        } else {
+                            Text("Downloads removed: \(report.freed, format: .fileSize) freed")
+                        }
+                    } icon: {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
+                    if !report.kept.isEmpty {
+                        Text("Kept (not fully uploaded or changed): \(report.kept.count)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.regularMaterial, in: Capsule())
+                .shadow(radius: 4)
+                .padding(.bottom, 56) // above the bottom bar's buttons
+                .transition(.opacity)
+            }
+        }
+        .animation(.default, value: shown)
+        .task(id: count) {
+            guard count > 0, let report else { return }
+            shown = true
+            announceForAccessibility(report.removed.isEmpty ? String(localized: "No download removed")
+                : String(localized: "Downloads removed: \(report.freed.formatted(.byteCount(style: .file))) freed"))
+            try? await Task.sleep(for: .seconds(3))
+            if !Task.isCancelled { shown = false }
+        }
     }
 }

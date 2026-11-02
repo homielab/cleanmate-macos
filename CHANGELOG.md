@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Smart Scan › Applications**: caches and logs of **Steam**, **Epic Games Launcher**, **Battle.net** and **GOG Galaxy** (web caches, library artwork, update manifests, logs, crash dumps, shader caches), 0.5–3 GB with Steam. Ticked and deleted, since the launcher downloads them again; skipped while the launcher runs. Games, downloads in progress, saves, settings and sign-ins are never touched.
+- **Large & Old Files › Remove Download**: with Full Disk Access, downloaded iCloud Drive files are listed with an **iCloud** label; for a file whose every change is in iCloud, Remove Download frees its space on this Mac and keeps it in iCloud Drive (it downloads again when opened). Files not uploaded yet, syncing or in conflict are locked. `cleanmate large --json` adds an `icloud` field.
 - `cleanmate restore --list` now lists launch agents removed in **Login Items**, and `cleanmate restore` puts them back.
 
 ### Changed

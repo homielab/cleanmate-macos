@@ -387,6 +387,7 @@ struct ActivitySettings: View {
         case "deleted": return (text("Deleted"), "xmark.circle")
         case "trashed": return (text("Trashed"), "trash")
         case "restored": return (text("Put back"), "arrow.uturn.backward")
+        case "evicted": return (text("Download removed (still in iCloud)"), "icloud")
         case "ran": return (text("Ran"), "wrench.and.screwdriver")
         case "failed": return (text("Failed"), "exclamationmark.triangle")
         case "skipped": return (text("Skipped: changed since the scan"), "exclamationmark.shield")

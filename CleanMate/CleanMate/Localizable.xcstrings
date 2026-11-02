@@ -131,6 +131,46 @@
         }
       }
     },
+    "Download removed (still in iCloud)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã bỏ bản tải về (vẫn trên iCloud)"
+          }
+        }
+      }
+    },
+    "Downloads removed: %@ freed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã bỏ bản tải về: giải phóng %@"
+          }
+        }
+      }
+    },
+    "Files in iCloud Drive never go to the Trash. Remove the download to free the space." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp trong iCloud Drive không bao giờ vào Thùng rác. Hãy bỏ bản tải về để giải phóng chỗ."
+          }
+        }
+      }
+    },
+    "Free the space: the file stays in iCloud Drive and downloads again when you open it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giải phóng chỗ: tệp vẫn ở trong iCloud Drive và sẽ tải về lại khi bạn mở."
+          }
+        }
+      }
+    },
     "Full Disk Access granted" : {
       "localizations" : {
         "vi" : {
@@ -157,6 +197,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hướng dẫn bắt đầu…"
+          }
+        }
+      }
+    },
+    "iCloud — conflicting versions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud — có phiên bản xung đột"
+          }
+        }
+      }
+    },
+    "iCloud — not uploaded yet" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud — chưa tải lên xong"
+          }
+        }
+      }
+    },
+    "iCloud — syncing" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud — đang đồng bộ"
           }
         }
       }
@@ -1279,6 +1349,16 @@
         }
       }
     },
+    "Kept (not fully uploaded or changed): %lld" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giữ lại (chưa tải lên xong hoặc đã thay đổi): %lld"
+          }
+        }
+      }
+    },
     "Largest folders in your home" : {
       "localizations" : {
         "vi" : {
@@ -1483,6 +1563,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tên và địa chỉ web của các tệp bạn đã tải xuống, do macOS lưu; các tệp đã tải vẫn được giữ"
+          }
+        }
+      }
+    },
+    "No download removed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa bỏ bản tải về nào"
           }
         }
       }
@@ -1807,6 +1897,16 @@
         }
       }
     },
+    "Only a file fully uploaded to iCloud can have its download removed." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bỏ được bản tải về của tệp đã tải lên iCloud xong."
+          }
+        }
+      }
+    },
     "Open Exclusions…" : {
       "localizations" : {
         "vi" : {
@@ -1983,6 +2083,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Máy chủ gần đây"
+          }
+        }
+      }
+    },
+    "Remove Download" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ bản tải về"
+          }
+        }
+      }
+    },
+    "Remove the download of “%@” (%@)?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ bản tải về của “%1$@” (%2$@)?"
+          }
+        }
+      }
+    },
+    "Remove the downloads of %lld files (%@)?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ bản tải về của %1$lld tệp (%2$@)?"
           }
         }
       }
@@ -2317,6 +2447,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thông tin quá dài để đưa vào liên kết. Hãy dán vào ô “System details” trên trang GitHub."
+          }
+        }
+      }
+    },
+    "The files stay in iCloud Drive and download again when you open them." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp vẫn ở trong iCloud Drive và sẽ tải về lại khi bạn mở."
           }
         }
       }

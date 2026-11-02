@@ -655,6 +655,8 @@ extension CommandLineToolTests {
         #expect(report.files.allSatisfy { (try? Date($0.modified, strategy: .iso8601)) != nil })
         let (_, printed) = await Self.run(["large", "--json", "--in", media, "--min-size", "1MB"], fixture.sources())
         #expect(printed.stdout.contains("\"lastUsed\" : null") && printed.stdout.contains("\"olderThanDays\" : null"))
+        // icloud only on files that sync with iCloud Drive: left out here.
+        #expect(report.files.allSatisfy { $0.icloud == nil } && !printed.stdout.contains("\"icloud\""))
 
         // --older-than: old.zip was opened 10 days ago, the others not for 400 days.
         let old = try await Self.largeReport(["--in", media, "--min-size=1MB", "--older-than", "30"], fixture.sources())
@@ -706,6 +708,12 @@ extension CommandLineToolTests {
         #expect(large.stdout.contains("3 files, ") && large.stdout.contains(" (1 MB or larger) in "))
         #expect(large.stdout.contains("(hard link)") && large.stdout.contains("last used "))
         #expect(large.stdout.contains("/Media/movie.mov") && large.stdout.contains("2 MB"))
+        #expect(!large.stdout.contains("(iCloud"))
+        // iCloud Drive files: labelled with their state, and a note when one can lose its download.
+        var report = try await Self.largeReport(["--in", fixture.home.path + "/Media", "--min-size", "1MB"], fixture.sources())
+        (report.files[0].icloud, report.files[1].icloud) = ("uploaded", "syncing")
+        let icloud = CommandLineTool.largeText(report, home: fixture.home, color: false)
+        #expect(icloud.contains("(iCloud)\n") && icloud.contains("(iCloud, syncing)") && icloud.contains("Remove Download"))
         let (_, help) = await Self.run(["--help"], fixture.sources())
         for flag in ["space [PATH]", "--limit", "--min-size", "--older-than", "--in PATH"] { #expect(help.stdout.contains(flag), "\(flag)") }
     }

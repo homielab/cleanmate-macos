@@ -161,6 +161,13 @@ final class LargeFilesModel: ObservableObject {
     }
     /// Injected by tests so the real Trash is never touched.
     var trashFiles: ([LargeFile]) async -> CleanReport = { await LargeFileScanner.trash($0) }
+    /// Injected by tests so no real iCloud file is touched.
+    var removeDownloadFiles: ([URL]) async -> ICloudDownloads.Report = { await ICloudDownloads.remove($0) }
+    /// A Remove Download is running: its buttons are off.
+    @Published private(set) var removingDownloads = false
+    /// The last Remove Download's result, for the notice; `downloadRemovals` counts them so each one shows.
+    @Published private(set) var downloadsRemoved: ICloudDownloads.Report?
+    @Published private(set) var downloadRemovals = 0
     /// The window's, set by the view: ⌘Z after a move to the Trash.
     weak var undoManager: UndoManager?
     /// "Undo" is putting files back: a scan now could miss them.
@@ -286,8 +293,8 @@ final class LargeFilesModel: ObservableObject {
         duplicateProgress = nil
     }
 
-    /// Only ticked files that the current filters still show are trashed.
-    var checkedFiles: [LargeFile] { visibleFiles.filter { checked.contains($0.url) } }
+    /// Only ticked files that the current filters still show are trashed (never one in iCloud Drive).
+    var checkedFiles: [LargeFile] { visibleFiles.filter { $0.trashable && checked.contains($0.url) } }
     /// What the ticked files free: an APFS clone counts only its own blocks.
     var checkedSize: Int64 { checkedFiles.reduce(0) { $0 + freedSize(of: $1) } }
 
@@ -303,13 +310,13 @@ final class LargeFilesModel: ObservableObject {
     }
     /// Every shown file is ticked (false when nothing is shown): the bottom bar's button reads "Deselect All".
     var allVisibleChecked: Bool {
-        let visible = visibleFiles
+        let visible = visibleFiles.filter(\.trashable)
         return !visible.isEmpty && visible.allSatisfy { checked.contains($0.url) }
     }
 
-    /// Select All/Deselect All: only the shown files; ticks on files a filter hides stay as they are.
+    /// Select All/Deselect All: only the shown files the Trash takes; ticks on files a filter hides stay as they are.
     func setVisibleChecked(_ on: Bool) {
-        let urls = visibleFiles.map(\.url)
+        let urls = visibleFiles.filter(\.trashable).map(\.url)
         if on { checked.formUnion(urls) } else { checked.subtract(urls) }
     }
 
@@ -330,7 +337,7 @@ final class LargeFilesModel: ObservableObject {
     /// would leave no copy once shown again.
     func checkExtraCopies() {
         let keep = keptCopies
-        checked.formUnion(visibleFiles.filter { duplicateIndex[$0.url] != nil && !keep.contains($0.url) && cloneFreedSize(of: $0) == nil }
+        checked.formUnion(visibleFiles.filter { $0.trashable && duplicateIndex[$0.url] != nil && !keep.contains($0.url) && cloneFreedSize(of: $0) == nil }
             .map(\.url))
         checked.subtract(keep)
     }
@@ -352,6 +359,35 @@ final class LargeFilesModel: ObservableObject {
         checked.subtract(gone)
         if duplicateGroups != nil { duplicateGroups = duplicateGroups?.map { $0.filter { !gone.contains($0) } }.filter { $0.count > 1 } }
         return true
+    }
+
+    /// Files among `urls` whose download Remove Download may take now (iCloud says every change is uploaded).
+    func removableDownloads(_ urls: Set<URL>) -> [LargeFile] {
+        files.filter { urls.contains($0.url) && $0.icloud?.allowsRemovingDownload == true }
+    }
+
+    /// Remove Download: each file's local copy goes, the file stays in iCloud. Only from results, with Full Disk
+    /// Access (iCloud Drive is only listed with it), never twice at once. Removed files leave the list; a file kept
+    /// shows its state as read right before.
+    func removeDownloads(of selection: [LargeFile]) async {
+        guard case .results = phase, !removingDownloads, hasFullDiskAccess() else { return }
+        let urls = selection.filter { $0.icloud?.allowsRemovingDownload == true }.map(\.url)
+        guard !urls.isEmpty else { return }
+        removingDownloads = true
+        let report = await removeDownloadFiles(urls)
+        removingDownloads = false
+        let gone = Set(report.removed)
+        files = files.compactMap { file in
+            if gone.contains(file.url) { return nil }
+            guard let state = report.kept[file.url] else { return file }
+            var file = file
+            file.icloud = state ?? .notUploaded // no longer readable as an iCloud file: never offered again
+            return file
+        }
+        checked.subtract(gone)
+        if duplicateGroups != nil { duplicateGroups = duplicateGroups?.map { $0.filter { !gone.contains($0) } }.filter { $0.count > 1 } }
+        downloadsRemoved = report
+        downloadRemovals += 1
     }
 
     /// `checked / estimate`, capped at 99% until the scan finishes (this run may check more than the last one).

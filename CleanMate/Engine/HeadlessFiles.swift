@@ -108,8 +108,11 @@ nonisolated enum HeadlessFiles {
         var lastUsed: String?
         /// Other hard links to the file exist: moving this one to the Trash frees nothing while they remain.
         var hardLinked: Bool
+        /// iCloud state (`ICloudStatus` raw value: uploaded, notUploaded, syncing, conflict) of a file that syncs with
+        /// iCloud Drive; left out for any other file.
+        var icloud: String?
 
-        enum CodingKeys: String, CodingKey { case path, name, size, kind, modified, lastUsed, hardLinked }
+        enum CodingKeys: String, CodingKey { case path, name, size, kind, modified, lastUsed, hardLinked, icloud }
 
         /// `lastUsed` is written as `null` when Spotlight doesn't know.
         func encode(to encoder: any Encoder) throws {
@@ -121,6 +124,7 @@ nonisolated enum HeadlessFiles {
             try container.encode(modified, forKey: .modified)
             try container.encode(lastUsed, forKey: .lastUsed)
             try container.encode(hardLinked, forKey: .hardLinked)
+            try container.encodeIfPresent(icloud, forKey: .icloud)
         }
     }
 
@@ -360,7 +364,8 @@ nonisolated enum HeadlessFiles {
                            files: shown.map { file in
                                LargeFileItem(path: file.url.path, name: file.name, size: file.size, kind: file.kind.rawValue,
                                              modified: file.modified.formatted(.iso8601),
-                                             lastUsed: lastUsed[file.url.path]?.formatted(.iso8601), hardLinked: file.hardLinked)
+                                             lastUsed: lastUsed[file.url.path]?.formatted(.iso8601), hardLinked: file.hardLinked,
+                                             icloud: file.icloud?.rawValue)
                            },
                            moreFiles: matches.count - shown.count,
                            skipped: skipped(skipping, inside: URL(fileURLWithPath: real))

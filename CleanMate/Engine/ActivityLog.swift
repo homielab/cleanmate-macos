@@ -36,6 +36,12 @@ nonisolated enum ActivityLog {
         log(module: module, item: item, count: 1, size: size, action: "restored", home: home, date: date, rotateAt: maxSize)
     }
 
+    /// An iCloud file whose download was removed (it stays in iCloud): "evicted", counted as freed like "deleted".
+    static func recordEvicted(module: LocalizedStringResource, item: String, size: Int64,
+                              home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
+        log(module: module, item: item, count: 1, size: size, action: "evicted", home: home, date: date, rotateAt: maxSize)
+    }
+
     /// An item left in place because it changed since it was checked (a symlink or another item put there,
     /// `CleanReport.changed`): "skipped", size 0, so the user can see why it is still there.
     static func recordSkipped(module: LocalizedStringResource, item: String,
@@ -124,8 +130,9 @@ nonisolated enum ActivityLog {
         /// Size as written (in the language of that time); `bytes` when the line has the raw column.
         var size = ""
         var bytes: Int64?
-        /// "deleted", "trashed" or "restored"; "ran" or "failed" for a Maintenance task; "skipped" for an item that
-        /// changed since it was checked; "failed" also for a move to the Trash that took something else.
+        /// "deleted", "trashed", "restored" or "evicted" (an iCloud file's download removed); "ran" or "failed" for a
+        /// Maintenance task; "skipped" for an item that changed since it was checked; "failed" also for a move to the
+        /// Trash that took something else.
         var kind = ""
     }
 
@@ -160,8 +167,9 @@ nonisolated enum ActivityLog {
         return [rotated, current].compactMap { try? String(contentsOf: $0, encoding: .utf8) }.joined(separator: "\n")
     }
 
-    /// Bytes removed since `cutoff`, counted from both log files (activity.1.log too). Only lines with the raw
-    /// byte column (written by current versions) count: the formatted size column depends on the locale it was written in.
+    /// Bytes removed since `cutoff` ("evicted" downloads count as deleted), counted from both log files (activity.1.log
+    /// too). Only lines with the raw byte column (written by current versions) count: the formatted size column depends
+    /// on the locale it was written in.
     /// `trashed` is still in the Trash; `since` is the oldest counted line.
     static func freed(after cutoff: Date = .distantPast, home: URL = SafetyPolicy.current.homeURL)
         -> (deleted: Int64, trashed: Int64, since: Date?) {
@@ -175,7 +183,7 @@ nonisolated enum ActivityLog {
                   let date = try? Date(String(fields[0]), strategy: .iso8601), date >= cutoff else { continue }
             let key = String(fields[1] + "\t" + fields[2])
             switch fields[5] {
-            case "deleted": result.deleted += bytes
+            case "deleted", "evicted": result.deleted += bytes
             case "trashed": result.trashed += bytes; counted[key, default: 0] += bytes
             case "restored": // put back by Undo
                 let back = min(bytes, counted[key] ?? 0)
@@ -214,7 +222,7 @@ nonisolated enum ActivityLog {
     /// Lines further apart than this belong to different cleanups.
     static let cleanupGap: TimeInterval = 5 * 60
 
-    /// `Cleanups` from both log files in one read; the "deleted" lines `freed` counts, no others.
+    /// `Cleanups` from both log files in one read; the "deleted" and "evicted" lines `freed` counts, no others.
     static func cleanups(now: Date = .now, home: URL = SafetyPolicy.current.homeURL,
                          calendar: Calendar = .current) -> Cleanups {
         var result = Cleanups()
@@ -222,7 +230,7 @@ nonisolated enum ActivityLog {
         var lines: [(date: Date, bytes: Int64)] = []
         for line in readAll(home: home).split(separator: "\n") {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
-            guard fields.count == 7, fields[5] == "deleted", let bytes = Int64(fields[6]), bytes >= 0,
+            guard fields.count == 7, fields[5] == "deleted" || fields[5] == "evicted", let bytes = Int64(fields[6]), bytes >= 0,
                   let date = try? Date(String(fields[0]), strategy: .iso8601) else { continue }
             result.total += bytes
             if date >= cutoff { result.last30Days += bytes }

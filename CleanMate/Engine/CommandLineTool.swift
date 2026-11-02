@@ -640,7 +640,8 @@ nonisolated enum CommandLineTool {
             let modified = (try? Date(file.modified, strategy: .iso8601)) ?? .distantPast
             let used = file.lastUsed.flatMap { try? Date($0, strategy: .iso8601) }.map { max($0, modified) } ?? modified
             text += "  \(rightAligned(size(file.size), 10))  \(shown(file.path, home: home))  "
-                + style.dim("last used \(used.formatted(day))") + (file.hardLinked ? "  " + style.yellow("(hard link)") : "") + "\n"
+                + style.dim("last used \(used.formatted(day))") + (file.hardLinked ? "  " + style.yellow("(hard link)") : "")
+                + (file.icloud.map { "  " + style.dim($0 == ICloudStatus.uploaded.rawValue ? "(iCloud)" : "(iCloud, \($0))") } ?? "") + "\n"
         }
         if report.files.isEmpty { text += "No files found.\n" }
         if report.moreFiles > 0 { text += style.dim("  … \(report.moreFiles) more") + "\n" }
@@ -649,6 +650,9 @@ nonisolated enum CommandLineTool {
             + " (\(size(report.minSize)) or larger\(age)) in \(shown(report.root, home: home))\n"
         if report.files.contains(where: \.hardLinked) {
             text += style.dim("(hard link): another link keeps the file on disk; moving this one frees nothing.") + "\n"
+        }
+        if report.files.contains(where: { $0.icloud == ICloudStatus.uploaded.rawValue }) {
+            text += style.dim("(iCloud): in iCloud Drive; Remove Download in Large & Old Files frees it and keeps it in iCloud.") + "\n"
         }
         text += skippedNote(report.skipped, home: home, style: style)
         return text + style.dim("Nothing was deleted. To move files to the Trash, use `cleanmate trash PATH…`.") + "\n"

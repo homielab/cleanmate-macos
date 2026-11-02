@@ -37,11 +37,17 @@ nonisolated struct LargeFile: Identifiable, Hashable, Sendable {
     /// The file has other hard links (nlink > 1): moving this one to the Trash frees nothing while another remains.
     /// Labelled in the list, still counted in the sizes and still movable.
     let hardLinked: Bool
+    /// iCloud state when the file syncs with iCloud Drive (in iCloud Drive, or Desktop & Documents in iCloud), else
+    /// nil. `.uploaded` offers Remove Download (`ICloudDownloads`).
+    var icloud: ICloudStatus?
+    /// False for a file in iCloud Drive's own folder (~/Library/Mobile Documents): never moved to the Trash, only its
+    /// download removed.
+    let trashable: Bool
 
     init(url: URL, size: Int64, lastUsed: Date, kind: FileKind, modified: Date? = nil, hardLinked: Bool = false,
-         home: URL = URL(fileURLWithPath: NSHomeDirectory())) {
+         icloud: ICloudStatus? = nil, trashable: Bool = true, home: URL = URL(fileURLWithPath: NSHomeDirectory())) {
         (self.url, self.size, self.lastUsed, self.kind, name) = (url, size, lastUsed, kind, url.lastPathComponent)
-        self.hardLinked = hardLinked
+        (self.hardLinked, self.icloud, self.trashable) = (hardLinked, icloud, trashable)
         self.modified = modified ?? lastUsed
         location = Self.displayLocation(of: url, home: home)
     }
@@ -90,15 +96,28 @@ nonisolated enum LargeFileScanner {
     /// `progress` gets the number of entries checked so far, every 500 entries.
     /// `spotlightLastUsed` is only asked for files already over `minSize` (one Spotlight lookup each); injectable for tests.
     /// Folders whose path is in `skipping` (`ProtectedFolders.skipped`) are not entered.
+    /// The whole home folder also takes in iCloud Drive (`ICloudDownloads.roots`), unless it is in `skipping` (no Full
+    /// Disk Access): its downloaded files are listed with `trashable` false. `icloudStatus` (read per file listed, for
+    /// those and Desktop & Documents in iCloud) is injectable for tests.
     @concurrent static func scan(root: URL, minSize: Int64, policy: SafetyPolicy = .current, skipping: Set<String> = [],
                                  spotlightLastUsed: @escaping @Sendable (URL) -> Date? = spotlightLastUsedDate,
+                                 icloudStatus: @escaping @Sendable (URL) -> ICloudStatus? = ICloudStatus.current,
                                  progress: (@Sendable (Int) -> Void)? = nil) async throws -> [LargeFile] {
         guard allowsRoot(root, policy: policy) else { throw OutsideHomeError() }
         let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, spotlightLastUsed: spotlightLastUsed,
-                        progress: progress, library: policy.homeURL.appending(path: "Library").standardizedFileURL.path)
+                        icloudStatus: icloudStatus, progress: progress,
+                        library: policy.homeURL.appending(path: "Library").standardizedFileURL.path)
         // The enumerator lists a root's files under its real path (/var → /private/var); the parallel levels do the same.
         let real = realpath(root.path, nil).map { defer { free($0) }; return String(cString: $0) } ?? root.path
-        return try await walk.tree(URL(fileURLWithPath: real, isDirectory: true), depth: splitDepth)
+        var found = try await walk.tree(URL(fileURLWithPath: real, isDirectory: true), depth: splitDepth)
+        let home = URL(fileURLWithPath: realpath(policy.homeURL.path, nil).map { defer { free($0) }; return String(cString: $0) }
+                       ?? policy.homeURL.path, isDirectory: true)
+        let drive = ICloudDownloads.folder(home: home)
+        if real == home.path, !ProtectedFolders.contains(skipping, drive),
+           !ProtectedFolders.contains(skipping, ICloudDownloads.folder(home: policy.homeURL)) {
+            found += try await walk.iCloudDrive(ICloudDownloads.roots(home: home))
+        }
+        return found
     }
 
     /// Folder levels below the root listed in parallel before each deeper folder gets one enumerator walk (the
@@ -113,14 +132,28 @@ nonisolated enum LargeFileScanner {
         let policy: SafetyPolicy
         let skipping: Set<String>
         let spotlightLastUsed: @Sendable (URL) -> Date?
+        let icloudStatus: @Sendable (URL) -> ICloudStatus?
         let progress: (@Sendable (Int) -> Void)?
         let library: String
         let checked = Locked(0)
 
         init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, spotlightLastUsed: @escaping @Sendable (URL) -> Date?,
-             progress: (@Sendable (Int) -> Void)?, library: String) {
-            (self.minSize, self.policy, self.skipping, self.spotlightLastUsed, self.progress, self.library)
-                = (minSize, policy, skipping, spotlightLastUsed, progress, library)
+             icloudStatus: @escaping @Sendable (URL) -> ICloudStatus?, progress: (@Sendable (Int) -> Void)?, library: String) {
+            (self.minSize, self.policy, self.skipping, self.spotlightLastUsed, self.icloudStatus, self.progress, self.library)
+                = (minSize, policy, skipping, spotlightLastUsed, icloudStatus, progress, library)
+        }
+
+        /// Downloaded iCloud files under `roots` (in iCloud Drive), one enumerator per root in parallel, never asking
+        /// iCloud for a folder or file that is only in the cloud (`withoutDownloading`).
+        func iCloudDrive(_ roots: [URL]) async throws -> [LargeFile] {
+            try await withThrowingTaskGroup(of: (Int, [LargeFile]).self) { group in
+                for (index, root) in roots.enumerated() {
+                    group.addTask { (index, try ICloudDownloads.withoutDownloading { try self.enumerate(root, inDrive: true) }) }
+                }
+                var parts: [(Int, [LargeFile])] = []
+                for try await part in group { parts.append(part) }
+                return parts.sorted { $0.0 < $1.0 }.flatMap(\.1)
+            }
         }
 
         /// Counts one entry checked; reports every 500 like the single walk did.
@@ -159,7 +192,7 @@ nonisolated enum LargeFileScanner {
             }
         }
 
-        func enumerate(_ folder: URL) throws -> [LargeFile] {
+        func enumerate(_ folder: URL, inDrive: Bool = false) throws -> [LargeFile] {
             guard let enumerator = FileManager.default.enumerator(
                 at: folder, includingPropertiesForKeys: keys,
                 options: [.skipsHiddenFiles, .skipsPackageDescendants], errorHandler: { _, _ in true })
@@ -173,7 +206,7 @@ nonisolated enum LargeFileScanner {
                     if skips(url, values) { enumerator.skipDescendants() }
                     continue
                 }
-                if let file = file(url, values) { found.append(file) }
+                if let file = file(url, values, inDrive: inDrive) { found.append(file) }
             }
             return found
         }
@@ -186,16 +219,21 @@ nonisolated enum LargeFileScanner {
                 || skippedFolderNames.contains(url.lastPathComponent)
         }
 
-        func file(_ url: URL, _ values: URLResourceValues) -> LargeFile? {
+        /// A listed file: one the Trash takes (`allowsUserFile`), or in iCloud Drive (`inDrive`) one whose download
+        /// can be removed (`allowsICloudDownload`) that syncs with iCloud.
+        func file(_ url: URL, _ values: URLResourceValues, inDrive: Bool = false) -> LargeFile? {
             // Allocated size: iCloud files evicted to the cloud take no space and are not listed.
             guard values.isRegularFile == true, let size = values.totalFileAllocatedSize, Int64(size) >= minSize,
-                  policy.allowsUserFile(url) else { return nil }
+                  inDrive ? policy.allowsICloudDownload(url) : policy.allowsUserFile(url) else { return nil }
+            let icloud = icloudStatus(url)
+            if inDrive, icloud == nil { return nil }
             let used = lastUsed(spotlight: spotlightLastUsed(url), accessed: values.contentAccessDate,
                                 modified: values.contentModificationDate)
             var info = stat()
             return LargeFile(url: url, size: Int64(size), lastUsed: used,
                              kind: FileKind(fileExtension: url.pathExtension), modified: values.contentModificationDate,
-                             hardLinked: lstat(url.path, &info) == 0 && info.st_nlink > 1, home: policy.homeURL)
+                             hardLinked: lstat(url.path, &info) == 0 && info.st_nlink > 1, icloud: icloud,
+                             trashable: !inDrive, home: policy.homeURL)
         }
     }
 
@@ -213,7 +251,7 @@ nonisolated enum LargeFileScanner {
 
     /// Moves files to the Trash (never deletes), re-checking the user-file policy right before each one.
     @concurrent static func trash(_ files: [LargeFile], policy: SafetyPolicy = .current) async -> CleanReport {
-        CleanReport.trashing(files.map { ($0.url, $0.size) }, module: "Large & Old Files", home: policy.homeURL,
+        CleanReport.trashing(files.filter(\.trashable).map { ($0.url, $0.size) }, module: "Large & Old Files", home: policy.homeURL,
                              allows: policy.allowsUserFile)
     }
 }

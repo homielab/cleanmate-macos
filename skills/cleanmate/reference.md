@@ -229,7 +229,9 @@ ones, with `size` `null`.
 ```
 
 `count` and `size` cover every file found, `files` the biggest `--limit` of them. `lastUsed` is when the file was last
-opened, from Spotlight, `null` when Spotlight does not know.
+opened, from Spotlight, `null` when Spotlight does not know. `icloud` appears only on a file that syncs with iCloud
+Drive: `uploaded` (every change is in iCloud), `notUploaded`, `syncing` or `conflict`. The command line can't remove a
+download: for an `uploaded` file, point to **Remove Download** in Large & Old Files (it stays in iCloud).
 
 ## `dupes --json` (shortened)
 
