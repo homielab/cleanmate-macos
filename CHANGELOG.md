@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7] - 2026-11-02
+
 ### Added
 - **Smart Scan › Applications**: caches and logs of **Steam**, **Epic Games Launcher**, **Battle.net** and **GOG Galaxy** (web caches, library artwork, update manifests, logs, crash dumps, shader caches), 0.5–3 GB with Steam. Ticked and deleted, since the launcher downloads them again; skipped while the launcher runs. Games, downloads in progress, saves, settings and sign-ins are never touched.
 - **Smart Scan › Applications**: logs, crash reports and web caches of **Minecraft** and **Prism Launcher** (including each Prism instance's logs and crash reports). Ticked and deleted; skipped while the launcher runs. Worlds, mods, resource packs, screenshots, settings and accounts are never touched.
