@@ -96,7 +96,7 @@ struct UISnapshots {
     /// Smart Scan / Privacy model on its real catalog with made-up results; nothing is scanned.
     func cleanerModel(_ module: Module) -> SmartScanModel {
         // The real catalog, not as this Mac's Full Disk Access, Settings › ages or Scan Groups shape it.
-        let model = SmartScanModel(module: module) { module == .privacy ? CleanerGroup.privacy : CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) }
+        let model = SmartScanModel.isolated(module: module) { module == .privacy ? CleanerGroup.privacy : CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) }
         model.runningApps = []
         model.runningProcesses = []
         // An app launching or quitting on this Mac mid-shot would reload runningApps from the real list.

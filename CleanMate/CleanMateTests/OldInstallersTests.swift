@@ -151,7 +151,7 @@ struct OldInstallersTests {
         try write("b.iso")
         let item = try #require(Self.item())
         let policy = policy, home = home, moveToFakeTrash = moveToFakeTrash
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { [] }
         model.appBundleIDs = { [] }
         model.blockedByExclusion = { _ in false }

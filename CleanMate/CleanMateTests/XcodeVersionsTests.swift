@@ -185,7 +185,7 @@ final class XcodeVersionsTests {
 
         let running = item(running: [old.appending(path: "Contents/MacOS/Xcode").path])
         let result = await scan(running)
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [running])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [running])] }
         model.scans[running.id] = result
         #expect(model.lockedEntries(running).contains(old))
         let report = await Cleaner.clean(running, scan: result, policy: policy, trash: moveToFakeTrash,

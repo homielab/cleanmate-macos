@@ -20,7 +20,7 @@ final class FakeUpdateCheck: UpdateCheckSetting {
 /// Welcome guide: when it shows, what its last step writes, and the live Full Disk Access status.
 @MainActor
 final class WelcomeTests {
-    let suite = "CleanMateWelcomeTests-\(UUID().uuidString)"
+    let suite = TestDefaults.suite("CleanMateWelcomeTests")
     let defaults: UserDefaults
     let center = FakeReminderCenter()
     let updater = FakeUpdateCheck()
@@ -29,7 +29,7 @@ final class WelcomeTests {
 
     init() { defaults = UserDefaults(suiteName: suite)! }
 
-    deinit { UserDefaults().removePersistentDomain(forName: suite) }
+    deinit { TestDefaults.remove(suite) }
 
     func model() -> WelcomeModel {
         WelcomeModel(defaults: defaults, domain: suite, updater: updater,

@@ -147,7 +147,7 @@ final class OldScreenshotsTests {
             try FileManager.default.moveItem(at: url, to: target)
             return target
         }
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { [] }
         model.appBundleIDs = { [] }
         model.blockedByExclusion = { _ in false }

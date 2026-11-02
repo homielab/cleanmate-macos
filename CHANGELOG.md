@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan** is faster after the first scan: the size of each folder in Gradle's caches (often 500,000 files, the slowest item) is kept between scans and measured again only when something up to two levels inside it changed. On a developer Mac, a repeat Smart Scan went from 9.6 to 5.0 seconds, and Gradle caches from 4.4 to 0.9 seconds.
 
 ### Fixed
+- **Tests**: the test suite no longer depends on the items you ticked in the app on the same Mac, and no longer leaves empty settings files (`CleanMate*-<id>.plist`) in `~/Library/Preferences` after each run.
 - **Large & Old Files**, **Space Lens**, **Uninstaller**, **Login Items** and Smart Scan items moved to the Trash: CleanMate now holds each item open from its safety check to the move and moves it by its real location, so an item or folder swapped for a symlink (or another item) in between is never moved; it is left alone and logged as skipped. If something else is swapped in during the move itself, it is not counted as freed, has no Undo and is logged as failed.
 
 ## [1.5] - 2026-11-01

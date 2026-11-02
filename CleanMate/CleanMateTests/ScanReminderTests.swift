@@ -53,7 +53,7 @@ struct ScanReminderTests {
     @MainActor
     final class Setup {
         let defaults: UserDefaults
-        let suite = "CleanMateScanReminderTests-\(UUID().uuidString)"
+        let suite = TestDefaults.suite("CleanMateScanReminderTests")
         let center: FakeReminderCenter
         var now: Date
         lazy var scheduler = ScanReminderScheduler(center: center, defaults: defaults, now: { [unowned self] in now },
@@ -70,13 +70,13 @@ struct ScanReminderTests {
 
         var request: ScanReminder.Request? { center.pending[ScanReminder.requestID] }
 
-        deinit { defaults.removePersistentDomain(forName: suite) }
+        deinit { TestDefaults.remove(suite) }
     }
 
     @Test func offByDefault() {
-        let suite = "CleanMateScanReminderTests-\(UUID().uuidString)"
+        let suite = TestDefaults.suite("CleanMateScanReminderTests")
         let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { TestDefaults.remove(suite) }
         #expect(ScanReminder.frequency(defaults: defaults) == .off)
         defaults.set("hourly", forKey: Preferences.scanReminder) // unknown value
         #expect(ScanReminder.frequency(defaults: defaults) == .off)

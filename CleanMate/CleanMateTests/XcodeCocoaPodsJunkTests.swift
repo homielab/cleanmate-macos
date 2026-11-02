@@ -60,7 +60,7 @@ final class XcodeCocoaPodsJunkTests {
     }
 
     @MainActor @Test func lockedWhileToolRuns() throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningProcesses = ["pod"]
         #expect(try model.isRunning(item("cocoapods-spec-repos")) && !model.isRunning(item("xcode-device-logs")))
         model.runningProcesses = []

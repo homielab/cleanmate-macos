@@ -143,7 +143,7 @@ final class MacOSInstallersTests {
         #expect(!policy.allowsMacOSInstaller(applications.appending(path: "Install macOS Sequoia.app"), owner: { _ in 0 }))
 
         // In SmartScanModel: locked entry cannot be selected, selectedScan has 0 entries
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [itemRoot])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [itemRoot])] }
         model.scans[itemRoot.id] = scanRoot
         #expect(model.isLocked(itemRoot))
         #expect(model.selectedScan(itemRoot)?.entries.isEmpty == true)
@@ -195,7 +195,7 @@ final class MacOSInstallersTests {
     /// While an installer or one of its tools runs, the item is locked: not ticked, counted nor cleaned.
     @MainActor @Test func skippedWhileAnInstallerRuns() {
         let item = item()
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.runningApps = []
         for name in ["InstallAssistant", "InstallAssistant_springboard", "startosinstall", "createinstallmedia", "osinstallersetupd"] {
             model.runningProcesses = [name, "zsh"]

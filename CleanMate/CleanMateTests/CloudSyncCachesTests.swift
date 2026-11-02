@@ -189,7 +189,7 @@ final class CloudSyncCachesTests {
 
     /// Each item is locked while its app, a helper or its File Provider extension runs; other apps don't lock it.
     @MainActor @Test func lockedWhileTheAppRuns() {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         let cases: [(CleanerItem, apps: [String], processes: [String])] = [
             (CloudSyncCaches.googleDrive, ["com.google.drivefs", "com.google.drivefs.fpext"], ["Google Drive", "Google Drive Helper"]),
             (CloudSyncCaches.dropbox { true }, ["com.getdropbox.dropbox", "com.getdropbox.dropbox.fileprovider",

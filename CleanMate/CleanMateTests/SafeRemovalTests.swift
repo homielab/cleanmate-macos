@@ -61,7 +61,7 @@ final class SafeRemovalTests {
         #expect(docs.files.allSatisfy(exists) && exists(entry.url)) // nothing removed, not even the link
 
         // The same through Smart Scan: the entry is left and logged with its reason.
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         let policy = policy
         try fm.removeItem(at: entry.url)
         try file("Library/Caches/app/cache.db")

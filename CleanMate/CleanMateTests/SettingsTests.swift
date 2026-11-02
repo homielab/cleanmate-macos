@@ -337,14 +337,14 @@ struct SettingsTests {
         #expect(!Preferences.canExclude(URL(fileURLWithPath: "/")))
         #expect(Preferences.addingExcluded([realHome], to: []) == [realHome.standardizedFileURL.path])
         let (defaults, name) = scratchDefaults()
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { TestDefaults.remove(name) }
         #expect(Preferences.exclude([realHome], defaults: defaults).isEmpty)
         #expect(defaults.stringArray(forKey: Preferences.excludedFolders) == [])
     }
 
     /// A throwaway defaults domain: tests never touch the real exclusion list.
     private func scratchDefaults() -> (UserDefaults, String) {
-        let name = "CleanMateTests-\(UUID().uuidString)"
+        let name = TestDefaults.suite("CleanMateTests")
         return (UserDefaults(suiteName: name)!, name)
     }
 
@@ -354,7 +354,7 @@ struct SettingsTests {
         let kept = try file("Library/Caches/App/keep.bin")
         let other = try file("Library/Caches/App/other.bin")
         let (defaults, name) = scratchDefaults()
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { TestDefaults.remove(name) }
         #expect(Preferences.exclude([kept, home.appending(path: "Tool.app")], defaults: defaults) == [kept])
         #expect(defaults.stringArray(forKey: Preferences.excludedFolders) == [kept.standardizedFileURL.path])
         let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"),
@@ -370,9 +370,9 @@ struct SettingsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         _ = (try file("Library/Caches/A/data"), try file("Library/Caches/B/data"))
         let (defaults, name) = scratchDefaults()
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { TestDefaults.remove(name) }
         let item = CleanerItem(id: "c", title: "C", paths: ["~/Library/Caches"], selectableEntries: true)
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { [] }
         model.scanItem = { [policy = policy()] in await Scanner.scan($0, policy: policy, openPaths: $1) }
         model.exclude = { Preferences.exclude($0, defaults: defaults) }
@@ -400,7 +400,7 @@ struct SettingsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let big = try file("big.iso"), copy = try file("copy.iso")
         let (defaults, name) = scratchDefaults()
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { TestDefaults.remove(name) }
         let model = LargeFilesModel()
         model.exclude = { Preferences.exclude($0, defaults: defaults) }
         model.files = [big, copy].map { LargeFile(url: $0, size: 10_000, lastUsed: .now, kind: .other) }
@@ -448,13 +448,13 @@ struct SettingsTests {
 /// Smart Scan groups turned off in Settings are neither scanned nor shown; all off = no scan.
 @MainActor struct DisabledScanGroupsTests {
     @Test func disabledGroupIsNotScannedNorShown() async {
-        let name = "CleanMateTests-\(UUID().uuidString)"
+        let name = TestDefaults.suite("CleanMateTests")
         let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { TestDefaults.remove(name) }
         defaults.set("dev\nnope", forKey: Preferences.disabledScanGroups)
         let a = CleanerItem(id: "a", title: "A", paths: ["/nonexistent"])
         let b = CleanerItem(id: "b", title: "B", paths: ["/nonexistent"])
-        let model = SmartScanModel(module: .smartScan) {
+        let model = SmartScanModel.isolated(module: .smartScan) {
             [CleanerGroup(id: "junk", title: "J", systemImage: "x", items: [a]),
              CleanerGroup(id: "dev", title: "D", systemImage: "x", items: [b])]
         }
@@ -477,12 +477,12 @@ struct SettingsTests {
 
     /// A group turned off after the scan is hidden, out of the totals and not cleaned; back on, its results return.
     @Test func groupTurnedOffAfterScanIsHiddenAndNotCleaned() async {
-        let name = "CleanMateTests-\(UUID().uuidString)"
+        let name = TestDefaults.suite("CleanMateTests")
         let defaults = UserDefaults(suiteName: name)!
-        defer { defaults.removePersistentDomain(forName: name) }
+        defer { TestDefaults.remove(name) }
         let a = CleanerItem(id: "a", title: "A", paths: ["/nonexistent"])
         let b = CleanerItem(id: "b", title: "B", paths: ["/nonexistent"])
-        let model = SmartScanModel(module: .smartScan) {
+        let model = SmartScanModel.isolated(module: .smartScan) {
             [CleanerGroup(id: "junk", title: "J", systemImage: "x", items: [a]),
              CleanerGroup(id: "dev", title: "D", systemImage: "x", items: [b])]
         }

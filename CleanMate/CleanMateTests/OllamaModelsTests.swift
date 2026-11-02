@@ -158,7 +158,7 @@ struct OllamaModelsTests {
         let item = try item
         let a = try box.model("registry.ollama.ai/library/a/latest", config: 1, layers: [2])
         let b = try box.model("registry.ollama.ai/library/b/latest", config: 3, layers: [2])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         let policy = box.policy
         model.logHome = box.home
         model.appBundleIDs = { [] } // Ollama may run on this Mac
@@ -272,7 +272,7 @@ struct OllamaModelsTests {
         defer { box.remove() }
         let item = try partialItem
         let data = try box.file(box.models.appending(path: "blobs/sha256-\(box.digest(4))-partial"))
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.appBundleIDs = { [] }
         model.runningApps = []
         model.processNames = { ["ollama", "zsh"] }

@@ -284,9 +284,9 @@ struct LargeFilesTests {
 
     /// Each scope keeps its own entry count for the progress estimate; a protected scope without access is not scanned.
     @MainActor @Test func scopeChangesRescanWithItsOwnEstimateAndProtectedScopesNeedAccess() async throws {
-        let suite = "CleanMateTests-\(UUID().uuidString)"
+        let suite = TestDefaults.suite("CleanMateTests")
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { TestDefaults.remove(suite) }
         let model = LargeFilesModel()
         #expect(model.lastCountDefaults == nil) // test host: never the real preferences
         model.lastCountDefaults = defaults

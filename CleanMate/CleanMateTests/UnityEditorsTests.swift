@@ -199,7 +199,7 @@ final class UnityEditorsTests {
         let other = item(running: [editors.path + "/6000.0.23f1/Unity.app/Contents/MacOS/Unity", old.path + "x/Unity.app"])
         #expect(await scan(other).entries.map(\.lockReason) == [nil])
 
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [running])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [running])] }
         model.scans[running.id] = result
         #expect(model.lockedEntries(running).contains(old))
         let report = await Cleaner.clean(running, scan: result, policy: policy, trash: moveToFakeTrash,

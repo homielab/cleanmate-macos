@@ -171,7 +171,7 @@ final class SimulatorDevicesTests {
     }
 
     @MainActor @Test func lockedWhileXcodeSimulatorOrTestsRun() throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningApps = [] // not the apps running on this Mac
         let items = CleanerGroup.developer.items.filter { [SimulatorDevices.dataID, SimulatorDevices.clonesID].contains($0.id) }
         #expect(items.count == 2 && items.allSatisfy { !model.isRunning($0) })

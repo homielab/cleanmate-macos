@@ -168,7 +168,7 @@ struct ToolVersionManagersTests {
 
     /// Skipped while asdf or mise runs (an install, a `mise exec`); other tools don't skip it.
     @MainActor @Test func skippedWhileTheToolRuns() throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningApps = []
         for (id, name) in [(ToolVersionManagers.asdfID, "asdf"), (ToolVersionManagers.miseID, "mise")] {
             let item = try #require(CleanerGroup.developer.items.first { $0.id == id })

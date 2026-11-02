@@ -479,7 +479,7 @@ struct EndToEndCleanTests {
         }
         let deleted = CleanerItem(id: "freed-delete", title: "Junk", paths: ["~/Library/Caches/junk"])
         let trashed = CleanerItem(id: "freed-trash", title: "Old", paths: ["~/Library/Caches/old"], mode: .trash)
-        let model = SmartScanModel(module: .smartScan) {
+        let model = SmartScanModel.isolated(module: .smartScan) {
             [CleanerGroup(id: "a", title: "A", systemImage: "x", items: [deleted]),
              CleanerGroup(id: "b", title: "B", systemImage: "x", items: [trashed])]
         }

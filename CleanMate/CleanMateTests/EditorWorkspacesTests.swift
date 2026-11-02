@@ -150,7 +150,7 @@ struct EditorWorkspacesTests {
         defer { box.remove() }
         let item = box.item()
         let entry = try box.workspace("Cursor", "d1", json: #"{"folder":"\#(box.folder(box.home.path + "/gone"))"}"#)
-        let smartScan = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let smartScan = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         smartScan.appBundleIDs = { [] }
         smartScan.runningApps = []
         smartScan.processNames = { ["Cursor Helper (Plugin)", "zsh"] }

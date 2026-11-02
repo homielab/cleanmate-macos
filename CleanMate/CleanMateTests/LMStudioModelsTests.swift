@@ -132,7 +132,7 @@ struct LMStudioModelsTests {
         defer { box.remove() }
         let item = try item
         let model = try box.model(".lmstudio/models/pub", "model")
-        let smartScan = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let smartScan = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         smartScan.appBundleIDs = { [] }
         smartScan.runningApps = []
         smartScan.processNames = { ["lms", "zsh"] }

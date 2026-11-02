@@ -217,7 +217,7 @@ struct AndroidSystemImagesTests {
             let argc = Int32(strings.count - 1)
             return RunningProcesses.argumentNames(withUnsafeBytes(of: argc) { Array($0) } + strings.flatMap { Array($0.utf8) + [0] })
         }
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningApps = []
         model.runningProcesses = names(["/usr/bin/java", "java", "-cp", "/g/launcher.jar", "org.gradle.launcher.daemon.bootstrap.GradleDaemon"])
         #expect(!model.isLocked(item))

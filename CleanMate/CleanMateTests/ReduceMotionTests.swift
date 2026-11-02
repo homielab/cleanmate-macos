@@ -133,7 +133,7 @@ struct ReduceMotionTests {
     // MARK: - DoneScreen (Smart Scan / Privacy)
 
     @Test func smartScanDoneScreenWithReduceMotionIsRevealedFromStart() {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.revealsDone = true
         let state = MotionHostState()
         state.reduceMotion = true
@@ -145,7 +145,7 @@ struct ReduceMotionTests {
     }
 
     @Test func smartScanDoneScreenTogglingReduceMotionWhileOpenSnapsToRevealed() async throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.revealsDone = true
         let state = MotionHostState()
         state.reduceMotion = false
@@ -170,7 +170,7 @@ struct ReduceMotionTests {
     }
 
     @Test func privacyDoneScreenWithReduceMotionIsRevealedFromStart() {
-        let model = SmartScanModel(module: .privacy) { [] }
+        let model = SmartScanModel.isolated(module: .privacy) { [] }
         model.revealsDone = true
         let state = MotionHostState()
         state.reduceMotion = true

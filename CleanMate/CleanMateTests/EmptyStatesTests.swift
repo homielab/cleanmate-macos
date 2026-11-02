@@ -48,7 +48,7 @@ struct EmptyStatesTests {
     @MainActor @Test func privacySelectionCountsRecords() {
         let history = CleanerItem(id: "h", title: "H", paths: ["/nonexistent"])
         let cookies = CleanerItem(id: "c", title: "C", paths: ["/nonexistent"])
-        let model = SmartScanModel(module: .privacy) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [history, cookies])] }
+        let model = SmartScanModel.isolated(module: .privacy) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [history, cookies])] }
         model.scans["h"] = ItemScan(entries: [ScanEntry(url: URL(fileURLWithPath: "/tmp/h.db"), size: 0, isDatabase: true, records: 42)])
         model.scans["c"] = ItemScan(entries: [ScanEntry(url: URL(fileURLWithPath: "/tmp/c"), size: 1000)])
         model.selected = ["h"]

@@ -54,7 +54,7 @@ struct PerfTests {
     @Test func smartScan() {
         let before = Self.footprintMB()
         // The real catalog, not as this Mac's Full Disk Access, Settings › ages or Scan Groups shape it.
-        let model = SmartScanModel(module: .smartScan) { CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) }
+        let model = SmartScanModel.isolated(module: .smartScan) { CleanerGroup.smartScan(ages: .default, hasFullDiskAccess: true) }
         model.runningApps = []
         model.runningProcesses = []
         let items = model.groups.flatMap(\.items)

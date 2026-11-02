@@ -55,7 +55,7 @@ struct OpenFilesTests {
         let items = ["A", "B", "C"].map { CleanerItem(id: "open.\($0)", title: "\($0)", paths: ["~/\($0)"], skipsOpenFiles: true) }
             + [CleanerItem(id: "open.D", title: "D", paths: ["~/D"])]
         let policy = SafetyPolicy(home: home, temp: temp)
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
         model.processNames = { [] }
         model.appBundleIDs = { [] }
         model.blockedByExclusion = { _ in false }
@@ -90,7 +90,7 @@ struct OpenFilesTests {
 
     /// No item skips open files: the table is never read.
     @MainActor @Test func noReadWithoutSkipsOpenFiles() async throws {
-        let model = SmartScanModel(module: .smartScan) {
+        let model = SmartScanModel.isolated(module: .smartScan) {
             [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [CleanerItem(id: "t", title: "T", paths: ["~/T"])])]
         }
         model.processNames = { [] }

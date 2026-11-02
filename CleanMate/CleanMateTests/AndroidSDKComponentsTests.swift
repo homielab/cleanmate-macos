@@ -271,7 +271,7 @@ struct AndroidSDKComponentsTests {
     }
 
     @MainActor @Test func lockedWhileAndroidStudioGradleOrTheEmulatorRuns() throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningApps = []
         model.runningProcesses = []
         let item = try #require(CleanerGroup.developer.items.first { $0.id == AndroidSDKComponents.id })

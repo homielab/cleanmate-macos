@@ -1283,9 +1283,9 @@ struct DeveloperToolsTests {
         #expect(SizeProbe.reusable(nil, fingerprint: "a", now: now) == nil)
 
         // uuidgen prints something new on each run: same output = reused.
-        let suite = "probeOutputReuse-\(UUID())"
+        let suite = TestDefaults.suite("CleanMateProbeOutputReuse")
         let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { TestDefaults.remove(suite) }
         func probe(_ fingerprint: String) -> SizeProbe {
             SizeProbe(command: ShellCommand(executable: "/usr/bin/uuidgen"), parse: { _ in nil }, fingerprint: { fingerprint })
         }
@@ -1340,7 +1340,7 @@ struct DeveloperToolsTests {
     /// rustup downloads stay while `cargo`/`rustc` build, and are locked only while `rustup` itself runs.
     @MainActor @Test func rustupDownloadsLockedOnlyByRustup() throws {
         let rustup = try #require(CleanerGroup.developer.items.first { $0.id == "rustup-downloads" })
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningProcesses = ["cargo", "rustc"]
         #expect(!model.isRunning(rustup))
         model.runningProcesses = ["rustup"]
@@ -1354,7 +1354,7 @@ struct DeveloperToolsTests {
             let argc = Int32(strings.count - 1)
             return RunningProcesses.argumentNames(withUnsafeBytes(of: argc) { Array($0) } + strings.flatMap { Array($0.utf8) + [0] })
         }
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningProcesses = names(["/usr/bin/java", "java", "-jar",
                                         "/Users/u/.cache/firebase/emulators/cloud-firestore-emulator-v1.19.jar"])
         #expect(model.isRunning(item) && model.isLocked(item))
@@ -1936,7 +1936,7 @@ struct AppCatalogTests {
     /// always running, do not lock it.
     @MainActor @Test func adobeMediaCacheLockedWhileAnAdobeMediaAppRuns() throws {
         let item = try #require(CleanerGroup.applications().items.first { $0.id == "adobe-media-cache" })
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningApps = ["com.adobe.acc.AdobeCreativeCloud", "com.adobe.CCXProcess"]
         model.runningProcesses = ["Creative Cloud", "AdobeIPCBroker", "CCXProcess", "Core Sync", "Adobe Desktop Service"]
         #expect(!model.isLocked(item))
@@ -2062,7 +2062,7 @@ struct AppCatalogTests {
         let tool = CleanerItem(id: "blocked-381", title: "uv", paths: ["~/.cache/uv"], command: ShellCommand(executable: "/bin/echo"))
         let plain = CleanerItem(id: "plain-381", title: "plain", paths: ["~/.cache/plain"])
         let group = CleanerGroup(id: "g", title: "G", systemImage: "x", items: [tool, plain])
-        let model = SmartScanModel(module: .smartScan) { [group] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [group] }
         model.processNames = { [] }
         model.appBundleIDs = { [] }
         model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
@@ -2085,7 +2085,7 @@ struct AppCatalogTests {
         try FileManager.default.createDirectory(at: box.temp.appending(path: "c"), withIntermediateDirectories: true)
         try Data(count: 5000).write(to: box.temp.appending(path: "c/f"))
         let item = CleanerItem(id: "x", title: "X", paths: [box.temp.appending(path: "c").path])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         let policy = box.policy // not this Mac's Settings › Exclusions
         model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
         await Task {
@@ -2107,7 +2107,7 @@ struct AppCatalogTests {
             "records": ItemScan(entries: [ScanEntry(url: URL(filePath: "/r"), size: 0, isDatabase: true, records: 40)]),
             "few": ItemScan(entries: [ScanEntry(url: URL(filePath: "/f"), size: 0, isDatabase: true, records: 3)]),
         ]
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
         model.processNames = { [] }
         let (gate, open) = AsyncStream<Void>.makeStream()
         model.scanItem = { item, _ in
@@ -2127,7 +2127,7 @@ struct AppCatalogTests {
         let fast = CleanerItem(id: "fast", title: "Fast", paths: ["/nonexistent"])
         let slow = CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"])
         let (gate, open) = AsyncStream<Void>.makeStream()
-        let model = SmartScanModel(module: .smartScan) {
+        let model = SmartScanModel.isolated(module: .smartScan) {
             [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [fast, slow])]
         }
         model.processNames = { [] }
@@ -2153,7 +2153,7 @@ struct AppCatalogTests {
             CleanerItem(id: "open", title: "Open", paths: ["/nonexistent"], runningAppBundleIDs: ["com.example.open"]),
             CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"]),
         ]
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
         model.processNames = { [] }
         model.appBundleIDs = { ["com.example.open"] }
         model.runningApps = ["com.example.open"]
@@ -2193,7 +2193,7 @@ struct AppCatalogTests {
     @MainActor @Test func scanningLineIsSampledWhileAnItemIsSlow() async throws {
         let fast = CleanerItem(id: "fast", title: "Fast", paths: ["/nonexistent"])
         let slow = CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [fast, slow])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [fast, slow])] }
         model.processNames = { [] }
         let (gate, open) = AsyncStream<Void>.makeStream()
         model.scanItem = { item, _ in
@@ -2212,7 +2212,7 @@ struct AppCatalogTests {
     @MainActor @Test func upperBoundSizeIsKeptOutOfTheSelectedTotal() async {
         let sure = CleanerItem(id: "sure", title: "Sure", paths: [])
         let upTo = CleanerItem(id: "upto", title: "Up to", paths: [], sizeIsUpperBound: true)
-        let model = SmartScanModel(module: .smartScan) {
+        let model = SmartScanModel.isolated(module: .smartScan) {
             [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [sure, upTo])]
         }
         model.processNames = { [] }
@@ -2229,7 +2229,7 @@ struct AppCatalogTests {
         let locked = CleanerItem(id: "t161.locked", title: "Locked", paths: [], runningAppBundleIDs: ["test.161.app"])
         let db = CleanerItem(id: "t161.db", title: "DB", paths: [])
         let group = CleanerGroup(id: "g", title: "G", systemImage: "x", items: [a, b, empty, locked, db])
-        let model = SmartScanModel(module: .smartScan) { [group] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [group] }
         model.runningApps = ["test.161.app"]
         model.scans = ["t161.a": ItemScan(measuredSize: 1000), "t161.b": ItemScan(measuredSize: 5000), "t161.empty": ItemScan(),
                        "t161.locked": ItemScan(measuredSize: 300),
@@ -2254,7 +2254,7 @@ struct AppCatalogTests {
         let empty = CleanerItem(id: "t177.empty", title: "Empty", paths: [])
         let locked = CleanerItem(id: "t177.locked", title: "Locked", paths: [], runningAppBundleIDs: ["test.177.app"])
         let group = CleanerGroup(id: "g", title: "G", systemImage: "x", items: [a, b, empty, locked])
-        let model = SmartScanModel(module: .smartScan) { [group] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [group] }
         model.runningApps = ["test.177.app"]
         model.scans = ["t177.a": ItemScan(measuredSize: 10), "t177.b": ItemScan(measuredSize: 20), "t177.empty": ItemScan(),
                        "t177.locked": ItemScan(measuredSize: 30)]
@@ -2280,7 +2280,7 @@ struct AppCatalogTests {
         let blockedItem = CleanerItem(id: "t397.blocked", title: "Blocked", paths: [], runningAppBundleIDs: ["test.397.blocked"])
         let open = CleanerItem(id: "t397.open", title: "Open", paths: [], runningAppBundleIDs: ["test.397.open"])
         let group = CleanerGroup(id: "g", title: "G", systemImage: "x", items: [cmd, blockedItem, open])
-        let model = SmartScanModel(module: .smartScan) { [group] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [group] }
         model.appBundleIDs = { [] }
         model.processNames = { [] }
         model.runningApps = ["test.397.cmd", "test.397.blocked", "test.397.open"]
@@ -2311,7 +2311,7 @@ struct AppCatalogTests {
         try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
         let backups = CleanerItem(id: "t219.backups", title: "Backups", paths: ["~/Backups"], mode: .trash, selectableEntries: true)
         let other = CleanerItem(id: "t219.other", title: "Other", paths: ["~/Other"], mode: .trash)
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [backups, other])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [backups, other])] }
         let policy = box.policy
         model.logHome = box.home // not the real ~/Library/Logs/CleanMate/activity.log
         model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }
@@ -2366,7 +2366,7 @@ struct AppCatalogTests {
         let item = CleanerItem(id: "t268.docker", title: "Docker: unused images", paths: [],
                                command: ShellCommand(executable: "/nonexistent/docker"))
         let images = (0..<3).map { ScanEntry(url: URL(string: "docker-image:\($0)")!, size: 1_000) }
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.logHome = home
         model.appBundleIDs = { [] }
         model.processNames = { [] }
@@ -2411,7 +2411,7 @@ struct AppCatalogTests {
         let path = box.temp.appending(path: "c").path
         let policy = box.policy // not this Mac's Settings › Exclusions
         let item = CleanerItem(id: "app", title: "App", paths: [path], runningAppBundleIDs: ["test.running.app"])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.appBundleIDs = { ["test.running.app"] }
         model.runningApps = ["test.running.app"]
         // An app launching on the Mac mid-scan refreshes the list; it used to bring back the real one.
@@ -2434,7 +2434,7 @@ struct AppCatalogTests {
         try Data(count: 5000).write(to: box.temp.appending(path: "s/f"))
         let item = CleanerItem(id: "cli", title: "CLI", paths: [box.temp.appending(path: "s").path],
                                runningProcessNames: ["claude"])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { ["claude", "zsh"] }
         let policy = box.policy // not this Mac's Exclusions, Trash or activity log
         model.logHome = box.home

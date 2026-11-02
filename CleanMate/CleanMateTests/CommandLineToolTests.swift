@@ -130,11 +130,10 @@ struct CommandLineToolTests {
 
         // The app's Smart Scan over the same catalog and home.
         let policy = fixture.policy
-        let model = SmartScanModel(module: .smartScan) { fixture.groups }
+        let model = SmartScanModel.isolated(module: .smartScan) { fixture.groups }
         model.processNames = { [] }
         model.appBundleIDs = { ["com.example.running"] }
         model.runningApps = ["com.example.running"]
-        model.selectionOverrides = { [:] }
         model.blockedByExclusion = { _ in false }
         model.readOpenFiles = EndToEndCleanTests.ownOpenPaths
         model.scanItem = { await Scanner.scan($0, policy: policy, openPaths: $1) }

@@ -412,7 +412,7 @@ struct OldRuntimesTests {
         try box.node("v20.18.0")
         try box.alias("default", "v20.18.0")
         let item = OldRuntimes.nodeItem(running: { [busy.path + "/bin/node"] })
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         // Ticking the item by hand is remembered in the real defaults: forget it.
         defer { Preferences.update(Preferences.selectionOverrides) { (all: inout [String: Bool]) in all[item.id] = nil } }
         let policy = box.policy

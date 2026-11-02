@@ -89,7 +89,7 @@ struct PackageCacheItemsTests {
 
     /// Locked and not ticked while the tool runs.
     @MainActor @Test func lockedWhileToolRuns() throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningProcesses = ["zsh"]
         #expect(try !model.isRunning(item("conda-cache")) && !model.isRunning(item("pub-cache")))
         model.runningProcesses = ["micromamba"]
@@ -161,7 +161,7 @@ struct PackageCacheItemsTests {
     }
 
     @MainActor @Test func buildToolCachesLockedWhileToolRuns() throws {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningProcesses = ["bazel(app)"]
         #expect(try model.isRunning(item("bazel-cache")) && !model.isRunning(item("zig-cache")))
         model.runningProcesses = ["dotnet"]

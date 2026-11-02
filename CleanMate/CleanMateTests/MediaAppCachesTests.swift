@@ -107,7 +107,7 @@ final class MediaAppCachesTests {
     }
 
     @MainActor @Test func lockedWhileTheAppRuns() {
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         let cases: [(CleanerItem, apps: [String], processes: [String])] = [
             (MediaAppCaches.telegram, ["ru.keepcoder.Telegram", "org.telegram.desktop"], ["Telegram"]),
             (MediaAppCaches.spotify, ["com.spotify.client"], ["Spotify"]),

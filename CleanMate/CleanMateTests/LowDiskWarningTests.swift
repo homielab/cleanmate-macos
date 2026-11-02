@@ -9,7 +9,7 @@ struct LowDiskWarningTests {
     @MainActor
     final class Setup {
         let defaults: UserDefaults
-        let suite = "CleanMateLowDiskWarningTests-\(UUID().uuidString)"
+        let suite = TestDefaults.suite("CleanMateLowDiskWarningTests")
         let center: FakeReminderCenter
         var now = ScanReminderTests.date(2026, 11, 2, 9)
         var volume = SpaceLensModel.Volume(name: "Macintosh HD", total: 100 * gb, available: 8 * gb)
@@ -27,7 +27,7 @@ struct LowDiskWarningTests {
 
         func free(_ gigabytes: Int64) { volume.available = gigabytes * gb }
 
-        deinit { defaults.removePersistentDomain(forName: suite) }
+        deinit { TestDefaults.remove(suite) }
     }
 
     @Test func tenPercentByDefault() {

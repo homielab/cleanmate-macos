@@ -5,12 +5,12 @@ import Testing
 /// The menu bar item's last-scan line and Scan Now, on a throwaway defaults domain.
 @MainActor
 struct MenuBarTests {
-    let suite = "CleanMateMenuBarTests-\(UUID().uuidString)"
+    let suite = TestDefaults.suite("CleanMateMenuBarTests")
     var defaults: UserDefaults { UserDefaults(suiteName: suite)! }
     static let date = Date(timeIntervalSince1970: 1_768_478_400) // 2026-01-15 12:00 UTC
 
     @Test func lastScanIsStoredAndACleanAddsWhatItFreed() {
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { TestDefaults.remove(suite) }
         #expect(LastScan.read(defaults: defaults) == nil)
         LastScan.recordClean(freed: 10, defaults: defaults) // no scan yet: nothing to add to
         #expect(LastScan.read(defaults: defaults) == nil)
@@ -41,7 +41,7 @@ struct MenuBarTests {
 
     @Test func modelReportsFinishedScansAndCleans() async {
         let item = CleanerItem(id: "menubar.cache", title: "Cache", paths: ["/nonexistent"])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.appBundleIDs = { [] }
         model.processNames = { [] }
         model.blockedByExclusion = { _ in false }

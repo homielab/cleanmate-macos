@@ -169,11 +169,10 @@ final class EditorExtensionsTests {
     @MainActor @Test func skippedWhileAnEditorRuns() async throws {
         try makeTree()
         let item = EditorExtensions.item()
-        let smartScan = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let smartScan = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         smartScan.appBundleIDs = { [] }
         smartScan.runningApps = []
         smartScan.processNames = { ["Cursor Helper (Plugin)", "zsh"] }
-        smartScan.selectionOverrides = { [:] } // not this Mac's remembered ticks
         let policy = policy
         smartScan.logHome = home
         smartScan.readOpenFiles = noOpenFiles

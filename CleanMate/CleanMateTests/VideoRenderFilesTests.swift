@@ -158,7 +158,7 @@ final class VideoRenderFilesTests {
 
     @MainActor @Test func lockedWhileFinalCutProOrIMovieRuns() throws {
         let item = VideoRenderFiles.item(hasFullDiskAccess: { true })
-        let model = SmartScanModel(module: .smartScan) { [] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [] }
         model.runningApps = ["com.apple.Photos", "com.apple.QuickTimePlayerX"]
         model.runningProcesses = ["Photos", "QuickTime Player", "Compressor"]
         #expect(!model.isLocked(item))

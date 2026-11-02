@@ -42,9 +42,9 @@ extension ScanBenchmark {
     func windowed<Model>(_ label: String, model make: (UserDefaults) -> Model, view: (Model) -> ContentView,
                          scan: (Model) async -> Void) async {
         let runs = ProcessInfo.processInfo.environment["CLEANMATE_BENCH_RUNS"].flatMap(Int.init) ?? 3
-        let suite = "CleanMateBenchWindow-\(UUID().uuidString)"
+        let suite = TestDefaults.suite("CleanMateBenchWindow")
         let defaults = UserDefaults(suiteName: suite)!
-        defer { defaults.removePersistentDomain(forName: suite) }
+        defer { TestDefaults.remove(suite) }
         var usages: [Usage] = []
         for run in 0...runs {
             let model = make(defaults)
@@ -74,7 +74,7 @@ extension ScanBenchmark {
 
     /// The Smart Scan catalog as Settings shape it; scan times are not stored (no durations key).
     @MainActor @Test func smartScanWindow() async {
-        await windowed("smart-scan", model: { _ in SmartScanModel(module: .smartScan) { CleanerGroup.smartScan } },
+        await windowed("smart-scan", model: { _ in SmartScanModel.isolated(module: .smartScan) { CleanerGroup.smartScan } },
                        view: { ContentView(smartScan: $0, selection: .smartScan) }) { await $0.scan() }
     }
 

@@ -32,7 +32,7 @@ struct RaceTests {
 
     func smartScan(_ gates: Gates, gated: @escaping @Sendable (Int) -> Bool) -> SmartScanModel {
         let item = CleanerItem(id: "x", title: "X", paths: [])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [item])] }
         model.processNames = { [] }
         model.scanItem = { _, _ in ItemScan(measuredSize: Int64(await gates.enter(gated: gated)) * 100) }
         return model
@@ -331,7 +331,7 @@ struct RaceTests {
     @Test func smartScanNoScanWhileUndoing() async throws {
         let gates = Gates()
         let junk = CleanerItem(id: "race.junk", title: "Junk", paths: ["~/nonexistent"])
-        let model = SmartScanModel(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [junk])] }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [junk])] }
         model.scanItem = { _, _ in ItemScan() }
         model.blockedByExclusion = { _ in false }
         model.processNames = { [] }
@@ -352,7 +352,7 @@ struct RaceTests {
 
     /// Quit asks first while something is being changed: a clean, a move/put back, a launchctl change.
     @Test func quitAsksWhileChanging() async throws {
-        let smartScan = SmartScanModel(module: .smartScan), privacy = SmartScanModel(module: .privacy)
+        let smartScan = SmartScanModel.isolated(module: .smartScan), privacy = SmartScanModel.isolated(module: .privacy)
         let largeFiles = largeFiles(Gates()) { _ in false }
         let uninstaller = UninstallerModel(), spaceLens = SpaceLensModel(), loginItems = LaunchAgentsModel()
         func changing() -> Bool { ContentView.isChanging(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems) }
@@ -381,8 +381,8 @@ struct RaceTests {
     /// Quit reads the models, not a flag the window mirrored: a model still cleaning after its window
     /// closed counts until it finishes; models gone with the window never do.
     @Test func busyFollowsModelsNotWindow() {
-        var smartScan: SmartScanModel? = SmartScanModel(module: .smartScan)
-        let privacy = SmartScanModel(module: .privacy)
+        var smartScan: SmartScanModel? = SmartScanModel.isolated(module: .smartScan)
+        let privacy = SmartScanModel.isolated(module: .privacy)
         let busy = ContentView.busyCheck(smartScan!, privacy, largeFiles(Gates()) { _ in false }, UninstallerModel(),
                                          SpaceLensModel(), LaunchAgentsModel())
         privacy.phase = .cleaning // the window closed; a running clean keeps `privacy` alive
@@ -396,8 +396,8 @@ struct RaceTests {
     /// outlived its window (still cleaning) keeps asking, and drops out once all of it is gone.
     @Test func busyChecksDoNotPileUp() {
         func models() -> (SmartScanModel, () -> Bool?) {
-            let smartScan = SmartScanModel(module: .smartScan)
-            return (smartScan, ContentView.busyCheck(smartScan, SmartScanModel(module: .privacy), largeFiles(Gates()) { _ in false },
+            let smartScan = SmartScanModel.isolated(module: .smartScan)
+            return (smartScan, ContentView.busyCheck(smartScan, SmartScanModel.isolated(module: .privacy), largeFiles(Gates()) { _ in false },
                                                      UninstallerModel(), SpaceLensModel(), LaunchAgentsModel()))
         }
         let (live, check) = models()
