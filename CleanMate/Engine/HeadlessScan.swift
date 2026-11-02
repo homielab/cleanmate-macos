@@ -160,6 +160,8 @@ nonisolated enum HeadlessScan {
         var version: @Sendable () -> String = { HeadlessScan.appVersion }
         /// Moves an item to the Trash for `cleanmate clean`; tests use a fake Trash folder.
         var trash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash
+        /// Spotlight's last-opened date of a file, for `cleanmate large`.
+        var spotlightLastUsed: @Sendable (URL) -> Date? = { LargeFileScanner.spotlightLastUsedDate($0) }
     }
 
     /// The app's version (`appBundle`).

@@ -505,3 +505,194 @@ struct CommandLineToolTests {
                 == [HeadlessClean.Skipped(path: "~/.tool", reason: HeadlessClean.keptReason)])
     }
 }
+
+// MARK: - space and large
+
+extension CommandLineToolTests {
+    /// A fake home for `space` and `large`: folders of known sizes, a protected folder, an excluded one, a hard link.
+    final class FilesFixture {
+        let root = TestTemp.url("CleanMateCLIFiles")
+        var home: URL { root.appending(path: "home") }
+        /// `home` with its symlinks resolved (/var → /private/var): the form the reports print.
+        var real: String { HeadlessFiles.realPath(home.path) ?? home.path }
+        var excluded: URL { home.appending(path: "Media/Excluded") }
+        /// Path in the fake home → bytes (whole 4 KB blocks, so the allocated size is the byte count).
+        let files = ["Projects/app/build.bin": 3_002_368, "Projects/app/data.bin": 2_498_560,
+                     "Media/movie.mov": 2_002_944, "Media/old.zip": 1_200_128, "Media/small.bin": 409_600,
+                     "Media/Excluded/kept.iso": 1_503_232, "Media/node_modules/dep.bin": 1_605_632,
+                     "Documents/secret.bin": 1_101_824, "Downloads/setup.dmg": 1_302_528, "top.bin": 40_960]
+        /// Bytes of the files in Media (without the hard link) and in Projects.
+        static let mediaFiles: Int64 = 2_002_944 + 1_200_128 + 409_600 + 1_503_232 + 1_605_632
+        static let projectFiles: Int64 = 3_002_368 + 2_498_560
+        let now = Date.now.addingTimeInterval(400 * 86_400)
+
+        init() throws {
+            let fm = FileManager.default
+            for (path, bytes) in files {
+                let url = home.appending(path: path)
+                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data(repeating: 7, count: bytes).write(to: url)
+            }
+            try fm.createDirectory(at: home.appending(path: "Library/Caches"), withIntermediateDirectories: true)
+            try fm.createDirectory(at: root.appending(path: "tmp"), withIntermediateDirectories: true)
+            // A second link to build.bin in another folder: counted once by space, flagged by large.
+            try fm.linkItem(at: home.appending(path: "Projects/app/build.bin"), to: home.appending(path: "Media/build-link.bin"))
+        }
+
+        deinit { try? FileManager.default.removeItem(at: root) }
+
+        func sources(fullDiskAccess: Bool = false) -> HeadlessScan.Sources {
+            let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"), excluded: [excluded.path])
+            let now = now, opened = home.appending(path: "Media/old.zip").path
+            var sources = HeadlessScan.Sources()
+            sources.policy = { policy }
+            sources.hasFullDiskAccess = { fullDiskAccess }
+            sources.now = { now }
+            sources.version = { "9.9" }
+            // Spotlight knows only old.zip, opened 10 days before "now".
+            sources.spotlightLastUsed = { url in
+                HeadlessFiles.realPath(url.path) == HeadlessFiles.realPath(opened) ? now.addingTimeInterval(-10 * 86_400) : nil
+            }
+            return sources
+        }
+    }
+
+    static func spaceReport(_ arguments: [String], _ sources: HeadlessScan.Sources) async throws -> HeadlessFiles.SpaceReport {
+        let (code, printed) = await run(["space", "--json"] + arguments, sources)
+        try #require(code == 0, "\(printed.stderr)")
+        return try JSONDecoder().decode(HeadlessFiles.SpaceReport.self, from: Data(printed.stdout.utf8))
+    }
+
+    static func largeReport(_ arguments: [String], _ sources: HeadlessScan.Sources) async throws -> HeadlessFiles.LargeReport {
+        let (code, printed) = await run(["large", "--json"] + arguments, sources)
+        try #require(code == 0, "\(printed.stderr)")
+        return try JSONDecoder().decode(HeadlessFiles.LargeReport.self, from: Data(printed.stdout.utf8))
+    }
+
+    @Test func spaceListsTheBiggestChildrenFirstAndCountsAHardLinkOnce() async throws {
+        let fixture = try FilesFixture()
+        let report = try await Self.spaceReport([fixture.home.path], fixture.sources(fullDiskAccess: true))
+        #expect(report.path == fixture.real && report.fullDiskAccess && report.version == "9.9" && report.skipped.isEmpty)
+        #expect(report.items.map(\.name) == ["Media", "Projects", "Downloads", "Documents", "top.bin", "Library"])
+        #expect(report.items.allSatisfy { !$0.skipped && $0.reason == nil && $0.path == fixture.real + "/" + $0.name })
+        #expect(report.items.map(\.kind) == ["folder", "folder", "folder", "folder", "file", "folder"])
+        let projects = try #require(report.items.first { $0.name == "Projects" }?.size)
+        let media = try #require(report.items.first { $0.name == "Media" }?.size)
+        // The hard link to build.bin counts in whichever sibling reaches it first, never in both (folders add a few KB).
+        let files = FilesFixture.mediaFiles + FilesFixture.projectFiles
+        #expect((0..<100_000).contains(media + projects - files))
+        let all = files + 1_101_824 + 1_302_528 + 40_960
+        #expect((0..<100_000).contains(report.size - all) && report.size >= report.items.compactMap(\.size).reduce(0, +))
+        #expect(report.moreItems == 0 && report.moreSize == 0)
+
+        let limited = try await Self.spaceReport(["--limit", "2", fixture.home.path], fixture.sources(fullDiskAccess: true))
+        #expect(limited.items.map(\.name) == ["Media", "Projects"] && limited.moreItems == 4 && limited.size == report.size)
+        #expect(limited.moreSize == report.items.dropFirst(2).compactMap(\.size).reduce(0, +))
+        // `~/…` and a relative path inside it name the same folder.
+        let media2 = try await Self.spaceReport([fixture.home.path + "/Media/../Media"], fixture.sources(fullDiskAccess: true))
+        #expect(media2.path == fixture.real + "/Media" && media2.items.first?.name == "build-link.bin")
+    }
+
+    @Test func withoutFullDiskAccessProtectedFoldersAreSkippedAndNeverOpened() async throws {
+        let fixture = try FilesFixture()
+        let report = try await Self.spaceReport([fixture.home.path], fixture.sources())
+        #expect(!report.fullDiskAccess)
+        let skipped = report.items.filter(\.skipped)
+        #expect(skipped.map(\.name) == ["Documents", "Downloads"])
+        #expect(skipped.allSatisfy { $0.size == nil && $0.reason == "Needs Full Disk Access" && $0.kind == "folder" })
+        #expect(report.items.suffix(2).allSatisfy { $0.skipped }) // after the measured ones, whatever the limit
+        #expect(report.skipped.map(\.path) == [fixture.real + "/Documents", fixture.real + "/Downloads"])
+        // Neither folder's files counted.
+        #expect((0..<100_000).contains(report.size - FilesFixture.mediaFiles - FilesFixture.projectFiles - 40_960))
+        // `size` and `reason` are written as null, not left out.
+        let (_, printed) = await Self.run(["space", "--json", fixture.home.path], fixture.sources())
+        #expect(printed.stdout.contains("\"size\" : null") && printed.stdout.contains("\"reason\" : null"))
+
+        // A path in a protected folder is refused before it is read, also through a symlink.
+        let link = fixture.root.appending(path: "docs-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: fixture.home.appending(path: "Documents"))
+        for arguments in [["space", fixture.home.path + "/Documents"], ["space", fixture.home.path + "/Documents/none"],
+                          ["space", link.path], ["large", "--in", fixture.home.path + "/Downloads"]] {
+            let (code, printed) = await Self.run(arguments, fixture.sources())
+            #expect(code == 3 && printed.stdout.isEmpty && printed.stderr.contains("Full Disk Access"), "\(arguments)")
+        }
+        let large = try await Self.largeReport(["--in", fixture.home.path, "--min-size", "50MB"], fixture.sources())
+        #expect(large.skipped.map(\.path) == [fixture.real + "/Documents", fixture.real + "/Downloads"] && large.count == 0)
+
+        // With Full Disk Access they are measured like any folder.
+        let granted = try await Self.spaceReport([fixture.home.path + "/Documents"], fixture.sources(fullDiskAccess: true))
+        #expect(granted.items.map(\.name) == ["secret.bin"] && granted.items[0].size == 1_101_824)
+    }
+
+    @Test func largeFiltersLikeLargeAndOldFiles() async throws {
+        let fixture = try FilesFixture()
+        let media = fixture.home.path + "/Media"
+        let report = try await Self.largeReport(["--in", media, "--min-size", "1MB"], fixture.sources(fullDiskAccess: true))
+        // Exclusions and node_modules left out; smaller than --min-size left out; biggest first.
+        #expect(report.files.map(\.name) == ["build-link.bin", "movie.mov", "old.zip"])
+        #expect(report.files.map(\.path) == ["build-link.bin", "movie.mov", "old.zip"].map { fixture.real + "/Media/" + $0 })
+        #expect(report.files.map(\.hardLinked) == [true, false, false])
+        #expect(report.files.map(\.kind) == ["other", "video", "archive"])
+        #expect(report.count == 3 && report.size == 3_002_368 + 2_002_944 + 1_200_128 && report.moreFiles == 0)
+        #expect(report.root == fixture.real + "/Media" && report.minSize == 1_000_000 && report.olderThanDays == nil)
+        #expect(report.scannedAt == fixture.now.formatted(.iso8601))
+        // lastUsed only from Spotlight, null otherwise; modified always.
+        #expect(report.files.map { $0.lastUsed != nil } == [false, false, true])
+        #expect(report.files.allSatisfy { (try? Date($0.modified, strategy: .iso8601)) != nil })
+        let (_, printed) = await Self.run(["large", "--json", "--in", media, "--min-size", "1MB"], fixture.sources())
+        #expect(printed.stdout.contains("\"lastUsed\" : null") && printed.stdout.contains("\"olderThanDays\" : null"))
+
+        // --older-than: old.zip was opened 10 days ago, the others not for 400 days.
+        let old = try await Self.largeReport(["--in", media, "--min-size=1MB", "--older-than", "30"], fixture.sources())
+        #expect(old.files.map(\.name) == ["build-link.bin", "movie.mov"] && old.olderThanDays == 30)
+        let none = try await Self.largeReport(["--in", media, "--min-size", "1MB", "--older-than", "500"], fixture.sources())
+        #expect(none.count == 0)
+        // --min-size and --limit.
+        let big = try await Self.largeReport(["--in", media, "--min-size", "1.5MB", "--limit", "1"], fixture.sources())
+        #expect(big.files.map(\.name) == ["build-link.bin"] && big.count == 2 && big.moreFiles == 1 && big.size == 3_002_368 + 2_002_944)
+        // The whole home: the same rules, Library and protected folders aside.
+        let home = try await Self.largeReport(["--min-size", "50MB"], fixture.sources(fullDiskAccess: true))
+        #expect(home.count == 0 && home.minSize == 50_000_000 && home.skipped.isEmpty)
+    }
+
+    @Test func spaceAndLargeArgumentsAndExitCodes() async throws {
+        let fixture = try FilesFixture()
+        let home = fixture.home.path
+        for arguments in [["space", home + "/nope"], ["space", home + "/top.bin"], ["space", home, home], ["space", "--limit", "0"],
+                          ["space", "--limit", "x"], ["space", "--limit"], ["space", "--min-size", "1MB"], ["space", "--in", home],
+                          ["large", "extra"], ["large", "--in", home + "/Library"], ["large", "--in", home + "/nope"],
+                          ["large", "--in", home + "/.hidden"], ["large", "--in", "/usr"], ["large", "--min-size", "10MB"],
+                          ["large", "--min-size", "abc"], ["large", "--min-size", "0"], ["large", "--in", home + "/Media", "--min-size", "500KB"],
+                          ["large", "--older-than", "0"], ["large", "--older-than", "-3"], ["large", "--in", home, "--in", home],
+                          ["large", "--json=1"]] {
+            let (code, printed) = await Self.run(arguments, fixture.sources(fullDiskAccess: true))
+            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.hasPrefix("cleanmate: "), "\(arguments)")
+        }
+        #expect(HeadlessFiles.parseSize("50MB") == 50_000_000 && HeadlessFiles.parseSize("1.5gb") == 1_500_000_000)
+        #expect(HeadlessFiles.parseSize("500M") == 500_000_000 && HeadlessFiles.parseSize("2048") == 2048)
+        #expect(HeadlessFiles.parseSize("1 GB") == 1_000_000_000 && HeadlessFiles.parseSize("MB") == nil)
+        #expect(HeadlessFiles.parseSize("-1MB") == nil && HeadlessFiles.parseSize("1e3") == nil)
+        let space = try CommandLineTool.parse(["space"])
+        #expect(space == .space(HeadlessFiles.SpaceOptions(), json: false))
+        let large = try CommandLineTool.parse(["large", "--limit=5", "--in", "a,b"])
+        #expect(large == .large(HeadlessFiles.LargeOptions(root: "a,b", limit: 5), json: false))
+        #expect(HeadlessFiles.resolve("~/x", home: URL(filePath: "/Users/me")).path == "/Users/me/x")
+        #expect(HeadlessFiles.resolve(nil, home: URL(filePath: "/Users/me")).path == "/Users/me")
+        #expect(HeadlessFiles.resolve("a/../b", home: URL(filePath: "/Users/me"), current: "/tmp/w").path == "/tmp/w/b")
+    }
+
+    @Test func spaceAndLargeTextIsReadable() async throws {
+        let fixture = try FilesFixture()
+        let (code, space) = await Self.run(["space", fixture.home.path, "--limit", "1"], fixture.sources())
+        #expect(code == 0 && !space.stdout.contains("\u{1B}["))
+        #expect(space.stdout.contains("Media/") && space.stdout.contains("skipped: Needs Full Disk Access"))
+        #expect(space.stdout.contains("… 3 more") && space.stdout.contains("no Full Disk Access"))
+        #expect(space.stdout.contains("Nothing was deleted"))
+        let (_, large) = await Self.run(["large", "--in", fixture.home.path + "/Media", "--min-size", "1MB"], fixture.sources())
+        #expect(large.stdout.contains("3 files, ") && large.stdout.contains(" (1 MB or larger) in "))
+        #expect(large.stdout.contains("(hard link)") && large.stdout.contains("last used "))
+        #expect(large.stdout.contains("/Media/movie.mov") && large.stdout.contains("2 MB"))
+        let (_, help) = await Self.run(["--help"], fixture.sources())
+        for flag in ["space [PATH]", "--limit", "--min-size", "--older-than", "--in PATH"] { #expect(help.stdout.contains(flag), "\(flag)") }
+    }
+}

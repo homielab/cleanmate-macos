@@ -1,6 +1,7 @@
 import Foundation
 
-/// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, as text or JSON.
+/// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, and the read-only
+/// `space` and `large` (what takes the disk space), as text or JSON.
 /// Stdin only for `clean`'s confirmation on a terminal; no network; colours only on a terminal without `NO_COLOR`.
 nonisolated enum CommandLineTool {
     enum Exit: Int32 {
@@ -41,6 +42,8 @@ nonisolated enum CommandLineTool {
         case list(json: Bool, privacy: Bool)
         case scan(HeadlessScan.Options, json: Bool, requireFullDiskAccess: Bool)
         case clean(HeadlessScan.Options, json: Bool, requireFullDiskAccess: Bool, dryRun: Bool, yes: Bool)
+        case space(HeadlessFiles.SpaceOptions, json: Bool)
+        case large(HeadlessFiles.LargeOptions, json: Bool)
     }
 
     struct UsageError: Error, Equatable { let message: String }
@@ -50,15 +53,17 @@ nonisolated enum CommandLineTool {
           cleanmate list [--json] [--privacy]
           cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]
           cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]
+          cleanmate space [PATH] [--limit N] [--json]
+          cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]
           cleanmate --version
           cleanmate --help
 
         """
 
     static let help = """
-        cleanmate: CleanMate's Smart Scan on the command line, for scripts and AI agents.
-        list and scan are read-only. clean removes what scan finds with the app's safety rules and
-        writes the app's activity log. It never connects to the network.
+        cleanmate: CleanMate's Smart Scan, Space Lens and Large & Old Files on the command line, for scripts
+        and AI agents. list, scan, space and large are read-only. clean removes what scan finds with the
+        app's safety rules and writes the app's activity log. It never connects to the network.
 
         \(usage)
         Commands:
@@ -76,6 +81,13 @@ nonisolated enum CommandLineTool {
                           Items marked "may hold data" (Docker volumes, stopped containers) are deleted
                           for good with what is inside: clean takes them only when named with --only,
                           never because they are ticked in the app.
+          space           What takes the space in a folder (default: your home folder), like Space Lens: its
+                          size and its biggest files and folders, sizes as `du -x` counts them (a hard-linked
+                          file once). Read-only: to remove something, use Space Lens in CleanMate.
+          large           Your largest files, like Large & Old Files: in your home folder (not ~/Library or
+                          hidden folders; node_modules, Pods and DerivedData skipped) or the folder named with
+                          --in, Settings › Exclusions left out. Read-only: to move files to the Trash, use
+                          Large & Old Files in CleanMate.
 
         Options:
           --json          Print one JSON object instead of text.
@@ -86,13 +98,20 @@ nonisolated enum CommandLineTool {
           --dry-run       clean: report what would be cleaned; delete nothing, log nothing.
           --yes           clean: don't ask. Required when not run in a terminal (scripts, AI agents).
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
+          --limit N       space, large: list the N biggest (default 20 for space, 50 for large).
+          --min-size SIZE large: only files of at least SIZE, like 100MB or 1.5GB (1 MB = 1,000,000 bytes).
+                          Default and minimum 50MB for the home folder; 1MB minimum with --in.
+          --older-than DAYS
+                          large: only files not opened or changed for DAYS days.
+          --in PATH       large: search this folder (in your home folder or on an external drive) instead.
           -h, --help      Show this help.
           --version       Show the version.
 
         Full Disk Access:
           macOS grants it to the app that runs cleanmate (Terminal, iTerm, your AI agent's app), not to
           CleanMate. Without it the scan skips the folders macOS protects (Desktop, Documents, Downloads,
-          the Trash, Mail, other apps' data) and reports "fullDiskAccess": false. To grant it: System
+          the Trash, Mail, other apps' data) and reports "fullDiskAccess": false; space and large list
+          them as skipped, and refuse a PATH inside one (exit code 3). To grant it: System
           Settings › Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
         Undo:
@@ -102,8 +121,8 @@ nonisolated enum CommandLineTool {
         Exit codes:
           0  OK (also when some items or files were skipped)
           1  Error
-          2  Invalid arguments
-          3  No Full Disk Access with --require-fda
+          2  Invalid arguments (also a PATH that is missing, not a folder or can't be read)
+          3  No Full Disk Access with --require-fda, or space or large asked for a folder macOS protects
           4  clean without --yes and without a terminal: nothing was deleted
 
         """
@@ -146,8 +165,41 @@ nonisolated enum CommandLineTool {
         case .clean(let options, let json, let requireAccess, let dryRun, let yes):
             return await clean(options, json: json, requireFullDiskAccess: requireAccess, dryRun: dryRun, yes: yes,
                                sources: sources, output: output)
+        case .space(let options, let json):
+            let folder: URL
+            do { folder = try HeadlessFiles.spaceFolder(options, sources: sources) } catch { return pathError(error, output) }
+            let showsProgress = output.progress && !json
+            if showsProgress { output.err("Measuring…") }
+            let report = await HeadlessFiles.space(folder, limit: options.limit, sources: sources)
+            if showsProgress { output.err("\r\u{1B}[K") }
+            guard let text = json ? encode(report) : spaceText(report, home: sources.policy().homeURL, color: output.color)
+            else { return Exit.failure.rawValue }
+            output.out(text)
+        case .large(let options, let json):
+            let root: URL
+            do { root = try HeadlessFiles.largeFolder(options, sources: sources) } catch { return pathError(error, output) }
+            let showsProgress = output.progress && !json
+            if showsProgress { output.err("Searching…") }
+            let found = try? await HeadlessFiles.large(root, options: options, sources: sources)
+            if showsProgress { output.err("\r\u{1B}[K") }
+            guard let report = found else {
+                output.err("cleanmate: could not search \(options.root ?? "~")\n")
+                return Exit.failure.rawValue
+            }
+            guard let text = json ? encode(report) : largeText(report, home: sources.policy().homeURL, color: output.color)
+            else { return Exit.failure.rawValue }
+            output.out(text)
         }
         return Exit.ok.rawValue
+    }
+
+    private static func pathError(_ error: HeadlessFiles.PathError, _ output: Output) -> Int32 {
+        if error.needsFullDiskAccess {
+            output.err("cleanmate: \(error.message)\n")
+            return Exit.noFullDiskAccess.rawValue
+        }
+        output.err("cleanmate: \(error.message)\nRun `cleanmate --help` for usage.\n")
+        return Exit.usage.rawValue
     }
 
     private static func noFullDiskAccess(_ output: Output) -> Int32 {
@@ -246,6 +298,47 @@ nonisolated enum CommandLineTool {
             case "scan": return .scan(options, json: json, requireFullDiskAccess: requireAccess)
             default: return .clean(options, json: json, requireFullDiskAccess: requireAccess, dryRun: dryRun, yes: yes)
             }
+        case "space", "large":
+            var json = false
+            var space = HeadlessFiles.SpaceOptions(), large = HeadlessFiles.LargeOptions()
+            while let argument = rest.popFirst() {
+                let (name, inline) = split(argument)
+                func value() throws -> String {
+                    guard let text = inline ?? rest.popFirst(), !text.isEmpty, !text.hasPrefix("-") else {
+                        throw UsageError(message: "\(name) needs a value")
+                    }
+                    return text
+                }
+                func number(minimum: Int) throws -> Int {
+                    let text = try value()
+                    guard let number = Int(text), number >= minimum else {
+                        throw UsageError(message: "\(name) needs a whole number of at least \(minimum), not `\(text)`")
+                    }
+                    return number
+                }
+                switch (name, first) {
+                case ("-h", _), ("--help", _): return .help
+                case ("--json", _) where inline == nil: json = true
+                case ("--limit", _):
+                    let limit = try number(minimum: 1)
+                    (space.limit, large.limit) = (limit, limit)
+                case ("--min-size", "large"):
+                    let text = try value()
+                    guard let size = HeadlessFiles.parseSize(text) else {
+                        throw UsageError(message: "--min-size needs a size like 100MB or 1.5GB, not `\(text)`")
+                    }
+                    large.minSize = size
+                case ("--older-than", "large"): large.olderThanDays = try number(minimum: 1)
+                case ("--in", "large"):
+                    guard large.root == nil else { throw UsageError(message: "--in takes one folder") }
+                    large.root = try value()
+                case (_, "space") where !argument.hasPrefix("-") && space.path == nil: space.path = argument
+                default:
+                    throw UsageError(message: argument.hasPrefix("-") ? "unknown option `\(name)` for \(first)"
+                                                                      : "unexpected argument `\(argument)`")
+                }
+            }
+            return first == "space" ? .space(space, json: json) : .large(large, json: json)
         default:
             throw UsageError(message: first.hasPrefix("-") ? "unknown option `\(first)`" : "unknown command `\(first)`")
         }
@@ -372,5 +465,61 @@ nonisolated enum CommandLineTool {
         text += "\n" + style.bold(total) + "\n"
         if let log = report.log { text += style.dim("Logged in \(log). No Undo here: put items back from the Trash in Finder.") + "\n" }
         return text
+    }
+
+    /// `~/…` for a path in the home folder, else the full path.
+    private static func shown(_ path: String, home: URL) -> String {
+        HeadlessScan.displayPath(URL(fileURLWithPath: path), home: home)
+    }
+
+    private static func rightAligned(_ text: String, _ width: Int) -> String {
+        String(repeating: " ", count: max(0, width - text.count)) + text
+    }
+
+    static func spaceText(_ report: HeadlessFiles.SpaceReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = style.bold("\(shown(report.path, home: home))  \(size(report.size))") + "\n"
+        for item in report.items {
+            let name = item.name + (item.kind == "folder" ? "/" : "")
+            if item.skipped {
+                text += "  \(rightAligned("–", 10))  \(name)  " + style.yellow("skipped: \(item.reason ?? HeadlessScan.needsAccess)") + "\n"
+            } else {
+                text += "  \(rightAligned(size(item.size ?? 0), 10))  \(name)\n"
+            }
+        }
+        if report.items.isEmpty { text += "  Empty.\n" }
+        if report.moreItems > 0 {
+            text += style.dim("  … \(report.moreItems) more, \(size(report.moreSize))") + "\n"
+        }
+        text += skippedNote(report.skipped, home: home, style: style)
+        return text + style.dim("Nothing was deleted. To remove something, use Space Lens in CleanMate.") + "\n"
+    }
+
+    static func largeText(_ report: HeadlessFiles.LargeReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = ""
+        let day = Date.ISO8601FormatStyle(timeZone: .current).year().month().day()
+        for file in report.files {
+            let modified = (try? Date(file.modified, strategy: .iso8601)) ?? .distantPast
+            let used = file.lastUsed.flatMap { try? Date($0, strategy: .iso8601) }.map { max($0, modified) } ?? modified
+            text += "  \(rightAligned(size(file.size), 10))  \(shown(file.path, home: home))  "
+                + style.dim("last used \(used.formatted(day))") + (file.hardLinked ? "  " + style.yellow("(hard link)") : "") + "\n"
+        }
+        if report.files.isEmpty { text += "No files found.\n" }
+        if report.moreFiles > 0 { text += style.dim("  … \(report.moreFiles) more") + "\n" }
+        let age = report.olderThanDays.map { ", not used for \($0) day\($0 == 1 ? "" : "s")" } ?? ""
+        text += "\n" + style.bold("\(report.count) file\(report.count == 1 ? "" : "s"), \(size(report.size))")
+            + " (\(size(report.minSize)) or larger\(age)) in \(shown(report.root, home: home))\n"
+        if report.files.contains(where: \.hardLinked) {
+            text += style.dim("(hard link): another link keeps the file on disk; moving this one frees nothing.") + "\n"
+        }
+        text += skippedNote(report.skipped, home: home, style: style)
+        return text + style.dim("Nothing was deleted. To move files to the Trash, use Large & Old Files in CleanMate.") + "\n"
+    }
+
+    private static func skippedNote(_ skipped: [HeadlessFiles.Skipped], home: URL, style: Style) -> String {
+        guard !skipped.isEmpty else { return "" }
+        return style.yellow("Note: no Full Disk Access, so these folders were not read: "
+                            + skipped.map { shown($0.path, home: home) }.joined(separator: ", ") + " (see `cleanmate --help`).") + "\n"
     }
 }

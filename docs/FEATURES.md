@@ -166,7 +166,7 @@ Every scan shows its progress and can be stopped with **Stop**, which ends it ri
 
 CleanMate.app includes `cleanmate`, a command with no window for scripts and AI agents (Claude Code, Codex…). It
 uses the same items, safety rules, **Settings › Exclusions** and **Scan Groups** as Smart Scan, and reads your ticks.
-`list` and `scan` are read-only. `clean` removes what Smart Scan would, through the app's own cleaning code, and writes
+`list`, `scan`, `space` and `large` are read-only. `clean` removes what Smart Scan would, through the app's own cleaning code, and writes
 the app's activity log. The command changes no setting, reads stdin only to ask before a clean on a terminal, and never
 connects to the network.
 
@@ -184,6 +184,8 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 | `cleanmate list [--json] [--privacy]` | Every Smart Scan item: group, id, name, what it removes, ticked by default or not, deleted or moved to the Trash, whether it may hold data, whether it needs Full Disk Access. |
 | `cleanmate scan [--only ID,ID…] [--group G,G…] [--privacy] [--json] [--require-fda]` | What Smart Scan would find now: items by group with their size, the total ticked by default, and a note when Full Disk Access is missing. |
 | `cleanmate clean [--only ID,ID…] [--group G,G…] [--privacy] [--dry-run] [--yes] [--json] [--require-fda]` | Scans again, then cleans; per item what was deleted, moved to the Trash or kept and why, then the totals. |
+| `cleanmate space [PATH] [--limit N] [--json]` | What fills a folder, like Space Lens: its children (folders and files) by size, biggest first, the folder's total, and the folders not read without Full Disk Access. PATH defaults to your home folder. |
+| `cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]` | Large files, like Large & Old Files: biggest first, with kind, last change, last use and whether other hard links exist, then the count and total found. |
 | `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Undo, Full Disk Access and exit codes. |
 
 - `--only` scans only the named items (ids from `cleanmate list`); `--group` only the named groups: `system`, `user`
@@ -199,8 +201,9 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
   clean them in Smart Scan instead.
 - Text output has colours only on a terminal and never when `NO_COLOR` is set; `--json` prints one JSON object.
   Names and descriptions are always in English.
-- Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments, `3` no Full Disk Access
-  with `--require-fda`, `4` `clean` without `--yes` and without a terminal (nothing was deleted).
+- Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments or a PATH that does not
+  exist, is not a folder or can't be read, `3` no Full Disk Access with `--require-fda`, or a `space` / `large` PATH in a
+  folder macOS protects without it, `4` `clean` without `--yes` and without a terminal (nothing was deleted).
 
 `cleanmate list --json`:
 
@@ -263,6 +266,67 @@ in Smart Scan.
 CleanMate. Without it the scan still runs, skips the folders macOS protects (as the app does), prints a note in text
 and reports `"fullDiskAccess": false`; `--require-fda` exits with code 3 instead. To grant it: System Settings ›
 Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
+
+### What takes space
+
+`cleanmate space` and `cleanmate large` answer "what fills my disk?" with the engines of **Space Lens** and **Large &
+Old Files**, so a script or an agent doesn't need `du` or `find`. Both only read: to remove what they find, use Space
+Lens or Large & Old Files in the app (they move items to the Trash).
+
+- `space` measures each child of PATH (default: the home folder; `~/…` and relative paths work) like Space Lens: hard
+  links counted once, files on other volumes not counted. `--limit N` (default 20) shows the N biggest; `moreItems`
+  and `moreSize` count the rest. Run it again on the biggest folder to drill down.
+- `large` finds files of `--min-size` or more (default `50MB`; accepts `KB`, `MB`, `GB`, `TB`, 1 MB = 10⁶ bytes) in
+  the home folder or the folder given with `--in`, with the same rules as Large & Old Files: **Settings › Exclusions**,
+  nothing in `~/Library`, hidden folders, app bundles and other packages, `node_modules`, `Pods` or `DerivedData`; an
+  external drive works. `--min-size` is at least 50 MB for the whole home folder and 1 MB for a folder.
+  `--older-than DAYS` keeps files not opened (per Spotlight) or changed for that long. `--limit N` (default 50) shows
+  the N biggest; `count` and `size` cover all.
+- Without Full Disk Access, the folders macOS protects (Desktop, Documents, Downloads, Mail…) are never opened, so no
+  permission prompt appears: they are listed in `skipped` (text: a note) and, in `space`, as items with `"skipped": true`
+  and `size` `null`. A PATH inside one exits with code 3.
+
+`cleanmate space --json` (bytes; `size` is the whole folder without skipped folders):
+
+```json
+{
+  "fullDiskAccess" : false,
+  "items" : [
+    { "kind" : "folder", "name" : "Developer", "path" : "/Users/me/Developer", "reason" : null, "size" : 96000000000, "skipped" : false },
+    { "kind" : "file", "name" : "backup.zip", "path" : "/Users/me/backup.zip", "reason" : null, "size" : 2100000000, "skipped" : false },
+    { "kind" : "folder", "name" : "Documents", "path" : "/Users/me/Documents", "reason" : "Needs Full Disk Access", "size" : null, "skipped" : true }
+  ],
+  "moreItems" : 9,
+  "moreSize" : 4200000000,
+  "path" : "/Users/me",
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "size" : 182000000000,
+  "skipped" : [ { "path" : "/Users/me/Documents", "reason" : "Needs Full Disk Access" } ],
+  "version" : "1.5"
+}
+```
+
+`cleanmate large --json --min-size 1GB --older-than 180` (`kind`: `video`, `archive`, `diskImage`, `installer` or
+`other`; `lastUsed` from Spotlight, `null` when unknown; `hardLinked`: moving the file to the Trash frees nothing while
+other links remain):
+
+```json
+{
+  "count" : 1,
+  "files" : [
+    { "hardLinked" : false, "kind" : "diskImage", "lastUsed" : "2025-03-14T09:12:00Z", "modified" : "2025-03-01T10:00:00Z", "name" : "Xcode_16.dmg", "path" : "/Users/me/Downloads/Xcode_16.dmg", "size" : 3400000000 }
+  ],
+  "fullDiskAccess" : true,
+  "minSize" : 1000000000,
+  "moreFiles" : 0,
+  "olderThanDays" : 180,
+  "root" : "/Users/me",
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "size" : 3400000000,
+  "skipped" : [ ],
+  "version" : "1.5"
+}
+```
 
 ### Cleaning
 
@@ -329,10 +393,12 @@ Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is
 The [Agent Skill](https://agentskills.io) in [`skills/cleanmate/`](../skills/cleanmate/SKILL.md) tells Claude Code,
 Codex, Cursor and other agents how to use `cleanmate`: find it, scan, show you the result by group (deleted or to the
 Trash, locked items and why, Full Disk Access), clean with `--yes --only` only the items you confirmed, then report what
-was freed, moved to the Trash and kept. It never installs anything, never adds Privacy items or items that are not
+was freed, moved to the Trash and kept. Asked what takes space, it runs `cleanmate space` (then again on the biggest
+folder) or `cleanmate large` and shows the result, and sends you to Space Lens or Large & Old Files to remove anything.
+It never installs anything, never adds Privacy items or items that are not
 ticked by default unless you ask, cleans an item that may hold data (Docker volumes, stopped containers) only when you
-name it after seeing its list, and points you to the app for what the command doesn't do (Large & Old Files,
-Uninstaller, Space Lens, Maintenance). Install it with:
+name it after seeing its list, never deletes the files `space` or `large` found, and points you to the app for what
+the command doesn't do (removing those files, Uninstaller, Maintenance). Install it with:
 
 ```sh
 bunx skills add homielab/cleanmate-macos

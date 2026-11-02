@@ -37,7 +37,8 @@ See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and short
 The app includes a `cleanmate` command for scripts and AI agents (Claude Code, Codex…): `cleanmate list` shows every
 Smart Scan item, `cleanmate scan --json` measures them like Smart Scan, and `cleanmate clean` cleans them with the
 same safety rules, exclusions and activity log as the app (`--dry-run` to preview; without a terminal it needs
-`--yes`). Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
+`--yes`). `cleanmate space [PATH]` shows what fills a folder, like Space Lens, and `cleanmate large` lists large files,
+like Large & Old Files; both only read. Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
 if ticked in the app. It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
 link it into a folder on your PATH:
 
@@ -50,7 +51,8 @@ cleanmate --help
 Commands, options, the JSON format and Full Disk Access: [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
 
 **AI agents.** An [Agent Skill](https://agentskills.io) in `skills/cleanmate/` teaches Claude Code, Codex, Cursor and
-others to scan first, show you the result and clean only what you confirm: `bunx skills add homielab/cleanmate-macos`.
+others to scan first, show you the result and clean only what you confirm, and to answer "what takes space?" with
+`space` and `large`: `bunx skills add homielab/cleanmate-macos`.
 
 ## Install
 

@@ -1,6 +1,6 @@
 ---
 name: cleanmate
-description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans only what the user confirms.
+description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space or which files are large, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans only what the user confirms.
 ---
 
 # CleanMate for macOS
@@ -83,9 +83,36 @@ There is no Undo in the command: items moved to the Trash can be put back from t
 Exit codes: 0 OK (also when something was skipped), 1 error, 2 bad arguments (stderr says why), 3 no Full Disk Access
 with `--require-fda`, 4 `clean` without `--yes` and without a terminal.
 
+## What takes space
+
+When the user asks what fills the disk or which files are big, measure with these instead of `du` or `find`: they
+follow the app's rules (exclusions, hard links counted once, protected folders never opened without Full Disk Access).
+Both are read-only.
+
+```bash
+cleanmate space --json                       # the home folder's children by size, like Space Lens
+cleanmate space ~/Library --json --limit 10  # drill into the biggest folder
+cleanmate large --json                       # files of 50 MB or more in the home folder, like Large & Old Files
+cleanmate large --json --min-size 1GB --older-than 180 --in ~/Downloads
+```
+
+`space` lists `items` biggest first (`size` in bytes, `kind` `folder` or `file`), then `moreItems` / `moreSize` for
+the rest beyond `--limit` (20). Start at the home folder and run `space` again on the biggest folder or two until the
+answer is clear (a project's `node_modules`, a video folder). `large` lists `files` biggest first with `kind` (video,
+archive, diskImage, installer, other), `modified`, `lastUsed` (Spotlight; may be null) and `hardLinked` (moving it to
+the Trash frees nothing while other links remain); `--older-than DAYS` keeps files not used for that long, `--in` a
+folder (then `--min-size` can go down to 1 MB). Show sizes human readable and paths with `~`.
+
+Both report `skipped` folders (no Full Disk Access): say they were not measured. A path inside one exits with code 3,
+a path that does not exist or is not a folder with code 2.
+
+Neither deletes anything. Never delete or move these files yourself, with `cleanmate` or by hand: `cleanmate clean`
+only takes Smart Scan items. To remove what you found, send the user to the app (`open -a CleanMate`): Space Lens for
+folders, Large & Old Files for files, both moving them to the Trash so they can be put back. If it is junk Smart Scan
+covers (DerivedData, caches, `node_modules`), scan and clean that item instead.
+
 ## Beyond Smart Scan
 
-Large & old files, uninstalling apps, Space Lens, login items and maintenance tasks are in the app: `open -a CleanMate`.
-Point the user there.
+Uninstalling apps, login items and maintenance tasks are in the app: `open -a CleanMate`. Point the user there.
 
 More: [reference.md](reference.md).

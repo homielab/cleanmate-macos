@@ -8,6 +8,8 @@
 | `cleanmate scan --json` | measures the items like Smart Scan in the app; changes nothing |
 | `cleanmate clean --dry-run --json --only ID,ID` | what a clean would do; deletes nothing, logs nothing |
 | `cleanmate clean --yes --json --only ID,ID` | scans again, then cleans those items |
+| `cleanmate space [PATH] --json` | a folder's children by size, like Space Lens (default: the home folder); read-only |
+| `cleanmate large --json` | large files, like Large & Old Files (default: 50 MB or more in the home folder); read-only |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
 Options for `scan` and `clean`:
@@ -26,6 +28,17 @@ Options for `scan` and `clean`:
   one by one, except entries with a `reason` (a volume a stopped container still uses). The rows the user ticks in the
   app's Smart Scan stay in the app: `clean` does not see them, so it takes all of them. To keep some (a database), the
   user cleans them in the app instead, ticking only the ones to remove.
+
+Options for `space` and `large`:
+
+- `--limit N`: show the N biggest (`space` 20, `large` 50); the rest is counted in `moreItems` / `moreSize` or
+  `moreFiles`.
+- `large --min-size SIZE`: `50MB` by default, `1GB`, `500MB`… (1 MB = 10⁶ bytes). At least 50 MB for the whole home
+  folder, 1 MB with `--in`.
+- `large --older-than DAYS`: only files not opened or changed for that many days.
+- `large --in PATH`: search this folder (in the home folder but not in `~/Library`, or an external drive).
+- Without Full Disk Access, the folders macOS protects are listed in `skipped` and never read; a PATH inside one exits
+  with code 3. A PATH that does not exist, is not a folder or can't be read exits with code 2.
 
 ## Example conversation
 
@@ -147,8 +160,71 @@ a container or image ID), not a file.
 does with a ticked item that may hold data: nothing, reported `locked`. With `--dry-run`, `dryRun` is `true`, `log` is `null`
 and the numbers are what a clean would free.
 
+## Example: what takes space
+
+> **User:** What is filling my disk?
+>
+> **Agent:** *(runs `cleanmate space --json`, then `cleanmate space ~/Developer --json` on the biggest folder)* Your
+> home folder holds 182 GB. The biggest part is Developer, 96 GB, mostly `~/Developer/game/Builds` (41 GB) and
+> `~/Developer/web/node_modules` (3.2 GB). Then Movies 38 GB and Library 31 GB. Documents and Downloads were not
+> measured: the app running me has no Full Disk Access.
+>
+> To remove builds you no longer need, open Space Lens in CleanMate: it moves them to the Trash so you can put them
+> back. `node_modules` folders you have not touched for months are also in Smart Scan; shall I scan for them?
+
+## `space --json` (shortened)
+
+```json
+{
+  "fullDiskAccess" : false,
+  "items" : [
+    { "kind" : "folder", "name" : "Developer", "path" : "/Users/me/Developer", "reason" : null, "size" : 96000000000, "skipped" : false },
+    { "kind" : "folder", "name" : "Movies", "path" : "/Users/me/Movies", "reason" : null, "size" : 38000000000, "skipped" : false },
+    { "kind" : "file", "name" : "backup.zip", "path" : "/Users/me/backup.zip", "reason" : null, "size" : 2100000000, "skipped" : false },
+    { "kind" : "folder", "name" : "Documents", "path" : "/Users/me/Documents", "reason" : "Needs Full Disk Access", "size" : null, "skipped" : true }
+  ],
+  "moreItems" : 9,
+  "moreSize" : 4200000000,
+  "path" : "/Users/me",
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "size" : 182000000000,
+  "skipped" : [
+    { "path" : "/Users/me/Documents", "reason" : "Needs Full Disk Access" }
+  ],
+  "version" : "1.5"
+}
+```
+
+`size` is the whole folder without the skipped ones, hard links counted once. Skipped folders come after the measured
+ones, with `size` `null`.
+
+## `large --json` (shortened)
+
+```json
+{
+  "count" : 2,
+  "files" : [
+    { "hardLinked" : false, "kind" : "diskImage", "lastUsed" : "2025-03-14T09:12:00Z", "modified" : "2025-03-01T10:00:00Z", "name" : "Xcode_16.dmg", "path" : "/Users/me/Downloads/Xcode_16.dmg", "size" : 3400000000 },
+    { "hardLinked" : false, "kind" : "video", "lastUsed" : null, "modified" : "2024-08-20T18:30:00Z", "name" : "trip.mov", "path" : "/Users/me/Movies/trip.mov", "size" : 1900000000 }
+  ],
+  "fullDiskAccess" : true,
+  "minSize" : 1000000000,
+  "moreFiles" : 0,
+  "olderThanDays" : 180,
+  "root" : "/Users/me",
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "size" : 5300000000,
+  "skipped" : [ ],
+  "version" : "1.5"
+}
+```
+
+`count` and `size` cover every file found, `files` the biggest `--limit` of them. `lastUsed` is when the file was last
+opened, from Spotlight, `null` when Spotlight does not know.
+
 ## Safety
 
 `cleanmate` cleans only the locations of CleanMate's catalog, with the app's safety rules and the user's exclusions
 (Settings › Exclusions). It never runs as root, never touches system files macOS protects, and never connects to the
-network. Every clean is written to the activity log.
+network. Every clean is written to the activity log. `space` and `large` only read: to remove what they find, the
+user opens Space Lens or Large & Old Files in the app.
