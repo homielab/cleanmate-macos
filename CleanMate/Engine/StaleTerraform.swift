@@ -65,6 +65,23 @@ nonisolated enum StaleTerraform {
         return newest
     }
 
+    /// Names a plugin cache holds at its top: one folder per registry host (`registry.terraform.io`,
+    /// `registry.opentofu.org`), so a dot and no leading dot. Anything else in a configured folder is not Terraform's.
+    static let pluginHostNames = ["[!.]*.*"]
+
+    /// A registry host folder of a plugin cache: a real folder (not a file nor a symlink) named like a host, as
+    /// Terraform writes it (lower case letters, digits and `-`, a top-level label of 2+ letters): `backup.d`,
+    /// `v1.2` or `Photos.photoslibrary` are not.
+    static func isPluginHost(_ url: URL) -> Bool {
+        let labels = url.lastPathComponent.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2, let top = labels.last, top.count >= 2, top.allSatisfy({ $0.isASCII && $0.isLowercase }),
+              labels.allSatisfy({ label in
+                  !label.isEmpty && label.allSatisfy { $0.isASCII && ($0.isLowercase || $0.isNumber || $0 == "-") }
+              }) else { return false }
+        var info = stat()
+        return lstat(url.path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+    }
+
     /// Plugin cache folders Terraform is told about: `TF_PLUGIN_CACHE_DIR` in this process's environment (the
     /// command line tool run from a shell) and `plugin_cache_dir = "<absolute path>"` in `~/.terraformrc`. Each is
     /// then checked like a shell folder (inside home, no symlink); the shell profile's variable is read by `shell:`.

@@ -289,10 +289,14 @@ extension CleanerGroup {
         dockerVolumes,
         // Infrastructure tools. Terraform's shared plugin cache (also `TF_PLUGIN_CACHE_DIR`, `plugin_cache_dir` in
         // ~/.terraformrc): unticked, `terraform init` downloads providers again; projects linking into it need init again.
+        // Only its registry host folders (`StaleTerraform.isPluginHost`): a variable set by mistake to a project or
+        // documents folder lists nothing else of it.
         dev("terraform-plugin-cache", "Terraform plugin cache",
             note: "Providers shared by projects, downloaded again by terraform init",
-            ["~/.terraform.d/plugin-cache"], shell: ["TF_PLUGIN_CACHE_DIR": [""]], selected: false,
+            ["~/.terraform.d/plugin-cache"], included: StaleTerraform.pluginHostNames,
+            shell: ["TF_PLUGIN_CACHE_DIR": [""]], selected: false,
             processes: ["terraform", "tofu", "terraform-provider-*"], openFiles: true,
+            skipsEntry: { { !StaleTerraform.isPluginHost($0) } },
             config: ConfigFolders(read: StaleTerraform.configuredPluginCaches(home:))),
         // Only minikube's downloads (ISO, preload images, kic base image, kubectl/kubeadm binaries); never `machines`,
         // `profiles`, certificates or config. Skipped while minikube or a VM driver it starts runs.
@@ -301,9 +305,11 @@ extension CleanerGroup {
             ["~/.minikube/cache"], selected: false,
             processes: ["minikube", "docker-machine-driver-*", "vfkit", "hyperkit", "qemu-system-*"], openFiles: true),
         // Helm's repository indexes and downloaded charts, fetched again by helm repo update; never its config or data
-        // (repositories, plugins).
+        // (repositories, plugins). Only `repository` and `content` (`included`): `plugins` holds the sources of plugins
+        // installed from git, and `HELM_CACHE_HOME` may name a folder holding other files.
         dev("helm-cache", "Helm cache", note: "Repository indexes and downloaded charts; repositories and plugins are kept",
-            ["~/Library/Caches/helm"], shell: ["HELM_CACHE_HOME": [""], "XDG_CACHE_HOME": ["helm"]], processes: ["helm"]),
+            ["~/Library/Caches/helm"], included: ["repository", "content"],
+            shell: ["HELM_CACHE_HOME": [""], "XDG_CACHE_HOME": ["helm"]], processes: ["helm"]),
         // OrbStack: the app's caches (its downloaded updates too) and logs; never ~/.orbstack's ssh keys, config,
         // shell setup or run folder, nor the machines and containers (in its group container). Skipped while the app
         // or its VM manager (`dev.kdrag0n.MacVirt.vmgr`) runs; a log a process still writes is kept.

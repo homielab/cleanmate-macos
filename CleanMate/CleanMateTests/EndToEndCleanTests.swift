@@ -321,6 +321,11 @@ struct EndToEndCleanTests {
                     try write(folder.appending(path: "junk-\(item.id)/state.vscdb"), Data(repeating: 1, count: 4096))
                     continue
                 }
+                if item.id == "terraform-plugin-cache" { // a provider under a registry host folder
+                    let provider = "registry.terraform.io/hashicorp/aws/1.0.0/darwin_arm64/terraform-provider-aws"
+                    try write(folder.appending(path: provider), Data(repeating: 1, count: 4096))
+                    continue
+                }
                 guard let included = item.included else {
                     // Old IDE versions only lists a version older than the newest (bait above) of its product.
                     let name = item.id != "old-ide-versions" ? "junk-\(item.id)"
