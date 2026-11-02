@@ -9,7 +9,7 @@ enum TestDefaults {
     static func suite(_ prefix: String) -> String { TestTemp.url(prefix).path }
 
     static func remove(_ suite: String) {
-        TestDefaults.remove(suite)
+        UserDefaults.standard.removePersistentDomain(forName: suite)
         CFPreferencesAppSynchronize(suite as CFString)
         try? FileManager.default.removeItem(atPath: suite + ".plist")
     }
