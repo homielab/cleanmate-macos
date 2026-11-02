@@ -77,7 +77,8 @@ struct AgentSkillTests {
         for rule in ["Never install anything yourself", "Always scan first", "--privacy", "selectedByDefault",
                      "clean --yes", "Contents/Helpers/cleanmate", "~/Library/Logs/CleanMate/activity.log",
                      "cleanmate space --json", "cleanmate large --json", "cleanmate dupes --json", "Never delete or move these files yourself",
-                     "cleanmate trash --yes", "only with the exact paths they confirmed", "cleanmate restore"] {
+                     "cleanmate trash --yes", "only with the exact paths they confirmed", "cleanmate restore",
+                     "cleanmate restore --list --json"] {
             #expect(skill.contains(rule), "\(rule)")
         }
     }
@@ -85,7 +86,7 @@ struct AgentSkillTests {
     @Test func jsonSamplesDecodeAsReports() throws {
         let text = try Self.text("reference.md")
         let blocks = text.components(separatedBy: "```json\n").dropFirst().map { $0.components(separatedBy: "```").first ?? "" }
-        try #require(blocks.count == 7)
+        try #require(blocks.count == 8)
         let scan = try JSONDecoder().decode(HeadlessScan.Report.self, from: Data(blocks[0].utf8))
         #expect(scan.items.contains { $0.locked })
         let clean = try JSONDecoder().decode(HeadlessClean.Report.self, from: Data(blocks[1].utf8))
@@ -104,5 +105,8 @@ struct AgentSkillTests {
         #expect(restore.items.filter { !$0.skipped }.count == restore.count && restore.items.contains { $0.path == nil })
         // The trashed path trash prints is what restore takes.
         #expect(restore.items.first?.trashed == moved.first?.trashed)
+        let list = try JSONDecoder().decode(HeadlessTrash.ListReport.self, from: Data(blocks[7].utf8))
+        #expect(list.version == 1 && list.count == list.items.count && list.items.first?.trashed == moved.first?.trashed)
+        #expect(list.items.allSatisfy { $0.date != nil } && list.items.map(\.date) == list.items.map(\.date).sorted(by: { ($0 ?? "") > ($1 ?? "") }))
     }
 }

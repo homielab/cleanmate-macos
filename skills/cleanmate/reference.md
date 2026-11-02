@@ -12,7 +12,8 @@
 | `cleanmate large --json` | large files, like Large & Old Files (default: 50 MB or more in the home folder); read-only |
 | `cleanmate dupes --json` | duplicate files among those `large` finds, like the Duplicates Only filter; read-only |
 | `cleanmate trash --yes --json PATH…` | moves exactly those files and folders to the Trash, after the user confirmed them |
-| `cleanmate restore --json TRASHED…` | puts items `trash` moved back at their old place, never overwriting |
+| `cleanmate restore --list --json` | what CleanMate (the app and `cleanmate`) moved to the Trash and is still there, newest first; read-only |
+| `cleanmate restore --json TRASHED…` | puts items CleanMate moved back at their old place, never overwriting |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
 Options for `scan` and `clean`:
@@ -287,16 +288,34 @@ until the Trash is emptied. `trashed` is the argument for `restore` (Finder may 
   "items" : [
     { "path" : "/Users/me/Downloads/trip copy.mov", "reason" : null, "skipped" : false, "trashed" : "/Users/me/.Trash/trip copy.mov" },
     { "path" : "/Users/me/Movies/trip.mov", "reason" : "Something is already at its place: nothing was overwritten", "skipped" : true, "trashed" : "/Users/me/.Trash/trip.mov" },
-    { "path" : null, "reason" : "Not moved to the Trash by `cleanmate trash` (or put back already)", "skipped" : true, "trashed" : "/Users/me/.Trash/other.mov" }
+    { "path" : null, "reason" : "Not moved to the Trash by CleanMate (or put back already): see `cleanmate restore --list`", "skipped" : true, "trashed" : "/Users/me/.Trash/other.mov" }
   ],
   "log" : "~/Library/Logs/CleanMate/activity.log",
   "version" : "1.5"
 }
 ```
 
-`path` is the old place. `restore` only knows what `trash` moved (kept in
-`~/Library/Application Support/CleanMate/trashed.json`); items moved to the Trash in Finder or by the app are put back
-with Put Back in Finder.
+`path` is the old place. `restore` only knows what CleanMate moved: `trash`, `clean`, and in the app
+Smart Scan, Large & Old Files, Space Lens and the Uninstaller (kept in
+`~/Library/Application Support/CleanMate/trashed.json`, the last 1,000). Items the user moved to the Trash in Finder
+are put back with Put Back in Finder; deleted junk can't be put back.
+
+## `restore --list --json` (shortened)
+
+```json
+{
+  "count" : 2,
+  "items" : [
+    { "date" : "2026-11-02T09:41:12+07:00", "kind" : "file", "path" : "/Users/me/Downloads/trip copy.mov", "size" : 1200000000, "source" : "Command Line", "trashed" : "/Users/me/.Trash/trip copy.mov" },
+    { "date" : "2026-11-01T18:03:55+07:00", "kind" : "folder", "path" : "/Users/me/Projects/old-app", "size" : 734003200, "source" : "Space Lens", "trashed" : "/Users/me/.Trash/old-app" }
+  ],
+  "version" : 1
+}
+```
+
+Newest first, at most 200 (`--limit N`). `date` is when it was moved, `source` what moved it (`Command Line`,
+`Smart Scan`, `Large & Old Files`, `Space Lens`, `Uninstaller`), `size` its bytes then. Items no longer in the Trash
+are not listed. Each `trashed` is an argument for `restore`. `version` is this format's version (1), not the app's.
 
 ## Safety
 

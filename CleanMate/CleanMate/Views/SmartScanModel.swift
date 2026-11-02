@@ -502,6 +502,7 @@ final class SmartScanModel: ObservableObject {
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
                                    size: result.freed, mode: item.mode, home: logHome)
             }
+            TrashRecords.add(result.trashed, module: module.title, home: logHome) { _ in ActivityLog.english(item.title) }
             for url in result.changed { ActivityLog.recordSkipped(module: module.title, item: url.path, home: logHome) }
             for url in result.failed { ActivityLog.recordFailed(module: module.title, item: url.path, home: logHome) }
         }

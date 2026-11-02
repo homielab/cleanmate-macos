@@ -339,7 +339,7 @@ struct CommandLineToolTests {
         let (declined, asked) = await Self.run(["clean", "--only", "cli-caches,cli-old"], sources, answer: "")
         #expect(declined == 0 && asked.stdout.isEmpty && asked.stderr.contains("Proceed? [y/N]"))
         #expect(asked.stderr.contains("About to clean 2 items: 49 KB deleted (junk apps rebuild), 16 KB moved to the Trash."))
-        #expect(asked.stderr.contains("Nothing was deleted") && asked.stderr.contains("No Undo"))
+        #expect(asked.stderr.contains("Nothing was deleted") && asked.stderr.contains("can't be put back"))
         for path in fixture.files.keys { #expect(fixture.exists(path), "\(path)") }
         #expect(!FileManager.default.fileExists(atPath: ActivityLog.url(home: fixture.home).path))
 

@@ -176,6 +176,7 @@ nonisolated enum HeadlessClean {
                     ActivityLog.record(module: module, item: ActivityLog.english(item.title), count: removed,
                                        size: cleaned.freed, mode: item.mode, home: home)
                 }
+                TrashRecords.add(cleaned.trashed, module: module, home: home) { _ in ActivityLog.english(item.title) }
                 for url in cleaned.changed { ActivityLog.recordSkipped(module: module, item: url.path, home: home) }
                 for url in cleaned.failed { ActivityLog.recordFailed(module: module, item: url.path, home: home) }
             }

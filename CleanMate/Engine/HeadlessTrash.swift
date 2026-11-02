@@ -5,8 +5,8 @@ import Foundation
 /// not in ~/Library, not hidden, not inside a package, not a top-level folder of the home), Settings › Exclusions, and
 /// without Full Disk Access stay out of the folders macOS protects; a symlink is refused (name what it points to).
 /// The move goes through `CleanReport.trashing` (`SafeRemoval.trash`: only the item checked moves) and is logged.
-/// Nothing is ever deleted. Each move is kept in a small record (`recordURL`) so `restore` puts back only what `trash`
-/// moved, to its old place, never over something already there.
+/// Nothing is ever deleted. Each move, the app's too, is kept in a small record (`TrashRecords`) so `restore --list`
+/// shows what CleanMate moved and `restore` puts back only that, to its old place, never over something already there.
 nonisolated enum HeadlessTrash {
     /// The activity log's module for both commands.
     static let module: LocalizedStringResource = "Command Line"
@@ -79,6 +79,47 @@ nonisolated enum HeadlessTrash {
         var log: String
     }
 
+    /// One item `cleanmate restore --list` shows: moved to the Trash by CleanMate and still there.
+    struct ListItem: Codable, Equatable, Sendable {
+        /// Where it is in the Trash: the argument for `cleanmate restore`.
+        var trashed: String
+        /// Its old place.
+        var path: String
+        /// Bytes when moved.
+        var size: Int64
+        /// "folder" or "file".
+        var kind: String
+        /// When it was moved (ISO 8601); nil for a record written before dates were kept.
+        var date: String?
+        /// What moved it: the activity log's module, like "Command Line", "Large & Old Files" or "Smart Scan".
+        var source: String
+
+        enum CodingKeys: String, CodingKey { case trashed, path, size, kind, date, source }
+
+        /// Absent values are written as `null`.
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(trashed, forKey: .trashed)
+            try container.encode(path, forKey: .path)
+            try container.encode(size, forKey: .size)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(date, forKey: .date)
+            try container.encode(source, forKey: .source)
+        }
+    }
+
+    /// `cleanmate restore --list`, the same on macOS and Linux: `version` is this format's, not the app's.
+    struct ListReport: Codable, Equatable, Sendable {
+        var version: Int
+        /// Items listed.
+        var count: Int
+        /// Newest first.
+        var items: [ListItem]
+    }
+
+    /// Items listed by `restore --list` when no `--limit` is given.
+    static let listLimit = 200
+
     // MARK: - Checks
 
     /// A path to move, checked: `reason` set when it is skipped.
@@ -89,6 +130,7 @@ nonisolated enum HeadlessTrash {
     }
 
     static let notFound = "Not found"
+    static let notRecorded = "Not moved to the Trash by CleanMate (or put back already): see `cleanmate restore --list`"
     static let symlinkReason = "A symlink: name the file or folder it points to"
     static let outsideHome = "Outside your home folder"
     static let homeReason = "Your home folder itself: name what is inside it"
@@ -160,13 +202,12 @@ nonisolated enum HeadlessTrash {
     // MARK: - trash
 
     /// Moves the movable `targets` to the Trash through `CleanReport.trashing`, checked again right before each move,
-    /// logs each one and keeps a record of where it went for `restore`.
+    /// logs each one and keeps a record of where it went for `restore` (`TrashRecords`, through `trashing`).
     static func trash(_ targets: [Target], sources: HeadlessScan.Sources) -> TrashReport {
         let policy = sources.policy()
         let home = policy.homeURL
         var report = TrashReport(version: sources.version(), count: 0, size: 0, items: [],
                                  log: HeadlessScan.displayPath(ActivityLog.url(home: home), home: home))
-        var records: [Record] = []
         for target in targets {
             var item = target.item
             defer { report.items.append(item) }
@@ -191,26 +232,37 @@ nonisolated enum HeadlessTrash {
                 report.size += size
                 if let trashed = moved.trashed.first {
                     item.trashed = trashed.inTrash.path
-                    if let id = SafeRemoval.FileID(trashed.inTrash) { records.append(Record(trashed, id: id)) }
                 } else {
                     item.reason = "Moved, but macOS did not say where: put it back from the Trash in Finder"
                 }
             }
         }
-        if !records.isEmpty { updateRecords(home: home) { $0 += records } }
         return report
     }
 
     // MARK: - restore
 
-    /// Puts back each item `trash` moved and the record knows, by its path in the Trash: only when it is still the
-    /// item moved, nothing is at its old place (never overwritten) and its old folder is still the same real folder
-    /// (not a symlink now, same volume). Each one put back is logged "restored" and leaves the record.
+    /// What CleanMate moved to the Trash (the app and the command line) and is still there, newest first, at most
+    /// `limit`. Read-only: no record file is made or changed.
+    static func list(limit: Int = listLimit, sources: HeadlessScan.Sources) -> ListReport {
+        let items = TrashRecords.inTrash(home: sources.policy().homeURL).reversed().prefix(limit).map { record in
+            var info = stat()
+            let isFolder = lstat(record.trashed, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+            return ListItem(trashed: record.trashed, path: record.original, size: record.size,
+                            kind: isFolder ? "folder" : "file", date: record.date, source: record.moduleName)
+        }
+        return ListReport(version: 1, count: items.count, items: Array(items))
+    }
+
+    /// Puts back each item CleanMate moved and `TrashRecords` knows (the app's moves too), by its path in the Trash:
+    /// only when it is still the item moved, nothing is at its old place (never overwritten) and its old folder is
+    /// still the same real folder (not a symlink now, same volume). Each one put back is logged "restored" under the
+    /// module and item its move was logged with, and leaves the record.
     static func restore(_ arguments: [String], sources: HeadlessScan.Sources) -> RestoreReport {
         let home = sources.policy().homeURL
         var report = RestoreReport(version: sources.version(), count: 0, items: [],
                                    log: HeadlessScan.displayPath(ActivityLog.url(home: home), home: home))
-        updateRecords(home: home, create: false) { records in
+        TrashRecords.update(home: home, create: false) { records in
             var seen = Set<String>()
             for argument in arguments {
                 let url = HeadlessFiles.resolve(argument, home: home)
@@ -218,7 +270,7 @@ nonisolated enum HeadlessTrash {
                 var item = RestoreItem(trashed: url.path, path: nil, skipped: true, reason: nil)
                 defer { report.items.append(item) }
                 guard let index = records.firstIndex(where: { $0.matches(url) }) else {
-                    item.reason = "Not moved to the Trash by `cleanmate trash` (or put back already)"
+                    item.reason = notRecorded
                     continue
                 }
                 let record = records[index]
@@ -235,7 +287,9 @@ nonisolated enum HeadlessTrash {
                     item.reason = "Its folder is a symlink now: nothing was moved"
                     continue
                 }
-                switch TrashUndo.putBack(record.item, module: module, home: home) {
+                let module = LocalizedStringResource(String.LocalizationValue(record.moduleName))
+                switch TrashUndo.putBack(record.item, module: module, home: home,
+                                         logName: { record.logItem ?? $0.path }) {
                 case .restored:
                     item.skipped = false
                     report.count += 1
@@ -253,87 +307,5 @@ nonisolated enum HeadlessTrash {
             }
         }
         return report
-    }
-
-    // MARK: - Record
-
-    /// One move of `trash`, kept until it is put back or no longer in the Trash.
-    struct Record: Codable, Equatable, Sendable {
-        var original: String
-        var trashed: String
-        var size: Int64
-        /// The old folder with symlinks resolved, and its volume, when moved (`TrashedItem`).
-        var folder: String
-        var volume: Int32?
-        /// The item in the Trash: put back only while it is still this one.
-        var device: Int32
-        var inode: UInt64
-
-        init(_ item: TrashedItem, id: SafeRemoval.FileID) {
-            original = item.original.path
-            trashed = item.inTrash.path
-            size = item.size
-            folder = item.folder
-            volume = item.volume
-            device = id.device
-            inode = id.inode
-        }
-
-        var id: SafeRemoval.FileID { SafeRemoval.FileID(device: device, inode: inode) }
-        var item: TrashedItem {
-            TrashedItem(original: URL(fileURLWithPath: original), inTrash: URL(fileURLWithPath: trashed), size: size,
-                        folder: folder, volume: volume)
-        }
-
-        /// `url` names this record's place in the Trash, as printed or with its symlinks resolved.
-        func matches(_ url: URL) -> Bool {
-            let path = url.standardizedFileURL.path
-            if path == URL(fileURLWithPath: trashed).standardizedFileURL.path { return true }
-            guard let real = HeadlessFiles.realPath(path) else { return false }
-            return real == HeadlessFiles.realPath(trashed)
-        }
-    }
-
-    /// At most this many records; the oldest go first.
-    static let recordLimit = 1_000
-
-    /// `~/Library/Application Support/CleanMate/trashed.json` of `home`.
-    static func recordURL(home: URL) -> URL {
-        home.appending(path: "Library/Application Support/CleanMate/trashed.json")
-    }
-
-    /// The records of `home`, oldest first.
-    static func records(home: URL) -> [Record] {
-        (try? Data(contentsOf: recordURL(home: home))).flatMap { try? JSONDecoder().decode([Record].self, from: $0) } ?? []
-    }
-
-    /// Reads, changes and writes the records under an exclusive lock, so two runs at once keep both changes. Records
-    /// of items no longer in the Trash are dropped. An unreadable file counts as empty; a write error loses nothing else.
-    /// `create` false: no file is made when there is none (`change` sees no records).
-    static func updateRecords(home: URL, create: Bool = true, _ change: (inout [Record]) -> Void) {
-        let url = recordURL(home: home)
-        if create {
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        }
-        let fd = open(url.path, O_RDWR | O_CLOEXEC | O_NOFOLLOW | (create ? O_CREAT : 0), 0o600)
-        guard fd >= 0 else {
-            var none: [Record] = []
-            change(&none)
-            return
-        }
-        defer { close(fd) }
-        guard flock(fd, LOCK_EX) == 0 else { return }
-        defer { flock(fd, LOCK_UN) }
-        let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
-        let data = (try? handle.readToEnd()) ?? Data()
-        var records = (try? JSONDecoder().decode([Record].self, from: data)) ?? []
-        change(&records)
-        records.removeAll { SafeRemoval.FileID(URL(fileURLWithPath: $0.trashed)) != $0.id }
-        records = Array(records.suffix(recordLimit))
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard let out = try? encoder.encode(records) else { return }
-        guard ftruncate(fd, 0) == 0, lseek(fd, 0, SEEK_SET) == 0 else { return }
-        try? handle.write(contentsOf: out)
     }
 }

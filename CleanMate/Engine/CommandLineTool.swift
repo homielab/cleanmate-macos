@@ -48,6 +48,7 @@ nonisolated enum CommandLineTool {
         case dupes(HeadlessFiles.DupesOptions, json: Bool)
         case trash(paths: [String], json: Bool, yes: Bool)
         case restore(paths: [String], json: Bool)
+        case restoreList(limit: Int, json: Bool)
     }
 
     struct UsageError: Error, Equatable { let message: String }
@@ -62,6 +63,7 @@ nonisolated enum CommandLineTool {
           cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]
           cleanmate trash [--yes] [--json] [--] PATH…
           cleanmate restore [--json] [--] TRASHED…
+          cleanmate restore --list [--limit N] [--json]
           cleanmate --version
           cleanmate --help
 
@@ -107,10 +109,13 @@ nonisolated enum CommandLineTool {
                           (like ~/Documents itself), not excluded in Settings › Exclusions, and not a symlink;
                           anything else is skipped with the reason. On a terminal it asks first; anywhere
                           else it needs --yes. Prints where each item went in the Trash.
-          restore         Puts back items `cleanmate trash` moved, named by their path in the Trash (as trash
-                          printed it), to the exact place they came from. Never overwrites: skipped when
-                          something is at that place now, or its folder was moved, removed or replaced by
-                          a symlink.
+          restore         Puts back items CleanMate moved to the Trash (`cleanmate trash`, Smart Scan, Large &
+                          Old Files, Space Lens, the Uninstaller; also after CleanMate quit), named by their
+                          path in the Trash (as trash or restore --list printed it), to the exact place they
+                          came from. Never overwrites: skipped when something is at that place now, or its
+                          folder was moved, removed or replaced by a symlink. Deleted junk can't be put back.
+                          With --list it only lists those items still in the Trash, newest first: when,
+                          size, where each came from and its path in the Trash.
 
         Options:
           --json          Print one JSON object instead of text.
@@ -122,7 +127,9 @@ nonisolated enum CommandLineTool {
           --yes, -y       clean, trash: don't ask. Required when not run in a terminal (scripts, AI agents).
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
           --limit N       space, large: list the N biggest (default 20 for space, 50 for large);
-                          dupes: the N groups wasting the most space (default 20).
+                          dupes: the N groups wasting the most space (default 20);
+                          restore --list: the N newest (default 200).
+          --list          restore: list what can be put back instead of putting anything back.
           --min-size SIZE large, dupes: only files of at least SIZE, like 100MB or 1.5GB (1 MB = 1,000,000 bytes).
                           Default and minimum 50MB for the home folder; 1MB minimum with --in.
           --older-than DAYS
@@ -140,9 +147,11 @@ nonisolated enum CommandLineTool {
           Settings › Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
         Undo:
-          clean has no Undo. What went to the Trash can be put back from the Trash in Finder (Put Back);
-          deleted junk is rebuilt by the apps that use it. Check first with `cleanmate clean --dry-run`.
-          trash: `cleanmate restore TRASHED…` puts the items back, until the Trash is emptied.
+          Deleted junk can't be put back: the apps that use it rebuild it. Check first with
+          `cleanmate clean --dry-run`. What CleanMate moved to the Trash (trash, clean, and the app's
+          Smart Scan, Large & Old Files, Space Lens and Uninstaller) is listed by
+          `cleanmate restore --list`, and `cleanmate restore TRASHED…` puts it back, until the Trash
+          is emptied.
 
         Exit codes:
           0  OK (also when some items or files were skipped)
@@ -234,6 +243,11 @@ nonisolated enum CommandLineTool {
         case .restore(let paths, let json):
             let report = HeadlessTrash.restore(paths, sources: sources)
             guard let text = json ? encode(report) : restoreText(report, home: sources.policy().homeURL, color: output.color)
+            else { return Exit.failure.rawValue }
+            output.out(text)
+        case .restoreList(let limit, let json):
+            let report = HeadlessTrash.list(limit: limit, sources: sources)
+            guard let text = json ? encode(report) : restoreListText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
         }
@@ -337,7 +351,7 @@ nonisolated enum CommandLineTool {
             text += "Not cleaned, may hold data (name with --only to clean): "
                 + plan.held.map(\.report.name).joined(separator: ", ") + "\n"
         }
-        return text + "No Undo here: put items back from the Trash in Finder.\nProceed? [y/N] "
+        return text + "Deleted junk can't be put back; `cleanmate restore` puts back what goes to the Trash.\nProceed? [y/N] "
     }
 
     static func parse(_ arguments: [String]) throws -> Command {
@@ -430,7 +444,7 @@ nonisolated enum CommandLineTool {
             default: return .dupes(dupes, json: json)
             }
         case "trash", "restore":
-            var json = false, yes = false, paths: [String] = []
+            var json = false, yes = false, list = false, limit: Int?, paths: [String] = []
             while let argument = rest.popFirst() {
                 switch argument {
                 case "--":
@@ -439,13 +453,25 @@ nonisolated enum CommandLineTool {
                 case "-h", "--help": return .help
                 case "--json": json = true
                 case "--yes" where first == "trash", "-y" where first == "trash": yes = true
+                case "--list" where first == "restore": list = true
+                case _ where first == "restore" && split(argument).0 == "--limit":
+                    let text = split(argument).1 ?? rest.popFirst() ?? ""
+                    guard let number = Int(text), number >= 1 else {
+                        throw UsageError(message: "--limit needs a whole number of at least 1, not `\(text)`")
+                    }
+                    limit = number
                 case _ where !argument.hasPrefix("-") || argument == "-": paths.append(argument)
                 default: throw UsageError(message: "unknown option `\(split(argument).0)` for \(first)")
                 }
             }
+            if list || limit != nil {
+                guard list else { throw UsageError(message: "--limit goes with restore --list") }
+                guard paths.isEmpty else { throw UsageError(message: "restore --list takes no TRASHED paths") }
+                return .restoreList(limit: limit ?? HeadlessTrash.listLimit, json: json)
+            }
             guard !paths.isEmpty else {
                 throw UsageError(message: first == "trash" ? "trash needs the PATH of each file or folder to move"
-                                                           : "restore needs the TRASHED path of each item, as trash printed it")
+                                                           : "restore needs the TRASHED path of each item, as trash or restore --list printed it")
             }
             return first == "trash" ? .trash(paths: paths, json: json, yes: yes) : .restore(paths: paths, json: json)
         default:
@@ -572,7 +598,9 @@ nonisolated enum CommandLineTool {
             + (report.upTo > 0 ? " (up to \(size(report.upTo)) of it may stay shared)" : "")
             + (report.inTrash > 0 ? ", \(size(report.inTrash)) of it in the Trash until you empty it" : "") + "."
         text += "\n" + style.bold(total) + "\n"
-        if let log = report.log { text += style.dim("Logged in \(log). No Undo here: put items back from the Trash in Finder.") + "\n" }
+        if let log = report.log {
+            text += style.dim("Logged in \(log)." + (report.inTrash > 0 ? " Undo: `cleanmate restore --list`." : "")) + "\n"
+        }
         return text
     }
 
@@ -682,6 +710,22 @@ nonisolated enum CommandLineTool {
         text += "\n" + style.bold("Put back \(report.count) item\(report.count == 1 ? "" : "s").") + "\n"
         if report.count > 0 { text += style.dim("Logged in \(report.log).") + "\n" }
         return text
+    }
+
+    static func restoreListText(_ report: HeadlessTrash.ListReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = ""
+        let when = DateFormatter()
+        when.locale = Locale(identifier: "en_US_POSIX")
+        when.dateFormat = "yyyy-MM-dd HH:mm"
+        for item in report.items {
+            let date = item.date.flatMap { try? Date($0, strategy: .iso8601) }.map(when.string)
+                ?? "–".padding(toLength: 16, withPad: " ", startingAt: 0)
+            text += "  \(date)  \(rightAligned(size(item.size), 10))  \(shown(item.path, home: home))  "
+                + style.dim("\(item.source) → \(shown(item.trashed, home: home))") + "\n"
+        }
+        if report.items.isEmpty { return "Nothing CleanMate moved to the Trash is still there.\n" }
+        return text + "\n" + style.dim("Put back: cleanmate restore TRASHED… (the path after →)") + "\n"
     }
 
     /// `path` quoted for a shell when it needs it.

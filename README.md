@@ -40,7 +40,8 @@ same safety rules, exclusions and activity log as the app (`--dry-run` to previe
 `--yes`). `cleanmate space [PATH]` shows what fills a folder, like Space Lens, `cleanmate large` lists large files,
 like Large & Old Files, and `cleanmate dupes` finds duplicate files among them; all three only read.
 `cleanmate trash PATH…` moves exactly the files and folders you name to the Trash, with the same safety rules as
-Space Lens (never `~/Library`, hidden files or anything excluded), and `cleanmate restore` puts them back. Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
+Space Lens (never `~/Library`, hidden files or anything excluded), and `cleanmate restore` puts them back. `cleanmate restore --list` shows everything CleanMate (the app or the command)
+moved to the Trash that is still there, so it can be put back later. Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
 if ticked in the app. It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
 link it into a folder on your PATH:
 

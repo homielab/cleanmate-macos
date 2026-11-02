@@ -53,8 +53,9 @@ nonisolated struct CleanReport: Sendable {
 
     /// Moves each item to the Trash (never deletes) if `allows` its real path right before, through
     /// `SafeRemoval.trash`: only the item checked is moved. Logs each one moved, each one that changed since the check
-    /// ("skipped") and each move that took something else ("failed"). `trash` is injectable so tests use a fake
-    /// Trash folder; `beforeMove` lets them swap an item between check and move.
+    /// ("skipped") and each move that took something else ("failed"), and keeps a record of each one moved
+    /// (`TrashRecords`, for `cleanmate restore`). `trash` is injectable so tests use a fake Trash folder; `beforeMove`
+    /// lets them swap an item between check and move.
     static func trashing(_ items: [(url: URL, size: Int64)], module: LocalizedStringResource, home: URL,
                          allows: (URL) -> Bool, trash: (URL) throws -> URL? = moveToTrash,
                          beforeMove: (URL) -> Void = { _ in }) -> CleanReport {
@@ -80,6 +81,7 @@ nonisolated struct CleanReport: Sendable {
                 report.skipped += 1
             }
         }
+        TrashRecords.add(report.trashed, module: module, home: home)
         return report
     }
 }

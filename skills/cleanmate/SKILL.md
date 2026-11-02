@@ -80,7 +80,8 @@ The result has `freed`, `inTrash`, `upTo` (part of `freed` that may stay shared 
 `trashed`, `skipped` (`path` + `reason`: in use, changed since the scan…), `dataLoss`, `locked` + `reason`. `log` is the activity
 log (`~/Library/Logs/CleanMate/activity.log`), also shown in the app's Settings › Activity.
 
-There is no Undo in the command: items moved to the Trash can be put back from the Trash in Finder (Put Back).
+Deleted junk can't be put back. Items `clean` moved to the Trash can, with `restore` (see "Put back what
+CleanMate moved").
 
 Exit codes: 0 OK (also when something was skipped), 1 error, 2 bad arguments (stderr says why), 3 no Full Disk Access
 with `--require-fda`, 4 `clean` or `trash` without `--yes` and without a terminal.
@@ -139,9 +140,33 @@ Full Disk Access. The result lists, per path, `path`, `size`, `kind`, `trashed` 
 for `restore`), `skipped` and `reason`; `count` and `size` (bytes) cover what moved. Without a terminal `trash` needs
 `--yes`: without it nothing moves and the exit code is 4.
 
-`restore` takes the `trashed` paths and puts each item back at its old place. It never overwrites: an item whose place
+`restore` takes the `trashed` paths (from `trash`, or `restore --list` for earlier moves, also the app's) and puts each
+item back at its old place. It never overwrites: an item whose place
 is taken again, or whose folder was moved or replaced by a symlink, is `skipped` with a `reason`. Both commands write
 the activity log.
+
+## Put back what CleanMate moved
+
+When the user wants back something CleanMate removed (today, yesterday, "the file it moved"), whether the app or
+`cleanmate` moved it:
+
+1. Run `cleanmate restore --list --json`: what CleanMate moved to the Trash and is still there, newest first, with
+   `date`, `path` (where it was), `size`, `source` (`Smart Scan`, `Large & Old Files`, `Space Lens`, `Uninstaller`,
+   `Command Line`) and `trashed`.
+2. Show the matching items (date, old path, size, source) and let the user pick. Don't put back anything they didn't
+   pick.
+3. Run `cleanmate restore --json TRASHED…` with the `trashed` path of each picked item, quoted. Report what was put
+   back and each `reason` for what was skipped (something is at the old place now, its folder changed, emptied).
+
+```bash
+cleanmate restore --list --json              # what can be put back, newest first
+cleanmate restore --list --limit 20 --json   # only the 20 newest
+cleanmate restore --json "/Users/me/.Trash/old-app"
+```
+
+An empty list means nothing CleanMate moved is still in the Trash. Junk Smart Scan deleted (caches, logs, developer
+junk) is never listed: it can't come back, and the apps rebuild it. Items the user moved to the Trash themselves are
+put back in Finder (Put Back).
 
 ## Beyond Smart Scan
 

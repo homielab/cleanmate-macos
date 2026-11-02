@@ -46,7 +46,7 @@ to Notification Center without a banner. macOS asks for permission the first tim
 setting; if notifications are off, **Turn On Notifications…** appears in the row. **View** › ⌘1–⌘8 switch modules (⌘1 Overview, then the sidebar order: Smart Scan ⌘2 … Login Items ⌘7, Maintenance ⌘8); **Scan › Scan Again** (⌘R) rescans the visible module and **Scan › Stop** (⌘.) stops a running scan. With VoiceOver, the warning shown when you exclude a broad folder and the confirmation that remembered choices were reset are read aloud, and keyboard focus moves to **Cancel** when a confirmation row appears in Settings. Clean/Trash have no shortcut on purpose, and while a delete or Trash confirmation is open ⌘R, ⌘., ⌘⌫ and ⌘1–⌘8 do nothing.
 Before the first scan, Smart Scan shows the free space on your disk and how much CleanMate freed in the last 30 days.
 In Smart Scan and Privacy the checkboxes are large and a click anywhere on a row ticks or unticks it (its buttons, links and file paths keep their own clicks); ticked rows are tinted. A locked row shows a lock on its checkbox with the reason below it. Each group header shows its total and a checkbox that ticks every item that can be ticked, unticks them all, or shows a dash when only some are ticked (items that are locked or empty stay unticked); a click anywhere on the header but its arrow does the same, and the arrow collapses the group. Arrow keys move between rows and Space ticks or unticks the selected ones. The Uninstaller's file list (leftovers and Reset too) and Extensions work the same way (rows that can't be ticked stay as they are); in Unknown Hidden Config, Space opens Quick Look. After a scan, items in each group are sorted largest first (during the scan they keep a fixed order so rows don't jump). Rows show the app's icon when there is one and a small bar comparing each size with the largest in the group (Large & Old Files, Uninstaller and Space Lens have the same bars); after cleaning, the result lists what each group freed. "Freed" is the size of what was removed or moved to the Trash (the part in the Trash is shown apart: emptying the Trash frees it), not the change in the disk's free space, which other apps, Spotlight and snapshots change too; the free space before and after is shown below it for reference, with a bar of the disk's used space. The result screen animates in once per cleanup, within a second: the freed number counts up, the tick springs in, the group rows come in one after another with their bars, and the disk bar moves from before to after; screens fade into each other. With **Reduce motion** (System Settings › Accessibility › Display) everything only fades in and the number shows its final value at once.
-After a scan the sidebar shows a badge next to Smart Scan and Privacy (size selected) and Large & Old Files (files found). After moving items to the Trash, an **Open Trash** button opens it in Finder. In Large & Old Files, Space Lens, Uninstaller (also a Reset) and Smart Scan an **Undo** button puts the items of that module's last move to the Trash back where they were — only while they are still in the Trash, never over something now in their place, and only if their folder still exists (not replaced by a link, nor by another disk mounted there); anything it can't put back is counted and left in the Trash. Undo lasts until CleanMate quits (nothing is saved). Launch agents an uninstall booted out stay unloaded until the next login. The same undo is also on **Edit › Undo Move to Trash / Undo Uninstall / Undo Reset (⌘Z)**; using either one removes the other, and there is no redo. It is dropped by a new scan, a new move to the Trash, another Space Lens folder, or switching to another module. While typing in a search field, ⌘Z first undoes the typing. In Smart Scan, Undo puts back only the items it moved to the Trash (mail attachments, backups, iOS updates, old installers, old downloads, old screenshots, abandoned downloads, stale node_modules and build folders); what it deleted outright stays deleted.
+After a scan the sidebar shows a badge next to Smart Scan and Privacy (size selected) and Large & Old Files (files found). After moving items to the Trash, an **Open Trash** button opens it in Finder. In Large & Old Files, Space Lens, Uninstaller (also a Reset) and Smart Scan an **Undo** button puts the items of that module's last move to the Trash back where they were — only while they are still in the Trash, never over something now in their place, and only if their folder still exists (not replaced by a link, nor by another disk mounted there); anything it can't put back is counted and left in the Trash. The Undo button lasts until CleanMate quits; after that, `cleanmate restore --list` still lists what CleanMate moved to the Trash and `cleanmate restore` puts it back (see [Moving files to the Trash](#moving-files-to-the-trash)). Launch agents an uninstall booted out stay unloaded until the next login. The same undo is also on **Edit › Undo Move to Trash / Undo Uninstall / Undo Reset (⌘Z)**; using either one removes the other, and there is no redo. It is dropped by a new scan, a new move to the Trash, another Space Lens folder, or switching to another module. While typing in a search field, ⌘Z first undoes the typing. In Smart Scan, Undo puts back only the items it moved to the Trash (mail attachments, backups, iOS updates, old installers, old downloads, old screenshots, abandoned downloads, stale node_modules and build folders); what it deleted outright stays deleted.
 Items locked in Finder can't be moved to the Trash: Large & Old Files, Space Lens and Extensions count them separately as **Locked in Finder (turn off Locked in Get Info): N** (a folder that only contains locked files still moves). Uninstalling a locked app says so — select it, choose File > Get Info, turn off Locked, then try again — and nothing is moved, its data included.
 CleanMate has a single main window; closing it keeps the app running — click the Dock icon (or **Open CleanMate** in the menu bar item) to bring it back. Quitting (⌘Q or the menu bar's Quit) while cleaning, moving items to or back from the Trash, or changing a login item asks first (**Quit Anyway**; Esc or Return cancels): what was done stays done, the rest is left, and there is no Undo.
 
@@ -362,7 +362,8 @@ other links remain):
   `--yes`. `--dry-run` needs neither: it prints the same report, deletes nothing and logs nothing.
 - **Activity log**: each cleaned item gets the same line as a clean in the app (module Smart Scan, or Privacy), so
   **Settings › Activity** and the Overview count it.
-- **No Undo**: put items back from the Trash in Finder (**Put Back**). Deleted junk is rebuilt by the apps that use it.
+- **Undo**: deleted junk can't be put back (the apps that use it rebuild it). Items moved to the Trash are listed by
+  `cleanmate restore --list` and put back with `cleanmate restore` (see [Moving files to the Trash](#moving-files-to-the-trash)).
 
 `cleanmate clean --yes --only user-caches,old-downloads --json` (bytes; `freed` counts what was deleted or moved to the
 Trash, `inTrash` the part in the Trash, `upTo` the part from items whose size is only a maximum; `log` is `null` with
@@ -421,11 +422,18 @@ wildcards, no recursion beyond a folder named whole). Nothing is ever deleted.
   terminal (scripts, AI agents) it moves nothing and exits with code `4` unless you pass `--yes`.
 - **Activity log**: each item moved is logged `trashed` under the module **Command Line**; `restore` logs `restored`,
   which **Settings › Activity** takes off the total in the Trash.
-- **Restore**: `cleanmate restore TRASHED…` takes the paths in the Trash that `trash` printed (`trashed`) and puts each
-  item back at its old place, only when nothing is there now (never overwrites), its folder is still the same folder
-  (not moved, removed or replaced by a symlink, on the same volume) and it is still the item `trash` moved. What
-  `trash` moved is kept in `~/Library/Application Support/CleanMate/trashed.json` until it is put back or leaves the
-  Trash (the last 1,000). Items moved in Finder or by the app are put back with **Put Back** in Finder.
+- **What can be put back**: every move to the Trash by CleanMate is recorded, also after CleanMate quit: `cleanmate
+  trash` and `clean`, and in the app Smart Scan, Large & Old Files, Space Lens and the Uninstaller. The record (old
+  place, place in the Trash, size, date, module) is kept in `~/Library/Application Support/CleanMate/trashed.json`
+  until the item is put back or leaves the Trash (the last 1,000); the item itself is never copied. Junk that was
+  deleted has no record. Items you moved in Finder are put back with **Put Back** in Finder.
+- **List**: `cleanmate restore --list` shows the recorded items still in the Trash, newest first, at most 200
+  (`--limit N`): date, size, old place, module and place in the Trash. It only reads, and creates no file.
+- **Restore**: `cleanmate restore TRASHED…` takes paths in the Trash, as `trash` or `restore --list` printed them
+  (`trashed`), and puts each item back at its old place, only when nothing is there now (never overwrites), its folder
+  is still the same folder (not moved, removed or replaced by a symlink, on the same volume) and it is still the item
+  CleanMate moved. It logs `restored` under the module that moved it, so **Settings › Activity** takes it off that
+  module's total in the Trash.
 - `--` ends the options: every argument after it is a path, even one starting with `-`.
 
 `cleanmate trash --yes --json "~/Downloads/trip copy.mov" ~/.ssh` (bytes; `count` and `size` cover what moved; `kind`
@@ -444,7 +452,22 @@ is `file`, `folder` or `null` when not found; absent values are `null`):
 }
 ```
 
-`cleanmate restore --json "/Users/me/.Trash/trip copy.mov"` (`path` is the old place, `null` when `trash` did not move
+`cleanmate restore --list --json` (newest first; `trashed` is what `restore` takes, `date` when it was moved, `source`
+the module that moved it: `Command Line`, `Smart Scan`, `Large & Old Files`, `Space Lens` or `Uninstaller`; `version`
+is the version of this format):
+
+```json
+{
+  "count" : 2,
+  "items" : [
+    { "date" : "2026-11-02T09:41:12+07:00", "kind" : "file", "path" : "/Users/me/Downloads/trip copy.mov", "size" : 1200000000, "source" : "Command Line", "trashed" : "/Users/me/.Trash/trip copy.mov" },
+    { "date" : "2026-11-01T18:03:55+07:00", "kind" : "folder", "path" : "/Users/me/Projects/old-app", "size" : 734003200, "source" : "Space Lens", "trashed" : "/Users/me/.Trash/old-app" }
+  ],
+  "version" : 1
+}
+```
+
+`cleanmate restore --json "/Users/me/.Trash/trip copy.mov"` (`path` is the old place, `null` when CleanMate did not move
 that item):
 
 ```json

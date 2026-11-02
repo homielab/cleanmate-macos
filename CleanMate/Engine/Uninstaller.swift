@@ -651,6 +651,7 @@ nonisolated enum Uninstaller {
             report.freed += size
             if let inTrash { report.trashed.append(TrashedItem(original: app, inTrash: inTrash, size: size)) }
             ActivityLog.record(module: "Uninstaller", item: app.path, size: size, mode: .trash, home: policy.homeURL)
+            TrashRecords.add(report.trashed, module: "Uninstaller", home: policy.homeURL)
             if let cask {
                 let cleared = await uninstallCask(cask)
                 if !cleared { report.casksLeft.append(cask.token) }

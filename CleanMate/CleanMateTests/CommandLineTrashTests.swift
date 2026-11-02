@@ -3,7 +3,8 @@ import Testing
 @testable import CleanMate
 
 /// `cleanmate trash` and `cleanmate restore`, in a fake home with a fake Trash: only the paths named move, only
-/// through the safety rules, never without --yes off a terminal, and restore puts back without overwriting.
+/// through the safety rules, never without --yes off a terminal, and restore puts back without overwriting. What the
+/// app moves to the Trash is listed by `restore --list` and put back by `restore` too.
 extension CommandLineToolTests {
     static func trashReport(_ arguments: [String], _ sources: HeadlessScan.Sources) async throws -> HeadlessTrash.TrashReport {
         let (code, printed) = await run(["trash", "--yes", "--json"] + arguments, sources)
@@ -15,6 +16,12 @@ extension CommandLineToolTests {
         let (code, printed) = await run(["restore", "--json"] + arguments, sources)
         try #require(code == 0, "\(printed.stderr)")
         return try JSONDecoder().decode(HeadlessTrash.RestoreReport.self, from: Data(printed.stdout.utf8))
+    }
+
+    static func restoreList(_ arguments: [String], _ sources: HeadlessScan.Sources) async throws -> HeadlessTrash.ListReport {
+        let (code, printed) = await run(["restore", "--list", "--json"] + arguments, sources)
+        try #require(code == 0, "\(printed.stderr)")
+        return try JSONDecoder().decode(HeadlessTrash.ListReport.self, from: Data(printed.stdout.utf8))
     }
 
     private static func inTrash(_ fixture: FilesFixture) -> [String] {
@@ -43,7 +50,7 @@ extension CommandLineToolTests {
         #expect(!Self.exists(fixture, "Media/movie.mov") && !Self.exists(fixture, "Projects/app"))
         // Everything else stays, the hard link to build.bin included.
         #expect(Self.exists(fixture, "Media/old.zip") && Self.exists(fixture, "Media/build-link.bin"))
-        #expect(HeadlessTrash.records(home: fixture.home).count == 2)
+        #expect(TrashRecords.inTrash(home: fixture.home).count == 2)
 
         let entries = ActivityLog.read(home: fixture.home).split(separator: "\n")
             .map { ActivityLog.entry($0, locale: Locale(identifier: "en")) }
@@ -56,14 +63,14 @@ extension CommandLineToolTests {
         let originals = [movie, fixture.home.appending(path: "Projects/app").path]
         #expect(restored.items.compactMap(\.path) == originals.map { SafetyPolicy.normalize(URL(fileURLWithPath: $0)) })
         #expect(Self.exists(fixture, "Media/movie.mov") && Self.exists(fixture, "Projects/app/build.bin"))
-        #expect(Self.inTrash(fixture).isEmpty && HeadlessTrash.records(home: fixture.home).isEmpty)
+        #expect(Self.inTrash(fixture).isEmpty && TrashRecords.inTrash(home: fixture.home).isEmpty)
         let kinds = ActivityLog.read(home: fixture.home).split(separator: "\n").map { ActivityLog.entry($0).kind }
         #expect(kinds == ["trashed", "trashed", "restored", "restored"] && ActivityLog.freed(home: fixture.home).trashed == 0)
 
         // Put back once: a second restore finds no record.
         let again = try await Self.restoreReport([trashed[0]], sources)
         #expect(again.count == 0 && again.items.first?.skipped == true && again.items.first?.path == nil)
-        #expect(again.items.first?.reason?.contains("cleanmate trash") == true)
+        #expect(again.items.first?.reason == HeadlessTrash.notRecorded)
     }
 
     @Test func trashSkipsWhatTheSafetyRulesRefuseAndMovesNothing() async throws {
@@ -101,7 +108,7 @@ extension CommandLineToolTests {
         #expect(report.count == 0 && report.size == 0)
         #expect(report.items.map(\.reason) == cases.map(\.1))
         #expect(report.items.allSatisfy { $0.skipped && $0.trashed == nil && $0.size == nil })
-        #expect(Self.inTrash(fixture).isEmpty && HeadlessTrash.records(home: home).isEmpty)
+        #expect(Self.inTrash(fixture).isEmpty && TrashRecords.inTrash(home: home).isEmpty)
         #expect(fm.fileExists(atPath: outside.path) && Self.exists(fixture, ".ssh/id_ed25519") && Self.exists(fixture, "Media/old.zip"))
         #expect(Self.exists(fixture, "Library/Caches/cache.bin") && Self.exists(fixture, "Documents/secret.bin"))
         #expect((try? fm.destinationOfSymbolicLink(atPath: home.appending(path: "Media/link.zip").path)) != nil)
@@ -121,7 +128,7 @@ extension CommandLineToolTests {
         // restore with nothing moved yet writes no record file.
         let restored = try await Self.restoreReport([fixture.trash.appending(path: "movie.mov").path], fixture.sources())
         #expect(restored.count == 0 && restored.items.first?.skipped == true)
-        #expect(!FileManager.default.fileExists(atPath: HeadlessTrash.recordURL(home: fixture.home).path))
+        #expect(!FileManager.default.fileExists(atPath: TrashRecords.url(home: fixture.home).path))
     }
 
     @Test func trashAsksOnATerminal() async throws {
@@ -165,11 +172,88 @@ extension CommandLineToolTests {
         #expect(!fm.fileExists(atPath: fixture.home.appending(path: "Projects/moved/data.bin").path))
         #expect(Self.inTrash(fixture) == ["data.bin", "movie.mov"])
         // The two still in the Trash keep their record: put back once their place is free again.
-        #expect(HeadlessTrash.records(home: fixture.home).count == 2)
+        #expect(TrashRecords.inTrash(home: fixture.home).count == 2)
         try fm.removeItem(at: newer)
         let second = try await Self.restoreReport([trashed[0]], sources)
         #expect(second.count == 1 && fm.fileExists(atPath: newer.path))
         #expect(try Data(contentsOf: newer).count == 2_002_944)
+    }
+
+    @Test func restoreListShowsWhatTheAppMovedNewestFirstAndRestorePutsItBack() async throws {
+        let fixture = try FilesFixture()
+        let sources = fixture.sources(fullDiskAccess: true)
+        let policy = sources.policy()
+        // No record yet: an empty list, and no file made.
+        let none = try await Self.restoreList([], sources)
+        #expect(none.version == 1 && none.count == 0 && none.items.isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: TrashRecords.url(home: fixture.home).path))
+        let (_, emptyText) = await Self.run(["restore", "--list"], sources)
+        #expect(emptyText.stdout == "Nothing CleanMate moved to the Trash is still there.\n")
+
+        // Large & Old Files and Space Lens in the app, then the command line.
+        let movie = URL(fileURLWithPath: SafetyPolicy.normalize(fixture.home.appending(path: "Media/movie.mov")))
+        let app = URL(fileURLWithPath: SafetyPolicy.normalize(fixture.home.appending(path: "Projects/app")))
+        let large = CleanReport.trashing([(movie, 2_002_944)], module: "Large & Old Files", home: fixture.home,
+                                         allows: policy.allowsUserFile, trash: sources.trash)
+        let lens = CleanReport.trashing([(app, FilesFixture.projectFiles)], module: "Space Lens", home: fixture.home,
+                                        allows: { policy.allowsSpaceLensItem($0) }, trash: sources.trash)
+        try #require(large.trashed.count == 1 && lens.trashed.count == 1)
+        let cli = try await Self.trashReport(["~/Media/old.zip"], sources)
+        try #require(cli.count == 1)
+
+        let list = try await Self.restoreList([], sources)
+        #expect(list.version == 1 && list.count == 3)
+        #expect(list.items.map(\.source) == ["Command Line", "Space Lens", "Large & Old Files"])
+        #expect(list.items.map(\.trashed) == [cli.items[0].trashed, lens.trashed[0].inTrash.path, large.trashed[0].inTrash.path])
+        #expect(list.items.map(\.path) == [SafetyPolicy.normalize(fixture.home.appending(path: "Media/old.zip")), app.path, movie.path])
+        #expect(list.items.map(\.kind) == ["file", "folder", "file"])
+        #expect(list.items.map(\.size) == [1_200_128, FilesFixture.projectFiles, 2_002_944])
+        #expect(list.items.allSatisfy { $0.date.flatMap { try? Date($0, strategy: .iso8601) } != nil })
+        // --limit keeps the newest; JSON writes every field.
+        #expect(try await Self.restoreList(["--limit", "1"], sources).items.map(\.source) == ["Command Line"])
+        let (_, json) = await Self.run(["restore", "--list", "--json"], sources)
+        #expect(json.stdout.contains("\"version\" : 1\n") && json.stdout.contains("\"source\" : \"Space Lens\""))
+        let (_, text) = await Self.run(["restore", "--list"], sources)
+        let lines = text.stdout.split(separator: "\n")
+        #expect(lines.count == 4 && lines[0].contains("~/Media/old.zip") && lines[0].contains("Command Line"))
+        #expect(lines[2].contains(CommandLineTool.size(2_002_944)) && lines[2].contains("~/Media/movie.mov"), "\(text.stdout)")
+        #expect(lines[3].hasPrefix("Put back: cleanmate restore"))
+
+        // Emptied from the Trash: no longer listed. Listing writes nothing.
+        try FileManager.default.removeItem(atPath: lens.trashed[0].inTrash.path)
+        let before = try Data(contentsOf: TrashRecords.url(home: fixture.home))
+        #expect(try await Self.restoreList([], sources).items.map(\.source) == ["Command Line", "Large & Old Files"])
+        #expect(try Data(contentsOf: TrashRecords.url(home: fixture.home)) == before)
+
+        // The app's move is put back, logged under its own module so the Trash total drops.
+        let restored = try await Self.restoreReport([large.trashed[0].inTrash.path], sources)
+        #expect(restored.count == 1 && restored.items.first?.path == movie.path)
+        #expect(FileManager.default.fileExists(atPath: movie.path))
+        let entries = ActivityLog.read(home: fixture.home).split(separator: "\n")
+            .map { ActivityLog.entry($0, locale: Locale(identifier: "en")) }
+        #expect(entries.last?.moduleKey == "Large & Old Files" && entries.last?.kind == "restored")
+        #expect(ActivityLog.freed(home: fixture.home).trashed == FilesFixture.projectFiles + 1_200_128)
+        #expect(try await Self.restoreList([], sources).items.map(\.source) == ["Command Line"])
+    }
+
+    @Test func smartScanItemsMovedToTheTrashAreListedAndDeletedOnesAreNot() async throws {
+        let fixture = try Fixture()
+        let sources = fixture.sources()
+        let cleaned = try await Self.cleanReport(["--yes", "--only", "cli-old,cli-caches"], sources)
+        #expect(cleaned.inTrash == 16_384 && cleaned.freed == 16_384 + 49_152)
+        let list = try await Self.restoreList([], sources)
+        // Only what went to the Trash: the deleted caches can't come back.
+        #expect(list.count == 1 && list.items.map(\.source) == ["Smart Scan"] && list.items.first?.size == 16_384)
+        let item = try #require(list.items.first)
+        #expect(item.trashed == fixture.trash.appending(path: "c.bin").path && item.path.hasSuffix("/Library/Caches/cli-old/c.bin"))
+
+        let restored = try await Self.restoreReport([item.trashed], sources)
+        #expect(restored.count == 1 && fixture.exists("Library/Caches/cli-old/c.bin") && fixture.inTrash.isEmpty)
+        // Logged "restored" under the item's name, like the app's Undo, so it no longer counts as in the Trash.
+        let last = try #require(ActivityLog.read(home: fixture.home).split(separator: "\n").last.map { ActivityLog.entry($0) })
+        #expect(last.moduleKey == "Smart Scan" && last.kind == "restored")
+        #expect(ActivityLog.freed(home: fixture.home).trashed == 0)
+        #expect(try await Self.restoreList([], sources).items.isEmpty)
     }
 
     @Test func trashAndRestoreArguments() throws {
@@ -177,9 +261,13 @@ extension CommandLineToolTests {
         #expect(try CommandLineTool.parse(["trash", "-y", "--json", "--", "-odd", "--yes"])
                 == .trash(paths: ["-odd", "--yes"], json: true, yes: true))
         #expect(try CommandLineTool.parse(["restore", "--json", "x"]) == .restore(paths: ["x"], json: true))
+        #expect(try CommandLineTool.parse(["restore", "--list"]) == .restoreList(limit: 200, json: false))
+        #expect(try CommandLineTool.parse(["restore", "--json", "--limit", "5", "--list"]) == .restoreList(limit: 5, json: true))
+        #expect(try CommandLineTool.parse(["restore", "--list", "--limit=3"]) == .restoreList(limit: 3, json: false))
         #expect(try CommandLineTool.parse(["trash", "--help"]) == .help)
         for bad in [["trash"], ["trash", "--yes"], ["restore"], ["restore", "--yes", "x"], ["trash", "--recursive", "x"],
-                    ["trash", "--json=1", "x"]] {
+                    ["trash", "--json=1", "x"], ["restore", "--list", "x"], ["restore", "--limit", "3", "x"],
+                    ["restore", "--list", "--limit", "0"], ["restore", "--list", "--limit"], ["trash", "--list", "x"]] {
             #expect(throws: CommandLineTool.UsageError.self, "\(bad)") { try CommandLineTool.parse(bad) }
         }
         #expect(CommandLineTool.quoted("/Users/me/.Trash/a.mov") == "/Users/me/.Trash/a.mov")
