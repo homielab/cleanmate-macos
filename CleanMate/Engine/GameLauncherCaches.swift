@@ -72,7 +72,44 @@ nonisolated enum GameLauncherCaches {
         showsWhenEmpty: false, runningAppBundleIDs: gogBundleIDs, runningProcessNames: gogProcessNames,
         skipsOpenFiles: true)
 
-    static let all = [steam, epic, battleNet, gogGalaxy]
+    // MARK: Minecraft
+
+    static let minecraftRoot = "~/Library/Application Support/minecraft"
+    static let minecraftBundleIDs = ["com.mojang.minecraftlauncher", "com.mojang.minecraftlauncher.*"]
+    /// The launcher (`Minecraft`, `Minecraft Launcher`) and its web helper. The game is a `java` process the launcher
+    /// starts, which can outlive a closed launcher; it is not matched by name (it would lock for any Java program), but
+    /// the open `logs/latest.log` and crash report make `skipsOpenFiles` leave exactly those out.
+    static let minecraftProcessNames = ["Minecraft", "Minecraft Launcher*", "minecraft-launcher*"]
+
+    /// Game logs, crash reports and the launcher's web cache (`webcache2`, older `webcache`). Never `saves`, `mods`,
+    /// `resourcepacks`, `shaderpacks`, `screenshots`, `config`, `options.txt`, `versions`, `libraries`, `assets`,
+    /// `launcher_accounts*.json` nor `launcher_profiles.json`. The `launcher_log*.txt` files are single files, left alone.
+    static let minecraft = CleanerItem(
+        id: "minecraft-cache", title: appName("Minecraft"), note: note,
+        paths: ["logs", "crash-reports", "webcache2", "webcache"].map { minecraftRoot + "/" + $0 },
+        showsWhenEmpty: false, runningAppBundleIDs: minecraftBundleIDs, runningProcessNames: minecraftProcessNames,
+        skipsOpenFiles: true)
+
+    // MARK: Prism Launcher
+
+    static let prismRoot = "~/Library/Application Support/PrismLauncher"
+    static let prismBundleIDs = ["org.prismlauncher.PrismLauncher", "org.prismlauncher.PrismLauncher.*"]
+    static let prismProcessNames = ["prismlauncher", "PrismLauncher*"]
+
+    /// The launcher's `logs` and `cache` and each instance's game logs and crash reports (`.minecraft` or `minecraft`,
+    /// by Prism's version). Only the default `instances` folder, inside the data folder: an `InstanceDir` the user moved
+    /// elsewhere is not read. Never `accounts.json`, `meta`, `libraries`, `instances/*` beyond those two folders (worlds,
+    /// mods, resource packs, screenshots, `instance.cfg`), `prismlauncher.cfg` nor `icons`.
+    static let prism = CleanerItem(
+        id: "prism-launcher-cache", title: appName("Prism Launcher"), note: note,
+        paths: [prismRoot + "/logs", prismRoot + "/cache"]
+            + [".minecraft", "minecraft"].flatMap { dir in
+                ["logs", "crash-reports"].map { prismRoot + "/instances/*/" + dir + "/" + $0 }
+            },
+        showsWhenEmpty: false, runningAppBundleIDs: prismBundleIDs, runningProcessNames: prismProcessNames,
+        skipsOpenFiles: true)
+
+    static let all = [steam, epic, battleNet, gogGalaxy, minecraft, prism]
 
     /// Launcher names are not translated, like the other app rows.
     private static func appName(_ name: String) -> LocalizedStringResource {

@@ -275,7 +275,7 @@ extension CleanerGroup {
         CloudSyncCaches.dropbox(hasFullDiskAccess: { hasFullDiskAccess }),
         // Media caches outside ~/Library/Caches (`MediaAppCaches`): unticked, deleted, skipped while the app runs.
         MediaAppCaches.spotify,
-    ] + GameLauncherCaches.all // Steam, Epic, Battle.net, GOG Galaxy: ticked, emptied, skipped while the launcher runs.
+    ] + GameLauncherCaches.all // Steam, Epic, Battle.net, GOG Galaxy, Minecraft, Prism: ticked, emptied, skipped while the launcher runs.
     + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive, MediaAppCaches.telegram] + MediaAppCaches.podcasts : []))
     }
 

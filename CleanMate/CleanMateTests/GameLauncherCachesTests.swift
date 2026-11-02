@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import CleanMate
 
-/// Steam, Epic Games Launcher, Battle.net and GOG Galaxy caches: only the cache and log folders are emptied (the
+/// Steam, Epic Games Launcher, Battle.net, GOG Galaxy, Minecraft and Prism Launcher caches: only the cache and log folders are emptied (the
 /// folders stay), never games, downloads in progress, saves, settings, sign-ins or install manifests, and nothing in
 /// ~/Library/Caches or ~/Library/Logs is listed again. Everything happens in a throwaway fake home.
 final class GameLauncherCachesTests {
@@ -37,7 +37,8 @@ final class GameLauncherCachesTests {
 
     @Test func itemsAreTickedDeletedAndHiddenWhenEmpty() async throws {
         let items = CleanerGroup.applications().items
-        for id in ["steam-cache", "epic-games-cache", "battlenet-cache", "gog-galaxy-cache"] {
+        for id in ["steam-cache", "epic-games-cache", "battlenet-cache", "gog-galaxy-cache", "minecraft-cache",
+                   "prism-launcher-cache"] {
             let item = try #require(items.first { $0.id == id }, "\(id)")
             #expect(item.selectedByDefault && item.mode == .delete && !item.showsWhenEmpty && item.note != nil, "\(id)")
             #expect(item.skipsOpenFiles && item.command == nil && item.minAge == nil, "\(id)")
@@ -137,6 +138,39 @@ final class GameLauncherCachesTests {
         for path in kept { #expect(exists(path), "\(path)") }
     }
 
+    @Test func minecraftEmptiesOnlyLogsCrashReportsAndWebCache() async throws {
+        let mc = "Library/Application Support/minecraft"
+        let caches = [mc + "/logs/latest.log", mc + "/crash-reports/crash-1.txt", mc + "/webcache2/Cache/data_0"]
+        let kept = [mc + "/saves/World/level.dat", mc + "/mods/m.jar", mc + "/resourcepacks/r.zip",
+                    mc + "/shaderpacks/s.zip", mc + "/screenshots/a.png", mc + "/config/c.toml", mc + "/options.txt",
+                    mc + "/versions/1.21/1.21.jar", mc + "/libraries/l.jar", mc + "/assets/a", mc + "/launcher_log.txt",
+                    mc + "/launcher_accounts.json", mc + "/launcher_profiles.json"]
+        for path in caches + kept { try file(path) }
+        let (_, listed) = await scanAndClean(GameLauncherCaches.minecraft)
+        #expect(listed == [mc + "/crash-reports/crash-1.txt", mc + "/logs/latest.log", mc + "/webcache2/Cache"])
+        for path in caches { #expect(!exists(path), "\(path)") }
+        for path in kept { #expect(exists(path), "\(path)") }
+        #expect(exists(mc + "/logs") && exists(mc + "/crash-reports") && exists(mc + "/webcache2"))
+    }
+
+    @Test func prismEmptiesOnlyLogsCachesAndInstanceLogs() async throws {
+        let prism = "Library/Application Support/PrismLauncher"
+        let caches = [prism + "/logs/prism-0.log", prism + "/cache/icons/a.png",
+                      prism + "/instances/A/.minecraft/logs/latest.log",
+                      prism + "/instances/A/.minecraft/crash-reports/c.txt",
+                      prism + "/instances/B/minecraft/logs/latest.log", prism + "/instances/B/minecraft/crash-reports/c.txt"]
+        let kept = [prism + "/accounts.json", prism + "/prismlauncher.cfg", prism + "/meta/net.minecraft/index.json",
+                    prism + "/libraries/l.jar", prism + "/instances/A/instance.cfg",
+                    prism + "/instances/A/.minecraft/saves/W/level.dat", prism + "/instances/A/.minecraft/mods/m.jar",
+                    prism + "/instances/A/.minecraft/screenshots/s.png", prism + "/instances/B/minecraft/options.txt",
+                    "Documents/PrismInstances/C/.minecraft/logs/latest.log"]
+        for path in caches + kept { try file(path) }
+        _ = await scanAndClean(GameLauncherCaches.prism)
+        for path in caches { #expect(!exists(path), "\(path)") }
+        for path in kept { #expect(exists(path), "\(path)") }
+        #expect(exists(prism + "/instances/A/.minecraft/logs") && exists(prism + "/logs"))
+    }
+
     @MainActor @Test func lockedWhileTheLauncherRuns() {
         let model = SmartScanModel.isolated(module: .smartScan) { [] }
         let cases: [(CleanerItem, apps: [String], processes: [String])] = [
@@ -145,6 +179,8 @@ final class GameLauncherCachesTests {
             (GameLauncherCaches.epic, ["com.epicgames.EpicGamesLauncher"], ["EpicGamesLauncher", "EpicWebHelper"]),
             (GameLauncherCaches.battleNet, ["net.battle.app"], ["Battle.net", "Battle.net Helper"]),
             (GameLauncherCaches.gogGalaxy, ["com.gog.galaxy"], ["GOG Galaxy", "GOG Galaxy Helper"]),
+            (GameLauncherCaches.minecraft, ["com.mojang.minecraftlauncher"], ["Minecraft", "Minecraft Launcher"]),
+            (GameLauncherCaches.prism, ["org.prismlauncher.PrismLauncher"], ["prismlauncher"]),
         ]
         for (item, apps, processes) in cases {
             // A game, another Valve or Epic app, or Unreal Editor does not lock the launcher's caches.
