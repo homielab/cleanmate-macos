@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6] - 2026-11-02
+
 ### Added
 - **Command line**: `cleanmate restore --list` shows what CleanMate moved to the Trash and is still there, newest first, with the date, size, old place and the module that moved it (Smart Scan, Large & Old Files, Space Lens, the Uninstaller or the command line); `--limit N` and `--json`. `cleanmate restore` now also puts back what the app moved, even after CleanMate quit, with the same never-overwrite checks. The Agent Skill uses it when you ask to get something back.
 - **Command line**: `cleanmate trash PATH…` moves exactly the files and folders you name to the Trash, with the safety rules of Space Lens (only in your home folder; never `~/Library`, hidden files like `~/.ssh`, packages, excluded paths or symlinks; each refused path is reported with the reason), and `cleanmate restore TRASHED…` puts them back at their old place, never over a file that is there now. It asks `Proceed? [y/N]` on a terminal and needs `--yes` elsewhere (exit code 4 without it); both write the activity log and take `--json`. The Agent Skill uses it after `space`, `large` or `dupes`, only for the paths you confirm.
