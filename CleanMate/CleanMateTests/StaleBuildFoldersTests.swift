@@ -63,8 +63,9 @@ struct StaleBuildFoldersTests {
         #expect(item.mode == .trash && !item.selectedByDefault && item.selectableEntries && item.skipsOpenFiles)
         #expect(!item.showsWhenEmpty && item.findEntries != nil && item.allowsEntry != nil && item.command == nil)
         #expect(item.paths == StaleProjects.folders)
-        #expect(["cargo", "rustc", "uv", "pod", "ruby", "python", "python3", "python3.12"].allSatisfy(StaleBuildFolders.isTool))
-        #expect(!StaleBuildFolders.isTool("node") && !StaleBuildFolders.isTool("python-helper"))
+        #expect(["cargo", "rustc", "uv", "pod", "ruby", "python", "python3", "python3.12", "java", "dart", "node",
+                 "swift-build", "beam.smp", "zig", "ghc", "ghc-9.8.2"].allSatisfy(StaleBuildFolders.isTool))
+        #expect(!StaleBuildFolders.isTool("python-helper") && !StaleBuildFolders.isTool("ghc-pkg") && !StaleBuildFolders.isTool("git"))
     }
 
     /// Old Cargo, Python and CocoaPods projects are listed with their build folder's size, labelled with the project's
@@ -83,7 +84,7 @@ struct StaleBuildFoldersTests {
         try write(developer.appending(path: "recent-lock/Cargo.lock"), bytes: 100, date: .now.addingTimeInterval(-10 * 86_400))
         try cargo("active-repo/crates/core") // its repository was committed to today
         try write(developer.appending(path: "active-repo/.git/index"), bytes: 100, date: .now)
-        try project("maven", files: ["pom.xml"], folder: "target", contents: ["app.jar": 50_000])
+        try project("web", files: ["package.json"], folder: "dist", contents: ["app.js": 50_000]) // no marker for dist
         try project("no-cfg", files: ["requirements.txt"], folder: "venv", contents: ["lib/x.py": 4096])
 
         let item = item()
@@ -164,7 +165,8 @@ struct StaleBuildFoldersTests {
         try write(home.appending(path: "Pictures/rs/target/x"))
         #expect(allows("Developer/rs/target") && allows("Developer/py/.venv") && allows("Developer/py/venv"))
         #expect(allows("Developer/ios/Pods"))
-        #expect(!allows("Developer/py/env") && !allows("Developer/mvn/target") && !allows("Developer/bare/.venv"))
+        #expect(allows("Developer/mvn/target"))
+        #expect(!allows("Developer/py/env") && !allows("Developer/bare/.venv"))
         #expect(!allows("Developer/rs/target/sub/target") && !allows("Pictures/rs/target") && !allows("Developer/rs"))
         #expect(!policy.allowsNodeModules(developer.appending(path: "rs/target")))
         try fm.removeItem(at: developer.appending(path: "py/venv/pyvenv.cfg"))
@@ -210,5 +212,152 @@ struct StaleBuildFoldersTests {
         let scan = await Scanner.scan(item, policy: policy(), openPaths: EndToEndCleanTests.ownOpenPaths)
         let sizes = Dictionary(uniqueKeysWithValues: scan.entries.map { ($0.url.lastPathComponent, $0.size) })
         #expect(sizes == [".venv": venvOwn, "target": rust + Scanner.fileSize(rustClone)])
+    }
+
+    /// Each build system's folders are found next to the file that makes them, and never without it, as a symlink or
+    /// as a regular file of the same name.
+    @Test func eachBuildSystemNeedsItsFile() throws {
+        defer { try? fm.removeItem(at: root) }
+        let cases: [(files: [String], folders: [String])] = [
+            (["Cargo.toml"], ["target"]), (["pom.xml"], ["target"]), (["Podfile"], ["Pods"]),
+            (["build.gradle"], ["build", ".gradle"]), (["build.gradle.kts"], ["build", ".gradle"]),
+            (["settings.gradle"], ["build", ".gradle"]), (["settings.gradle.kts"], ["build", ".gradle"]),
+            (["Package.swift"], [".build"]), (["pubspec.yaml"], [".dart_tool", "build"]),
+            (["package.json", "next.config.mjs"], [".next"]), (["package.json", "nuxt.config.ts"], [".nuxt", ".output"]),
+            (["package.json", "svelte.config.js"], [".svelte-kit"]), (["package.json", "angular.json"], [".angular/cache"]),
+            (["package.json", "turbo.json"], [".turbo"]), (["stack.yaml"], [".stack-work"]),
+            (["cabal.project"], ["dist-newstyle"]), (["app.cabal"], ["dist-newstyle"]),
+            (["mix.exs"], ["_build", "deps"]), (["build.zig"], [".zig-cache", "zig-cache"]),
+        ]
+        func found(_ project: URL) -> Set<String> {
+            Set(StaleProjects.buildFolders(in: project.path, children: StaleProjects.entries(of: project.path)))
+        }
+        for (index, (files, folders)) in cases.enumerated() {
+            let project = developer.appending(path: "p\(index)")
+            for folder in folders { try write(project.appending(path: folder + "/x")) }
+            for file in files.dropLast() { try write(project.appending(path: file), bytes: 10) }
+            #expect(found(project).isEmpty, "\(files) without \(files.last!)")
+            try write(project.appending(path: files.last!), bytes: 10)
+            #expect(found(project) == Set(folders), "\(files)")
+            for folder in folders { #expect(StaleProjects.isProjectFolder(project.appending(path: folder).path)) }
+
+            // The same names as a symlink to a real folder, or a regular file, are not build folders.
+            let links = developer.appending(path: "links\(index)"), plain = developer.appending(path: "files\(index)")
+            for file in files {
+                try write(links.appending(path: file), bytes: 10)
+                try write(plain.appending(path: file), bytes: 10)
+            }
+            for folder in folders {
+                try fm.createDirectory(at: links.appending(path: folder).deletingLastPathComponent(), withIntermediateDirectories: true)
+                try fm.createSymbolicLink(at: links.appending(path: folder), withDestinationURL: project.appending(path: folder))
+                try write(plain.appending(path: folder))
+            }
+            #expect(found(links).isEmpty && found(plain).isEmpty, "\(files)")
+        }
+        // A framework's config without package.json, the marker as a folder, zig-out and names alone are not.
+        let other = developer.appending(path: "other")
+        for folder in [".next", "zig-out", "build", "dist", "out", "target", "_build"] { try write(other.appending(path: folder + "/x")) }
+        try write(other.appending(path: "next.config.js"), bytes: 10)
+        try fm.createDirectory(at: other.appending(path: "Cargo.toml"), withIntermediateDirectories: true)
+        #expect(found(other).isEmpty)
+        try write(other.appending(path: "build.zig"), bytes: 10)
+        #expect(found(other).isEmpty) // no .zig-cache; zig-out is what the project installs
+    }
+
+    /// A Gradle module's `build` belongs to the project around it only when the module has its own build file.
+    @Test func gradleModuleBuildNeedsItsBuildFile() throws {
+        defer { try? fm.removeItem(at: root) }
+        let android = developer.appending(path: "android")
+        try write(android.appending(path: "settings.gradle.kts"), bytes: 10)
+        try write(android.appending(path: "app/build.gradle.kts"), bytes: 10)
+        try write(android.appending(path: "app/build/outputs/app.apk"))
+        try write(android.appending(path: "lib/build/x")) // no build file
+        try write(android.appending(path: ".hidden/build.gradle"), bytes: 10)
+        try write(android.appending(path: ".hidden/build/x"))
+        try write(android.appending(path: "core/build.gradle"), bytes: 10)
+        try fm.createSymbolicLink(at: android.appending(path: "core/build"), withDestinationURL: android.appending(path: "app/build"))
+        let found = StaleProjects.buildFolders(in: android.path, children: StaleProjects.entries(of: android.path))
+        #expect(found == ["app/build"])
+        let appBuild = android.appending(path: "app/build")
+        #expect(StaleProjects.projectPath(of: appBuild.path) == android.path)
+        #expect(StaleBuildFolders.label(appBuild, home: home) == "~/Developer/android — app/build/")
+        #expect(StaleBuildFolders.label(android.appending(path: ".angular/cache"), home: home) == "~/Developer/android — .angular/cache/")
+        // A Gradle module alone is its own project.
+        try fm.removeItem(at: android.appending(path: "settings.gradle.kts"))
+        #expect(StaleProjects.projectPath(of: appBuild.path) == android.appending(path: "app").path)
+        #expect(StaleBuildFolders.label(appBuild, home: home) == "~/Developer/android/app — build/")
+    }
+
+    /// Old Android, Next.js, Angular, Elixir and Zig projects are listed, each folder once with its path in the project;
+    /// a Gradle project changed 10 days ago, a project inside a build folder and Zig's `zig-out` are not, nor a project
+    /// a tool runs in. Two-level folders go to the (fake) Trash and come back.
+    @Test func listsNewBuildSystems() async throws {
+        defer { try? fm.removeItem(at: root) }
+        try fm.createDirectory(at: trash, withIntermediateDirectories: true)
+        try project("android", files: ["settings.gradle.kts", "build.gradle.kts", "app/build.gradle.kts"], folder: "app/build",
+                    contents: ["outputs/app.apk": 80_000])
+        try project("android", files: [], folder: ".gradle", contents: ["8.10/file-hashes.bin": 10_000])
+        try project("android", files: [], folder: "build/sub", contents: ["Cargo.toml": 100, "target/x": 4096]) // not walked
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: developer.appending(path: "android/build").path)
+        try project("site", files: ["package.json", "next.config.ts"], folder: ".next", contents: ["cache/x": 30_000])
+        try project("ng", files: ["package.json", "angular.json"], folder: ".angular/cache", contents: ["x": 20_000])
+        try project("ex", files: ["mix.exs", "mix.lock"], folder: "deps", contents: ["jason/lib/jason.ex": 9_000])
+        try project("zig", files: ["build.zig"], folder: ".zig-cache", contents: ["o/x": 9_000])
+        try project("zig", files: [], folder: "zig-out", contents: ["bin/app": 9_000])
+        try project("busy", files: ["package.json", "turbo.json"], folder: ".turbo", contents: ["x": 4096])
+        try project("recent", files: ["build.gradle"], folder: "build", contents: ["x": 4096])
+        try write(developer.appending(path: "recent/build.gradle"), bytes: 10, date: .now.addingTimeInterval(-10 * 86_400))
+
+        let item = item(running: [developer.appending(path: "busy").path])
+        let scan = await Scanner.scan(item, policy: policy(), openPaths: EndToEndCleanTests.ownOpenPaths)
+        let titles = scan.entries.compactMap(\.title).sorted()
+        #expect(titles == ["~/Developer/android — .gradle/", "~/Developer/android — app/build/", "~/Developer/android — build/",
+                           "~/Developer/ex — deps/",
+                           "~/Developer/ng — .angular/cache/", "~/Developer/site — .next/", "~/Developer/zig — .zig-cache/"])
+        // The module's own build.gradle.kts changed today: its project was worked on.
+        try write(developer.appending(path: "android/app/build.gradle.kts"), bytes: 10, date: .now)
+        #expect(try #require(StaleBuildFolders.lastWorkedOn(developer.appending(path: "android/app/build"), home: home)) > .now.addingTimeInterval(-60))
+        try fm.setAttributes([.modificationDate: old], ofItemAtPath: developer.appending(path: "android/app/build.gradle.kts").path)
+        // The framework's config counts as one of the project's files.
+        try write(developer.appending(path: "site/next.config.ts"), bytes: 10, date: .now)
+        #expect(try #require(StaleBuildFolders.lastWorkedOn(developer.appending(path: "site/.next"), home: home)) > .now.addingTimeInterval(-60))
+
+        let twoLevel = scan.entries.filter { $0.url.path.hasSuffix("/app/build") || $0.url.path.hasSuffix("/.angular/cache") }
+        var cleaned = scan
+        cleaned.entries = twoLevel
+        let report = await Cleaner.clean(item, scan: cleaned, policy: policy(), trash: moveToFakeTrash,
+                                         openPaths: EndToEndCleanTests.ownOpenPaths)
+        #expect(report.skipped == 0 && report.trashed.count == 2)
+        #expect(!fm.fileExists(atPath: developer.appending(path: "android/app/build").path))
+        #expect(!fm.fileExists(atPath: developer.appending(path: "ng/.angular/cache").path))
+        #expect(fm.fileExists(atPath: developer.appending(path: "android/app/build.gradle.kts").path))
+        #expect(fm.fileExists(atPath: developer.appending(path: "ng/.angular").path))
+        let undo = await TrashUndo.restore(report.trashed, module: "Smart Scan", home: home)
+        #expect(undo == TrashUndo.Result(restored: 2, skipped: 0))
+        #expect(fm.fileExists(atPath: developer.appending(path: "android/app/build/outputs/app.apk").path))
+    }
+
+    /// The policy allows a module's `build` and `.angular/cache` next to their files, nothing inside a build folder,
+    /// and no `build` without a build file.
+    @Test func policyAllowsTwoLevelBuildFolders() throws {
+        defer { try? fm.removeItem(at: root) }
+        let policy = policy()
+        func allows(_ path: String) -> Bool { policy.allowsBuildFolder(developer.appending(path: path)) }
+        try write(developer.appending(path: "and/settings.gradle"), bytes: 10)
+        try write(developer.appending(path: "and/app/build.gradle"), bytes: 10)
+        try write(developer.appending(path: "and/app/build/x"))
+        try write(developer.appending(path: "and/lib/build/x"))
+        try write(developer.appending(path: "and/build/sub/build.gradle"), bytes: 10) // inside a build folder
+        try write(developer.appending(path: "and/build/sub/build/x"))
+        try write(developer.appending(path: "ng/package.json"), bytes: 10)
+        try write(developer.appending(path: "ng/angular.json"), bytes: 10)
+        try write(developer.appending(path: "ng/.angular/cache/x"))
+        try write(developer.appending(path: "plain/build/x"))
+        try write(developer.appending(path: "ex/mix.exs"), bytes: 10)
+        try write(developer.appending(path: "ex/deps/x"))
+        #expect(allows("and/app/build") && allows("and/build") && allows("ng/.angular/cache") && allows("ex/deps"))
+        #expect(!allows("and/lib/build") && !allows("and/build/sub/build") && !allows("plain/build") && !allows("ng/.angular"))
+        #expect(!policy.allowsNodeModules(developer.appending(path: "and/build")))
+        #expect(!policy.allowsTerraformFolder(developer.appending(path: "ng/.angular/cache")))
     }
 }

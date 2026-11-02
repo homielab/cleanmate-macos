@@ -269,8 +269,9 @@ nonisolated struct SafetyPolicy: Sendable {
     func allowsNodeModules(_ url: URL) -> Bool { allowsProjectFolder(url, named: [StaleNodeModules.folderName]) }
 
     /// Smart Scan rule for a stale project's build folder (`StaleBuildFolders`), only ever moved to the Trash: a real
-    /// `target` next to a regular `Cargo.toml`, `Pods` next to a `Podfile`, or `.venv`/`venv` holding `pyvenv.cfg`
-    /// next to a Python project file (see `allowsProjectFolder`).
+    /// folder its project holds next to the regular file that makes it (`StaleProjects.buildFolders`: `target` next to
+    /// `Cargo.toml` or `pom.xml`, Gradle's `build` and `app/build`, `.venv` holding `pyvenv.cfg`…; see
+    /// `allowsProjectFolder`).
     func allowsBuildFolder(_ url: URL) -> Bool { allowsProjectFolder(url, named: StaleBuildFolders.folderNames) }
 
     /// Smart Scan rule for a stale Terraform or OpenTofu project's downloads (`StaleTerraform`), only ever moved to the
@@ -326,7 +327,8 @@ nonisolated struct SafetyPolicy: Sendable {
             && lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
     }
 
-    /// A folder named one of `names` that its parent holds as a project folder (`StaleProjects.isProjectFolder`),
+    /// A folder named one of `names` that its project holds as a project folder (`StaleProjects.isProjectFolder`), not
+    /// inside another one (`StaleProjects.isInsideProjectFolder`),
     /// strictly inside the home folder, not under ~/Library, a hidden folder, a dependency or build folder
     /// (`StaleProjects.unwalked`) or a package (an app's bundled modules), on the home's volume with no other volume
     /// mounted inside, not excluded. Unlike `allows`, also inside Documents and Desktop, where people keep projects;
@@ -336,19 +338,21 @@ nonisolated struct SafetyPolicy: Sendable {
         guard names.contains((path as NSString).lastPathComponent), let home = allowedRoots.first,
               path.hasPrefix(home + "/"), !isExcluded(path) else { return false }
         let parts = path.dropFirst(home.count + 1).split(separator: "/")
-        // `<project>/.terraform/providers`: `.terraform` is the one hidden folder allowed, right above the entry.
-        let inside = parts.count - (path.dropLast((path as NSString).lastPathComponent.count + 1).hasSuffix("/.terraform") ? 2 : 1)
+        // The project's own path: `<project>/.terraform/providers`, `.angular/cache` and a Gradle module's `app/build`
+        // are the folders allowed between the project and the entry (`StaleProjects.projectFolders` checks them).
+        let project = StaleProjects.projectPath(of: path)
+        let inside = project.hasPrefix(home + "/") ? project.dropFirst(home.count + 1).split(separator: "/").count : 0
         guard parts.first?.lowercased() != "library",
-              !parts.prefix(max(0, inside)).contains(where: { $0.hasPrefix(".") || StaleProjects.unwalked.contains(String($0)) })
+              !parts.prefix(inside).contains(where: { $0.hasPrefix(".") || StaleProjects.unwalked.contains(String($0)) })
         else { return false }
         let key = path.lowercased()
         let projectTrees = ["Documents", "Desktop"].map { (home + "/" + $0).lowercased() }
         guard !protectedTrees.contains(where: { !projectTrees.contains($0) && key.hasPrefix($0 + "/") }) else { return false }
         if let homeDevice = rootDevices[0], device(path) != homeDevice { return false }
         if holdsMount(path) { return false }
-        guard StaleProjects.isProjectFolder(path) else { return false }
+        guard StaleProjects.isProjectFolder(path), !StaleProjects.isInsideProjectFolder(path, home: home) else { return false }
         var folder = URL(fileURLWithPath: home)
-        for part in parts.prefix(max(0, inside)) {
+        for part in parts.dropLast() {
             folder.append(path: String(part))
             if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return false }
         }

@@ -1,7 +1,8 @@
 import Foundation
 
 /// Folders a tool makes again for projects nobody worked on for `days` days: JavaScript's `node_modules`
-/// (`StaleNodeModules`), Cargo's `target`, a Python virtual environment and CocoaPods' `Pods` (`StaleBuildFolders`).
+/// (`StaleNodeModules`), build folders (`StaleBuildFolders`: Cargo, Gradle, Flutter, Next.js…) and Terraform's
+/// downloads (`StaleTerraform`).
 /// A project is a folder holding such a folder next to the file that makes it (`projectFolders`), found in the usual
 /// project folders up to `depth` levels down by one walk that both Smart Scan items share (`find(in:policy:…)`).
 nonisolated enum StaleProjects {
@@ -16,57 +17,153 @@ nonisolated enum StaleProjects {
     /// Folder name extensions that are bundles, never walked (a package's node_modules belongs to the app).
     static let bundleExtensions: Set = ["app", "bundle", "framework", "plugin", "xcodeproj", "xcworkspace", "photoslibrary",
                                          "musiclibrary", "tvlibrary", "photolibrary", "fcpbundle", "logicx", "band"]
-    /// Dependencies and build output, never walked into (hidden ones such as `.venv` never are anyway): what they hold
-    /// belongs to the project around them.
+    /// Dependencies and build output, never walked into (hidden ones such as `.venv` never are anyway, nor any folder
+    /// found next to the file that makes it, such as Gradle's `build`): what they hold belongs to the project around them.
     static let unwalked: Set = ["node_modules", "target", "Pods", "venv"]
     /// A walk's result is handed to calls for the same folders this long after it started: both items of one scan.
     static let reuseTime = Duration.seconds(10)
 
     /// Names of the folders a tool makes that `folder` holds next to the file that makes them, from its `readdir`
-    /// names and types (`children`): `node_modules` by `package.json`, `target` by `Cargo.toml`, `Pods` by `Podfile`,
-    /// `.venv` or `venv` holding `pyvenv.cfg` by `pyproject.toml`, `setup.py` or a `requirements*.txt`, and
-    /// `.terraform/providers` and `.terraform/modules` by a `*.tf` file (Terraform, OpenTofu). Only real
+    /// names and types (`children`), relative to `folder`: `node_modules` by `package.json`, `.terraform/providers` and
+    /// `.terraform/modules` by a `*.tf` file (Terraform, OpenTofu), and the build folders of `buildFolders`. Only real
     /// folders next to regular files count (a symlink is neither).
     static func projectFolders(in folder: String, children: [String: UInt8]) -> [String] {
         let file = UInt8(DT_REG), directory = UInt8(DT_DIR)
         var found: [String] = []
         if children["package.json"] == file, children["node_modules"] == directory { found.append("node_modules") }
-        if children["Cargo.toml"] == file, children["target"] == directory { found.append("target") }
-        if children["Podfile"] == file, children["Pods"] == directory { found.append("Pods") }
-        if children["pyproject.toml"] == file || children["setup.py"] == file
-            || children.contains(where: { $0.value == file && isRequirements($0.key) }) {
-            for name in [".venv", "venv"] where children[name] == directory {
-                var info = stat()
-                if lstat(folder + "/" + name + "/pyvenv.cfg", &info) == 0, info.st_mode & S_IFMT == S_IFREG { found.append(name) }
-            }
-        }
+        found += buildFolders(in: folder, children: children)
         if children[".terraform"] == directory, children.contains(where: { $0.value == file && $0.key.hasSuffix(".tf") }) {
-            for name in StaleTerraform.folderNames {
-                var info = stat()
-                if lstat(folder + "/.terraform/" + name, &info) == 0, info.st_mode & S_IFMT == S_IFDIR {
-                    found.append(".terraform/" + name)
-                }
+            for name in StaleTerraform.folderNames where isFolder(folder + "/.terraform/" + name) {
+                found.append(".terraform/" + name)
             }
         }
         return found
     }
 
+    /// The build folders `folder` holds, relative to it, each only next to the file that makes it:
+    /// - Cargo: `target` by `Cargo.toml`; Maven: `target` by `pom.xml`; CocoaPods: `Pods` by `Podfile`;
+    /// - Python: `.venv` or `venv` holding `pyvenv.cfg` by `pyproject.toml`, `setup.py` or a `requirements*.txt`;
+    /// - Gradle and Android: `build` and `.gradle` by `build.gradle(.kts)` or `settings.gradle(.kts)`, and
+    ///   `<module>/build` of each first-level module holding its own `build.gradle(.kts)` (Android's `app/build`);
+    /// - SwiftPM: `.build` by `Package.swift`; Flutter and Dart: `.dart_tool` and `build` by `pubspec.yaml`;
+    /// - with a `package.json`: `.next` by `next.config.*`, `.nuxt` and `.output` by `nuxt.config.*`, `.svelte-kit`
+    ///   by `svelte.config.*`, `.angular/cache` by `angular.json`, `.turbo` by `turbo.json`;
+    /// - Haskell: `.stack-work` by `stack.yaml`, `dist-newstyle` by `cabal.project` or a `*.cabal`;
+    /// - Elixir: `_build` and `deps` by `mix.exs`; Zig: `.zig-cache` and `zig-cache` by `build.zig` (never `zig-out`,
+    ///   what the project installs).
+    /// Never a name such as `build`, `dist` or `out` without the file that makes it.
+    static func buildFolders(in folder: String, children: [String: UInt8]) -> [String] {
+        let file = UInt8(DT_REG), directory = UInt8(DT_DIR)
+        func has(_ name: String) -> Bool { children[name] == file }
+        func hasFile(where test: (String) -> Bool) -> Bool { children.contains { $0.value == file && test($0.key) } }
+        func config(_ name: String) -> Bool { hasFile { $0.hasPrefix(name + ".config.") } }
+        var found: [String] = []
+        func add(_ names: String..., when condition: Bool) {
+            guard condition else { return }
+            for name in names where children[name] == directory && !found.contains(name) { found.append(name) }
+        }
+        add("target", when: has("Cargo.toml") || has("pom.xml"))
+        add("Pods", when: has("Podfile"))
+        if has("pyproject.toml") || has("setup.py") || hasFile(where: isRequirements) {
+            for name in [".venv", "venv"] where children[name] == directory && isFile(folder + "/" + name + "/pyvenv.cfg") {
+                found.append(name)
+            }
+        }
+        let gradle = isGradleProject(children)
+        add("build", ".gradle", when: gradle)
+        if gradle {
+            for (name, type) in children.sorted(by: { $0.key < $1.key }) where type == directory && !name.hasPrefix(".")
+                && name != "build" && !bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
+                let module = folder + "/" + name
+                if gradleBuildFiles.contains(where: { isFile(module + "/" + $0) }), isFolder(module + "/build") {
+                    found.append(name + "/build")
+                }
+            }
+        }
+        add(".build", when: has("Package.swift"))
+        add(".dart_tool", "build", when: has("pubspec.yaml"))
+        if has("package.json") {
+            add(".next", when: config("next"))
+            add(".nuxt", ".output", when: config("nuxt"))
+            add(".svelte-kit", when: config("svelte"))
+            if has("angular.json"), children[".angular"] == directory, isFolder(folder + "/.angular/cache") {
+                found.append(".angular/cache")
+            }
+            add(".turbo", when: has("turbo.json"))
+        }
+        add(".stack-work", when: has("stack.yaml"))
+        add("dist-newstyle", when: has("cabal.project") || hasFile(where: isCabalFile))
+        add("_build", "deps", when: has("mix.exs"))
+        add(".zig-cache", "zig-cache", when: has("build.zig"))
+        return found
+    }
+
+    static let gradleBuildFiles = ["build.gradle", "build.gradle.kts"]
+    static let gradleProjectFiles = gradleBuildFiles + ["settings.gradle", "settings.gradle.kts"]
+
+    /// A Gradle project's folder: a regular `build.gradle(.kts)` or `settings.gradle(.kts)` among `children`.
+    static func isGradleProject(_ children: [String: UInt8]) -> Bool {
+        gradleProjectFiles.contains { children[$0] == UInt8(DT_REG) }
+    }
+
     /// `requirements.txt`, `requirements-dev.txt`…
     static func isRequirements(_ name: String) -> Bool { name.hasPrefix("requirements") && name.hasSuffix(".txt") }
 
-    /// Whether `path` is a real folder that its project holds as one of its `projectFolders` (the parent, or the
-    /// parent of `.terraform` for Terraform's folders).
-    static func isProjectFolder(_ path: String) -> Bool {
+    /// `app.cabal`: a Cabal package description (not a file named only `.cabal`).
+    static func isCabalFile(_ name: String) -> Bool { name.hasSuffix(".cabal") && name.count > ".cabal".count }
+
+    /// Whether `path` is a real folder (`lstat`: a symlink is not).
+    static func isFolder(_ path: String) -> Bool {
         var info = stat()
-        guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return false }
+        return lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFDIR
+    }
+
+    /// Whether `path` is a regular file (`lstat`: a symlink is not).
+    static func isFile(_ path: String) -> Bool {
+        var info = stat()
+        return lstat(path, &info) == 0 && info.st_mode & S_IFMT == S_IFREG
+    }
+
+    /// Whether `path` is a real folder that its project (`projectPath`) holds as one of its `projectFolders`.
+    static func isProjectFolder(_ path: String) -> Bool {
+        guard isFolder(path) else { return false }
         let project = projectPath(of: path)
         return projectFolders(in: project, children: entries(of: project)).contains(String(path.dropFirst(project.count + 1)))
     }
 
-    /// The project holding a project folder: its parent, or two levels up for `<project>/.terraform/<name>`.
+    /// The project holding a project folder: its parent, or two levels up for `<project>/.terraform/<name>`,
+    /// `<project>/.angular/cache` and a Gradle module's `<project>/<module>/build` (both folders Gradle projects).
     static func projectPath(of path: String) -> String {
-        let parent = (path as NSString).deletingLastPathComponent
-        return (parent as NSString).lastPathComponent == ".terraform" ? (parent as NSString).deletingLastPathComponent : parent
+        let parent = (path as NSString).deletingLastPathComponent, parentName = (parent as NSString).lastPathComponent
+        let grandparent = (parent as NSString).deletingLastPathComponent
+        if parentName == ".terraform" || parentName == ".angular" && (path as NSString).lastPathComponent == "cache" {
+            return grandparent
+        }
+        if (path as NSString).lastPathComponent == "build", gradleBuildFiles.contains(where: { isFile(parent + "/" + $0) }),
+           gradleProjectFiles.contains(where: { isFile(grandparent + "/" + $0) }) {
+            return grandparent
+        }
+        return parent
+    }
+
+    /// `~/Developer/app — app/build/`: the project's path from the home folder, as project names repeat (`app`, `ios`),
+    /// and the folder's path in it.
+    static func label(_ folder: URL, home: URL) -> String {
+        let path = folder.standardizedFileURL.path, project = projectPath(of: path), homePath = home.standardizedFileURL.path
+        let shown = project.hasPrefix(homePath + "/") ? "~" + project.dropFirst(homePath.count) : project
+        return shown + " — " + path.dropFirst(project.count + 1) + "/"
+    }
+
+    /// Whether a folder between `home` and `path` is a project folder of the folder holding it: what a tool made is
+    /// never walked into, so nothing found inside it is a project's.
+    static func isInsideProjectFolder(_ path: String, home: String) -> Bool {
+        guard path.hasPrefix(home + "/") else { return false }
+        var parent = home
+        for part in path.dropFirst(home.count + 1).split(separator: "/").dropLast() {
+            if projectFolders(in: parent, children: entries(of: parent)).contains(String(part)) { return true }
+            parent += "/" + part
+        }
+        return false
     }
 
     /// The project folders in `roots` (an item's `Scanner.roots`), leaving out what macOS guards without Full Disk
@@ -104,7 +201,9 @@ nonisolated enum StaleProjects {
             for root in roots { group.addTask { await walk(root, skipping: skipping, depth: depth, budget: budget) } }
             return await group.reduce(into: []) { $0 += $1 }
         }
-        return found.sorted { $0.path < $1.path }
+        // A Gradle module's `build` is found from its project and from the module itself.
+        var seen = Set<String>()
+        return found.filter { seen.insert($0.path).inserted }.sorted { $0.path < $1.path }
     }
 
     /// `find` in one root, taking the folders it reads from `budget`; a level's folders are read in path order, so
@@ -132,13 +231,15 @@ nonisolated enum StaleProjects {
                         var found: [URL] = [], next: [String] = []
                         for folder in folders[start..<min(start + slice, folders.count)] {
                             let children = entries(of: folder)
-                            for name in projectFolders(in: folder, children: children) {
+                            let names = projectFolders(in: folder, children: children)
+                            for name in names {
                                 found.append(URL(fileURLWithPath: folder + "/" + name, isDirectory: true))
                             }
                             guard current < depth else { continue }
                             var info = stat()
                             for (name, type) in children where type == UInt8(DT_DIR) && !name.hasPrefix(".")
-                                && !unwalked.contains(name) && !bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
+                                && !unwalked.contains(name) && !names.contains(name)
+                                && !bundleExtensions.contains((name as NSString).pathExtension.lowercased()) {
                                 let path = folder + "/" + name
                                 guard !skipping.contains(path), lstat(path, &info) == 0, info.st_dev == device else { continue }
                                 next.append(path)
@@ -202,9 +303,9 @@ nonisolated enum StaleProjects {
         return names
     }
 
-    /// Newest modification date of `folder` itself, of the `markers` of the project holding it and of each folder above
-    /// it below `home`, and of the project's own files `projectFile` accepts (`requirements*.txt`); nil when `folder` is
-    /// gone. A `.git` file (a worktree, a submodule) leads to its own Git folder's index.
+    /// Newest modification date of `folder` itself, of the `markers` in each folder above it below `home` (its project,
+    /// a Gradle module, the repository around them), and of the project's own files `projectFile` accepts
+    /// (`requirements*.txt`, `next.config.mjs`); nil when `folder` is gone. A `.git` file (a worktree, a submodule) leads to its own Git folder's index.
     static func lastWorkedOn(_ folder: URL, markers: [String], projectFile: ((String) -> Bool)? = nil, home: URL) -> Date? {
         var info = stat()
         let path = folder.standardizedFileURL.path
@@ -217,10 +318,11 @@ nonisolated enum StaleProjects {
             }
         }
         let homePath = home.standardizedFileURL.path
-        var current = (path as NSString).deletingLastPathComponent
         if let projectFile {
-            for name in entries(of: current).keys where projectFile(name) { consider(current + "/" + name) }
+            let project = projectPath(of: path)
+            for name in entries(of: project).keys where projectFile(name) { consider(project + "/" + name) }
         }
+        var current = (path as NSString).deletingLastPathComponent
         while current.hasPrefix(homePath + "/") {
             for marker in markers { consider(current + "/" + marker) }
             if let gitFolder = gitFolder(linkedFrom: current + "/.git") { consider(gitFolder + "/index") }
@@ -255,7 +357,8 @@ nonisolated enum StaleProjects {
         {
             let busy = running(), cutoff = now().addingTimeInterval(-Double(days) * 86_400)
             return { url in
-                isUsed(url.deletingLastPathComponent(), by: busy) || lastWorkedOn(url).map { $0 >= cutoff } ?? true
+                isUsed(URL(fileURLWithPath: projectPath(of: url.standardizedFileURL.path)), by: busy)
+                    || lastWorkedOn(url).map { $0 >= cutoff } ?? true
             }
         }
     }
