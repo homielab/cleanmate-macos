@@ -38,6 +38,9 @@ section the script stops before building anything.
   --profile NAME   notarytool keychain profile (default: \$NOTARY_PROFILE or cleanmate-notary).
   --help           Show this help.
 
+Notarization credentials: with ASC_KEY_ID and ASC_ISSUER_ID set, an App Store Connect API key is used
+(~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8, or ASC_KEY_PATH); otherwise the keychain profile.
+
 One-time setup:
   - "Developer ID Application" certificate for team 79LQ4MHVMG in the login keychain.
   - xcrun notarytool store-credentials cleanmate-notary \\
@@ -109,7 +112,12 @@ printf '%s\n' "$NOTES" > "$NOTES_FILE"
 echo "==> Release notes: $NOTES_FILE"
 
 notarize() { # $1 = file to submit (zip or dmg)
-  xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait
+  if [[ -n "${ASC_KEY_ID:-}" && -n "${ASC_ISSUER_ID:-}" ]]; then
+    xcrun notarytool submit "$1" --key "${ASC_KEY_PATH:-$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8}" \
+      --key-id "$ASC_KEY_ID" --issuer "$ASC_ISSUER_ID" --wait
+  else
+    xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait
+  fi
 }
 
 echo "==> Archive"
