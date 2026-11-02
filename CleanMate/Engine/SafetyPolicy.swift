@@ -273,6 +273,17 @@ nonisolated struct SafetyPolicy: Sendable {
     /// next to a Python project file (see `allowsProjectFolder`).
     func allowsBuildFolder(_ url: URL) -> Bool { allowsProjectFolder(url, named: StaleBuildFolders.folderNames) }
 
+    /// Smart Scan rule for a stale Terraform or OpenTofu project's downloads (`StaleTerraform`), only ever moved to the
+    /// Trash: a real `providers` or `modules` folder in a real `.terraform` folder next to a regular `*.tf` file (see
+    /// `allowsProjectFolder`). Never `.terraform` itself, its `terraform.tfstate` or `environment`, nor a project file.
+    func allowsTerraformFolder(_ url: URL) -> Bool {
+        let parent = Self.normalize(url.deletingLastPathComponent())
+        guard (parent as NSString).lastPathComponent == ".terraform" else { return false }
+        var info = stat()
+        guard lstat(parent, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return false }
+        return allowsProjectFolder(url, named: StaleTerraform.folderNames)
+    }
+
     /// Smart Scan rule for a Final Cut Pro or iMovie library (`VideoRenderFiles`), never removed itself (only its
     /// render files, `allowsRenderFiles`): a real folder named `*.fcpbundle` or `*.imovielibrary` directly in Movies,
     /// Desktop or Documents or in a folder there (not hidden, not a package), on the home's volume with no other volume
@@ -325,8 +336,10 @@ nonisolated struct SafetyPolicy: Sendable {
         guard names.contains((path as NSString).lastPathComponent), let home = allowedRoots.first,
               path.hasPrefix(home + "/"), !isExcluded(path) else { return false }
         let parts = path.dropFirst(home.count + 1).split(separator: "/")
+        // `<project>/.terraform/providers`: `.terraform` is the one hidden folder allowed, right above the entry.
+        let inside = parts.count - (path.dropLast((path as NSString).lastPathComponent.count + 1).hasSuffix("/.terraform") ? 2 : 1)
         guard parts.first?.lowercased() != "library",
-              !parts.dropLast().contains(where: { $0.hasPrefix(".") || StaleProjects.unwalked.contains(String($0)) })
+              !parts.prefix(max(0, inside)).contains(where: { $0.hasPrefix(".") || StaleProjects.unwalked.contains(String($0)) })
         else { return false }
         let key = path.lowercased()
         let projectTrees = ["Documents", "Desktop"].map { (home + "/" + $0).lowercased() }
@@ -335,7 +348,7 @@ nonisolated struct SafetyPolicy: Sendable {
         if holdsMount(path) { return false }
         guard StaleProjects.isProjectFolder(path) else { return false }
         var folder = URL(fileURLWithPath: home)
-        for part in parts.dropLast() {
+        for part in parts.prefix(max(0, inside)) {
             folder.append(path: String(part))
             if (try? folder.resourceValues(forKeys: [.isPackageKey]))?.isPackage == true { return false }
         }

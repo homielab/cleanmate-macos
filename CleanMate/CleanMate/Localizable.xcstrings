@@ -8119,6 +8119,86 @@
           }
         }
       }
+    },
+    "Stale Terraform providers" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider Terraform bỏ lâu"
+          }
+        }
+      }
+    },
+    "Providers and modules in .terraform of Terraform and OpenTofu projects whose files and Git index were not modified for 90 days. Moved to the Trash; terraform init downloads them again. State files are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider và module trong .terraform của dự án Terraform và OpenTofu có tệp và chỉ mục Git không đổi trong 90 ngày. Chuyển vào Thùng rác; terraform init tải lại. Tệp state được giữ lại"
+          }
+        }
+      }
+    },
+    "Terraform plugin cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache plugin Terraform"
+          }
+        }
+      }
+    },
+    "Providers shared by projects, downloaded again by terraform init" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider dùng chung giữa các dự án, terraform init tải lại"
+          }
+        }
+      }
+    },
+    "minikube cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache minikube"
+          }
+        }
+      }
+    },
+    "Downloaded ISO, preloaded images and binaries, downloaded again by minikube start; clusters and certificates are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ISO, image preload và tệp chạy đã tải, minikube start tải lại; cụm và chứng chỉ được giữ lại"
+          }
+        }
+      }
+    },
+    "Helm cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache Helm"
+          }
+        }
+      }
+    },
+    "Repository indexes and downloaded charts; repositories and plugins are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ mục kho và chart đã tải; danh sách kho và plugin được giữ lại"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -18,6 +18,7 @@ nonisolated enum ShellEnvironment {
         "ANDROID_HOME", "ANDROID_SDK_ROOT", "ANDROID_USER_HOME", "ANDROID_SDK_HOME", "ANDROID_PREFS_ROOT",
         // Build tool caches (`DeveloperCatalog`).
         "DENO_DIR", "ZIG_GLOBAL_CACHE_DIR", "CCACHE_DIR", "SCCACHE_DIR", "POETRY_CACHE_DIR", "PRE_COMMIT_HOME", "PIPX_HOME",
+        "TF_PLUGIN_CACHE_DIR", "HELM_CACHE_HOME",
     ]
     /// zsh's load order (later wins); the bash files only fill variables no zsh file sets.
     /// shortcut: ZDOTDIR, `source`d files, /etc/zshenv and .zlogin are not read; add them if users ask.

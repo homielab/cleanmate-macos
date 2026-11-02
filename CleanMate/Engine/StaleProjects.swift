@@ -24,7 +24,8 @@ nonisolated enum StaleProjects {
 
     /// Names of the folders a tool makes that `folder` holds next to the file that makes them, from its `readdir`
     /// names and types (`children`): `node_modules` by `package.json`, `target` by `Cargo.toml`, `Pods` by `Podfile`,
-    /// `.venv` or `venv` holding `pyvenv.cfg` by `pyproject.toml`, `setup.py` or a `requirements*.txt`. Only real
+    /// `.venv` or `venv` holding `pyvenv.cfg` by `pyproject.toml`, `setup.py` or a `requirements*.txt`, and
+    /// `.terraform/providers` and `.terraform/modules` by a `*.tf` file (Terraform, OpenTofu). Only real
     /// folders next to regular files count (a symlink is neither).
     static func projectFolders(in folder: String, children: [String: UInt8]) -> [String] {
         let file = UInt8(DT_REG), directory = UInt8(DT_DIR)
@@ -39,18 +40,33 @@ nonisolated enum StaleProjects {
                 if lstat(folder + "/" + name + "/pyvenv.cfg", &info) == 0, info.st_mode & S_IFMT == S_IFREG { found.append(name) }
             }
         }
+        if children[".terraform"] == directory, children.contains(where: { $0.value == file && $0.key.hasSuffix(".tf") }) {
+            for name in StaleTerraform.folderNames {
+                var info = stat()
+                if lstat(folder + "/.terraform/" + name, &info) == 0, info.st_mode & S_IFMT == S_IFDIR {
+                    found.append(".terraform/" + name)
+                }
+            }
+        }
         return found
     }
 
     /// `requirements.txt`, `requirements-dev.txt`…
     static func isRequirements(_ name: String) -> Bool { name.hasPrefix("requirements") && name.hasSuffix(".txt") }
 
-    /// Whether `path` is a real folder that its parent holds as one of its `projectFolders`.
+    /// Whether `path` is a real folder that its project holds as one of its `projectFolders` (the parent, or the
+    /// parent of `.terraform` for Terraform's folders).
     static func isProjectFolder(_ path: String) -> Bool {
         var info = stat()
         guard lstat(path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR else { return false }
+        let project = projectPath(of: path)
+        return projectFolders(in: project, children: entries(of: project)).contains(String(path.dropFirst(project.count + 1)))
+    }
+
+    /// The project holding a project folder: its parent, or two levels up for `<project>/.terraform/<name>`.
+    static func projectPath(of path: String) -> String {
         let parent = (path as NSString).deletingLastPathComponent
-        return projectFolders(in: parent, children: entries(of: parent)).contains((path as NSString).lastPathComponent)
+        return (parent as NSString).lastPathComponent == ".terraform" ? (parent as NSString).deletingLastPathComponent : parent
     }
 
     /// The project folders in `roots` (an item's `Scanner.roots`), leaving out what macOS guards without Full Disk

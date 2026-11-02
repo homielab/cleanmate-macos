@@ -208,6 +208,8 @@ struct EndToEndCleanTests {
                     ? StaleNodeModules.item(home: home, hasFullDiskAccess: { true }, running: { [] })
                     : item.id == "stale-build-dirs"
                     ? StaleBuildFolders.item(home: home, hasFullDiskAccess: { true }, running: { [] })
+                    : item.id == "stale-terraform-providers"
+                    ? StaleTerraform.item(home: home, hasFullDiskAccess: { true }, running: { [] })
                     : item.id == "vscode-stale-workspaces" ? EditorWorkspaces.item(home: home, hasFullDiskAccess: { true }) : item)
                 item.command = nil
                 item.entryCommand = nil // a simulator's entry is removed as a folder here, not erased with simctl
@@ -262,10 +264,13 @@ struct EndToEndCleanTests {
                 }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes
                     let project = folder.appending(path: "junk-\(item.id)")
-                    let (manifest, built) = item.id == "stale-build-dirs" ? ("Cargo.toml", "target") : ("package.json", "node_modules")
+                    let (manifest, built) = item.id == "stale-build-dirs" ? ("Cargo.toml", "target")
+                        : item.id == "stale-terraform-providers" ? ("main.tf", ".terraform/providers")
+                        : ("package.json", "node_modules")
                     try write(project.appending(path: manifest), Data("{}".utf8))
                     try write(project.appending(path: built + "/dep/index.js"), Data(repeating: 1, count: 4096))
-                    for url in [project.appending(path: built + "/dep"), project.appending(path: built)] {
+                    for url in [project.appending(path: built + "/dep"), project.appending(path: built),
+                                project.appending(path: built).deletingLastPathComponent()] {
                         try fm.setAttributes([.modificationDate: old], ofItemAtPath: url.path)
                     }
                     continue
