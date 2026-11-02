@@ -675,6 +675,16 @@
         }
       }
     },
+    "Downloaded again by the launcher; games, saves and sign-ins are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launcher tự tải lại; game, bản lưu và đăng nhập được giữ"
+          }
+        }
+      }
+    },
     "Downloaded again with ollama pull; a model made with ollama create must be made again" : {
       "localizations" : {
         "vi" : {

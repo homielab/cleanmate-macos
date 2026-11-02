@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Smart Scan › Applications**: caches and logs of **Steam**, **Epic Games Launcher**, **Battle.net** and **GOG Galaxy** (web caches, library artwork, update manifests, logs, crash dumps, shader caches), 0.5–3 GB with Steam. Ticked and deleted, since the launcher downloads them again; skipped while the launcher runs. Games, downloads in progress, saves, settings and sign-ins are never touched.
+
 ## [1.6] - 2026-11-02
 
 ### Added
