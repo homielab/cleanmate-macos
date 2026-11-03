@@ -180,6 +180,28 @@ nonisolated extension RunningProcesses {
     /// Whether `url` is, or is a folder holding, one of `openPaths`.
     static func holdsOpenFile(_ url: URL, openPaths: Set<String>) -> Bool {
         let path = withoutPrivate(url.standardizedFileURL.path)
-        return openPaths.contains { $0 == path || $0.hasPrefix(path + "/") }
+        if openPaths.contains(path) { return true }
+        let folder = path + "/"
+        return openPaths.contains { $0.hasPrefix(folder) }
+    }
+
+    /// `openPaths` and every folder above each of them, for `holdsOpenFile(_:holders:)`: one lookup per entry instead
+    /// of a comparison with every open path (thousands open in `$TMPDIR` × its thousands of entries took seconds).
+    static func holders(of openPaths: Set<String>) -> Set<String> {
+        var holders = openPaths
+        for path in openPaths {
+            var folder = Substring(path)
+            while let slash = folder.lastIndex(of: "/"), slash > folder.startIndex {
+                folder = folder[..<slash]
+                // Already there: its own folders are too, or will be once it is reached as an open path itself.
+                guard holders.insert(String(folder)).inserted else { break }
+            }
+        }
+        return holders
+    }
+
+    /// `holdsOpenFile(_:openPaths:)` with the `holders(of:)` of those open paths.
+    static func holdsOpenFile(_ url: URL, holders: Set<String>) -> Bool {
+        holders.contains(withoutPrivate(url.standardizedFileURL.path))
     }
 }

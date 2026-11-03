@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Each release also carries `CleanMate.dmg` (+ `.sha256`), so the README download link always points to the latest version.
 - **Smart Scan › Developer**: Gradle caches are measured faster (their folders are read in parallel), with the same items and sizes.
+- **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
 
 ## [1.7] - 2026-11-02
 

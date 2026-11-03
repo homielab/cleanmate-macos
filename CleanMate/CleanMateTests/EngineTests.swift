@@ -609,7 +609,7 @@ struct ProbeAndCommandTests {
         defer { box.remove() }
         try box.file("Library/Developer/CoreSimulator/Devices/AAA/data/x.bin")
         try box.file("Library/Developer/CoreSimulator/Devices/BBB/data/x.bin")
-        // Deeper than `Scanner.splitDepth`: these entries are walked split, same size as one walk.
+        // Several levels deep: the entry's size is that of one walk of the whole folder.
         for (i, dir) in ["a", "a/b", "a/b/c", "a/b/c/d", "a/b/c/d/e"].enumerated() {
             try box.file("Library/Developer/CoreSimulator/Devices/AAA/data/\(dir)/f.bin", bytes: 5_000 * (i + 1))
         }
@@ -3047,4 +3047,59 @@ func sqlite(_ url: URL, _ sql: String) async throws -> String {
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     let output = await ShellCommand(executable: DatabaseErase.sqlite, arguments: [url.path, sql]).output()
     return try #require(output).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+/// `RunningProcesses.holders(of:)` answers like comparing an entry with every open path.
+struct OpenFileHoldersTests {
+    static let open: Set<String> = [
+        "/var/folders/x/T/app/cache/a.db",
+        "/var/folders/x/T/app/cache/a.db-wal",
+        "/var/folders/x/T/session", // an open folder (a process's working directory)
+        "/var/folders/x/T/session/deep/inside/log.txt",
+        "/var/folders/x/T/other.lock",
+        "/Users/u/Library/Caches/tool/blob",
+    ]
+
+    @Test func holdersMatchComparingEveryOpenPath() {
+        let holders = RunningProcesses.holders(of: Self.open)
+        let asked = [
+            "/var/folders/x/T/app", "/var/folders/x/T/app/cache", "/var/folders/x/T/app/cache/a.db",
+            "/var/folders/x/T/app/cache/a", "/var/folders/x/T/app/cach", "/var/folders/x/T/ap",
+            "/var/folders/x/T/session", "/var/folders/x/T/session/deep", "/var/folders/x/T/session/other",
+            "/var/folders/x/T/other.lock", "/var/folders/x/T/other", "/var/folders/x/T", "/var/folders/x/T/new",
+            "/private/var/folders/x/T/app", "/Users/u/Library/Caches", "/Users/u/Library/Caches/tool2", "/Users",
+        ]
+        for path in asked {
+            let url = URL(fileURLWithPath: path)
+            #expect(RunningProcesses.holdsOpenFile(url, holders: holders)
+                    == RunningProcesses.holdsOpenFile(url, openPaths: Self.open), "\(path)")
+        }
+        #expect(RunningProcesses.holdsOpenFile(URL(fileURLWithPath: "/var/folders/x/T/session/deep"), holders: holders))
+        #expect(!RunningProcesses.holdsOpenFile(URL(fileURLWithPath: "/var/folders/x/T/app/cach"), holders: holders))
+    }
+
+    /// An open folder holding open files, whichever of them is reached first.
+    @Test func holdersOfNestedOpenPaths() {
+        let open: Set<String> = ["/a/b", "/a/b/c/d", "/a/x/y", "/a/b/c"]
+        #expect(RunningProcesses.holders(of: open) == open.union(["/a", "/a/x"]))
+        #expect(RunningProcesses.holders(of: []).isEmpty)
+    }
+
+    /// A scan keeps out the `$TMPDIR`-like entries holding an open file, with many entries and open files.
+    @Test func scanSkipsEntriesHoldingOpenFiles() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        var open = Set<String>()
+        for i in 0..<300 {
+            let file = try box.file("Tmp/entry\(i)/f.bin")
+            if i % 3 == 0 { open.insert(RunningProcesses.withoutPrivate(file.standardizedFileURL.path)) }
+        }
+        let item = CleanerItem(id: "t", title: "t", paths: ["~/Tmp"], skipsOpenFiles: true)
+        let held = open
+        let scan = await Scanner.scan(item, policy: box.policy, openPaths: { root in
+            Set(held.filter { $0.hasPrefix(RunningProcesses.withoutPrivate(root) + "/") })
+        })
+        let names = Set(scan.entries.map(\.url.lastPathComponent))
+        #expect(names == Set((0..<300).filter { $0 % 3 != 0 }.map { "entry\($0)" }))
+    }
 }

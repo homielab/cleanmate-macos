@@ -174,6 +174,7 @@ nonisolated enum Scanner {
                                  into: result, policy: policy, cutoff: cutoff, split: 1, openPaths: open)
         }
         let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: roots, read: openPaths) : []
+        let holders = RunningProcesses.holders(of: open)
         func listed(_ urls: [URL], under prefix: String) -> [URL] {
             urls.flatMap { url -> [URL] in
                 let name = prefix + url.lastPathComponent
@@ -185,7 +186,7 @@ nonisolated enum Scanner {
                    modified(values) >= cutoff { return [] }
                 guard !Cleaner.isExcluded(name, excluded: item.excluded), item.allowsEntry?(policy, url) ?? policy.allows(url),
                       skips?(url) != true, !isLocked(url),
-                      open.isEmpty || !holdsOpenFile(url, of: item, openPaths: open) else { return [] }
+                      open.isEmpty || !holdsOpenFile(url, of: item, holders: holders) else { return [] }
                 if prefix.isEmpty, only?.contains(name) == false
                     || item.included?.contains(where: { fnmatch($0, name, 0) == 0 }) == false { return [] }
                 guard holdsExclusion else { return [url] }
@@ -212,10 +213,10 @@ nonisolated enum Scanner {
             }
             candidates += listed(children, under: "")
         }
-        // An item filtered by its probe starts walking only once the tool answered, ~1–3 s into a Smart Scan whose other
-        // walks fill the thread pool: one thread per entry left a simulator's 66 k-file `data` as the scan's tail.
+        // One walk per entry, also for an item filtered by its probe (simulators): split 3 levels deep, a simulator's
+        // walk spent ~4× the CPU in the kernel (threads contending for the same folders) and ended later in a Smart Scan.
         return await measure(candidates, of: item, into: result, policy: policy, cutoff: cutoff,
-                             split: item.entrySplitDepth ?? (only != nil ? splitDepth : 0), openPaths: open)
+                             split: item.entrySplitDepth ?? 0, openPaths: open)
     }
 
     /// `result` with `candidates` measured at once (or their database records counted), labelled, largest first.
@@ -297,8 +298,16 @@ nonisolated enum Scanner {
     /// Whether the entry `url` is, or holds, one of `openPaths`, or one of its own `CleanerItem.entryFiles` is (the
     /// file aria2 downloads into next to its `.aria2`).
     static func holdsOpenFile(_ url: URL, of item: CleanerItem, openPaths: Set<String>) -> Bool {
-        RunningProcesses.holdsOpenFile(url, openPaths: openPaths)
-            || item.entryFiles?(url).own.contains { RunningProcesses.holdsOpenFile($0, openPaths: openPaths) } == true
+        holdsOpenFile(url, of: item) { RunningProcesses.holdsOpenFile($0, openPaths: openPaths) }
+    }
+
+    /// `holdsOpenFile(_:of:openPaths:)` with the `RunningProcesses.holders(of:)` of those paths: for many entries.
+    static func holdsOpenFile(_ url: URL, of item: CleanerItem, holders: Set<String>) -> Bool {
+        holdsOpenFile(url, of: item) { RunningProcesses.holdsOpenFile($0, holders: holders) }
+    }
+
+    private static func holdsOpenFile(_ url: URL, of item: CleanerItem, holds: (URL) -> Bool) -> Bool {
+        holds(url) || item.entryFiles?(url).own.contains(where: holds) == true
     }
 
     /// Allocated bytes of a regular file (not through a symlink); 0 for anything else or a missing file.
@@ -450,7 +459,7 @@ nonisolated enum Scanner {
 
     /// Folder levels of an entry's child read in parallel before each deeper folder gets one `tree` walk, for the
     /// Uninstaller's sizes (one 230 k-file folder in an app's Application Support took 3.5 s on one thread).
-    /// In a scan only for items filtered by a probe (they start late): thousands of entries already keep every
+    /// Not in a Smart Scan unless an item asks (`CleanerItem.entrySplitDepth`): thousands of entries already keep every
     /// core busy, and splitting all of them made a Smart Scan ~1.5× slower.
     static let splitDepth = 3
 
