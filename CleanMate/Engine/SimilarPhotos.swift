@@ -39,6 +39,26 @@ nonisolated enum SimilarPhotos {
         var suggested: Photo { photos[0] }
         /// What trashing every photo but the suggested one frees.
         var extraSize: Int64 { photos.dropFirst().reduce(0) { $0 + $1.size } }
+        /// The newest photo's last change.
+        var newest: Date { photos.lazy.map(\.modified).max() ?? .distantPast }
+    }
+
+    /// How the groups are listed: the most space to free, the newest photo, or the most photos first. Ties keep the
+    /// most space to free first, then the suggested photo's path.
+    enum GroupOrder: String, CaseIterable, Sendable {
+        case space, date, count
+
+        func sorted(_ groups: [Group]) -> [Group] {
+            groups.sorted { a, b in
+                switch self {
+                case .date where a.newest != b.newest: return a.newest > b.newest
+                case .count where a.photos.count != b.photos.count: return a.photos.count > b.photos.count
+                default:
+                    if a.extraSize != b.extraSize { return a.extraSize > b.extraSize }
+                    return a.id.path < b.id.path
+                }
+            }
+        }
     }
 
     /// One photo's feature print, L2-normalized and stored as Float16 (half the size of the cache, distances unchanged

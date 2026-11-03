@@ -6,19 +6,67 @@ import UniformTypeIdentifiers
 // Large & Old Files: user files found by walking the home folder, moved to the Trash only when the user ticks them.
 
 nonisolated enum FileKind: String, CaseIterable, Sendable {
-    case video, archive, diskImage, installer, other
+    case video, audio, image, document, code, archive, diskImage, installer, other
 
     static let archiveExtensions: Set = ["zip", "tar", "gz", "tgz", "bz2", "tbz", "xz", "txz", "zst", "7z", "rar", "lz", "lzma", "cab", "jar", "war", "xip"]
     static let diskImageExtensions: Set = ["iso", "img", "toast", "vmdk", "vdi", "vhd", "vhdx", "qcow2", "raw", "sparseimage", "ipsw"]
     static let installerExtensions: Set = ["dmg", "pkg", "mpkg", "exe", "msi", "apk", "deb", "rpm", "appimage"]
+    /// Source and notebook files macOS only has a type for when an editor declares one, and style sheets (text to
+    /// macOS, so they would read as documents).
+    static let codeExtensions: Set = ["go", "rs", "kt", "kts", "jsx", "vue", "svelte", "dart", "scala", "lua", "zig", "ex",
+                                      "exs", "erl", "hs", "clj", "ml", "fs", "nim", "jl", "r", "ipynb", "gradle", "tf",
+                                      "proto", "css", "scss", "sass", "less"]
+    /// Ebooks and documents macOS only has a type for when an app declares one.
+    static let documentExtensions: Set = ["mobi", "azw", "azw3", "djvu", "fb2", "odt", "ods", "odp", "tex"]
+    /// Text formats read as code, not documents: source, scripts and data or config files.
+    static let codeTypes: [UTType] = [.sourceCode, .script, .json, .xml, .yaml, .propertyList]
+    static let documentTypes: [UTType] = [.pdf, .epub, .compositeContent, .presentation, .spreadsheet, .text]
+    /// A file or folder whose presence makes its folder a project: unknown files in it count as code.
+    static let projectMarkers = [".git", "Package.swift", "package.json", "Cargo.toml", "go.mod", "pyproject.toml",
+                                 "setup.py", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts",
+                                 "pom.xml", "Podfile", "Gemfile", "CMakeLists.txt", "Makefile", "composer.json",
+                                 "pubspec.yaml", "mix.exs"]
 
+    /// By extension first (installers, disk images, archives, then code and documents macOS may not know), else by the
+    /// extension's `UTType`.
     init(fileExtension: String) {
         let ext = fileExtension.lowercased()
         if Self.installerExtensions.contains(ext) { self = .installer }
         else if Self.diskImageExtensions.contains(ext) { self = .diskImage }
         else if Self.archiveExtensions.contains(ext) { self = .archive }
-        else if UTType(filenameExtension: ext)?.conforms(to: .movie) == true { self = .video }
+        else if Self.codeExtensions.contains(ext) { self = .code }
+        else if Self.documentExtensions.contains(ext) { self = .document }
+        else if !ext.isEmpty, let type = UTType(filenameExtension: ext) { self.init(type: type) }
         else { self = .other }
+    }
+
+    /// Media before text (an SVG is an image, though XML), code before documents (source is plain text too).
+    init(type: UTType) {
+        if type.conforms(to: .movie) { self = .video }
+        else if type.conforms(to: .audio) { self = .audio }
+        else if type.conforms(to: .image) { self = .image }
+        else if Self.codeTypes.contains(where: type.conforms) { self = .code }
+        else if Self.documentTypes.contains(where: type.conforms) { self = .document }
+        else { self = .other }
+    }
+
+    /// Whether `folder` is in a project (it or a folder above it holds a `projectMarkers` entry), looking no higher
+    /// than below `home`, or below an external drive's root for a folder on one: a home or a drive under Git does not
+    /// make every file in it code. `known` remembers each folder's answer for the files after it.
+    static func isInProject(_ folder: String, home: String, known: Locked<[String: Bool]>) -> Bool {
+        func inScope(_ path: String) -> Bool {
+            path.hasPrefix(home + "/") || (!path.hasPrefix(home) && path.hasPrefix("/Volumes/")
+                && path.split(separator: "/").count > 2)
+        }
+        var (dir, chain, found) = (folder, [String](), false)
+        while inScope(dir) {
+            if let answer = known.withLock({ $0[dir] }) { found = answer; break }
+            chain.append(dir)
+            if projectMarkers.contains(where: { FileManager.default.fileExists(atPath: dir + "/" + $0) }) { found = true; break }
+            dir = (dir as NSString).deletingLastPathComponent
+        }
+        known.withLock { answers in for path in chain { answers[path] = found } }
+        return found
     }
 }
 
@@ -107,14 +155,14 @@ nonisolated enum LargeFileScanner {
                                  icloudStatus: @escaping @Sendable (URL) -> ICloudStatus? = ICloudStatus.current,
                                  progress: (@Sendable (Int) -> Void)? = nil) async throws -> [LargeFile] {
         guard allowsRoot(root, policy: policy) else { throw OutsideHomeError() }
+        let home = URL(fileURLWithPath: realpath(policy.homeURL.path, nil).map { defer { free($0) }; return String(cString: $0) }
+                       ?? policy.homeURL.path, isDirectory: true)
         let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, extensions: extensions,
                         spotlightLastUsed: spotlightLastUsed, icloudStatus: icloudStatus, progress: progress,
-                        library: policy.homeURL.appending(path: "Library").standardizedFileURL.path)
+                        library: policy.homeURL.appending(path: "Library").standardizedFileURL.path, home: home.path)
         // The enumerator lists a root's files under its real path (/var → /private/var); the parallel levels do the same.
         let real = realpath(root.path, nil).map { defer { free($0) }; return String(cString: $0) } ?? root.path
         var found = try await walk.tree(URL(fileURLWithPath: real, isDirectory: true), depth: splitDepth)
-        let home = URL(fileURLWithPath: realpath(policy.homeURL.path, nil).map { defer { free($0) }; return String(cString: $0) }
-                       ?? policy.homeURL.path, isDirectory: true)
         let drive = ICloudDownloads.folder(home: home)
         if extensions == nil, real == home.path, !ProtectedFolders.contains(skipping, drive),
            !ProtectedFolders.contains(skipping, ICloudDownloads.folder(home: policy.homeURL)) {
@@ -139,13 +187,24 @@ nonisolated enum LargeFileScanner {
         let icloudStatus: @Sendable (URL) -> ICloudStatus?
         let progress: (@Sendable (Int) -> Void)?
         let library: String
+        /// The home folder's real path, as the walk lists files: where `FileKind.isInProject` stops looking up.
+        let home: String
         let checked = Locked(0)
+        /// Folders already known to be in a project or not (`FileKind.isInProject`).
+        let projectFolders = Locked([String: Bool]())
 
         init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, extensions: Set<String>?,
              spotlightLastUsed: @escaping @Sendable (URL) -> Date?, icloudStatus: @escaping @Sendable (URL) -> ICloudStatus?,
-             progress: (@Sendable (Int) -> Void)?, library: String) {
+             progress: (@Sendable (Int) -> Void)?, library: String, home: String) {
             (self.minSize, self.policy, self.skipping, self.extensions, self.spotlightLastUsed, self.icloudStatus, self.progress,
-             self.library) = (minSize, policy, skipping, extensions, spotlightLastUsed, icloudStatus, progress, library)
+             self.library, self.home) = (minSize, policy, skipping, extensions, spotlightLastUsed, icloudStatus, progress, library, home)
+        }
+
+        /// The extension's kind; a file of no known kind inside a project (a model, a database, a build product) is code.
+        func kind(of url: URL) -> FileKind {
+            let kind = FileKind(fileExtension: url.pathExtension)
+            guard kind == .other else { return kind }
+            return FileKind.isInProject(url.deletingLastPathComponent().path, home: home, known: projectFolders) ? .code : .other
         }
 
         /// Downloaded iCloud files under `roots` (in iCloud Drive), one enumerator per root in parallel, never asking
@@ -237,7 +296,7 @@ nonisolated enum LargeFileScanner {
                                 modified: values.contentModificationDate)
             var info = stat()
             return LargeFile(url: url, size: Int64(size), lastUsed: used,
-                             kind: FileKind(fileExtension: url.pathExtension), modified: values.contentModificationDate,
+                             kind: kind(of: url), modified: values.contentModificationDate,
                              hardLinked: lstat(url.path, &info) == 0 && info.st_nlink > 1, icloud: icloud,
                              trashable: !inDrive, home: policy.homeURL)
         }

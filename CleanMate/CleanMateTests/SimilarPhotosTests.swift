@@ -247,6 +247,22 @@ import UniformTypeIdentifiers
         #expect(ranked.map(\.name) == ["big", "new", "old", "small"])
     }
 
+    @Test func sortsGroupsBySpaceDateOrCount() {
+        func group(_ name: String, sizes: [Int64], day: Double) -> SimilarPhotos.Group {
+            SimilarPhotos.Group(photos: sizes.enumerated().map { index, size in
+                SimilarPhotos.Photo(url: URL(filePath: "/x/\(name)\(index)"), size: size,
+                                    modified: Date(timeIntervalSince1970: (day + Double(index)) * 86_400),
+                                    width: 100, height: 100, name: "\(name)\(index)", location: "~")
+            })
+        }
+        let groups = [group("small", sizes: [9, 1, 1, 1], day: 1), group("big", sizes: [9, 50], day: 2),
+                      group("new", sizes: [9, 5], day: 30)]
+        #expect(SimilarPhotos.GroupOrder.space.sorted(groups).map(\.suggested.name) == ["big0", "new0", "small0"])
+        #expect(SimilarPhotos.GroupOrder.date.sorted(groups).map(\.suggested.name) == ["new0", "small0", "big0"])
+        #expect(SimilarPhotos.GroupOrder.count.sorted(groups).map(\.suggested.name) == ["small0", "big0", "new0"])
+        #expect(groups[0].newest == Date(timeIntervalSince1970: 4 * 86_400))
+    }
+
     // MARK: - Never inside a library or an app
 
     @Test func neverListsPhotosInsideAPhotosLibraryOrAnApp() async throws {

@@ -6,6 +6,10 @@ extension FileKind {
     var title: LocalizedStringResource {
         switch self {
         case .video: "Videos"
+        case .audio: "Audio"
+        case .image: "Images"
+        case .document: "Documents"
+        case .code: "Code & Projects"
         case .archive: "Archives"
         case .diskImage: "Disk Images"
         case .installer: "Installers"
@@ -17,10 +21,29 @@ extension FileKind {
     var singularTitle: LocalizedStringResource {
         switch self {
         case .video: "Video"
+        case .audio: "Audio"
+        case .image: "Image"
+        case .document: "Document"
+        case .code: "Code"
         case .archive: "Archive"
         case .diskImage: "Disk Image"
         case .installer: "Installer"
         case .other: "Other"
+        }
+    }
+
+    /// SF Symbol for the Kind menu and column.
+    var systemImage: String {
+        switch self {
+        case .video: "film"
+        case .audio: "music.note"
+        case .image: "photo"
+        case .document: "doc.text"
+        case .code: "chevron.left.forwardslash.chevron.right"
+        case .archive: "archivebox"
+        case .diskImage: "opticaldisc"
+        case .installer: "shippingbox"
+        case .other: "doc"
         }
     }
 }
@@ -36,6 +59,9 @@ struct LargeFilesView: View {
     /// Files whose download the confirmation asks to remove; empty = not asking.
     @State private var removingDownloads: [LargeFile] = []
     @State private var excludedCount = 0
+    /// Last Used › Custom…: the number of days being typed.
+    @State private var askingDays = false
+    @State private var typedDays = ""
     @State private var choosingFolder = false
     @State private var unsupportedFolder = false
     /// Folders chosen with "Choose Folder…", newest first, one path per line.
@@ -194,32 +220,36 @@ struct LargeFilesView: View {
             }
             .width(32)
             TableColumn("Name", value: \.name) { file in
-                Label {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(file.name).help(file.url.path)
-                        if let icloud = file.icloud { iCloudLine(file, icloud) }
-                        if file.hardLinked {
-                            Text("Hard link — moving it frees no space").font(.caption).foregroundStyle(.secondary)
-                        } else if let freed = model.cloneFreedSize(of: file) {
-                            Group {
-                                if freed == 0 {
-                                    Text("APFS clone — moving it frees no space")
-                                } else {
-                                    Text("APFS clone — moving it frees only \(freed, format: .fileSize)")
+                HStack(spacing: 4) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(file.name).help(file.url.path)
+                            if let icloud = file.icloud { iCloudLine(file, icloud) }
+                            if file.hardLinked {
+                                Text("Hard link — moving it frees no space").font(.caption).foregroundStyle(.secondary)
+                            } else if let freed = model.cloneFreedSize(of: file) {
+                                Group {
+                                    if freed == 0 {
+                                        Text("APFS clone — moving it frees no space")
+                                    } else {
+                                        Text("APFS clone — moving it frees only \(freed, format: .fileSize)")
+                                    }
                                 }
+                                .font(.caption).foregroundStyle(.secondary)
                             }
-                            .font(.caption).foregroundStyle(.secondary)
                         }
+                    } icon: {
+                        Image(nsImage: Self.icon(forExtension: file.url.pathExtension))
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .accessibilityHidden(true)
                     }
-                } icon: {
-                    Image(nsImage: Self.icon(forExtension: file.url.pathExtension))
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                        .accessibilityHidden(true)
+                    .padding(.vertical, 3)
+                    Spacer(minLength: 0)
+                    QuickLookButton(url: file.url, preview: $previewURL)
                 }
-                .padding(.vertical, 3)
             }
-            .width(min: 120, ideal: 160)
+            .width(min: 140, ideal: 180)
             // Own column so the name is not cut by the label. Always present (a conditional column needs macOS 14.4)
             // and collapsed to zero width outside the duplicates view.
             TableColumn(model.duplicatesOnly ? LocalizedStringKey("Copies") : "") { file in
@@ -239,9 +269,10 @@ struct LargeFilesView: View {
             }
             .width(min: 80, ideal: 110)
             TableColumn("Kind") { file in
-                Text(file.kind.singularTitle).foregroundStyle(.secondary)
+                Label { Text(file.kind.singularTitle) } icon: { Image(systemName: file.kind.systemImage) }
+                    .foregroundStyle(.secondary)
             }
-            .width(min: 70, ideal: 90)
+            .width(min: 80, ideal: 110)
             TableColumn("Size", value: \.size) { file in
                 HStack(spacing: 8) {
                     Text(file.size, format: .fileSize).sizeColumnStyle(emphasized: model.checked.contains(file.url))
@@ -256,6 +287,7 @@ struct LargeFilesView: View {
             .width(min: 90, ideal: 110)
         }
         .contextMenu(forSelectionType: URL.self) { urls in
+            Button("Open") { FileOpener.open(Array(urls)) }.disabled(urls.count > FileOpener.limit)
             Button("Quick Look") { previewURL = urls.first }
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(Array(urls)) }
             if let url = urls.first { Button("Show in Space Lens") { ModuleRouter.shared.spaceLensItem = url } }
@@ -270,7 +302,7 @@ struct LargeFilesView: View {
                 }
             }
         } primaryAction: { urls in
-            NSWorkspace.shared.activateFileViewerSelecting(Array(urls))
+            FileOpener.open(files.map(\.url).filter(urls.contains)) // double-click or Return, like Finder
         }
         .onSpaceKey {
             previewURL = previewURL == nil ? files.first { selection.contains($0.url) }?.url : nil
@@ -318,7 +350,7 @@ struct LargeFilesView: View {
                     Text("All Kinds").tag(FileKind?.none)
                     ForEach(FileKind.allCases, id: \.self) { kind in
                         let size = model.files(of: kind).reduce(Int64(0)) { $0 + $1.size }
-                        Text("\(Text(kind.title)) (\(size, format: .fileSize))")
+                        Label { Text("\(Text(kind.title)) (\(size, format: .fileSize))") } icon: { Image(systemName: kind.systemImage) }
                             .tag(FileKind?.some(kind))
                     }
                 }
@@ -331,23 +363,24 @@ struct LargeFilesView: View {
                     }
                 }
             }
-            if !model.files.isEmpty {
-                Picker("Last Used", selection: $model.minAgeMonths) {
-                    ForEach(LargeFilesModel.ageOptions, id: \.self) { months in
-                        switch months {
-                        case 0: Text("Any Time").tag(months)
-                        case 12: Text("Over 1 year ago").tag(months)
-                        case 24: Text("Over 2 years ago").tag(months)
-                        default: Text("Over \(months) months ago").tag(months)
-                        }
-                    }
-                }
-            }
+            if !model.files.isEmpty { lastUsedMenu }
             // Similar Photos looks for smaller files too: offered even when no large file was found.
             if !model.needsAccess { listingMenu }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.skippedProtected { ProtectedFoldersNote() }
+        }
+        // Last Used › Custom…
+        .alert("Not Used for More Than", isPresented: $askingDays) {
+            TextField("Days", text: $typedDays)
+            Button("Apply") {
+                if let days = Int(typedDays.trimmingCharacters(in: .whitespaces)), LargeFilesModel.customDays.contains(days) {
+                    model.unusedFor = .days(days)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Show files not used for more than this many days (1 to 36,500).")
         }
         .safeAreaInset(edge: .bottom) {
             HStack {
@@ -400,6 +433,32 @@ struct LargeFilesView: View {
             } else {
                 Text("Every copy is selected: no copy of \(lost, format: .list(type: .and)) will be left. You can put them back from the Trash until it is emptied.")
             }
+        }
+    }
+
+    /// Any time, 1 month to 2 years, or Custom…: a number of days typed in a prompt (`.days(0)` is that item).
+    private var lastUsedMenu: some View {
+        typealias UnusedFor = LargeFilesModel.UnusedFor
+        return Picker("Last Used", selection: Binding(get: { model.unusedFor }, set: { value in
+            if value == .days(0) {
+                if case .days(let days) = model.unusedFor { typedDays = String(days) } else { typedDays = "" }
+                askingDays = true
+            } else {
+                model.unusedFor = value
+            }
+        })) {
+            Text("Any Time").tag(UnusedFor.anyTime)
+            ForEach(LargeFilesModel.ageOptions, id: \.self) { months in
+                switch months {
+                case 1: Text("Over 1 month ago").tag(UnusedFor.months(months))
+                case 12: Text("Over 1 year ago").tag(UnusedFor.months(months))
+                case 24: Text("Over 2 years ago").tag(UnusedFor.months(months))
+                default: Text("Over \(months) months ago").tag(UnusedFor.months(months))
+                }
+            }
+            Divider()
+            if case .days(let days) = model.unusedFor { Text("Over \(days) days ago").tag(model.unusedFor) }
+            Text("Custom…").tag(UnusedFor.days(0))
         }
     }
 

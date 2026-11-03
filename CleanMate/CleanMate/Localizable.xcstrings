@@ -141,12 +141,32 @@
         }
       }
     },
+    "Apply" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Áp dụng"
+          }
+        }
+      }
+    },
     "Apps and tools recreate caches as needed." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
+          }
+        }
+      }
+    },
+    "Audio" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Âm thanh"
           }
         }
       }
@@ -171,6 +191,26 @@
         }
       }
     },
+    "Code" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mã nguồn"
+          }
+        }
+      }
+    },
+    "Code & Projects" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mã nguồn & dự án"
+          }
+        }
+      }
+    },
     "Comparing photos…" : {
       "localizations" : {
         "vi" : {
@@ -191,12 +231,52 @@
         }
       }
     },
+    "Custom…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tuỳ chỉnh…"
+          }
+        }
+      }
+    },
+    "Days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Số ngày"
+          }
+        }
+      }
+    },
     "Deleted permanently" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xoá hẳn"
+          }
+        }
+      }
+    },
+    "Document" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài liệu"
+          }
+        }
+      }
+    },
+    "Documents" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tài liệu"
           }
         }
       }
@@ -367,6 +447,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "iCloud — đang đồng bộ"
+          }
+        }
+      }
+    },
+    "Image" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh"
+          }
+        }
+      }
+    },
+    "Images" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh"
           }
         }
       }
@@ -1559,6 +1659,46 @@
         }
       }
     },
+    "Not Used for More Than" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không dùng quá"
+          }
+        }
+      }
+    },
+    "Number of Photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Số ảnh"
+          }
+        }
+      }
+    },
+    "Over %lld days ago" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hơn %lld ngày trước"
+          }
+        }
+      }
+    },
+    "Over 1 month ago" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hơn 1 tháng trước"
+          }
+        }
+      }
+    },
     "Review and clean the items Smart Scan found" : {
       "localizations" : {
         "vi" : {
@@ -2581,6 +2721,16 @@
         }
       }
     },
+    "Show files not used for more than this many days (1 to 36,500)." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện các tệp không dùng quá số ngày này (1 đến 36.500)."
+          }
+        }
+      }
+    },
     "Shows here after a few days of use." : {
       "localizations" : {
         "vi" : {
@@ -2657,6 +2807,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã bỏ chọn một số mục con"
+          }
+        }
+      }
+    },
+    "Sort groups by the space their extra photos take, their newest photo, or how many photos they have" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sắp xếp nhóm theo dung lượng của các ảnh thừa, ảnh mới nhất hoặc số ảnh trong nhóm"
+          }
+        }
+      }
+    },
+    "Space to Free" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng giải phóng"
           }
         }
       }

@@ -8,6 +8,8 @@ final class SimilarPhotosModel: ObservableObject {
 
     @Published var phase = Phase.idle
     @Published var groups: [SimilarPhotos.Group] = []
+    /// Sort By in the toolbar.
+    @Published var order = SimilarPhotos.GroupOrder.space
     /// Ticked for the Trash. Never pre-filled.
     @Published var checked: Set<URL> = []
     /// Image files checked so far while listing.
@@ -145,6 +147,9 @@ final class SimilarPhotosModel: ObservableObject {
     }
 
     var photoCount: Int { groups.reduce(0) { $0 + $1.photos.count } }
+
+    /// `groups` in the chosen `order`, as listed.
+    var sortedGroups: [SimilarPhotos.Group] { order.sorted(groups) }
 
     var checkedPhotos: [SimilarPhotos.Photo] { groups.flatMap(\.photos).filter { checked.contains($0.url) } }
     var checkedSize: Int64 { checkedPhotos.reduce(0) { $0 + $1.size } }

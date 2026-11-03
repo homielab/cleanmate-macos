@@ -8,8 +8,24 @@ final class LargeFilesModel: ObservableObject {
     static let sizeOptions: [Int64] = [50, 100, 500, 1_000, 5_000].map { $0 * 1_000_000 }
     /// A folder scope also offers 1 and 10 MB; the whole home stays at 50 MB or more (far too many files below).
     static let folderSizeOptions: [Int64] = [1, 10].map { $0 * 1_000_000 } + sizeOptions
-    /// Months without use; 0 = any age.
-    static let ageOptions = [0, 3, 6, 12, 24]
+    /// Months without use the Last Used menu offers; any time and a number of days are offered too.
+    static let ageOptions = [1, 3, 6, 12, 24]
+    /// Days the user may type for Last Used: a day to 100 years.
+    static let customDays = 1...36_500
+
+    /// Last Used: any time, or not used for some months (the menu) or a number of days (typed).
+    enum UnusedFor: Hashable {
+        case anyTime, months(Int), days(Int)
+
+        /// Files last used before this date match; nil = any time.
+        func cutoff(from now: Date = .now, calendar: Calendar = .current) -> Date? {
+            switch self {
+            case .anyTime: nil
+            case .months(let months): calendar.date(byAdding: .month, value: -months, to: now)
+            case .days(let days): calendar.date(byAdding: .day, value: -days, to: now)
+            }
+        }
+    }
 
     @Published var phase = Phase.idle
     @Published var files: [LargeFile] = [] {
@@ -29,7 +45,7 @@ final class LargeFilesModel: ObservableObject {
     @Published private(set) var scannedMinSize = sizeOptions[0]
     /// Sizes the Size menu offers for the current scope.
     var sizeChoices: [Int64] { scope == nil ? Self.sizeOptions : Self.folderSizeOptions }
-    @Published var minAgeMonths = 0
+    @Published var unusedFor = UnusedFor.anyTime
     /// nil = all kinds.
     @Published var kind: FileKind?
     /// Toolbar search: file name or location; "" = no search.
@@ -218,7 +234,7 @@ final class LargeFilesModel: ObservableObject {
 
     /// Files passing the size, age and search filters, of `kind` (nil = all kinds).
     func files(of kind: FileKind?) -> [LargeFile] {
-        let cutoff = minAgeMonths == 0 ? nil : Calendar.current.date(byAdding: .month, value: -minAgeMonths, to: .now)
+        let cutoff = unusedFor.cutoff()
         let search = search.trimmingCharacters(in: .whitespaces)
         return files.filter {
             $0.matches(minSize: minSize, unusedSince: cutoff) && (kind == nil || $0.kind == kind)

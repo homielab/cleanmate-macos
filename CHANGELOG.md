@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Large & Old Files**: the Kind filter has nine kinds with icons — videos, audio, images, documents, code & projects (also unknown files inside a project folder or Git repository), archives, disk images, installers and other — so far fewer files land in **Other**; `cleanmate large --json` reports the same kinds.
+- **Large & Old Files**, **Duplicates Only** and **Similar Photos**: **Open** a file with its app (right-click or Return, and double-click in the file list), and preview it with the eye button on each row as well as Space; **Last Used** adds **Over 1 month ago** and **Custom…** for any number of days.
+- **Similar Photos**: **Sort By** lists groups by space to free, date or number of photos.
 - **Smart Scan** and **Privacy**: every item has a **Why is this safe?** button that explains what it is, where it is, what cleaning does to it (made again, moved to the Trash or deleted for good) and when it is skipped, in English and Vietnamese.
 - **Smart Scan** and **Privacy**: **Clean…** / **Erase…** first opens a review of everything ticked, by group, with each item's size and whether it goes to the Trash or is deleted permanently, the total of each, and what will be skipped; untick anything there before cleaning.
 - **Smart Scan** and **Privacy**: search the results with ⌘F by item name or file path; ⌘A / ⇧⌘A tick or untick the whole group of the selected row.

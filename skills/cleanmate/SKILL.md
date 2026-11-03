@@ -105,7 +105,7 @@ cleanmate similar --json ~/Pictures ~/Desktop # photos that look alike, like Sim
 `space` lists `items` biggest first (`size` in bytes, `kind` `folder` or `file`), then `moreItems` / `moreSize` for
 the rest beyond `--limit` (20). Start at the home folder and run `space` again on the biggest folder or two until the
 answer is clear (a project's `node_modules`, a video folder). `large` lists `files` biggest first with `kind` (video,
-archive, diskImage, installer, other), `modified`, `lastUsed` (Spotlight; may be null) and `hardLinked` (moving it to
+audio, image, document, code, archive, diskImage, installer, other), `modified`, `lastUsed` (Spotlight; may be null) and `hardLinked` (moving it to
 the Trash frees nothing while other links remain), and `icloud` on iCloud Drive files (`uploaded`: Remove Download in
 Large & Old Files frees it and keeps it in iCloud; never `trash` a file inside iCloud Drive); `--older-than DAYS`
 keeps files not used for that long, `--in` a folder (then `--min-size` can go down to 1 MB). `dupes` takes the same

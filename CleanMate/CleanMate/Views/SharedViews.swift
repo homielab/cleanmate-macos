@@ -207,6 +207,35 @@ extension View {
     }
 }
 
+/// Opens files with their default apps, as a double-click in Finder does. More than `limit` at once (a whole
+/// selection by mistake) are revealed in Finder instead.
+enum FileOpener {
+    static let limit = 10
+
+    @MainActor static func open(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        if urls.count > limit {
+            NSWorkspace.shared.activateFileViewerSelecting(urls)
+        } else {
+            for url in urls { NSWorkspace.shared.open(url) }
+        }
+    }
+}
+
+/// Eye button at the end of a file row: Quick Look, like Space on the selected row.
+struct QuickLookButton: View {
+    let url: URL
+    @Binding var preview: URL?
+
+    var body: some View {
+        Button("Quick Look", systemImage: "eye") { preview = url }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Quick Look")
+    }
+}
+
 /// Small bar beside a size: `size` as a share of `largest` (the largest item in view), same Capsule look as Space
 /// Lens' share column. Decorative: VoiceOver reads the size text beside it instead.
 struct SizeBar: View {

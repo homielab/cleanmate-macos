@@ -2,6 +2,7 @@ import Combine
 import CryptoKit
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import CleanMate
 
 /// Large & Old Files run against a throwaway fake home; nothing is ever moved to the real Trash.
@@ -53,10 +54,51 @@ struct LargeFilesTests {
     @Test(arguments: [
         ("Movie.MOV", FileKind.video), ("clip.mp4", .video), ("a.mkv", .video), ("x.zip", .archive), ("x.tar", .archive),
         ("x.7z", .archive), ("x.xip", .archive), ("Ubuntu.iso", .diskImage), ("vm.qcow2", .diskImage),
-        ("Setup.dmg", .installer), ("x.pkg", .installer), ("x.pdf", .other), ("noext", .other),
+        ("Setup.dmg", .installer), ("x.pkg", .installer), ("song.mp3", .audio), ("take.WAV", .audio), ("x.flac", .audio),
+        ("IMG_1.HEIC", .image), ("x.png", .image), ("x.psd", .image), ("x.dng", .image), ("logo.svg", .image),
+        ("x.pdf", .document), ("x.docx", .document), ("x.xlsx", .document), ("x.pptx", .document),
+        ("notes.txt", .document), ("x.md", .document), ("x.csv", .document), ("x.epub", .document),
+        ("x.mobi", .document), ("x.swift", .code), ("x.py", .code), ("x.go", .code), ("x.rs", .code), ("x.json", .code),
+        ("x.ipynb", .code), ("x.sql", .code), ("x.css", .code), ("noext", .other), ("model.gguf", .other), ("x.db", .other),
     ])
     func classifiesByExtension(name: String, kind: FileKind) {
         #expect(FileKind(fileExtension: (name as NSString).pathExtension) == kind)
+    }
+
+    /// Nine kinds in the filter; each kind's `UTType` family lands in it.
+    @Test func classifiesByType() {
+        #expect(FileKind.allCases.count == 9)
+        #expect(FileKind(type: .mpeg4Movie) == .video && FileKind(type: .mp3) == .audio && FileKind(type: .jpeg) == .image)
+        #expect(FileKind(type: .rtf) == .document && FileKind(type: .presentation) == .document)
+        #expect(FileKind(type: .shellScript) == .code && FileKind(type: .yaml) == .code && FileKind(type: .data) == .other)
+    }
+
+    /// A file of no known kind inside a project (a Git repo, a package) is code; known kinds keep theirs; a home under
+    /// Git does not make everything code.
+    @Test func unknownFilesInAProjectAreCode() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: home.appending(path: "Developer/app/.git"), withIntermediateDirectories: true)
+        try file("Developer/app/models/weights.gguf")
+        try file("Developer/app/demo.mov")
+        try file("Developer/tool/Cargo.toml", bytes: 10)
+        try file("Developer/tool/target/debug/tool.rlib")
+        try file("Downloads/backup.db")
+        try FileManager.default.createDirectory(at: home.appending(path: ".git"), withIntermediateDirectories: true)
+        let found = try await LargeFileScanner.scan(root: home, minSize: 10_000, policy: policy)
+        let kinds = Dictionary(uniqueKeysWithValues: found.map { ($0.name, $0.kind) })
+        #expect(kinds == ["weights.gguf": .code, "demo.mov": .video, "tool.rlib": .code, "backup.db": .other])
+    }
+
+    @Test func projectLookupStopsBelowHomeAndRemembersFolders() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repo = home.appending(path: "a/repo")
+        try FileManager.default.createDirectory(at: repo.appending(path: "src/deep"), withIntermediateDirectories: true)
+        try Data().write(to: repo.appending(path: "package.json"))
+        let known = Locked([String: Bool]())
+        #expect(FileKind.isInProject(repo.appending(path: "src/deep").path, home: home.path, known: known))
+        #expect(known.withLock { $0[repo.appending(path: "src").path] } == true)
+        #expect(!FileKind.isInProject(home.appending(path: "a").path, home: home.path, known: known))
+        #expect(!FileKind.isInProject(home.path, home: home.path, known: known)) // never the home itself
     }
 
     @Test(arguments: [
@@ -706,6 +748,27 @@ struct DuplicateFinderTests {
     #expect(LargeFilesModel.fraction(checked: 250, estimate: 1_000) == 0.25)
     #expect(LargeFilesModel.fraction(checked: 1_000, estimate: 1_000) == 0.99)
     #expect(LargeFilesModel.fraction(checked: 5_000, estimate: 1_000) == 0.99)
+}
+
+/// Last Used: whole months from the menu, or a typed number of days.
+@Test func lastUsedFilterTakesMonthsOrDays() throws {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let calendar = Calendar(identifier: .gregorian)
+    #expect(LargeFilesModel.UnusedFor.anyTime.cutoff(from: now) == nil)
+    #expect(LargeFilesModel.UnusedFor.days(10).cutoff(from: now, calendar: calendar) == now.addingTimeInterval(-10 * 86_400))
+    #expect(LargeFilesModel.UnusedFor.months(1).cutoff(from: now, calendar: calendar)
+            == calendar.date(byAdding: .month, value: -1, to: now))
+    #expect(LargeFilesModel.ageOptions.first == 1)
+
+    let model = LargeFilesModel()
+    let day: TimeInterval = 86_400
+    let files = [5, 20, 40].map { LargeFile(url: URL(fileURLWithPath: "/f\($0)"), size: 100_000_000,
+                                           lastUsed: .now.addingTimeInterval(-Double($0) * day), kind: .other) }
+    model.files = files
+    model.unusedFor = .days(10)
+    #expect(model.visibleFiles.map(\.name) == ["f20", "f40"])
+    model.unusedFor = .months(1)
+    #expect(model.visibleFiles.map(\.name) == ["f40"])
 }
 
 /// Select All/Deselect All touch only the files the filters show.

@@ -12,6 +12,8 @@ struct SimilarPhotosView<Listing: View>: View {
     /// The Duplicates menu, kept in the toolbar so the user can go back to the file list.
     @ViewBuilder let listingMenu: () -> Listing
     @State private var previewURL: URL?
+    /// The List's selected rows: Space, Open and Reveal act on them; ticking is the checkboxes.
+    @State private var highlighted: Set<URL> = []
 
     var body: some View {
         Group {
@@ -76,10 +78,11 @@ struct SimilarPhotosView<Listing: View>: View {
     }
 
     private var results: some View {
-        let largest = model.groups.lazy.flatMap(\.photos).map(\.size).max() ?? 0
-        let urls = model.groups.flatMap { $0.photos.map(\.url) }
-        return List {
-            ForEach(model.groups) { group in
+        let groups = model.sortedGroups
+        let largest = groups.lazy.flatMap(\.photos).map(\.size).max() ?? 0
+        let urls = groups.flatMap { $0.photos.map(\.url) }
+        return List(selection: $highlighted) {
+            ForEach(groups) { group in
                 Section {
                     ForEach(group.photos) { photo in
                         row(photo, suggested: photo.url == group.suggested.url, largest: largest)
@@ -89,11 +92,26 @@ struct SimilarPhotosView<Listing: View>: View {
                 }
             }
         }
-        .contextMenu(forSelectionType: URL.self) { urls in
-            Button("Quick Look") { previewURL = urls.first }
-            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(Array(urls)) }
+        .contextMenu(forSelectionType: URL.self) { selected in
+            Button("Open") { FileOpener.open(urls.filter(selected.contains)) }.disabled(selected.count > FileOpener.limit)
+            Button("Quick Look") { previewURL = urls.first(where: selected.contains) }
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting(urls.filter(selected.contains)) }
+        } primaryAction: { selected in
+            FileOpener.open(urls.filter(selected.contains)) // double-click or Return, like Finder
+        }
+        .onSpaceKey {
+            previewURL = previewURL == nil ? urls.first(where: highlighted.contains) : nil
+            return true
         }
         .quickLookPreview($previewURL, in: urls)
+        .toolbar {
+            Picker("Sort By", selection: $model.order) {
+                Text("Space to Free").tag(SimilarPhotos.GroupOrder.space)
+                Text("Date").tag(SimilarPhotos.GroupOrder.date)
+                Text("Number of Photos").tag(SimilarPhotos.GroupOrder.count)
+            }
+            .help("Sort groups by the space their extra photos take, their newest photo, or how many photos they have")
+        }
         .safeAreaInset(edge: .bottom) {
             HStack {
                 Text("Selected: \(model.checkedPhotos.count) photos, \(model.checkedSize, format: .fileSize)")
@@ -174,9 +192,12 @@ struct SimilarPhotosView<Listing: View>: View {
             Spacer(minLength: 8)
             Text(photo.size, format: .fileSize).sizeColumnStyle(emphasized: isOn)
             SizeBar(size: photo.size, largest: largest)
+            QuickLookButton(url: photo.url, preview: $previewURL)
         }
         .padding(.vertical, 2)
-        .selectionRow(isOn: isOn) { if isOn { model.checked.remove(photo.url) } else { model.checked.insert(photo.url) } }
+        .selectionRow(isOn: isOn, highlight: { highlighted = [photo.url] }) {
+            if isOn { model.checked.remove(photo.url) } else { model.checked.insert(photo.url) }
+        }
         .tag(photo.url)
     }
 

@@ -217,7 +217,7 @@ ones, with `size` `null`.
 {
   "count" : 2,
   "files" : [
-    { "hardLinked" : false, "kind" : "diskImage", "lastUsed" : "2025-03-14T09:12:00Z", "modified" : "2025-03-01T10:00:00Z", "name" : "Xcode_16.dmg", "path" : "/Users/me/Downloads/Xcode_16.dmg", "size" : 3400000000 },
+    { "hardLinked" : false, "kind" : "installer", "lastUsed" : "2025-03-14T09:12:00Z", "modified" : "2025-03-01T10:00:00Z", "name" : "Xcode_16.dmg", "path" : "/Users/me/Downloads/Xcode_16.dmg", "size" : 3400000000 },
     { "hardLinked" : false, "kind" : "video", "lastUsed" : null, "modified" : "2024-08-20T18:30:00Z", "name" : "trip.mov", "path" : "/Users/me/Movies/trip.mov", "size" : 1900000000 }
   ],
   "fullDiskAccess" : true,
