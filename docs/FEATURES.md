@@ -315,7 +315,8 @@ remove what they find, use `cleanmate trash` (below), or Space Lens or Large & O
   then largest, then newest, listed first). Nothing is chosen for you: pass the photos you want gone to
   `cleanmate trash`, and `cleanmate restore` puts them back. It reads the app's cache of photos already analyzed but
   never writes it, so the first run on many photos takes a while. `--limit N` (default 20) groups; `count` and
-  `freeable` cover all.
+  `freeable` cover all. `scripts/bench-similar.sh` (in the source repository) times it on 2,000 generated photos
+  (`-p` for more), with its peak memory and how many of the generated groups it finds.
 - Without Full Disk Access, the folders macOS protects (Desktop, Documents, Downloads, Mail…) are never opened, so no
   permission prompt appears: they are listed in `skipped` (text: a note) and, in `space`, as items with `"skipped": true`
   and `size` `null`. A PATH inside one exits with code 3.

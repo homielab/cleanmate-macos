@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
 
 ### Changed
+- **Large & Old Files › Similar Photos** and `cleanmate similar` use about a third less memory on large libraries (20,000 photos: 490 MB → 320 MB at peak), with the same groups.
 - **Overview** opens at once: the largest folders in your home show the sizes of the last measure, with when they were measured, while they are measured again in the background.
 - Each release also carries `CleanMate.dmg` (+ `.sha256`), so the README download link always points to the latest version.
 - **Smart Scan › Developer**: Gradle caches are measured faster (their folders are read in parallel), with the same items and sizes.

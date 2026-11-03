@@ -132,17 +132,25 @@ nonisolated enum SimilarPhotos {
         } catch {
             throw Cancelled(prints: result.prints)
         }
+        // Each print unpacked straight into its column of one matrix: no array per photo held at once.
+        let made = zip(todo, prints).compactMap { item, print in print.map { (item, $0) } }
+        let dimension = made.first.map { $0.1.vector.count / 2 } ?? 0
+        let usable = made.filter { $0.1.vector.count == dimension * 2 }
         var photos: [Photo] = []
-        var vectors: [[Float]] = []
-        for (item, print) in zip(todo, prints) {
-            guard let print, let vector = unpack(print.vector) else { continue }
-            photos.append(Photo(url: item.file.url, size: item.file.size, modified: item.key.modified, width: print.width,
-                                height: print.height, name: item.file.name, location: item.file.location))
-            vectors.append(vector)
+        photos.reserveCapacity(usable.count)
+        var columns = [Float](repeating: 0, count: usable.count * dimension)
+        columns.withUnsafeMutableBufferPointer { columns in
+            for (item, print) in usable {
+                guard let vector = unpack(print.vector) else { continue }
+                // Column = index in `photos`; columns left over at the end stay zero and never match anything.
+                for (row, value) in vector.enumerated() { columns[row * usable.count + photos.count] = value }
+                photos.append(Photo(url: item.file.url, size: item.file.size, modified: item.key.modified, width: print.width,
+                                    height: print.height, name: item.file.name, location: item.file.location))
+            }
         }
         do {
             try Task.checkCancellation()
-            result.groups = clusters(vectors, threshold: threshold(revision: revision))
+            result.groups = clusters(columns: columns, count: usable.count, threshold: threshold(revision: revision))
                 .map { Group(photos: ranked($0.map { photos[$0] })) }
                 .sorted { ($0.extraSize, $1.id.path) > ($1.extraSize, $0.id.path) }
         } catch {
@@ -164,26 +172,39 @@ nonisolated enum SimilarPhotos {
     /// Indexes of `vectors` (each L2-normalized) in groups of 2+ where every two members are within `threshold`
     /// (complete linkage: a burst drifting frame by frame does not chain unrelated ends together). Closest pairs merge
     /// first. Groups in order of their first index, indexes sorted.
+    static func clusters(_ vectors: [[Float]], threshold: Float, maxPairs: Int = 2_000_000) -> [[Int]] {
+        guard let dimension = vectors.first?.count, dimension > 0, vectors.allSatisfy({ $0.count == dimension }) else { return [] }
+        var columns = [Float](repeating: 0, count: vectors.count * dimension)
+        for (column, vector) in vectors.enumerated() {
+            for (row, value) in vector.enumerated() { columns[row * vectors.count + column] = value }
+        }
+        return clusters(columns: columns, count: vectors.count, threshold: threshold, maxPairs: maxPairs)
+    }
+
+    /// `clusters(_:threshold:maxPairs:)` of the `count` vectors stored as the columns of `columns` (dimension × count,
+    /// row-major): the only copy of the prints, besides 256 of them at a time.
     // shortcut: past `maxPairs` close pairs (tens of thousands of near-identical images) the rest are ignored, so
     // some photos end up in smaller groups or none; memory stays bounded.
-    static func clusters(_ vectors: [[Float]], threshold: Float, maxPairs: Int = 2_000_000) -> [[Int]] {
-        let n = vectors.count
-        guard n >= 2, let dimension = vectors.first?.count, dimension > 0,
-              vectors.allSatisfy({ $0.count == dimension }) else { return [] }
+    static func clusters(columns: [Float], count n: Int, threshold: Float, maxPairs: Int = 2_000_000) -> [[Int]] {
+        guard n >= 2, !columns.isEmpty, columns.count % n == 0 else { return [] }
+        let dimension = columns.count / n
         // |a - b|² = 2 - 2 a·b for unit vectors: distance ≤ threshold ⇔ a·b ≥ 1 - threshold² / 2.
         let minDot = 1 - threshold * threshold / 2
-        let matrix = vectors.flatMap(\.self) // n × dimension, row-major
-        var transposed = [Float](repeating: 0, count: n * dimension)
-        vDSP_mtrans(matrix, 1, &transposed, 1, vDSP_Length(dimension), vDSP_Length(n))
         var pairs: [(dot: Float, a: Int, b: Int)] = []
         let rows = 256
+        var slice = [Float](repeating: 0, count: min(rows, n) * dimension)
         var block = [Float](repeating: 0, count: min(rows, n) * n)
         rowBlocks: for start in stride(from: 0, to: n, by: rows) {
             let count = min(rows, n - start)
-            matrix.withUnsafeBufferPointer { m in
-                vDSP_mmul(m.baseAddress! + start * dimension, 1, transposed, 1, &block, 1,
-                          vDSP_Length(count), vDSP_Length(n), vDSP_Length(dimension))
+            // Vectors start..<start + count as rows (count × dimension), times all of them as columns.
+            columns.withUnsafeBufferPointer { columns in
+                slice.withUnsafeMutableBufferPointer { slice in
+                    for k in 0..<dimension {
+                        for row in 0..<count { slice[row * dimension + k] = columns[k * n + start + row] }
+                    }
+                }
             }
+            vDSP_mmul(slice, 1, columns, 1, &block, 1, vDSP_Length(count), vDSP_Length(n), vDSP_Length(dimension))
             for row in 0..<count {
                 let a = start + row
                 for b in (a + 1)..<n where block[row * n + b] >= minDot {

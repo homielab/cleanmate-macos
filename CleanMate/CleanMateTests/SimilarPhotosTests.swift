@@ -172,12 +172,14 @@ import UniformTypeIdentifiers
             return nil
         }, started: started)
         #expect(elapsed < .seconds(1), "\(elapsed)")
+        // A photo whose thread was already past the stop check may begin just after the stop: wait until every photo
+        // begun has been told. No other photo starts, so it stays at most the 8 in flight (without the stop, the fakes
+        // returning would let all 20 start).
+        try await Task.sleep(for: .milliseconds(100))
+        for _ in 0..<200 where told.withLock({ $0 }) < started.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(10)) }
         let running = started.withLock { $0 }
         #expect(running <= 8)
-        for _ in 0..<100 where told.withLock({ $0 }) < running { try await Task.sleep(for: .milliseconds(10)) }
         #expect(told.withLock { $0 } == running)
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(started.withLock { $0 } == running) // nothing started after the stop
 
         // A fake that never looks at the stop: still not waited for.
         let ignoring = Locked(0)
@@ -205,6 +207,25 @@ import UniformTypeIdentifiers
         #expect(groups.contains([0, 1]) || groups.contains([1, 2]))
         #expect(SimilarPhotos.clusters([unit(0)], threshold: 0.35).isEmpty)
         #expect(SimilarPhotos.clusters([unit(0), unit(1)], threshold: 0.35).isEmpty)
+    }
+
+    /// Prints compared 256 at a time: a group spread over several blocks is still one group, and the column matrix
+    /// `find` builds gives the same groups as the vectors.
+    @Test func clustersAcrossBlocks() {
+        var random = SplitMix(7)
+        func noise(_ scale: Float) -> [Float] { (0..<32).map { _ in (Float(random.unit()) - 0.5) * scale } }
+        func unit(_ values: [Float]) -> [Float] { SimilarPhotos.normalized(values)! }
+        var vectors = (0..<600).map { _ in unit(noise(2)) }
+        let base = vectors[10]
+        for index in [300, 590] { vectors[index] = unit(zip(base, noise(0.05)).map { $0 + $1 }) }
+        #expect(SimilarPhotos.clusters(vectors, threshold: 0.35) == [[10, 300, 590]])
+
+        var columns = [Float](repeating: 0, count: 600 * 32)
+        for (column, vector) in vectors.enumerated() {
+            for (row, value) in vector.enumerated() { columns[row * 600 + column] = value }
+        }
+        #expect(SimilarPhotos.clusters(columns: columns, count: 600, threshold: 0.35) == [[10, 300, 590]])
+        #expect(SimilarPhotos.clusters(columns: columns, count: 0, threshold: 0.35).isEmpty)
     }
 
     @Test func packedPrintsKeepTheirDirection() throws {

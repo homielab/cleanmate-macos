@@ -130,6 +130,9 @@ scripts/check-warnings.sh
 
 # Smart Scan time per item: median of 3 read-only scans of this Mac (never cleans)
 scripts/bench-scan.sh
+
+# Similar Photos on 2,000 generated photos (JPEG, HEIC, PNG): median time, peak memory, groups found
+scripts/bench-similar.sh
 ```
 
 Or open `CleanMate/CleanMate.xcodeproj` in Xcode and press Run.
