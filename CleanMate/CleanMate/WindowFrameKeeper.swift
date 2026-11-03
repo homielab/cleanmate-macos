@@ -18,7 +18,8 @@ final class WindowFrameKeeperView: NSView {
         super.viewDidMoveToWindow()
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
-        guard window != nil else { return }
+        guard let window else { return }
+        if BackgroundMode.shared.launchingHidden { window.alphaValue = 0 } // started at login: never shown
         // On the next turn of the run loop, once SwiftUI has given the new window its default size: that size must
         // neither replace the saved frame nor be saved over it.
         DispatchQueue.main.async { [weak self] in

@@ -46,6 +46,9 @@ struct GeneralSettings: View {
     @AppStorage(Preferences.installerDays) private var installerDays = CleanupAges.default.installers
     @AppStorage(Preferences.downloadDays) private var downloadDays = CleanupAges.default.downloads
     @AppStorage(Preferences.showMenuBarExtra) private var showMenuBarExtra = false
+    @AppStorage(Preferences.menuBarOnly) private var menuBarOnly = false
+    /// Kept by macOS, read again each time General shows and when the user comes back from System Settings.
+    @State private var login: OpenAtLogin.State
     @AppStorage(Preferences.scanReminder) private var reminder = ScanReminder.Frequency.off
     /// Reminders are on but CleanMate may not post notifications: shows how to allow them.
     @State private var reminderDenied: Bool
@@ -55,16 +58,19 @@ struct GeneralSettings: View {
     @State private var language = AppLanguage.current()
     private let reminders: ScanReminderScheduler
     private let lowDiskWarning: LowDiskWarningChecker
+    private let openAtLogin: OpenAtLogin
     @State private var confirmingReset = false
     /// The pressed button disappears when the inline confirmation swaps in: keyboard focus follows it.
     @FocusState private var resetFocus: Bool?
 
-    /// Tests pass a scheduler and checker with a fake notification center, and `notificationsDenied` to measure the
-    /// tallest layout.
+    /// Tests pass a scheduler and checker with a fake notification center, a fake login item, and
+    /// `notificationsDenied` to measure the tallest layout.
     init(reminders: ScanReminderScheduler = .shared, lowDiskWarning: LowDiskWarningChecker = .shared,
-         notificationsDenied: Bool = false) {
+         openAtLogin: OpenAtLogin = .shared, notificationsDenied: Bool = false) {
         self.reminders = reminders
         self.lowDiskWarning = lowDiskWarning
+        self.openAtLogin = openAtLogin
+        _login = State(initialValue: openAtLogin.state)
         _reminderDenied = State(initialValue: notificationsDenied)
         _lowDiskDenied = State(initialValue: notificationsDenied)
     }
@@ -73,6 +79,9 @@ struct GeneralSettings: View {
         Form {
             Section {
                 Toggle("Show free space in the menu bar", isOn: $showMenuBarExtra)
+                BackgroundRow(openAtLogin: Binding(get: { login != .off }, set: { login = openAtLogin.set($0) }),
+                              menuBarOnly: $menuBarOnly, needsApproval: login == .needsApproval,
+                              menuBarShown: showMenuBarExtra)
                 LabeledContent("Warn when free space is below") {
                     HStack {
                         // In the same row, not one more: General has no height to spare.
@@ -87,10 +96,6 @@ struct GeneralSettings: View {
                     }
                 }
                 .help("A notification when the startup disk runs low, checked when CleanMate opens, after Smart Scan and every hour while it runs; at most one a day.")
-            } footer: {
-                Text("CleanMate keeps running in the menu bar after its window is closed. It does not start at login.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             Section {
                 // One row with its button: General has no height to spare (`SettingsView.size`).
@@ -190,13 +195,21 @@ struct GeneralSettings: View {
         .formStyle(.grouped)
         .onAppear {
             granted = FullDiskAccess.isGranted
+            login = openAtLogin.state
             refreshNotifications()
         }
         // Granting access happens in System Settings: refresh when the user comes back.
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             granted = FullDiskAccess.isGranted
+            login = openAtLogin.state
             refreshNotifications()
         }
+        .onChange(of: showMenuBarExtra) { on in
+            openAtLogin.menuBarChanged(on: on)
+            login = openAtLogin.state
+            BackgroundMode.shared.apply()
+        }
+        .onChange(of: menuBarOnly) { _ in BackgroundMode.shared.apply() }
         // The first time a reminder or the warning is turned on, macOS asks whether CleanMate may post notifications.
         .onChange(of: reminder) { _ in
             Task { reminderDenied = !(await reminders.update()) }
@@ -212,6 +225,55 @@ struct GeneralSettings: View {
             reminderDenied = !(await reminders.refresh())
             lowDiskDenied = !(await lowDiskWarning.refresh())
         }
+    }
+}
+
+/// Open at login and Menu bar only, as two checkboxes in one row (General has no height to spare), with
+/// the way to System Settings while macOS has not allowed the login item. Shared with the welcome guide.
+struct BackgroundRow: View {
+    @Binding var openAtLogin: Bool
+    @Binding var menuBarOnly: Bool
+    let needsApproval: Bool
+    /// Settings: both need the menu bar item. The welcome guide turns it on with them, so passes true.
+    let menuBarShown: Bool
+
+    var body: some View {
+        LabeledContent("In the background") {
+            HStack(spacing: 12) {
+                if needsApproval {
+                    // macOS has not allowed the login item yet: the way to allow it, in the row (no room for more).
+                    Button { OpenAtLogin.openSystemSettings() } label: {
+                        Label("Allow…", systemImage: "exclamationmark.triangle.fill")
+                    }
+                    .help("Allow CleanMate in System Settings › General › Login Items to open it at login.")
+                }
+                Toggle("Open at login", isOn: $openAtLogin)
+                    .disabled(!menuBarShown && !openAtLogin)
+                    .help("CleanMate starts in the menu bar when you log in, with no window, to warn you when the disk runs low.")
+                Toggle("Menu bar only", isOn: $menuBarOnly)
+                    .disabled(!menuBarShown)
+                    .help("Closing the window takes CleanMate out of the Dock and ⌘Tab; Open CleanMate in the menu bar brings it back.")
+            }
+            .toggleStyle(.checkbox)
+        }
+    }
+}
+
+/// Under the welcome guide's background options: what running in the background means, or why Open at login is
+/// not on yet.
+struct MenuBarFooter: View {
+    let login: OpenAtLogin.State
+
+    var body: some View {
+        Group {
+            if login == .needsApproval {
+                Text("Allow CleanMate in System Settings › General › Login Items to open it at login.")
+            } else {
+                Text("CleanMate keeps running in the menu bar after its window is closed. It never cleans unless you click.")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
 

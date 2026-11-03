@@ -8,7 +8,7 @@ protocol UpdateCheckSetting: AnyObject {
 
 extension AppUpdater: UpdateCheckSetting {}
 
-/// The welcome guide: what CleanMate does, Full Disk Access, then language, scan reminder and update checks.
+/// The welcome guide: what CleanMate does, Full Disk Access, then language, scan reminder, menu bar and update checks.
 /// Shown once on a new install; Help › Getting Started… opens it again. It writes the same settings as
 /// Settings › General, and only those the user changes.
 final class WelcomeModel: ObservableObject {
@@ -35,6 +35,30 @@ final class WelcomeModel: ObservableObject {
         }
     }
 
+    /// Kept by macOS (`SMAppService`); read again when the user comes back from System Settings.
+    @Published private(set) var login: OpenAtLogin.State
+
+    /// Open at login also turns the menu bar item on: a login launch shows nothing else.
+    var openAtLogin: Bool {
+        get { login != .off }
+        set {
+            guard newValue != openAtLogin else { return }
+            if newValue { showMenuBarItem() }
+            login = loginItem.set(newValue)
+            applyDock()
+        }
+    }
+
+    /// Menu bar only also turns the menu bar item on, so CleanMate can always be reopened.
+    @Published var menuBarOnly: Bool {
+        didSet {
+            guard menuBarOnly != oldValue else { return }
+            defaults.set(menuBarOnly, forKey: Preferences.menuBarOnly)
+            if menuBarOnly { showMenuBarItem() }
+            applyDock()
+        }
+    }
+
     /// Sparkle's setting: left untouched, Sparkle still asks on the second launch.
     var automaticallyChecks: Bool {
         get { updater.automaticallyChecks }
@@ -49,22 +73,34 @@ final class WelcomeModel: ObservableObject {
     private let defaults: UserDefaults
     private let updater: any UpdateCheckSetting
     private let reminders: ScanReminderScheduler
+    private let loginItem: OpenAtLogin
+    /// The Dock icon follows the menu bar settings at once; tests never change the test host's.
+    private let applyDock: () -> Void
     private let readAccess: () -> Bool
     private var observer: AnyCancellable?
 
     init(defaults: UserDefaults = .standard, domain: String = Bundle.main.bundleIdentifier ?? "",
          updater: any UpdateCheckSetting = AppUpdater.shared, reminders: ScanReminderScheduler = .shared,
+         loginItem: OpenAtLogin = .shared, applyDock: @escaping () -> Void = { BackgroundMode.shared.apply() },
          readAccess: @escaping () -> Bool = { FullDiskAccess.isGranted }, center: NotificationCenter = .default) {
         self.defaults = defaults
         self.updater = updater
         self.reminders = reminders
+        self.loginItem = loginItem
+        self.applyDock = applyDock
         self.readAccess = readAccess
         hasFullDiskAccess = readAccess()
+        login = loginItem.state
+        menuBarOnly = defaults.bool(forKey: Preferences.menuBarOnly)
         language = AppLanguage.current(defaults: defaults, domain: domain)
         reminder = ScanReminder.frequency(defaults: defaults)
-        // Access is granted in System Settings: read it again when the user comes back.
+        // Access and login items are allowed in System Settings: read them again when the user comes back.
         observer = center.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.refreshAccess() } }
+    }
+
+    private func showMenuBarItem() {
+        if !defaults.bool(forKey: Preferences.showMenuBarExtra) { defaults.set(true, forKey: Preferences.showMenuBarExtra) }
     }
 
     /// A new install sees the guide at launch; tests and UI snapshots never do. Versions before the guide set
@@ -79,6 +115,8 @@ final class WelcomeModel: ObservableObject {
     func refreshAccess() {
         let granted = readAccess()
         if granted != hasFullDiskAccess { hasFullDiskAccess = granted }
+        let state = loginItem.state
+        if state != login { login = state }
     }
 
     /// Notification permission may have changed in System Settings; never asks while the reminder is off.
@@ -106,7 +144,7 @@ final class WelcomeModel: ObservableObject {
 }
 
 struct WelcomeView: View {
-    static let size = CGSize(width: 580, height: 500)
+    static let size = CGSize(width: 580, height: 520)
     static let barHeight: CGFloat = 52
     /// Room for a page above the button bar and its divider.
     static var pageHeight: CGFloat { size.height - barHeight - 1 }
@@ -299,7 +337,7 @@ struct WelcomeAccessPage: View {
 }
 
 /// Step 3: the settings most people want to choose first, with the same keys as Settings › General.
-private struct WelcomeOptionsPage: View {
+struct WelcomeOptionsPage: View {
     @ObservedObject var model: WelcomeModel
     let finish: () -> Void
 
@@ -349,6 +387,13 @@ private struct WelcomeOptionsPage: View {
                     Text("A notification reminds you to run Smart Scan; it never cleans by itself.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                Section {
+                    // Either one also turns the menu bar item on.
+                    BackgroundRow(openAtLogin: $model.openAtLogin, menuBarOnly: $model.menuBarOnly,
+                                  needsApproval: model.login == .needsApproval, menuBarShown: true)
+                } footer: {
+                    MenuBarFooter(login: model.login)
                 }
                 Section {
                     Toggle("Automatically check for updates", isOn: $model.automaticallyChecks)

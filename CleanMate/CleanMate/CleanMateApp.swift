@@ -31,7 +31,7 @@ struct CleanMateApp: App {
 }
 
 /// A lone SwiftUI `Window` scene quits the app when it closes; keep running like a normal Mac app,
-/// the Dock icon / `open` brings the window back.
+/// the Dock icon / `open` / the menu bar brings the window back (`BackgroundMode`: started at login, menu bar only).
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     /// Low-disk check every hour while CleanMate runs, also with its window closed.
     private var lowDiskTimer: Timer?
@@ -44,7 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Preferences.obsolete.forEach(UserDefaults.standard.removeObject(forKey:))
         // Set at launch: a click on the reminder that launched CleanMate is delivered right after.
         UNUserNotificationCenter.current().delegate = self
-        Task { await ScanReminderScheduler.shared.postpone() } // CleanMate was used: next reminder one period from now
+        let loginLaunch = BackgroundMode.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
+        BackgroundMode.shared.start(loginLaunch: loginLaunch)
+        // CleanMate was used: next reminder one period from now. A login launch is not a use: postponing it at every
+        // login would keep the reminder from ever coming.
+        if !loginLaunch { Task { await ScanReminderScheduler.shared.postpone() } }
         DiskHistory.shared.recordNow() // today's free space for the Overview chart
         Task { await LowDiskWarningChecker.shared.check() }
         let timer = Timer(timeInterval: LowDiskWarning.checkInterval, repeats: true) { _ in

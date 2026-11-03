@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ServiceManagement
 import SwiftUI
 import Testing
 @testable import CleanMate
@@ -24,6 +25,8 @@ final class WelcomeTests {
     let defaults: UserDefaults
     let center = FakeReminderCenter()
     let updater = FakeUpdateCheck()
+    let loginItem = FakeLoginItem()
+    var dockUpdates = 0
     let notifications = NotificationCenter()
     var granted = false
 
@@ -34,6 +37,7 @@ final class WelcomeTests {
     func model() -> WelcomeModel {
         WelcomeModel(defaults: defaults, domain: suite, updater: updater,
                      reminders: ScanReminderScheduler(center: center, defaults: defaults),
+                     loginItem: OpenAtLogin(service: loginItem), applyDock: { [unowned self] in dockUpdates += 1 },
                      readAccess: { [unowned self] in granted }, center: notifications)
     }
 
@@ -80,6 +84,38 @@ final class WelcomeTests {
         #expect(stored as NSDictionary == before)
         #expect(updater.writes == 0)
         #expect(center.prompts == 0)
+        #expect(loginItem.registers == 0 && loginItem.unregisters == 0 && dockUpdates == 0)
+    }
+
+    /// Open at login and Menu bar only: same login item and key as Settings, and either one turns the menu
+    /// bar item on (a login launch or a closed window would show nothing else). Turning them off leaves it.
+    @Test func menuBarOptionsTurnTheMenuBarItemOn() {
+        let model = model()
+        #expect(!model.openAtLogin && !model.menuBarOnly)
+        model.openAtLogin = true
+        #expect(loginItem.registers == 1 && model.login == .on)
+        #expect(defaults.bool(forKey: Preferences.showMenuBarExtra))
+        defaults.removeObject(forKey: Preferences.showMenuBarExtra)
+        model.menuBarOnly = true
+        #expect(defaults.bool(forKey: Preferences.menuBarOnly) && defaults.bool(forKey: Preferences.showMenuBarExtra))
+        #expect(dockUpdates == 2)
+
+        model.openAtLogin = false
+        model.menuBarOnly = false
+        #expect(loginItem.unregisters == 1 && model.login == .off)
+        #expect(defaults.object(forKey: Preferences.menuBarOnly) as? Bool == false)
+        #expect(defaults.bool(forKey: Preferences.showMenuBarExtra))
+    }
+
+    /// Allowed in System Settings › Login Items: the row drops its button when the user comes back.
+    @Test func loginApprovalIsReadAgainOnReturn() {
+        loginItem.registersAs = .requiresApproval
+        let model = model()
+        model.openAtLogin = true
+        #expect(model.login == .needsApproval)
+        loginItem.status = .enabled
+        notifications.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+        #expect(model.login == .on)
     }
 
     /// Step 3 writes the keys Settings › General reads, and no others.
@@ -126,6 +162,31 @@ final class WelcomeTests {
         granted = false
         model.refreshAccess()
         #expect(!model.hasFullDiskAccess)
+    }
+
+    /// Step 3's form fits the sheet without scrolling in both languages, with the tallest rows (notifications and
+    /// login item both waiting for System Settings).
+    @Test(arguments: ["en", "vi"])
+    func optionsPageFitsWithoutScrolling(language: String) async throws {
+        center.grants = false
+        loginItem.registersAs = .requiresApproval
+        let model = model()
+        model.reminder = .weekly
+        await model.reminderTask?.value
+        model.openAtLogin = true
+        let host = NSHostingView(rootView: WelcomeOptionsPage(model: model, finish: {})
+            .environment(\.locale, Locale(identifier: language))
+            .frame(width: WelcomeView.size.width, height: WelcomeView.pageHeight))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: WelcomeView.size.width, height: WelcomeView.pageHeight), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200)) }
+        let scroll = try #require(GeneralSettingsLayoutTests.scrollView(in: host))
+        let content = try #require(scroll.documentView).frame.height
+        let visible = scroll.contentView.bounds.height
+        #expect(content <= visible + 1, "\(language): step 3 needs \(content) pt, shows \(visible) pt")
+        window.close()
     }
 
     /// Steps 1 and 2 fit the sheet above its button bar in both languages.

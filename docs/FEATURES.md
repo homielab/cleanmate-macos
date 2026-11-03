@@ -29,11 +29,17 @@ For a short overview, see the [README](../README.md). CleanMate requires macOS 1
 **Settings** (⌘,): optional menu bar item (off by default) showing free space out of the disk's size (as in Finder),
 the last Smart Scan ("Junk found: 2.4 GB (scanned …)": everything the scan found, ticked or not, and what cleaning
 it freed; click it to open Smart Scan) and the space freed in the last 30 days, with **Scan Now** (opens Smart Scan and starts a scan; disabled, like ⌘R, while a confirmation is open or
-something is being cleaned), **Open CleanMate** and **Quit**; Full Disk Access status, age thresholds (logs, temporary files, AI sessions, installers in Downloads — default 30 days, files in Downloads — default 90 days, both 7 to 365), remembered
+something is being cleaned), **Open CleanMate** and **Quit**; **In the background** (both off by default, and only
+with the menu bar item on): **Open at login** adds CleanMate to System Settings › General › Login Items, so it starts in
+the menu bar when you log in, with no window, no scan and no network use besides the update check you chose; if macOS
+has not allowed it yet, **Allow…** opens Login Items. Turning the menu bar item off also turns Open at login off.
+**Menu bar only** takes CleanMate out of the Dock and ⌘Tab while its window is closed; **Open CleanMate** (or opening
+the app again in Finder) brings the window and the Dock icon back, and **Quit** in the menu bar quits it. The welcome
+guide's last step offers both (turning either on there also shows the menu bar item); Full Disk Access status, age thresholds (logs, temporary files, AI sessions, installers in Downloads — default 30 days, files in Downloads — default 90 days, both 7 to 365), remembered
 choices, low disk warning, scan reminder, updates (see [Privacy](#privacy)), excluded folders, and the activity log.
 **Remind me to scan** (Settings › General, Off by default): Weekly or Monthly posts a local notification at 10:00
-about a week or a month after you last opened CleanMate or finished a Smart Scan (each launch and each finished
-Smart Scan moves it), then keeps repeating while CleanMate goes unused. Clicking it opens Smart Scan without starting
+about a week or a month after you last opened CleanMate or finished a Smart Scan (each launch, except a start at login,
+and each finished Smart Scan moves it), then keeps repeating while CleanMate goes unused. Clicking it opens Smart Scan without starting
 a scan; it is not shown while CleanMate is the app in front. macOS asks for permission the first time you turn it on;
 if notifications are off, **Turn On Notifications…** opens System Settings › Notifications. Monthly reminders use
 the 28th at the latest, so no month is skipped.
@@ -44,7 +50,7 @@ never asks for permission and never starts a clean.
 **Warn when free space is below** (Settings › General, 10% by default; Off, 5%, 15% or 20%): a local notification
 such as "“Macintosh HD” has 8 GB free (8%)" when the disk holding your home folder (the one the menu bar item shows)
 has less free space than that share of its size. It is checked when CleanMate opens, when Smart Scan finishes a scan or
-a clean, and every hour while CleanMate runs, also with its window closed (CleanMate does not start at login); at most
+a clean, and every hour while CleanMate runs, also with its window closed or after a start at login (**Open at login**); at most
 one warning a day. Clicking it opens Smart Scan without starting a scan; while CleanMate is the app in front it goes
 to Notification Center without a banner. macOS asks for permission the first time a warning is due or you change the
 setting; if notifications are off, **Turn On Notifications…** appears in the row. **View** › ⌘1–⌘8 switch modules (⌘1 Overview, then the sidebar order: Smart Scan ⌘2 … Login Items ⌘7, Maintenance ⌘8); **Scan › Scan Again** (⌘R) rescans the visible module and **Scan › Stop** (⌘.) stops a running scan. With VoiceOver, the warning shown when you exclude a broad folder and the confirmation that remembered choices were reset are read aloud, and keyboard focus moves to **Cancel** when a confirmation row appears in Settings. Clean/Trash have no shortcut on purpose, and while a delete or Trash confirmation is open ⌘R, ⌘., ⌘⌫ and ⌘1–⌘8 do nothing.

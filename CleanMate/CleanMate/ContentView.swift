@@ -123,6 +123,7 @@ final class ModuleRouter: ObservableObject {
         let window = Self.mainWindow
         // A confirmation open (sheet on the window) keeps its module, like ⌘1…⌘8: only bring the window front.
         requested = window?.attachedSheet == nil ? module : nil
+        BackgroundMode.showInDock() // out of it while the window was closed with Menu bar only
         NSApp.activate(ignoringOtherApps: true) // macOS 14+ ignores the flag, like `activate()` (macOS 14)
         if let window {
             window.makeKeyAndOrderFront(nil)
@@ -248,9 +249,10 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            if WelcomeModel.showsAtLaunch() { showsWelcome = true }
+            if WelcomeModel.showsAtLaunch(), !BackgroundMode.shared.launchingHidden { showsWelcome = true }
             AppUpdater.shared.start()  // after the window: see `start`
             router.openMainWindow = openWindow
+            BackgroundMode.shared.hideLaunchWindow() // started at login: menu bar only
         }
         .sheet(isPresented: $showsWelcome) { WelcomeView { selection = .overview } }
         .sheet(isPresented: $showsTrashedItems) { TrashedItemsView() }

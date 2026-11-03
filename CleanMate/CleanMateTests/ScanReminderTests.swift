@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ServiceManagement
 import SwiftUI
 import Testing
 @testable import CleanMate
@@ -171,8 +172,10 @@ struct GeneralSettingsLayoutTests {
     func generalSettingsFitsWithoutScrolling(language: String, denied: Bool) async throws {
         let setup = ScanReminderTests.Setup(.weekly, center: FakeReminderCenter(status: .denied), now: .now)
         let lowDisk = LowDiskWarningChecker(center: setup.center, defaults: setup.defaults)
+        // Denied: the login item waits for approval too, so its row has a button and the footer its longer text.
+        let login = OpenAtLogin(service: FakeLoginItem(denied ? .requiresApproval : .notRegistered))
         let host = NSHostingView(rootView: GeneralSettings(reminders: setup.scheduler, lowDiskWarning: lowDisk,
-                                                           notificationsDenied: denied)
+                                                           openAtLogin: login, notificationsDenied: denied)
             .environment(\.locale, Locale(identifier: language))
             .frame(width: SettingsView.size.width, height: SettingsView.size.height))
         let window = NSWindow(contentRect: CGRect(origin: .zero, size: SettingsView.size), styleMask: [.titled],

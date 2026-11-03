@@ -227,6 +227,26 @@
         }
       }
     },
+    "Allow CleanMate in System Settings › General › Login Items to open it at login." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cho phép CleanMate trong Cài đặt hệ thống › Cài đặt chung › Mục đăng nhập để mở lúc đăng nhập."
+          }
+        }
+      }
+    },
+    "Allow…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cho phép…"
+          }
+        }
+      }
+    },
     "An item with the same name is already there. Nothing was replaced." : {
       "localizations" : {
         "vi" : {
@@ -393,6 +413,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate yêu cầu ứng dụng thoát và chờ tối đa 10 giây; nếu nó không thoát, không có gì bị di chuyển. Bạn có thể lấy lại các mục từ Thùng rác cho tới khi dọn sạch nó."
+          }
+        }
+      }
+    },
+    "CleanMate keeps running in the menu bar after its window is closed. It never cleans unless you click." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate vẫn chạy trên thanh menu sau khi đóng cửa sổ. Không dọn gì khi bạn không bấm."
+          }
+        }
+      }
+    },
+    "CleanMate starts in the menu bar when you log in, with no window, to warn you when the disk runs low." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate khởi động trên thanh menu khi bạn đăng nhập, không mở cửa sổ, để cảnh báo khi ổ đĩa sắp đầy."
+          }
+        }
+      }
+    },
+    "Closing the window takes CleanMate out of the Dock and ⌘Tab; Open CleanMate in the menu bar brings it back." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đóng cửa sổ thì CleanMate rời khỏi Dock và ⌘Tab; Mở CleanMate trên thanh menu sẽ đưa nó trở lại."
           }
         }
       }
@@ -1847,6 +1897,16 @@
         }
       }
     },
+    "In the background" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chạy nền"
+          }
+        }
+      }
+    },
     "In the Trash: %lld (%@)" : {
       "localizations" : {
         "vi" : {
@@ -2115,6 +2175,16 @@
         }
       }
     },
+    "Menu bar only" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ trên thanh menu"
+          }
+        }
+      }
+    },
     "Moved to the Trash" : {
       "localizations" : {
         "vi" : {
@@ -2211,6 +2281,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ứng dụng đang mở sẽ bị bỏ qua: %@. Thoát chúng để gỡ luôn."
+          }
+        }
+      }
+    },
+    "Open at login" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở lúc đăng nhập"
           }
         }
       }
@@ -4997,16 +5077,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate không xoá các mục này; hãy kiểm tra và tự xử lý nếu cần."
-          }
-        }
-      }
-    },
-    "CleanMate keeps running in the menu bar after its window is closed. It does not start at login." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CleanMate vẫn chạy trên thanh menu sau khi đóng cửa sổ. Ứng dụng không tự mở khi đăng nhập."
           }
         }
       }
