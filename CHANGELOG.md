@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Large & Old Files › Similar Photos**: groups photos that look alike (bursts, edits, resized or recompressed copies), compared on this Mac with Vision; each group suggests the photo to keep, nothing is ticked for you, and moved photos can be put back with `cleanmate restore`. Photos libraries and apps are never read.
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
 
 ### Changed

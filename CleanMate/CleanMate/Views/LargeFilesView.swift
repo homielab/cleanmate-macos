@@ -32,6 +32,7 @@ struct LargeFilesView: View {
     @State private var selection: Set<URL> = []
     @State private var previewURL: URL?
     @State private var confirming = false
+    @State private var confirmingPhotos = false
     /// Files whose download the confirmation asks to remove; empty = not asking.
     @State private var removingDownloads: [LargeFile] = []
     @State private var excludedCount = 0
@@ -64,7 +65,13 @@ struct LargeFilesView: View {
             case .trashing:
                 ProgressView("Moving to Trash…")
             case .results:
-                results
+                if model.similarPhotosShown, !model.needsAccess {
+                    SimilarPhotosView(model: model.similarPhotos, scopeName: model.scopeName, confirming: $confirmingPhotos) {
+                        listingMenu
+                    }
+                } else {
+                    results
+                }
             case .done(let report):
                 EmptyStateView(title: Text("Moved \(report.freed, format: .fileSize) to the Trash"), systemImage: "checkmark.circle") {
                     Text("Empty the Trash to free the space.")
@@ -146,12 +153,27 @@ struct LargeFilesView: View {
             Label("Scope", systemImage: model.scope == nil ? "house" : model.scope!.path.hasPrefix("/Volumes/") ? "externaldrive" : "folder")
         }
         .help(Text("Scope: \(model.scopeName ?? String(localized: "Home Folder"))"))
-        .disabled(model.undoing || { if case .trashing = model.phase { true } else { false } }())
+        .disabled(model.undoing || model.similarPhotos.isChanging || { if case .trashing = model.phase { true } else { false } }())
+    }
+
+    /// All files, identical copies only, or Similar Photos (which replaces the file list).
+    private var listingMenu: some View {
+        Picker("Duplicates", selection: $model.listing) {
+            Text("All Files").tag(LargeFilesModel.Listing.allFiles)
+            Text("Duplicates Only").tag(LargeFilesModel.Listing.duplicates)
+            Text("Similar Photos").tag(LargeFilesModel.Listing.similarPhotos)
+        }
+        .disabled(model.similarPhotos.isChanging)
     }
 
     /// File › Move to Trash… (⌘⌫): opens the same confirmation as the button; nil (disabled) outside results or with nothing ticked.
     private var moveToTrash: (() -> Void)? {
-        guard case .results = model.phase, !model.checkedFiles.isEmpty else { return nil }
+        guard case .results = model.phase else { return nil }
+        if model.similarPhotosShown {
+            guard case .results = model.similarPhotos.phase, !model.similarPhotos.checkedPhotos.isEmpty else { return nil }
+            return { confirmingPhotos = true }
+        }
+        guard !model.checkedFiles.isEmpty else { return nil }
         return { confirming = true }
     }
 
@@ -320,11 +342,9 @@ struct LargeFilesView: View {
                         }
                     }
                 }
-                Picker("Duplicates", selection: $model.duplicatesOnly) {
-                    Text("All Files").tag(false)
-                    Text("Duplicates Only").tag(true)
-                }
             }
+            // Similar Photos looks for smaller files too: offered even when no large file was found.
+            if !model.needsAccess { listingMenu }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.skippedProtected { ProtectedFoldersNote() }

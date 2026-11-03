@@ -99,13 +99,16 @@ nonisolated enum LargeFileScanner {
     /// The whole home folder also takes in iCloud Drive (`ICloudDownloads.roots`), unless it is in `skipping` (no Full
     /// Disk Access): its downloaded files are listed with `trashable` false. `icloudStatus` (read per file listed, for
     /// those and Desktop & Documents in iCloud) is injectable for tests.
+    /// `extensions` (lowercased) lists only files with one of them, never one inside a library or app
+    /// (`SimilarPhotos.isInLibraryOrApp`), and leaves iCloud Drive out (its files never go to the Trash).
     @concurrent static func scan(root: URL, minSize: Int64, policy: SafetyPolicy = .current, skipping: Set<String> = [],
+                                 extensions: Set<String>? = nil,
                                  spotlightLastUsed: @escaping @Sendable (URL) -> Date? = spotlightLastUsedDate,
                                  icloudStatus: @escaping @Sendable (URL) -> ICloudStatus? = ICloudStatus.current,
                                  progress: (@Sendable (Int) -> Void)? = nil) async throws -> [LargeFile] {
         guard allowsRoot(root, policy: policy) else { throw OutsideHomeError() }
-        let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, spotlightLastUsed: spotlightLastUsed,
-                        icloudStatus: icloudStatus, progress: progress,
+        let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, extensions: extensions,
+                        spotlightLastUsed: spotlightLastUsed, icloudStatus: icloudStatus, progress: progress,
                         library: policy.homeURL.appending(path: "Library").standardizedFileURL.path)
         // The enumerator lists a root's files under its real path (/var → /private/var); the parallel levels do the same.
         let real = realpath(root.path, nil).map { defer { free($0) }; return String(cString: $0) } ?? root.path
@@ -113,7 +116,7 @@ nonisolated enum LargeFileScanner {
         let home = URL(fileURLWithPath: realpath(policy.homeURL.path, nil).map { defer { free($0) }; return String(cString: $0) }
                        ?? policy.homeURL.path, isDirectory: true)
         let drive = ICloudDownloads.folder(home: home)
-        if real == home.path, !ProtectedFolders.contains(skipping, drive),
+        if extensions == nil, real == home.path, !ProtectedFolders.contains(skipping, drive),
            !ProtectedFolders.contains(skipping, ICloudDownloads.folder(home: policy.homeURL)) {
             found += try await walk.iCloudDrive(ICloudDownloads.roots(home: home))
         }
@@ -131,16 +134,18 @@ nonisolated enum LargeFileScanner {
         let minSize: Int64
         let policy: SafetyPolicy
         let skipping: Set<String>
+        let extensions: Set<String>?
         let spotlightLastUsed: @Sendable (URL) -> Date?
         let icloudStatus: @Sendable (URL) -> ICloudStatus?
         let progress: (@Sendable (Int) -> Void)?
         let library: String
         let checked = Locked(0)
 
-        init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, spotlightLastUsed: @escaping @Sendable (URL) -> Date?,
-             icloudStatus: @escaping @Sendable (URL) -> ICloudStatus?, progress: (@Sendable (Int) -> Void)?, library: String) {
-            (self.minSize, self.policy, self.skipping, self.spotlightLastUsed, self.icloudStatus, self.progress, self.library)
-                = (minSize, policy, skipping, spotlightLastUsed, icloudStatus, progress, library)
+        init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, extensions: Set<String>?,
+             spotlightLastUsed: @escaping @Sendable (URL) -> Date?, icloudStatus: @escaping @Sendable (URL) -> ICloudStatus?,
+             progress: (@Sendable (Int) -> Void)?, library: String) {
+            (self.minSize, self.policy, self.skipping, self.extensions, self.spotlightLastUsed, self.icloudStatus, self.progress,
+             self.library) = (minSize, policy, skipping, extensions, spotlightLastUsed, icloudStatus, progress, library)
         }
 
         /// Downloaded iCloud files under `roots` (in iCloud Drive), one enumerator per root in parallel, never asking
@@ -224,6 +229,7 @@ nonisolated enum LargeFileScanner {
         func file(_ url: URL, _ values: URLResourceValues, inDrive: Bool = false) -> LargeFile? {
             // Allocated size: iCloud files evicted to the cloud take no space and are not listed.
             guard values.isRegularFile == true, let size = values.totalFileAllocatedSize, Int64(size) >= minSize,
+                  extensions.map({ $0.contains(url.pathExtension.lowercased()) && !SimilarPhotos.isInLibraryOrApp(url) }) ?? true,
                   inDrive ? policy.allowsICloudDownload(url) : policy.allowsUserFile(url) else { return nil }
             let icloud = icloudStatus(url)
             if inDrive, icloud == nil { return nil }
@@ -489,13 +495,17 @@ nonisolated enum DuplicateFinder {
 
     /// SHA-256 of the file's first `limit` bytes read in 1 MB chunks, checking for cancellation between chunks; nil when
     /// it cannot be read.
-    /// Reading moves the access date forward (when it is not after the modification date), which the Last Used column
-    /// relies on, so the previous access date is put back.
+    /// Reading moves the access date forward (`keepingAccessDate`).
     static func sha256(of url: URL, limit: Int = .max, progress: (Int) -> Void = { _ in }) throws -> Data? {
+        try keepingAccessDate(of: url) { try readHash(of: url, limit: limit, progress: progress) }
+    }
+
+    /// Runs `body` (which reads the file at `url`), then puts back the file's access date: reading moves it forward
+    /// (when it is not after the modification date), and the Last Used column relies on it.
+    static func keepingAccessDate<T>(of url: URL, _ body: () throws -> T) rethrows -> T {
         var before = stat()
-        guard lstat(url.path, &before) == 0, let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        guard lstat(url.path, &before) == 0 else { return try body() }
         defer {
-            try? handle.close()
             var after = stat()
             if lstat(url.path, &after) == 0, after.st_atimespec.tv_sec != before.st_atimespec.tv_sec
                 || after.st_atimespec.tv_nsec != before.st_atimespec.tv_nsec {
@@ -506,6 +516,12 @@ nonisolated enum DuplicateFinder {
                 _ = setattrlist(url.path, &attrs, &time, MemoryLayout<timespec>.size, UInt32(FSOPT_NOFOLLOW))
             }
         }
+        return try body()
+    }
+
+    private static func readHash(of url: URL, limit: Int, progress: (Int) -> Void) throws -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
         var hasher = SHA256()
         var read = 0
         while read < limit {

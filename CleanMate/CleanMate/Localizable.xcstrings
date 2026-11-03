@@ -71,6 +71,26 @@
         }
       }
     },
+    "%lld of %lld photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld ảnh"
+          }
+        }
+      }
+    },
+    "%lld similar photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ảnh tương tự"
+          }
+        }
+      }
+    },
     "A notification reminds you to run Smart Scan; it never cleans by itself." : {
       "localizations" : {
         "vi" : {
@@ -107,6 +127,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thư mục build của các dự án có tệp và chỉ mục Git không đổi trong 90 ngày: Cargo, Gradle và Android, Maven, SwiftPM, Flutter, Next.js, Nuxt, SvelteKit, Angular, Turborepo, Haskell, Elixir và Zig, môi trường ảo Python và Pods của CocoaPods. Chuyển vào Thùng rác; công cụ build của dự án sẽ tạo lại"
+          }
+        }
+      }
+    },
+    "Comparing photos…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang so sánh ảnh…"
           }
         }
       }
@@ -151,12 +181,62 @@
         }
       }
     },
+    "Every photo is selected in the group of %@: none of them will be left. You can put them back from the Trash until it is emptied." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chọn mọi ảnh trong nhóm của %@: sẽ không còn ảnh nào của nhóm đó. Bạn có thể khôi phục chúng từ Thùng rác cho tới khi Thùng rác được dọn sạch."
+          }
+        }
+      }
+    },
+    "Extra copies: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản thừa: %@"
+          }
+        }
+      }
+    },
     "Files in iCloud Drive never go to the Trash. Remove the download to free the space." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp trong iCloud Drive không bao giờ vào Thùng rác. Hãy bỏ bản tải về để giải phóng chỗ."
+          }
+        }
+      }
+    },
+    "Find Again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm lại"
+          }
+        }
+      }
+    },
+    "Find photos that look alike — bursts, edits, resized copies — and keep one. Photos are compared on this Mac; nothing is uploaded." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm ảnh trông gần giống nhau — chụp liên tiếp, bản sửa, bản thu nhỏ — và giữ lại một. Ảnh được so sánh ngay trên máy Mac này, không tải lên đâu cả."
+          }
+        }
+      }
+    },
+    "Find Similar Photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm ảnh tương tự"
           }
         }
       }
@@ -1349,6 +1429,16 @@
         }
       }
     },
+    "Keeps the suggested photo of each group" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giữ lại ảnh được gợi ý của mỗi nhóm"
+          }
+        }
+      }
+    },
     "Kept (not fully uploaded or changed): %lld" : {
       "localizations" : {
         "vi" : {
@@ -1487,6 +1577,16 @@
         }
       }
     },
+    "Looking for photos…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang tìm ảnh…"
+          }
+        }
+      }
+    },
     "Losing about %@ a week." : {
       "localizations" : {
         "vi" : {
@@ -1543,6 +1643,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hàng tháng"
+          }
+        }
+      }
+    },
+    "Move %lld photos (%@) to the Trash?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Move %lld photo (%@) to the Trash?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Move %lld photos (%@) to the Trash?"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển %lld ảnh (%@) vào Thùng rác?"
           }
         }
       }
@@ -1617,12 +1745,42 @@
         }
       }
     },
+    "No Similar Photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có ảnh tương tự"
+          }
+        }
+      }
+    },
     "No two large files have the same content." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không có hai tệp lớn nào cùng nội dung."
+          }
+        }
+      }
+    },
+    "No two photos in %@ look alike." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có hai ảnh nào trong %@ trông giống nhau."
+          }
+        }
+      }
+    },
+    "No two photos in your home folder look alike." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có hai ảnh nào trong thư mục người dùng trông giống nhau."
           }
         }
       }
@@ -1987,6 +2145,16 @@
         }
       }
     },
+    "Photos are compared on this Mac; nothing is uploaded." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh được so sánh ngay trên máy Mac này, không tải lên đâu cả."
+          }
+        }
+      }
+    },
     "Poetry cache" : {
       "localizations" : {
         "vi" : {
@@ -2245,6 +2413,44 @@
         }
       }
     },
+    "Select All but Suggested" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn tất cả trừ ảnh gợi ý giữ"
+          }
+        }
+      }
+    },
+    "Selected: %lld photos, %@" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Selected: %lld photo, %@"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Selected: %lld photos, %@"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chọn: %lld ảnh, %@"
+          }
+        }
+      }
+    },
     "Share CleanMate" : {
       "localizations" : {
         "vi" : {
@@ -2281,6 +2487,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cho thấy thứ gì chiếm dung lượng ổ đĩa, theo từng thư mục."
+          }
+        }
+      }
+    },
+    "Similar Photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ảnh tương tự"
           }
         }
       }
@@ -2359,6 +2575,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Góp ý tính năng…"
+          }
+        }
+      }
+    },
+    "Suggested to keep" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gợi ý giữ"
+          }
+        }
+      }
+    },
+    "Suggested: the most pixels, then the largest and newest file. Nothing is selected for you." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gợi ý: ảnh nhiều điểm ảnh nhất, rồi tệp lớn nhất và mới nhất. Không có gì được chọn sẵn."
           }
         }
       }

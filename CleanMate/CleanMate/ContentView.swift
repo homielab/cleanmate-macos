@@ -192,7 +192,10 @@ struct ContentView: View {
         case .smartScan: hasResults(smartScan) ? module.badge(hasResults: true, size: smartScan.selectedSize) : nil
         case .privacy: hasResults(privacy) ? module.badge(hasResults: true, size: privacy.selectedSize) : nil
         case .largeFiles:
-            if case .results = largeFiles.phase { module.badge(hasResults: true, files: largeFiles.visibleFiles.count) } else { nil }
+            if case .results = largeFiles.phase {
+                module.badge(hasResults: true, files: largeFiles.similarPhotosShown ? largeFiles.similarPhotos.photoCount
+                                                                                    : largeFiles.visibleFiles.count)
+            } else { nil }
         case .overview, .uninstaller, .spaceLens, .loginItems, .maintenance: nil
         }
         return switch badge {
@@ -215,7 +218,7 @@ struct ContentView: View {
         case .largeFiles:
             switch largeFiles.phase {
             case .scanning, .trashing: nil
-            default: largeFiles.undoing ? nil : { largeFiles.scan() } // scan() ignores it while putting back
+            default: largeFiles.undoing || largeFiles.similarPhotos.isChanging ? nil : { largeFiles.scan() } // scan() ignores it while putting back
             }
         case .uninstaller: uninstaller.loadingApps || uninstaller.working ? nil : { uninstaller.refresh() }
         case .spaceLens: spaceLens.trashing ? nil : { spaceLens.rescan() }
@@ -231,7 +234,8 @@ struct ContentView: View {
         let cleaning = [smartScan, privacy].contains { if case .cleaning? = $0?.phase { true } else { $0?.undoing == true } }
         let trashingFiles = if case .trashing? = largeFiles?.phase { true } else { false }
         // Uninstaller `working` and Space Lens `trashing` also cover their Undo.
-        return cleaning || trashingFiles || largeFiles?.undoing == true || uninstaller?.working == true
+        return cleaning || trashingFiles || largeFiles?.undoing == true || largeFiles?.similarPhotos.isChanging == true
+            || uninstaller?.working == true
             || spaceLens?.trashing == true || loginItems?.working == true
     }
 
@@ -267,8 +271,13 @@ struct ContentView: View {
             if case .scanning = privacy.phase { running = true } else { running = false }
             stop = { privacy.cancelScan() }
         case .largeFiles:
-            if case .scanning = largeFiles.phase { running = true } else { running = false }
-            stop = { largeFiles.cancel() }
+            if case .scanning = largeFiles.phase {
+                running = true
+                stop = { largeFiles.cancel() }
+            } else {
+                running = largeFiles.similarPhotosShown && largeFiles.similarPhotos.isSearching
+                stop = { largeFiles.similarPhotos.stop() }
+            }
         case .spaceLens:
             running = spaceLens.measuring && !spaceLens.trashing
             stop = { spaceLens.cancel() }
