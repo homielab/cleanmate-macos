@@ -39,8 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan › Developer**: Gradle caches are measured faster (their folders are read in parallel), with the same items and sizes.
 - **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
 - When something can't be cleaned, moved to the Trash, uninstalled or reset, the done screen says how many items stayed and **Show Details…** lists each one with the real reason (not permitted, in use, locked, no Trash on the drive, iCloud file not downloaded, or the tool's exit code and error) and what to do, such as granting Full Disk Access or quitting the app. Settings › Activity shows the reason too.
+- **Large & Old Files**: after a move to the Trash the list stays, without the files moved, and nothing is scanned again; a bar above it shows what was moved, with **Undo**.
+- **Overview**: measuring your home folder shows which folder is being measured and how much so far, with a **Stop** button; after a clean only the folders it touched are measured again.
 
 ### Fixed
+- CleanMate no longer stalls while checking Full Disk Access with a large Trash: the check reads one entry instead of listing the whole Trash, in the background when CleanMate becomes active.
+- **Similar Photos**: when too many photos look nearly alike to compare them all, the results say **Results may be incomplete** instead of leaving photos out silently.
 - The menu bar and Overview line **Junk found: … (scanned …)**, dates in notifications and some Settings texts now use CleanMate's language (for example Vietnamese) and its date format even when macOS is set to another language.
 - `cleanmate dupes` with a folder it can't search names `cleanmate dupes` in the error, not `cleanmate large`.
 - `cleanmate space /` no longer counts the startup disk's data volume a second time inside /System: another volume mounted in a folder is listed as a mounted volume and left out of the total, as in Space Lens.

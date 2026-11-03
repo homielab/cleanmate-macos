@@ -3,7 +3,8 @@ import Combine
 
 /// Large & Old Files: scan the home folder (or the chosen scope inside it) once (≥ the smallest size option), then filter in memory.
 final class LargeFilesModel: ObservableObject {
-    enum Phase { case idle, scanning, results, trashing, done(CleanReport) }
+    /// A move to the Trash goes back to `.results`: the list stays, without the files moved (`lastTrash` says what went).
+    enum Phase { case idle, scanning, results, trashing }
 
     static let sizeOptions: [Int64] = [50, 100, 500, 1_000, 5_000].map { $0 * 1_000_000 }
     /// A folder scope also offers 1 and 10 MB; the whole home stays at 50 MB or more (far too many files below).
@@ -226,6 +227,11 @@ final class LargeFilesModel: ObservableObject {
     weak var undoManager: UndoManager?
     /// "Undo" is putting files back: a scan now could miss them.
     @Published private(set) var undoing = false
+    /// The last move to the Trash, shown above the list (what went, what didn't, "Undo") until the next scan or
+    /// until dismissed. Set by `trash()` (tests and snapshots set it directly).
+    @Published var lastTrash: CleanReport?
+    /// The rows that move took out of the list: "Undo" lists again those put back.
+    private var trashedRows: [LargeFile] = []
     private var scanTask: Task<Void, Never>?
     /// Bumped by every scan: an older scan that is still finishing never writes over a newer one.
     private var generation = 0
@@ -472,6 +478,8 @@ final class LargeFilesModel: ObservableObject {
         if case .trashing = phase { return }
         if undoing || similarPhotos.isChanging { return }
         undoManager?.removeAllActions(withTarget: self)
+        lastTrash = nil
+        trashedRows = []
         scanTask?.cancel()
         generation += 1
         let current = generation
@@ -553,7 +561,7 @@ final class LargeFilesModel: ObservableObject {
                            skipping: ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess()))
     }
 
-    /// Photos Similar Photos moved to the Trash leave the file list and its duplicate groups.
+    /// Files moved to the Trash, here or by Similar Photos, leave the file list and its duplicate groups.
     private func dropTrashed(_ urls: [URL]) {
         let gone = Set(urls)
         guard !gone.isEmpty else { return }
@@ -595,37 +603,60 @@ final class LargeFilesModel: ObservableObject {
         return result
     }
 
-    /// Only from results: not twice, nor after a new scan started behind the dialog (⌘R).
+    /// Only from results: not twice, nor after a new scan started behind the dialog (⌘R). The list stays: the files
+    /// moved leave it (and their duplicate groups), the others stay listed, nothing is scanned again.
     func trash() async {
         guard case .results = phase else { return }
         let selection = checkedFiles
         phase = .trashing
+        let searching = duplicateTask != nil
         stopFindingDuplicates() // its result would bring back groups of trashed files
         similarPhotos.reset()
         let report = await trashFiles(selection)
-        files = []
-        checked = []
-        duplicateGroups = nil
-        phase = .done(report)
+        let gone = Set(report.trashed.map(\.original))
+        trashedRows = selection.filter { gone.contains($0.url) }
+        dropTrashed(Array(gone))
+        checked.subtract(selection.map(\.url))
+        lastTrash = report
+        phase = .results
+        if searching, duplicatesOnly { findDuplicates() } // among the files left
         if !report.trashed.isEmpty {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash() }
         }
         Attention.finished()
     }
 
-    /// "Undo" on the done screen: puts the files just trashed back. Once only; the list stays empty (scan again).
+    /// Closes the note of the last move to the Trash; its ⌘Z goes too (Moved Items still puts files back).
+    func dismissTrashReport() {
+        guard !undoing else { return }
+        undoManager?.removeAllActions(withTarget: self)
+        lastTrash = nil
+        trashedRows = []
+    }
+
+    /// "Undo" in the note of the last move (or ⌘Z): puts the files just trashed back, once. Those back at their place
+    /// are listed again.
     func undoTrash() async {
-        guard case .done(var report) = phase, report.undo == nil, !report.trashed.isEmpty else { return }
+        guard var report = lastTrash, report.undo == nil, !report.trashed.isEmpty, !undoing else { return }
         undoManager?.removeAllActions(withTarget: self) // the button ran it, or ⌘Z did
         let items = report.trashed
         report.trashed = []
-        phase = .done(report)
+        lastTrash = report
         undoing = true
         let result = await restore(items)
         undoing = false
-        guard case .done = phase else { return } // a new scan started meanwhile
         report.undo = result
-        phase = .done(report)
+        lastTrash = report
+        let listed = Set(files.map(\.url))
+        let back = trashedRows.filter { !listed.contains($0.url) && FileManager.default.fileExists(atPath: $0.url.path) }
+        trashedRows = []
+        guard !back.isEmpty else { return }
+        files += back
+        if duplicateGroups != nil { // groups may gain the files back: found again
+            stopFindingDuplicates()
+            duplicateGroups = nil
+            if duplicatesOnly { findDuplicates() }
+        }
     }
 }
 

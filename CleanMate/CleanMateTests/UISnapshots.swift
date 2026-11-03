@@ -326,13 +326,17 @@ struct UISnapshots {
             let model = LargeFilesModel()
             let moved = TrashedItem(original: Self.sample.appending(path: "Movies/Holiday 2023.mov"),
                                     inTrash: URL(fileURLWithPath: "/tmp/Holiday 2023.mov"), size: 4_800_000_000)
-            model.phase = .done(CleanReport(freed: 4_800_000_000, skipped: 0, trashed: [moved])) // "Undo" shown
+            model.files = [LargeFile(url: Self.sample.appending(path: "Downloads/macOS-Installer.dmg"), size: 14_200_000_000,
+                                     lastUsed: Self.today.addingTimeInterval(-90 * 86_400), kind: .diskImage, home: Self.sample)]
+            model.phase = .results
+            model.lastTrash = CleanReport(freed: 4_800_000_000, skipped: 0, trashed: [moved]) // "Undo" shown
             return LargeFilesView(model: model)
         }
         // Locked in Finder count apart from skipped.
         try await snapshot("largefiles-done-locked") {
             let model = LargeFilesModel()
-            model.phase = .done(CleanReport(freed: 4_800_000_000, skipped: 1, locked: 2))
+            model.phase = .results
+            model.lastTrash = CleanReport(freed: 4_800_000_000, skipped: 1, locked: 2)
             return LargeFilesView(model: model)
         }
         // Scope: only Downloads, its name under the title; then a protected scope without Full Disk Access.

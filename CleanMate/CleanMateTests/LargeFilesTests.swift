@@ -376,6 +376,51 @@ struct LargeFilesTests {
                 == ["/Users/me/F39|full": 3, "/Users/me/F10|full": 10])
     }
 
+    /// Moving 2 of 5 files to the Trash keeps the list: 3 rows stay, the report shows above them, nothing is scanned
+    /// again. "Undo" lists the 2 again once they are back.
+    @MainActor @Test(.timeLimit(.minutes(1))) func trashKeepsTheOtherRowsWithoutScanningAgain() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let urls = try (1...5).map { try file("Movies/\($0).mov") }
+        let trash = root.appending(path: "Trash")
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+        let model = LargeFilesModel()
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        let scans = Locked(0)
+        model.scanFiles = { _, _, _, _ in
+            scans.withLock { $0 += 1 }
+            return urls.map { LargeFile(url: $0, size: 100_000_000, lastUsed: .distantPast, kind: .video, home: home) }
+        }
+        model.trashFiles = { files in
+            var report = CleanReport()
+            for file in files {
+                let inTrash = trash.appending(path: file.url.lastPathComponent)
+                guard (try? FileManager.default.moveItem(at: file.url, to: inTrash)) != nil else { continue }
+                report.freed += file.size
+                report.trashed.append(TrashedItem(original: file.url, inTrash: inTrash, size: file.size))
+            }
+            return report
+        }
+        model.restore = { items in
+            for item in items { try? FileManager.default.moveItem(at: item.inTrash, to: item.original) }
+            return TrashUndo.Result(restored: items.count, skipped: 0)
+        }
+        model.scan()
+        await until(model) { if case .results = $0.phase { true } else { false } }
+        #expect(model.files.count == 5)
+        model.checked = [urls[1], urls[3]]
+        await model.trash()
+        guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(Set(model.files.map(\.url)) == Set([urls[0], urls[2], urls[4]]))
+        #expect(model.checked.isEmpty && scans.withLock { $0 } == 1)
+        #expect(model.lastTrash?.freed == 200_000_000 && model.lastTrash?.trashed.count == 2)
+        await model.undoTrash()
+        #expect(Set(model.files.map(\.url)) == Set(urls) && scans.withLock { $0 } == 1)
+        #expect(model.lastTrash?.undo == TrashUndo.Result(restored: 2, skipped: 0))
+        model.dismissTrashReport()
+        #expect(model.lastTrash == nil)
+    }
+
     /// Under a test host a finished scan keeps its count in memory only: the real preferences stay untouched.
     @MainActor @Test func finishedScanNeverWritesTheRealPreferencesInTests() async throws {
         let before = UserDefaults.standard.dictionary(forKey: Preferences.largeFilesLastCount) as? [String: Int]

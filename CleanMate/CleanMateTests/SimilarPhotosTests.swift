@@ -225,6 +225,43 @@ import UniformTypeIdentifiers
         #expect(SimilarPhotos.clusters(columns: columns, count: 0, threshold: 0.35).isEmpty)
     }
 
+    /// Past `maxPairs` close pairs the rest are not compared: the result says so instead of looking complete.
+    @Test(.timeLimit(.minutes(1))) func moreClosePairsThanTheLimitAreReportedAsIncomplete() async throws {
+        func unit(_ angle: Float) -> [Float] { [cos(angle), sin(angle)] }
+        let burst = [unit(0), unit(0.01), unit(0.02), unit(2)] // 3 close pairs
+        #expect(SimilarPhotos.clustering(columns: columns(burst), count: 4, threshold: 0.35, maxPairs: 3).truncated == false)
+        let cut = SimilarPhotos.clustering(columns: columns(burst), count: 4, threshold: 0.35, maxPairs: 1)
+        #expect(cut.truncated && cut.groups.count <= 1)
+
+        _ = try writeSet() // 3 photos alike: 3 close pairs
+        let photos = try await SimilarPhotos.photos(in: home, policy: policy)
+        let whole = try await SimilarPhotos.find(photos)
+        #expect(!whole.truncated && whole.groups.count == 1)
+        let limited = try await SimilarPhotos.find(photos, cache: whole.prints, maxPairs: 1)
+        #expect(limited.truncated)
+
+        // The model keeps the flag for the view's "Results may be incomplete" until the next search or a reset.
+        let model = model()
+        let flagged = Locked(true)
+        model.findSimilar = { _, _, _ in SimilarPhotos.Result(truncated: flagged.withLock { $0 }) }
+        model.find(in: home, policy: policy, skipping: [])
+        await results(model)
+        #expect(model.truncated)
+        flagged.withLock { $0 = false }
+        model.findAgain()
+        await until(model) { if case .results = $0.phase { !$0.truncated } else { false } }
+        model.reset()
+        #expect(!model.truncated)
+    }
+
+    func columns(_ vectors: [[Float]]) -> [Float] {
+        var columns = [Float](repeating: 0, count: vectors.count * (vectors.first?.count ?? 0))
+        for (column, vector) in vectors.enumerated() {
+            for (row, value) in vector.enumerated() { columns[row * vectors.count + column] = value }
+        }
+        return columns
+    }
+
     @Test func packedPrintsKeepTheirDirection() throws {
         let values: [Float] = [3, 4, 0, -12]
         let packed = try #require(SimilarPhotos.pack(SimilarPhotos.normalized(values)))

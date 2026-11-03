@@ -200,7 +200,8 @@ nonisolated enum TrashUndo {
         } catch {
             return lstat(item.original.path, &info) == 0 ? .occupied : .failed
         }
-        ActivityLog.recordRestored(module: module, item: logName(item.original), size: item.size, home: home)
+        ActivityLog.recordRestored(module: module, item: logName(item.original), size: item.size,
+                                   path: item.original.path, home: home)
         return .restored
     }
 

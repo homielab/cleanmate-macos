@@ -11,6 +11,9 @@ nonisolated enum ActivityLog {
     static let maxSize = 1_000_000
     /// Posted after every `record` (object: the module's localization key), so cached sizes elsewhere can be dropped and Settings › Activity reloads.
     static let didRecord = Notification.Name("CleanMate.ActivityLog.didRecord")
+    /// `didRecord`'s userInfo key: the paths removed or put back (`[String]`, empty when nothing changed on disk);
+    /// absent when not known (a command ran), so a cache of folder sizes drops everything.
+    static let pathsKey = "paths"
     /// Serializes size check + rotation + append across every `record` caller: two rotations racing
     /// would remove the activity.1.log the other just made.
     private static let lock = NSLock()
@@ -25,22 +28,28 @@ nonisolated enum ActivityLog {
         home.appending(path: "Library/Logs/CleanMate/activity.log")
     }
 
+    /// `paths`: what was removed, when `item` is a name rather than the path itself (`pathsKey`).
     static func record(module: LocalizedStringResource, item: String, count: Int = 1, size: Int64, mode: RemovalMode,
-                       home: URL = SafetyPolicy.current.homeURL, date: Date = .now, rotateAt: Int = maxSize) {
+                       paths: [String]? = nil, home: URL = SafetyPolicy.current.homeURL, date: Date = .now,
+                       rotateAt: Int = maxSize) {
         log(module: module, item: item, count: count, size: size, action: mode == .delete ? "deleted" : "trashed",
-            home: home, date: date, rotateAt: rotateAt)
+            paths: paths ?? (item.hasPrefix("/") ? [item] : nil), home: home, date: date, rotateAt: rotateAt)
     }
 
     /// An item put back from the Trash by "Undo": its "trashed" bytes no longer count in `freed`.
-    static func recordRestored(module: LocalizedStringResource, item: String, size: Int64,
+    /// `path`: where it is back, when `item` is a name.
+    static func recordRestored(module: LocalizedStringResource, item: String, size: Int64, path: String? = nil,
                                home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
-        log(module: module, item: item, count: 1, size: size, action: "restored", home: home, date: date, rotateAt: maxSize)
+        log(module: module, item: item, count: 1, size: size, action: "restored",
+            paths: (path ?? (item.hasPrefix("/") ? item : nil)).map { [$0] }, home: home,
+            date: date, rotateAt: maxSize)
     }
 
     /// An iCloud file whose download was removed (it stays in iCloud): "evicted", counted as freed like "deleted".
     static func recordEvicted(module: LocalizedStringResource, item: String, size: Int64,
                               home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
-        log(module: module, item: item, count: 1, size: size, action: "evicted", home: home, date: date, rotateAt: maxSize)
+        log(module: module, item: item, count: 1, size: size, action: "evicted", paths: [item], home: home, date: date,
+            rotateAt: maxSize)
     }
 
     /// An item left in place because it changed since it was checked (a symlink or another item put there,
@@ -48,8 +57,8 @@ nonisolated enum ActivityLog {
     /// `reason`: why, in English, as an eighth column (`Entry.reason`).
     static func recordSkipped(module: LocalizedStringResource, item: String, reason: String? = nil,
                               home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
-        log(module: module, item: item, count: 1, size: 0, action: "skipped", reason: reason, home: home, date: date,
-            rotateAt: maxSize)
+        log(module: module, item: item, count: 1, size: 0, action: "skipped", reason: reason, paths: [], home: home,
+            date: date, rotateAt: maxSize)
     }
 
     /// An item a clean, delete or uninstall left in place (`CleanReport.failures`), or a move to the Trash that took
@@ -57,8 +66,8 @@ nonisolated enum ActivityLog {
     /// eighth column, so the user can see why it is still there.
     static func recordFailed(module: LocalizedStringResource, item: String, reason: String? = nil,
                              home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
-        log(module: module, item: item, count: 1, size: 0, action: "failed", reason: reason, home: home, date: date,
-            rotateAt: maxSize)
+        log(module: module, item: item, count: 1, size: 0, action: "failed", reason: reason, paths: [], home: home,
+            date: date, rotateAt: maxSize)
     }
 
     /// A Maintenance task that was run: "ran" when every step succeeded, else "failed". Removes nothing, so size 0.
@@ -69,7 +78,7 @@ nonisolated enum ActivityLog {
     }
 
     private static func log(module: LocalizedStringResource, item: String, count: Int, size: Int64, action: String,
-                            reason: String? = nil, home: URL, date: Date, rotateAt: Int) {
+                            reason: String? = nil, paths: [String]? = nil, home: URL, date: Date, rotateAt: Int) {
         guard !writesRealLogInTests(home) else {
             // Loud in a test run: a test forgot to pass a throwaway home.
             assertionFailure("Test wrote to the real activity log: \(english(module)) \(item)")
@@ -81,7 +90,7 @@ nonisolated enum ActivityLog {
         ] + [reason].compactMap { $0 }
         append(fields.map { $0.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ") }
             .joined(separator: "\t") + "\n", to: url(home: home), rotateAt: rotateAt)
-        NotificationCenter.default.post(name: didRecord, object: module.key)
+        NotificationCenter.default.post(name: didRecord, object: module.key, userInfo: paths.map { [pathsKey: $0] })
     }
 
     /// Separates the English text, the catalog key and its arguments in the item column of an interpolated title.

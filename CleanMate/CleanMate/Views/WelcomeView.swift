@@ -82,7 +82,7 @@ final class WelcomeModel: ObservableObject {
     init(defaults: UserDefaults = .standard, domain: String = Bundle.main.bundleIdentifier ?? "",
          updater: any UpdateCheckSetting = AppUpdater.shared, reminders: ScanReminderScheduler = .shared,
          loginItem: OpenAtLogin = .shared, applyDock: @escaping () -> Void = { BackgroundMode.shared.apply() },
-         readAccess: @escaping () -> Bool = { FullDiskAccess.isGranted }, center: NotificationCenter = .default) {
+         readAccess: @escaping () -> Bool = { FullDiskAccess.refresh() }, center: NotificationCenter = .default) {
         self.defaults = defaults
         self.updater = updater
         self.reminders = reminders
@@ -293,7 +293,8 @@ private struct WelcomeRow: View {
 /// Step 2: why Full Disk Access matters, the button to grant it, and its status read again when the user comes back.
 struct WelcomeAccessPage: View {
     @ObservedObject var model: WelcomeModel
-    /// While the app is in front: the user may grant access without switching away (System Settings in another Space).
+    /// While this page shows and the app is in front: the user may grant access without switching away (System
+    /// Settings in another Space). Each read is one `opendir`, not a listing of the Trash.
     private let poll = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -332,6 +333,7 @@ struct WelcomeAccessPage: View {
         .onReceive(poll) { _ in if NSApp.isActive { model.refreshAccess() } }
         .onChange(of: model.hasFullDiskAccess) { granted in
             if granted { announceForAccessibility(String(localized: "Full Disk Access granted")) }
+            FullDiskAccessStatus.shared.refresh() // the rest of the app too, without waiting for the next activation
         }
     }
 }

@@ -184,6 +184,7 @@ struct OverviewView: View {
 
     private var foldersSection: some View {
         Section {
+            if model.measuring { MeasureProgressRow(progress: model.progress) { model.cancel() } }
             if model.skippedProtected {
                 HStack {
                     Image(systemName: "lock.shield").foregroundStyle(.orange)
@@ -206,12 +207,9 @@ struct OverviewView: View {
                 Text("Not measured: \(model.unmeasuredFolders.formatted(.list(type: .and).locale(locale)))")
                     .foregroundStyle(.secondary)
             }
-            if model.folders.isEmpty {
-                if model.measuring {
-                    Text("Measuring…").foregroundStyle(.secondary)
-                } else if model.measured && model.unreadableFolders.isEmpty && model.unmeasuredFolders.isEmpty {
-                    Text("Your home folder is empty.").foregroundStyle(.secondary)
-                }
+            if model.folders.isEmpty, !model.measuring, model.measured, model.unreadableFolders.isEmpty,
+               model.unmeasuredFolders.isEmpty {
+                Text("Your home folder is empty.").foregroundStyle(.secondary)
             }
             let largest = model.folders.first?.sortSize ?? 0
             ForEach(model.folders) { FolderRow(item: $0, largest: largest) }
@@ -224,7 +222,6 @@ struct OverviewView: View {
                     Text("Measured \(date, format: Date.FormatStyle(date: .abbreviated, time: .shortened))")
                         .font(.caption).foregroundStyle(.tertiary)
                 }
-                if model.measuring { ProgressView().controlSize(.small) }
             }
         } footer: {
             if !model.folders.isEmpty {
@@ -765,5 +762,35 @@ private struct FreedByDayChart: View {
     /// "12 Oct 2026: 1.2 GB freed".
     private func hoverText(_ day: ActivityLog.Cleanups.Day) -> Text {
         Text("\(day.date, format: .dateTime.day().month().year()): \(day.bytes, format: .fileSize) freed")
+    }
+}
+
+/// While the home folder is measured: the folder being measured, the bytes measured so far, a bar and Stop (⌘.).
+private struct MeasureProgressRow: View {
+    let progress: OverviewModel.MeasureProgress?
+    let stop: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let fraction = progress?.fraction {
+                    ProgressView(value: fraction)
+                } else {
+                    ProgressView().progressViewStyle(.linear)
+                }
+                HStack {
+                    if let current = progress?.current {
+                        Text("Measuring \(current)…").lineLimit(1).truncationMode(.middle)
+                    } else {
+                        Text("Measuring…")
+                    }
+                    Spacer()
+                    if let bytes = progress?.bytes, bytes > 0 { Text("\(bytes, format: .fileSize) measured") }
+                }
+                .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+            }
+            Button("Stop", action: stop)
+                .help(Text("Stop measuring; the sizes shown stay."))
+        }
     }
 }

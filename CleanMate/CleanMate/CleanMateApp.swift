@@ -45,6 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         Preferences.obsolete.forEach(UserDefaults.standard.removeObject(forKey:))
         // Set at launch: a click on the reminder that launched CleanMate is delivered right after.
         UNUserNotificationCenter.current().delegate = self
+        // Reads access again each time the app becomes active, whichever module shows (scans use the cached answer).
+        _ = FullDiskAccessStatus.shared
         let loginLaunch = BackgroundMode.isLoginLaunch(NSAppleEventManager.shared().currentAppleEvent)
         BackgroundMode.shared.start(loginLaunch: loginLaunch)
         // CleanMate was used: next reminder one period from now. A login launch is not a use: postponing it at every

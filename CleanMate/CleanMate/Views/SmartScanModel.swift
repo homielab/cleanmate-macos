@@ -31,8 +31,8 @@ final class SmartScanModel: ObservableObject {
     /// Source of `runningApps` when an app launches or quits and before cleaning. Injected by tests, so an app
     /// opening or quitting on the Mac mid-test can't swap their fake list for the real one.
     var appBundleIDs: () -> Set<String> = SmartScanModel.currentRunningApps
-    /// Injected by tests.
-    var processNames: () -> Set<String> = RunningProcesses.names
+    /// Injected by tests. Read off the main thread (`readProcessNames`): it reads every process's arguments.
+    var processNames: @Sendable () -> Set<String> = RunningProcesses.names
     /// Item ids whose tool folder overlaps Settings › Exclusions at the last scan: locked, unticked, not counted.
     @Published var blocked: Set<String> = []
     /// The check `Cleaner` makes before running the item's command; tests pass a sandbox policy.
@@ -581,6 +581,18 @@ final class SmartScanModel: ObservableObject {
 
     func cancelScan() { scanTask?.cancel() }
 
+    /// Where cleaning `item` removed things, for the Overview to measure only those folders again: its entries (what
+    /// was removed is among them); nil when a command ran (what it removed is not known).
+    nonisolated static func removedPaths(_ item: CleanerItem, _ scan: ItemScan) -> [String]? {
+        guard item.command == nil, item.entryCommand == nil, !scan.entries.isEmpty else { return nil }
+        return scan.entries.map(\.url.path)
+    }
+
+    /// `RunningProcesses.names` makes a sysctl per process: never on the main thread.
+    @concurrent private nonisolated static func readProcessNames(_ read: @Sendable () -> Set<String>) async -> Set<String> {
+        read()
+    }
+
     /// Scans every item, showing each result as soon as it is ready.
     /// When cancelled, nothing is kept: the previous phase, groups, results and selection come back.
     func scan() async {
@@ -597,8 +609,10 @@ final class SmartScanModel: ObservableObject {
         selected = []
         excludedEntries = [:]
         blocked = []
-        runningProcesses = processNames()
         phase = .scanning
+        let names = await Self.readProcessNames(processNames)
+        guard current == generation else { return } // a newer scan started meanwhile
+        runningProcesses = names
         let newItems = items
         scannedItems = 0
         totalItems = newItems.count
@@ -664,7 +678,7 @@ final class SmartScanModel: ObservableObject {
         guard case .results = phase else { return }
         phase = .cleaning
         runningApps = appBundleIDs()
-        runningProcesses = processNames()
+        runningProcesses = await Self.readProcessNames(processNames)
         refreshDisabled() // a group turned off since the scan is not cleaned
         var report = CleanReport()
         // Only what the "Selected" total counts: a ticked item with nothing left to clean never reaches the cleaner,
@@ -703,7 +717,7 @@ final class SmartScanModel: ObservableObject {
             let removed = Cleaner.removedCount(item, scan, result)
             if result.freed > 0 || removed > 0 {
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
-                                   size: result.freed, mode: item.mode, home: logHome)
+                                   size: result.freed, mode: item.mode, paths: Self.removedPaths(item, scan), home: logHome)
             }
             TrashRecords.add(result.trashed, module: module.title, home: logHome) { _ in ActivityLog.english(item.title) }
             result.logFailures(module: module.title, home: logHome)

@@ -160,6 +160,76 @@ struct OverviewTests {
         #expect(!model.measuring)
     }
 
+    /// After a clean only the folders holding what was removed are measured again; the others keep their size. A clean
+    /// with no paths (a command) measures everything again; skipped items change nothing.
+    @MainActor @Test func cleanMeasuresAgainOnlyTheFoldersItTouched() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for name in ["A", "B", "C"] { try file("\(name)/data.bin", bytes: 10) }
+        let calls = Locked([String: Int]()), sizes = Locked(["A": Int64(3_000), "B": 2_000, "C": 1_000])
+        let center = NotificationCenter()
+        let model = OverviewModel(center: center)
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        model.readDisks = { [] }
+        model.measure = { url, _, _ in
+            let name = url.lastPathComponent
+            calls.withLock { $0[name, default: 0] += 1 }
+            return (sizes.withLock { $0[name] ?? 0 }, [:])
+        }
+        model.startIfNeeded()
+        await until(model) { $0.measured && !$0.measuring }
+        #expect(calls.withLock { $0 } == ["A": 1, "B": 1, "C": 1])
+
+        sizes.withLock { $0["B"] = 500 }
+        center.post(name: ActivityLog.didRecord, object: "Large & Old Files",
+                    userInfo: [ActivityLog.pathsKey: [home.appending(path: "B/data.bin").path]])
+        center.post(name: ActivityLog.didRecord, object: "Smart Scan", userInfo: [ActivityLog.pathsKey: [String]()])
+        #expect(model.changedFolders == [home.standardizedFileURL.appending(path: "B").path])
+        model.startIfNeeded()
+        #expect(model.measuring)
+        await until(model) { !$0.measuring }
+        #expect(calls.withLock { $0 } == ["A": 1, "B": 2, "C": 1])
+        #expect(model.folders.map(\.name) == ["A", "C", "B"] && model.folders.map(\.size) == [3_000, 1_000, 500])
+        #expect(model.homeSize == 4_500)
+
+        model.startIfNeeded() // nothing removed since: nothing measured
+        #expect(!model.measuring && model.changedFolders.isEmpty)
+
+        center.post(name: ActivityLog.didRecord, object: "Smart Scan") // a command: where is not known
+        model.startIfNeeded()
+        await until(model) { !$0.measuring }
+        #expect(calls.withLock { $0 } == ["A": 2, "B": 3, "C": 2])
+    }
+
+    /// Stop ends the measure at once: the progress row goes, and the folder walk is cancelled and returns within a second.
+    @MainActor @Test func stopEndsTheMeasureWithinASecond() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try file("A/data.bin", bytes: 10)
+        let entered = SignalCount(), left = SignalCount()
+        let model = OverviewModel(center: NotificationCenter())
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        model.readDisks = { [] }
+        model.measure = { _, _, _ in
+            entered.add()
+            defer { left.add() }
+            // A walk that checks for cancellation as `SpaceLens.measure` does, and would otherwise run for minutes.
+            for _ in 0..<60_000 {
+                try Task.checkCancellation()
+                try? await Task.sleep(for: .milliseconds(1))
+            }
+            return (1, [:])
+        }
+        model.startIfNeeded()
+        await entered.reach(1)
+        #expect(model.measuring && model.progress?.total == 1 && model.progress?.current == "A")
+        let start = ContinuousClock.now
+        model.cancel()
+        #expect(!model.measuring && model.progress == nil)
+        await left.reach(1)
+        #expect(ContinuousClock.now - start < .seconds(1))
+    }
+
     /// Saved sizes come back as written, only for the same home; a missing, damaged or older-format file reads as nil.
     @Test func savedFolderSizesRoundTrip() throws {
         defer { try? FileManager.default.removeItem(at: root) }

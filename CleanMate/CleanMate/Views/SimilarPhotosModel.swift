@@ -19,6 +19,8 @@ final class SimilarPhotosModel: ObservableObject {
     /// Photos analyzed (or answered from the cache) and their total while analyzing.
     @Published private(set) var analyzed = 0
     @Published private(set) var total = 0
+    /// The last search stopped comparing at `SimilarPhotos.maxPairs` close pairs: some photos may be missing from `groups`.
+    @Published private(set) var truncated = false
     /// "Undo" is putting photos back.
     @Published private(set) var undoing = false
     /// The window's, set by the view: ⌘Z after a move to the Trash.
@@ -68,6 +70,7 @@ final class SimilarPhotosModel: ObservableObject {
         stop()
         last = (root, policy, skipping)
         groups = []
+        truncated = false
         checked = []
         listed = 0
         (analyzed, total) = (0, 0)
@@ -104,6 +107,7 @@ final class SimilarPhotosModel: ObservableObject {
                 if let cacheURL { await SimilarPhotos.Cache.save(result.prints, to: cacheURL) }
                 guard current == run else { return }
                 groups = result.groups
+                truncated = result.truncated
                 phase = .results
                 task = nil
                 Attention.finished()
@@ -144,6 +148,7 @@ final class SimilarPhotosModel: ObservableObject {
         stop()
         undoManager?.removeAllActions(withTarget: self)
         groups = []
+        truncated = false
         checked = []
         phase = .idle
     }

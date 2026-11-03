@@ -39,7 +39,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettings: View {
-    @State private var granted = FullDiskAccess.isGranted
+    @ObservedObject private var access = FullDiskAccessStatus.shared
     @AppStorage(Preferences.oldLogsDays) private var logsDays = CleanupAges.default.logs
     @AppStorage(Preferences.tempFilesDays) private var tempDays = CleanupAges.default.temp
     @AppStorage(Preferences.sessionDays) private var sessionDays = CleanupAges.default.sessions
@@ -101,7 +101,7 @@ struct GeneralSettings: View {
                 // One row with its button: General has no height to spare (`SettingsView.size`).
                 LabeledContent("Full Disk Access") {
                     HStack {
-                        granted ? Text("Granted") : Text("Not granted")
+                        access.granted ? Text("Granted") : Text("Not granted")
                         Button("Open Privacy Settings…") { FullDiskAccess.openSettings() }
                     }
                 }
@@ -194,13 +194,12 @@ struct GeneralSettings: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            granted = FullDiskAccess.isGranted
             login = openAtLogin.state
             refreshNotifications()
         }
-        // Granting access happens in System Settings: refresh when the user comes back.
+        // Login items and notifications are allowed in System Settings: refresh when the user comes back
+        // (`FullDiskAccessStatus` does the same for access).
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            granted = FullDiskAccess.isGranted
             login = openAtLogin.state
             refreshNotifications()
         }

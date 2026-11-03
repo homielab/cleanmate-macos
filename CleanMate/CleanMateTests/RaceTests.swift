@@ -292,23 +292,30 @@ struct RaceTests {
         #expect(model.revealed == nil)
     }
 
+    /// The search running when files go to the Trash is stopped (its groups would bring them back) and started again
+    /// among the files left.
     @Test func largeFilesTrashStopsFindingDuplicates() async throws {
         let gates = Gates()
         let a = LargeFile(url: URL(fileURLWithPath: "/nonexistent/a"), size: 1, lastUsed: .now, kind: .other)
         let b = LargeFile(url: URL(fileURLWithPath: "/nonexistent/b"), size: 1, lastUsed: .now, kind: .other)
         let model = LargeFilesModel()
-        model.findDuplicateFiles = { _, _, _ in _ = await gates.enter(); return DuplicateFinder.Result(groups: [[a.url, b.url]]) }
-        model.trashFiles = { _ in CleanReport(freed: 1) }
+        model.findDuplicateFiles = { urls, _, _ in
+            _ = await gates.enter()
+            return DuplicateFinder.Result(groups: urls.count >= 2 ? [urls] : [])
+        }
+        model.trashFiles = { _ in CleanReport(freed: 1, trashed: [TrashedItem(original: a.url, inTrash: a.url, size: 1)]) }
         model.files = [a, b]
         model.checked = [a.url]
         model.phase = .results
         model.duplicatesOnly = true
         try await until { gates.calls == 1 }
         await model.trash()
+        #expect(model.files.map(\.url) == [b.url])
         gates.open(1)
-        try await until { gates.left == 1 }
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(model.duplicateGroups == nil && model.duplicateProgress == nil)
+        try await until { gates.calls == 2 }
+        gates.open(2)
+        try await until { gates.left == 2 && model.duplicateGroups != nil }
+        #expect(model.duplicateGroups == [] && model.duplicateProgress == nil) // b alone: no group, a's group never back
     }
 
     @Test func largeFilesNoScanWhileUndoing() async throws {
@@ -316,15 +323,15 @@ struct RaceTests {
         let model = largeFiles(Gates()) { _ in false }
         model.restore = { items in _ = await gates.enter(); return TrashUndo.Result(restored: items.count, skipped: 0) }
         let item = TrashedItem(original: URL(fileURLWithPath: "/nonexistent/x"), inTrash: URL(fileURLWithPath: "/nonexistent/y"), size: 1)
-        model.phase = .done(CleanReport(freed: 1, trashed: [item]))
+        model.phase = .results
+        model.lastTrash = CleanReport(freed: 1, trashed: [item])
         let undo = Task { await model.undoTrash() }
         try await until { gates.calls == 1 }
         model.scan() // "Scan Again" / ⌘R while putting files back: ignored
-        guard case .done = model.phase else { Issue.record("phase \(model.phase)"); gates.open(1); return }
+        guard case .results = model.phase else { Issue.record("phase \(model.phase)"); gates.open(1); return }
         gates.open(1)
         await undo.value
-        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
-        #expect(!model.undoing && report.undo == TrashUndo.Result(restored: 1, skipped: 0))
+        #expect(!model.undoing && model.lastTrash?.undo == TrashUndo.Result(restored: 1, skipped: 0))
     }
 
     /// Smart Scan's Undo: Scan Again / ⌘R while files come back is ignored, and quitting asks first.

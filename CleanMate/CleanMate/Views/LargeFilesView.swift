@@ -98,15 +98,6 @@ struct LargeFilesView: View {
                 } else {
                     results
                 }
-            case .done(let report):
-                EmptyStateView(title: Text("Moved \(report.freed, format: .fileSize) to the Trash"), systemImage: "checkmark.circle") {
-                    Text("Empty the Trash to free the space.")
-                    NotCleanedSummary(report: report)
-                    if let result = report.undo { UndoTrashResult(result: result) }
-                } actions: {
-                    Button("Scan Again") { model.scan() }.disabled(model.undoing)
-                    TrashReportButtons(report: report) { await model.undoTrash() }
-                }
             }
         }
         .navigationTitle(Text(Module.largeFiles.title))
@@ -375,7 +366,14 @@ struct LargeFilesView: View {
             if !model.needsAccess { listingMenu }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            if model.skippedProtected { ProtectedFoldersNote() }
+            VStack(spacing: 0) {
+                if let report = model.lastTrash {
+                    MovedToTrashNote(report: report, undoing: model.undoing) { await model.undoTrash() } dismiss: {
+                        model.dismissTrashReport()
+                    }
+                }
+                if model.skippedProtected { ProtectedFoldersNote() }
+            }
         }
         // Last Used › Custom…
         .alert("Not Used for More Than", isPresented: $askingDays) {
@@ -515,6 +513,37 @@ struct LargeFilesView: View {
 }
 
 /// Shown for a few seconds after Remove Download: the space freed, and how many files were kept and why.
+/// After Move to Trash, above the list: what went (and what didn't), Undo, Open Trash, View Moved Items.
+private struct MovedToTrashNote: View {
+    let report: CleanReport
+    let undoing: Bool
+    let undo: () async -> Void
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Moved \(report.freed, format: .fileSize) to the Trash")
+                    .help(Text("Empty the Trash to free the space."))
+                NotCleanedSummary(report: report)
+                if let result = report.undo { UndoTrashResult(result: result).font(.caption).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            TrashReportButtons(report: report, undo: undo).disabled(undoing)
+            Button { dismiss() } label: { Image(systemName: "xmark") }
+                .buttonStyle(.borderless)
+                .disabled(undoing)
+                .help(Text("Close"))
+                .accessibilityLabel(Text("Close"))
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+        .onAppear { announceForAccessibility(String(localized: "Moved \(report.freed.formatted(.byteCount(style: .file))) to the Trash")) }
+    }
+}
+
 private struct DownloadsRemovedNotice: View {
     let report: ICloudDownloads.Report?
     let count: Int

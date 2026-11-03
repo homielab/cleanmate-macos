@@ -54,6 +54,16 @@
         }
       }
     },
+    "%@ measured" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã đo %@"
+          }
+        }
+      }
+    },
     "%@ to the Trash: you can put it back with Undo or from the Trash." : {
       "localizations" : {
         "vi" : {
@@ -562,6 +572,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate khởi động trên thanh menu khi bạn đăng nhập, không mở cửa sổ, để cảnh báo khi ổ đĩa sắp đầy."
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đóng"
           }
         }
       }
@@ -2504,6 +2524,16 @@
         }
       }
     },
+    "Measuring %@…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang đo %@…"
+          }
+        }
+      }
+    },
     "Measuring their size needs administrator rights. macOS deletes them by itself when it needs the space." : {
       "localizations" : {
         "vi" : {
@@ -2850,6 +2880,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã bị thay từ lúc được kiểm tra"
+          }
+        }
+      }
+    },
+    "Results may be incomplete: too many photos look alike to compare them all, so some may be missing from the groups." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kết quả có thể chưa đủ: có quá nhiều ảnh giống nhau để so sánh hết, nên một số ảnh có thể không có trong các nhóm."
           }
         }
       }
@@ -4130,6 +4170,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bước %1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    "Stop measuring; the sizes shown stay." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dừng đo; các dung lượng đang hiện vẫn giữ nguyên."
           }
         }
       }

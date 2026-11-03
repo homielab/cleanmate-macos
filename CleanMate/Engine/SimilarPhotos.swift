@@ -77,7 +77,12 @@ nonisolated enum SimilarPhotos {
         var prints: [DuplicateFinder.Key: Print] = [:]
         /// Photos read and analyzed this run (not answered from the cache).
         var analyzedCount = 0
+        /// More close pairs than `maxPairs`: the rest were not compared, so some photos may be missing from `groups`.
+        var truncated = false
     }
+
+    /// Most close pairs `clusters` keeps (memory stays bounded with tens of thousands of near-identical images).
+    static let maxPairs = 2_000_000
 
     /// Thrown instead of `CancellationError` by `find`: the cache passed in plus every print finished before the stop.
     struct Cancelled: Error { let prints: [DuplicateFinder.Key: Print] }
@@ -107,7 +112,7 @@ nonisolated enum SimilarPhotos {
     /// can't be read or decoded is left out. `progress` gets (done, total). Throws `Cancelled` when cancelled, at once:
     /// photos being analyzed are given up (their Vision requests cancelled), not waited for.
     @concurrent static func find(_ files: [LargeFile], cache: [DuplicateFinder.Key: Print] = [:], revision: Int = revision,
-                                 makePrint: @escaping PrintMaker = featurePrint,
+                                 maxPairs: Int = maxPairs, makePrint: @escaping PrintMaker = featurePrint,
                                  progress: (@Sendable (Int, Int) -> Void)? = nil) async throws -> Result {
         var result = Result(prints: cache)
         var seen = Set<[UInt64]>()
@@ -170,7 +175,10 @@ nonisolated enum SimilarPhotos {
         }
         do {
             try Task.checkCancellation()
-            result.groups = clusters(columns: columns, count: usable.count, threshold: threshold(revision: revision))
+            let found = clustering(columns: columns, count: usable.count, threshold: threshold(revision: revision),
+                                   maxPairs: maxPairs)
+            result.truncated = found.truncated
+            result.groups = found.groups
                 .map { Group(photos: ranked($0.map { photos[$0] })) }
                 .sorted { ($0.extraSize, $1.id.path) > ($1.extraSize, $0.id.path) }
         } catch {
@@ -192,7 +200,7 @@ nonisolated enum SimilarPhotos {
     /// Indexes of `vectors` (each L2-normalized) in groups of 2+ where every two members are within `threshold`
     /// (complete linkage: a burst drifting frame by frame does not chain unrelated ends together). Closest pairs merge
     /// first. Groups in order of their first index, indexes sorted.
-    static func clusters(_ vectors: [[Float]], threshold: Float, maxPairs: Int = 2_000_000) -> [[Int]] {
+    static func clusters(_ vectors: [[Float]], threshold: Float, maxPairs: Int = maxPairs) -> [[Int]] {
         guard let dimension = vectors.first?.count, dimension > 0, vectors.allSatisfy({ $0.count == dimension }) else { return [] }
         var columns = [Float](repeating: 0, count: vectors.count * dimension)
         for (column, vector) in vectors.enumerated() {
@@ -203,14 +211,20 @@ nonisolated enum SimilarPhotos {
 
     /// `clusters(_:threshold:maxPairs:)` of the `count` vectors stored as the columns of `columns` (dimension × count,
     /// row-major): the only copy of the prints, besides 256 of them at a time.
-    // shortcut: past `maxPairs` close pairs (tens of thousands of near-identical images) the rest are ignored, so
-    // some photos end up in smaller groups or none; memory stays bounded.
-    static func clusters(columns: [Float], count n: Int, threshold: Float, maxPairs: Int = 2_000_000) -> [[Int]] {
-        guard n >= 2, !columns.isEmpty, columns.count % n == 0 else { return [] }
+    static func clusters(columns: [Float], count n: Int, threshold: Float, maxPairs: Int = maxPairs) -> [[Int]] {
+        clustering(columns: columns, count: n, threshold: threshold, maxPairs: maxPairs).groups
+    }
+
+    /// `clusters(columns:count:threshold:maxPairs:)`, saying whether it stopped at `maxPairs` close pairs: the rest
+    /// are ignored then (tens of thousands of near-identical images), so some photos end up in smaller groups or none.
+    static func clustering(columns: [Float], count n: Int, threshold: Float,
+                           maxPairs: Int = maxPairs) -> (groups: [[Int]], truncated: Bool) {
+        guard n >= 2, !columns.isEmpty, columns.count % n == 0 else { return ([], false) }
         let dimension = columns.count / n
         // |a - b|² = 2 - 2 a·b for unit vectors: distance ≤ threshold ⇔ a·b ≥ 1 - threshold² / 2.
         let minDot = 1 - threshold * threshold / 2
         var pairs: [(dot: Float, a: Int, b: Int)] = []
+        var truncated = false
         let rows = 256
         var slice = [Float](repeating: 0, count: min(rows, n) * dimension)
         var block = [Float](repeating: 0, count: min(rows, n) * n)
@@ -228,8 +242,11 @@ nonisolated enum SimilarPhotos {
             for row in 0..<count {
                 let a = start + row
                 for b in (a + 1)..<n where block[row * n + b] >= minDot {
+                    if pairs.count >= maxPairs {
+                        truncated = true
+                        break rowBlocks
+                    }
                     pairs.append((block[row * n + b], a, b))
-                    if pairs.count >= maxPairs { break rowBlocks }
                 }
             }
         }
@@ -246,7 +263,7 @@ nonisolated enum SimilarPhotos {
             members[keep] += members[gone]
             members[gone] = []
         }
-        return members.filter { $0.count >= 2 }.map { $0.sorted() }.sorted { $0[0] < $1[0] }
+        return (members.filter { $0.count >= 2 }.map { $0.sorted() }.sorted { $0[0] < $1[0] }, truncated)
     }
 
     /// Stops one photo's analysis: a print not started yet is never made, a running Vision request is cancelled.

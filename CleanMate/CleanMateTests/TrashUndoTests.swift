@@ -124,10 +124,11 @@ struct TrashUndoTests {
         var calls = 0
         model.restore = { items in calls += 1; return TrashUndo.Result(restored: items.count, skipped: 0) }
         let item = TrashedItem(original: URL(fileURLWithPath: "/tmp/x"), inTrash: URL(fileURLWithPath: "/tmp/y"), size: 1)
-        model.phase = .done(CleanReport(freed: 1, trashed: [item]))
+        model.phase = .results
+        model.lastTrash = CleanReport(freed: 1, trashed: [item])
         await model.undoTrash()
         await model.undoTrash()
-        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
+        guard let report = model.lastTrash else { Issue.record("no report"); return }
         #expect(calls == 1 && report.trashed.isEmpty && report.undo == TrashUndo.Result(restored: 1, skipped: 0))
     }
 
@@ -165,10 +166,9 @@ struct TrashUndoTests {
         #expect(undo.canUndo && undo.undoActionName == String(localized: "Move to Trash"))
         undo.undo() // ⌘Z
         await settle { calls == 1 }
-        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
+        guard let report = model.lastTrash else { Issue.record("no report"); return }
         #expect(calls == 1 && report.undo != nil && !undo.canUndo && !undo.canRedo) // button gone, no redo
         // The button instead: ⌘Z is gone too.
-        model.phase = .results
         await event(undo) { await model.trash() }
         await model.undoTrash()
         #expect(calls == 2 && !undo.canUndo)

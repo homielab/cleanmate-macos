@@ -43,6 +43,17 @@ final class OverviewModel: ObservableObject {
     /// Largest first, at most `folderLimit`; filled when measuring ends.
     @Published private(set) var folders: [SpaceItem] = []
     @Published private(set) var measuring = false
+    /// How far the running measure is; nil when not measuring.
+    @Published private(set) var progress: MeasureProgress?
+    nonisolated struct MeasureProgress: Equatable, Sendable {
+        /// A folder still being measured (the first in the listing), nil before the listing is read.
+        var current: String?
+        var done = 0
+        var total = 0
+        /// Bytes of the folders measured so far (and of those kept from the last measure).
+        var bytes: Int64 = 0
+        var fraction: Double? { total > 0 ? Double(done) / Double(total) : nil }
+    }
     /// The last measure finished (an empty `folders` then means an empty home folder).
     @Published private(set) var measured = false
     /// Folders macOS protects were left out (no Full Disk Access): the view shows a note.
@@ -108,15 +119,47 @@ final class OverviewModel: ObservableObject {
     private var snapshotsTask: Task<Void, Never>?
     private var suggestionsTask: Task<Void, Never>?
     private var started = false
-    /// Something was removed since the last measure: measure again next time the Overview is shown.
+    /// Something was removed, where is not known: measure everything again next time the Overview is shown.
     private var stale = false
+    /// Folders of the home folder (paths) holding something removed since the last measure: only those are measured
+    /// again next time the Overview is shown.
+    private(set) var changedFolders: Set<String> = []
+    /// The `changedFolders` the running measure took: a Stop leaves them to measure next time.
+    private var remeasuring: Set<String> = []
+    /// Something was removed since the suggestions were read (they may name it): read them again.
+    private var removedSince = false
+    /// Every folder of the home folder as last measured, and the sizes of the folders inside them (for Space Lens):
+    /// a measure after a clean keeps those of the folders the clean didn't touch.
+    private var listing: [SpaceItem] = []
+    private var nestedSizes: [String: Int64] = [:]
     private var observer: (any NSObjectProtocol)?
 
     /// `center`: tests pass their own, so cleans recorded by tests running in parallel don't mark it stale.
     init(center: NotificationCenter = .default) {
         // Only marked: a clean records every item, and the Overview is not on screen while another module cleans.
-        observer = center.addObserver(forName: ActivityLog.didRecord, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.stale = true }
+        observer = center.addObserver(forName: ActivityLog.didRecord, object: nil, queue: .main) { [weak self] note in
+            let paths = note.userInfo?[ActivityLog.pathsKey] as? [String]
+            MainActor.assumeIsolated { self?.removed(paths) }
+        }
+    }
+
+    /// A removal was recorded: the folders of the home folder holding `paths` are measured again next time; nil (not
+    /// known, e.g. a command ran) means all of them. Paths outside the home folder change only the drives, read anyway.
+    func removed(_ paths: [String]?) {
+        guard let paths else { return stale = true }
+        guard !paths.isEmpty else { return } // skipped or failed: nothing changed
+        removedSince = true
+        // Before the first measure ends, or during one: the next measures everything.
+        guard measured, !measuring, !stale else { return stale = true }
+        let home = home.standardizedFileURL.path
+        for path in paths {
+            let path = URL(fileURLWithPath: path).standardizedFileURL.path
+            guard path.hasPrefix(home + "/") else {
+                if path == home { stale = true }
+                continue
+            }
+            let name = path.dropFirst(home.count + 1).prefix { $0 != "/" }
+            changedFolders.insert(home + "/" + name)
         }
     }
 
@@ -128,7 +171,13 @@ final class OverviewModel: ObservableObject {
         readQuick()
         readSnapshotList()
         readSecurityStatus()
-        if !suggesting, suggestionsDate.map({ now().timeIntervalSince($0) > Self.suggestionsMaxAge }) ?? true {
+        let changed = changedFolders
+        if !changed.isEmpty {
+            changedFolders = []
+            measureFolders(changed: changed)
+        }
+        if removedSince || !suggesting && suggestionsDate.map({ now().timeIntervalSince($0) > Self.suggestionsMaxAge }) ?? true {
+            removedSince = false
             readSuggestions()
         }
     }
@@ -137,6 +186,8 @@ final class OverviewModel: ObservableObject {
     func refresh() {
         started = true
         stale = false
+        changedFolders = []
+        removedSince = false
         readQuick()
         readSnapshotList()
         readSecurityStatus()
@@ -144,11 +195,14 @@ final class OverviewModel: ObservableObject {
         readSuggestions()
     }
 
-    /// Stops measuring; the folders shown stay.
+    /// Stop and ⌘.: stops measuring at once (the walk checks every thousand entries); the folders shown stay.
     func cancel() {
         task?.cancel()
         task = nil
+        if measuring { changedFolders.formUnion(remeasuring) }
+        remeasuring = []
         measuring = false
+        progress = nil
     }
 
     private func readQuick() {
@@ -227,40 +281,66 @@ final class OverviewModel: ObservableObject {
         }
     }
 
-    private func measureFolders() {
+    /// Measures each folder of the home folder in parallel. `changed` (after a clean): only those folders, and folders
+    /// new since; the others keep their last size. The home folder itself is always listed again (its loose files).
+    private func measureFolders(changed: Set<String>? = nil) {
         task?.cancel()
         let home = home.standardizedFileURL
         let skipping = ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess())
         let measure = measure
         let epoch = spaceLens?.cacheEpoch
         let sizesFile = sizesFile
+        let kept = changed == nil ? [:] : Dictionary(listing.map { ($0.url.path, $0.size) }) { $1 }
         showSavedSizes(home: home)
+        remeasuring = changed ?? []
         measuring = true
+        progress = MeasureProgress()
         task = Task {
             // One per listing, as in Space Lens: sibling folders don't count a shared hard link twice.
             let links = SpaceLens.HardLinks()
             let entries = await SpaceLens.list(home, links: links)
             let looseFiles = entries.reduce(0) { $0 + ($1.isFolder ? 0 : $1.size ?? 0) }
             var listed = entries.filter(\.isFolder)
+            var pending: [Int] = []
             for index in listed.indices {
                 listed[index].isProtected = skipping.contains(listed[index].url.standardizedFileURL.path)
                 if !listed[index].isProtected { listed[index].isUnreadable = SpaceLens.isUnreadable(listed[index].url) }
-            }
-            var nested: [String: Int64] = [:]
-            await withTaskGroup(of: (URL, Int64, [String: Int64])?.self) { group in
-                for item in listed where !item.isProtected && !item.isUnreadable {
-                    group.addTask {
-                        guard let result = try? await measure(item.url, links, skipping) else { return nil }
-                        return (item.url, result.size, result.folders)
-                    }
+                guard !listed[index].isProtected, !listed[index].isUnreadable else { continue }
+                let path = listed[index].url.path
+                if let changed, !changed.contains(path), let size = kept[path] ?? nil {
+                    listed[index].size = size
+                } else {
+                    pending.append(index)
                 }
-                for await result in group {
-                    guard let (url, size, folders) = result else { continue }
-                    nested.merge(folders) { $1 }
-                    if let index = listed.firstIndex(where: { $0.url == url }) { listed[index].size = size }
+            }
+            let measuredPaths = Set(pending.map { listed[$0].url.path })
+            var nested = changed == nil ? [:] : nestedSizes.filter { path, _ in
+                !measuredPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
+            }
+            progress = MeasureProgress(current: pending.first.map { listed[$0].name }, total: pending.count,
+                                       bytes: listed.reduce(0) { $0 + ($1.size ?? 0) })
+            await withTaskGroup(of: (index: Int, measured: (size: Int64, folders: [String: Int64])?).self) { group in
+                for index in pending {
+                    let url = listed[index].url
+                    group.addTask { (index, try? await measure(url, links, skipping)) } // nil: stays unmeasured
+                }
+                var left = pending
+                for await (index, measured) in group {
+                    guard !Task.isCancelled else { continue }
+                    left.removeAll { $0 == index }
+                    if let measured {
+                        nested.merge(measured.folders) { $1 }
+                        listed[index].size = measured.size
+                        progress?.bytes += measured.size
+                    }
+                    progress?.done += 1
+                    progress?.current = left.first.map { listed[$0].name }
                 }
             }
             guard !Task.isCancelled else { return }
+            listing = listed
+            nestedSizes = nested
+            remeasuring = []
             let sized = listed.filter { $0.size != nil }
             folders = Array(sized.filter { $0.sortSize > 0 }.sorted { $0.sortSize > $1.sortSize }.prefix(Self.folderLimit))
             skippedProtected = listed.contains(where: \.isProtected)
@@ -269,6 +349,7 @@ final class OverviewModel: ObservableObject {
             homeSize = sized.reduce(looseFiles) { $0 + max($1.sortSize, 0) }
             measured = true
             measuring = false
+            progress = nil
             savedSizesDate = nil
             if let sizesFile {
                 let saved = HomeFolderSizes(home: home.path, date: now(),

@@ -9,7 +9,7 @@ struct SmartScanView: View {
     @State private var reviewing = false
     @State private var reviewIDs: Set<String> = []
     @State private var excludedCount = 0
-    @State private var hasFullDiskAccess = FullDiskAccess.isGranted
+    @ObservedObject private var access = FullDiskAccessStatus.shared
     /// Idle-screen overview source; snapshots inject fixed values instead of reading the disk.
     var readOverview: @MainActor () -> Overview = { Self.readOverview() }
     @State private var overview: Overview?
@@ -104,15 +104,11 @@ struct SmartScanView: View {
         .navigationTitle(Text(module.title))
         .trashUndo(model)
         .onAppear {
-            hasFullDiskAccess = FullDiskAccess.isGranted
             if module == .smartScan { overview = readOverview() }
         }
         // record() may post off the main thread; hop to main before touching @State.
         .onReceive(NotificationCenter.default.publisher(for: ActivityLog.didRecord).receive(on: RunLoop.main)) { _ in
             if module == .smartScan { overview = readOverview() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            hasFullDiskAccess = FullDiskAccess.isGranted
         }
     }
 
@@ -135,7 +131,7 @@ struct SmartScanView: View {
         // Arrow keys move the row selection, Space ticks/unticks it; controls inside rows still take clicks.
         ScrollViewReader { proxy in
             List(selection: $model.highlighted) {
-                if module == .privacy && !hasFullDiskAccess {
+                if module == .privacy && !access.granted {
                     fullDiskAccessBanner
                 }
                 if offCount > 0 {

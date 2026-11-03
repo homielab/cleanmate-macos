@@ -50,6 +50,7 @@ struct SimilarPhotosView<Listing: View>: View {
                         } else {
                             Text("No two photos in your home folder look alike.")
                         }
+                        if model.truncated { IncompleteResultsNote() }
                     } actions: {
                         Button("Find Again") { model.findAgain() }
                     }
@@ -117,6 +118,15 @@ struct SimilarPhotosView<Listing: View>: View {
                 Text("Number of Photos").tag(SimilarPhotos.GroupOrder.count)
             }
             .help("Sort groups by the space their extra photos take, their newest photo, or how many photos they have")
+        }
+        .safeAreaInset(edge: .top) {
+            if model.truncated {
+                IncompleteResultsNote()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.bar)
+            }
         }
         .safeAreaInset(edge: .bottom) {
             HStack {
@@ -263,4 +273,16 @@ private enum ThumbnailCache {
         cache.countLimit = 2_000
         return cache
     }()
+}
+
+/// Shown when the search stopped comparing at `SimilarPhotos.maxPairs` close pairs, instead of dropping the rest silently.
+private struct IncompleteResultsNote: View {
+    var body: some View {
+        Label {
+            Text("Results may be incomplete: too many photos look alike to compare them all, so some may be missing from the groups.")
+        } icon: {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+        }
+        .font(.callout)
+    }
 }
