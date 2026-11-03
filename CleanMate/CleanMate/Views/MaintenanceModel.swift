@@ -8,6 +8,8 @@ final class MaintenanceModel: ObservableObject {
         case running
         case succeeded(Date)
         case failed(Date)
+        /// The user stopped it (Stop, ⌘., Quit Anyway): its tool was ended and the steps after it never ran.
+        case stopped(Date)
     }
 
     struct Result: Equatable {
@@ -106,6 +108,28 @@ final class MaintenanceModel: ObservableObject {
     /// A task runs or snapshots are being deleted: every Run and Delete button is disabled.
     var busy: Bool { running != nil || deletingSnapshots }
 
+    /// The task started by `start`, which `stop` cancels.
+    private var runTask: Task<Void, Never>?
+
+    /// Runs `task` (see `run`) so that `stop()` can end it.
+    func start(_ task: MaintenanceTask) {
+        guard !busy else { return }
+        runTask = Task { await run(task) }
+    }
+
+    /// Stop: ends the running task's tool and its children (SIGTERM, SIGKILL after `ShellCommand.termGrace`); the
+    /// steps after it don't run. What the tool already did stays done.
+    func stop() {
+        guard running != nil else { return }
+        runTask?.cancel()
+    }
+
+    /// `stop()`, then waits until the task has ended (before quitting: the tool would outlive CleanMate).
+    func stopAndWait() async {
+        stop()
+        await runTask?.value
+    }
+
     /// Reads again whether Homebrew is installed and a `brew` command runs (not while the Homebrew task runs: its own
     /// brew would lock it).
     func checkBrew() async {
@@ -138,13 +162,19 @@ final class MaintenanceModel: ObservableObject {
             guard state.installed, !state.running else { results[task] = previous; return }
         }
         let deadline = task.timeLimit.map { ContinuousClock.now + $0 }
-        var output = "", succeeded = true
+        var output = "", succeeded = true, stopped = false
         for var command in task.commands {
+            if Task.isCancelled { stopped = true; break }
             let tool = (command.executable as NSString).lastPathComponent
             if let deadline { command.timeout = min(command.timeout, deadline - .now) }
             let outcome = command.timeout > .zero
                 ? await runCommand(command) { chunk in if task.streamsOutput { self.show(chunk, of: task) } }
                 : nil
+            if Task.isCancelled { // stopped by the user: the tool was ended; keep what it printed until then
+                output = outcome.map { output + $0.output } ?? results[task]?.output ?? output
+                stopped = true
+                break
+            }
             guard let outcome else {
                 output += String(localized: "\(tool) is missing or took too long and was stopped.") + "\n"
                 succeeded = false
@@ -154,10 +184,11 @@ final class MaintenanceModel: ObservableObject {
             results[task]?.output = output
             if !outcome.succeeded { succeeded = false; break }
         }
+        if stopped { succeeded = false }
         var text = output.trimmingCharacters(in: .whitespacesAndNewlines)
         if succeeded, let line = task.closingLine(output: output) { text += text.isEmpty ? line : "\n\n" + line }
         let date = now()
-        results[task] = Result(status: succeeded ? .succeeded(date) : .failed(date), output: text)
+        results[task] = Result(status: stopped ? .stopped(date) : succeeded ? .succeeded(date) : .failed(date), output: text)
         record(task, succeeded)
     }
 

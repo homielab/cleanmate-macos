@@ -79,7 +79,7 @@ final class ModuleRouter: ObservableObject {
 
     static var mainWindow: NSWindow? { NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) }
 
-    var canScanNow: Bool { Self.canScanNow(sheetOpen: Self.mainWindow?.attachedSheet != nil, busy: AppDelegate.isBusy) }
+    var canScanNow: Bool { Self.canScanNow(sheetOpen: Self.mainWindow?.attachedSheet != nil, busy: AppModels.shared.isChanging) }
 
     /// Opens the main window on Smart Scan and starts a scan.
     func scanNow(openWindow: OpenWindowAction? = nil) {
@@ -136,14 +136,16 @@ final class ModuleRouter: ObservableObject {
 struct ContentView: View {
     @ObservedObject private var router = ModuleRouter.shared
     @State private var selection: Module? = .overview
-    @StateObject private var overview = OverviewModel()
-    @StateObject private var smartScan = SmartScanModel(module: .smartScan)
-    @StateObject private var privacy = SmartScanModel(module: .privacy)
-    @StateObject private var largeFiles = LargeFilesModel()
-    @StateObject private var uninstaller = UninstallerModel()
-    @StateObject private var spaceLens = SpaceLensModel()
-    @StateObject private var loginItems = LaunchAgentsModel()
-    @StateObject private var maintenance = MaintenanceModel()
+    /// Owned by the app, not this view: closing the window keeps results and running scans, reopening shows them.
+    let models: AppModels
+    @ObservedObject private var overview: OverviewModel
+    @ObservedObject private var smartScan: SmartScanModel
+    @ObservedObject private var privacy: SmartScanModel
+    @ObservedObject private var largeFiles: LargeFilesModel
+    @ObservedObject private var uninstaller: UninstallerModel
+    @ObservedObject private var spaceLens: SpaceLensModel
+    @ObservedObject private var loginItems: LaunchAgentsModel
+    @ObservedObject private var maintenance: MaintenanceModel
     @State private var showsWelcome = false
     @State private var showsTrashedItems = false
     @Environment(\.openWindow) private var openWindow
@@ -153,17 +155,29 @@ struct ContentView: View {
 
     /// Opens on the module shown last (Overview the first time); the menu bar, a notification or the welcome guide
     /// still pick their own module once the window is up.
-    init() {
-        remembers = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
-        _selection = State(initialValue: remembers ? Self.lastModule() : .overview)
+    init(models: AppModels = .shared) {
+        let remembers = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+        self.init(models: models, selection: remembers ? Self.lastModule() : .overview, remembers: remembers)
     }
 
     /// The scan benchmark's window: its own Smart Scan / Large & Old Files models, opened on `selection`.
     init(smartScan: SmartScanModel? = nil, largeFiles: LargeFilesModel? = nil, selection: Module) {
-        if let smartScan { _smartScan = StateObject(wrappedValue: smartScan) }
-        if let largeFiles { _largeFiles = StateObject(wrappedValue: largeFiles) }
+        self.init(models: AppModels(smartScan: smartScan ?? SmartScanModel(module: .smartScan),
+                                    largeFiles: largeFiles ?? LargeFilesModel()), selection: selection, remembers: false)
+    }
+
+    private init(models: AppModels, selection: Module, remembers: Bool) {
+        self.models = models
+        self.remembers = remembers
         _selection = State(initialValue: selection)
-        remembers = false
+        _overview = ObservedObject(wrappedValue: models.overview)
+        _smartScan = ObservedObject(wrappedValue: models.smartScan)
+        _privacy = ObservedObject(wrappedValue: models.privacy)
+        _largeFiles = ObservedObject(wrappedValue: models.largeFiles)
+        _uninstaller = ObservedObject(wrappedValue: models.uninstaller)
+        _spaceLens = ObservedObject(wrappedValue: models.spaceLens)
+        _loginItems = ObservedObject(wrappedValue: models.loginItems)
+        _maintenance = ObservedObject(wrappedValue: models.maintenance)
     }
 
     /// The module saved by `remember`; Overview when none or one this version no longer has.
@@ -199,14 +213,6 @@ struct ContentView: View {
         .focusedSceneValue(\.scanAgain, scanAgain)
         .focusedSceneValue(\.stopScan, stopScan)
         .focusedSceneValue(\.module, $selection)
-        .onAppear {
-            // Read from the models at quit time, not mirrored by this view: closing the window mid-clean left
-            // a mirrored flag stuck. Weak: a model a still-running task keeps alive after the window closed counts too.
-            overview.spaceLens = spaceLens
-            overview.uninstaller = uninstaller
-            AppDelegate.registerBusyCheck(ObjectIdentifier(smartScan),
-                                          Self.busyCheck(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems))
-        }
         .onAppearAndChange(of: router.requested) { _ in
             if let module = router.requested { selection = module; router.requested = nil }
         }
@@ -250,7 +256,9 @@ struct ContentView: View {
         }
         .onAppear {
             if WelcomeModel.showsAtLaunch(), !BackgroundMode.shared.launchingHidden { showsWelcome = true }
-            AppUpdater.shared.start()  // after the window: see `start`
+            // After the window (see `start`); a login launch's hidden window waits for the user to open one. Next turn
+            // of the run loop: this window may appear before `applicationDidFinishLaunching` marks a login launch.
+            DispatchQueue.main.async { AppUpdater.shared.windowShown(launchingHidden: BackgroundMode.shared.launchingHidden) }
             router.openMainWindow = openWindow
             BackgroundMode.shared.hideLaunchWindow() // started at login: menu bar only
         }
@@ -301,28 +309,6 @@ struct ContentView: View {
         }
     }
 
-    /// Deleting, moving to the Trash, putting back or a launchctl change is under way: quitting now would stop it partway.
-    /// nil = that model is gone (window closed, nothing running in it).
-    static func isChanging(_ smartScan: SmartScanModel?, _ privacy: SmartScanModel?, _ largeFiles: LargeFilesModel?,
-                           _ uninstaller: UninstallerModel?, _ spaceLens: SpaceLensModel?, _ loginItems: LaunchAgentsModel?) -> Bool {
-        let cleaning = [smartScan, privacy].contains { if case .cleaning? = $0?.phase { true } else { $0?.undoing == true } }
-        let trashingFiles = if case .trashing? = largeFiles?.phase { true } else { false }
-        // Uninstaller `working` and Space Lens `trashing` also cover their Undo.
-        return cleaning || trashingFiles || largeFiles?.undoing == true || largeFiles?.similarPhotos.isChanging == true
-            || uninstaller?.working == true
-            || spaceLens?.trashing == true || loginItems?.working == true
-    }
-
-    /// `isChanging` over weak references, for `AppDelegate.isBusy`; nil once every model is gone.
-    static func busyCheck(_ smartScan: SmartScanModel, _ privacy: SmartScanModel, _ largeFiles: LargeFilesModel,
-                          _ uninstaller: UninstallerModel, _ spaceLens: SpaceLensModel, _ loginItems: LaunchAgentsModel) -> () -> Bool? {
-        { [weak smartScan, weak privacy, weak largeFiles, weak uninstaller, weak spaceLens, weak loginItems] in
-            let models: [AnyObject?] = [smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems]
-            guard models.contains(where: { $0 != nil }) else { return nil }
-            return isChanging(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems)
-        }
-    }
-
     private func scanAction(_ model: SmartScanModel) -> (() -> Void)? {
         switch model.phase {
         case .scanning, .cleaning: nil
@@ -330,7 +316,8 @@ struct ContentView: View {
         }
     }
 
-    /// ⌘.: stops the visible module's running scan; nil (menu item disabled) when nothing can be stopped.
+    /// ⌘.: stops the visible module's scan, clean (after the item under way), Maintenance task or wait for an app to
+    /// quit; nil (menu item disabled) when nothing can be stopped.
     private var stopScan: (() -> Void)? {
         let running: Bool
         let stop: () -> Void
@@ -338,12 +325,13 @@ struct ContentView: View {
         case .overview:
             running = overview.measuring
             stop = { overview.cancel() }
-        case .smartScan:
-            if case .scanning = smartScan.phase { running = true } else { running = false }
-            stop = { smartScan.cancelScan() }
-        case .privacy:
-            if case .scanning = privacy.phase { running = true } else { running = false }
-            stop = { privacy.cancelScan() }
+        case .smartScan, .privacy:
+            let model = selection == .privacy ? privacy : smartScan
+            switch model.phase {
+            case .scanning: running = true; stop = { model.cancelScan() }
+            case .cleaning: running = !model.stoppingClean; stop = { model.stopClean() } // after the item being cleaned
+            default: running = false; stop = {}
+            }
         case .largeFiles:
             if case .scanning = largeFiles.phase {
                 running = true
@@ -355,7 +343,13 @@ struct ContentView: View {
         case .spaceLens:
             running = spaceLens.measuring && !spaceLens.trashing
             stop = { spaceLens.cancel() }
-        case .uninstaller, .loginItems, .maintenance: // short loads or tasks with no stop button
+        case .maintenance:
+            running = maintenance.running != nil
+            stop = { maintenance.stop() }
+        case .uninstaller: // "Quit and Uninstall" waiting for the app to quit
+            running = uninstaller.quitting != nil
+            stop = { uninstaller.cancelQuit() }
+        case .loginItems: // short loads
             running = false
             stop = {}
         }

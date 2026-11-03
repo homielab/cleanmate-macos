@@ -16,6 +16,19 @@ struct UpdaterTests {
         #expect(!AppUpdater.shared.isStarted)
     }
 
+    /// Opened at login with the window hidden: Sparkle doesn't start (no prompt or update alert alone at login);
+    /// the user opening the window starts it, once.
+    @Test func hiddenLoginLaunchStartsTheUpdaterOnlyWhenTheWindowOpens() {
+        var starts = 0
+        let updater = AppUpdater(environment: [:]) { starts += 1 }
+        updater.windowShown(launchingHidden: true)
+        #expect(!updater.isStarted && starts == 0)
+        updater.windowShown(launchingHidden: false)
+        #expect(updater.isStarted && starts == 1)
+        updater.windowShown(launchingHidden: false) // the window opened again
+        #expect(starts == 1)
+    }
+
     @Test func feedIsTheLatestGitHubRelease() {
         #expect(info["SUFeedURL"] as? String == "https://github.com/homielab/cleanmate-macos/releases/latest/download/appcast.xml")
     }

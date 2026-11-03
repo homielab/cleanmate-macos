@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
 - **Login Items**: after removing an agent, **Undo** (also ⌘Z) puts it back and loads it again, and **View Moved Items…** shows it.
 
+- **Stop** while a Smart Scan or Privacy clean runs (the rest is left as it is and the done screen says how many items weren’t cleaned), on a running Maintenance task, and while the Uninstaller waits for an app to quit; ⌘. does the same.
 ### Changed
 - The menu bar item shows **Junk found: X (scanned …)**, everything the last Smart Scan found, and opens Smart Scan when clicked.
 - **Large & Old Files › Similar Photos** and `cleanmate similar` use about a third less memory on large libraries (20,000 photos: 490 MB → 320 MB at peak), with the same groups.
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Overview**: measuring your home folder shows which folder is being measured and how much so far, with a **Stop** button; after a clean only the folders it touched are measured again.
 
 ### Fixed
+- Closing the window no longer loses scan results or a scan still running; quitting during a Maintenance task asks first and ends its tool; after a hidden start at login, the update check waits until you open the window.
 - CleanMate no longer stalls while checking Full Disk Access with a large Trash: the check reads one entry instead of listing the whole Trash, in the background when CleanMate becomes active.
 - **Similar Photos**: when too many photos look nearly alike to compare them all, the results say **Results may be incomplete** instead of leaving photos out silently.
 - The menu bar and Overview line **Junk found: … (scanned …)**, dates in notifications and some Settings texts now use CleanMate's language (for example Vietnamese) and its date format even when macOS is set to another language.

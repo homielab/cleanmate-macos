@@ -11359,6 +11359,104 @@
           }
         }
       }
+    },
+    "The maintenance task that is running stops partway, as if you clicked Stop." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tác vụ bảo trì đang chạy sẽ dừng giữa chừng, như khi bạn bấm Dừng."
+          }
+        }
+      }
+    },
+    "End the running tool now. What it already did stays done; the steps after it don’t run." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kết thúc công cụ đang chạy ngay. Phần đã làm vẫn giữ nguyên; các bước sau không chạy."
+          }
+        }
+      }
+    },
+    "Stopped at %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng lúc %@"
+          }
+        }
+      }
+    },
+    "Stopping after this item…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sẽ dừng sau mục này…"
+          }
+        }
+      }
+    },
+    "Finish the item being cleaned and leave the rest as they are." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn xong mục đang dọn rồi để nguyên các mục còn lại."
+          }
+        }
+      }
+    },
+    "Stopped: %lld items weren’t cleaned." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Stopped: %lld item wasn’t cleaned."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Stopped: %lld items weren’t cleaned."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng: %lld mục chưa dọn."
+          }
+        }
+      }
+    },
+    "Waiting for %@ to quit…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ %@ thoát…"
+          }
+        }
+      }
+    },
+    "Stop waiting. Nothing is moved to the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thôi chờ. Không có gì được chuyển vào Thùng rác."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

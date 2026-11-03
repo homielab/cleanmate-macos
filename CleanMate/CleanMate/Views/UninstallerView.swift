@@ -696,7 +696,14 @@ struct UninstallerView: View {
             // A ticked app row is in `size` too, so count it.
             Text("Selected: \(count + (uninstalling ? 1 : 0)) items, \(size)").monospacedDigit()
             Spacer()
-            if model.working { ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…") }
+            if let quitting = model.quitting {
+                ProgressView().controlSize(.small)
+                Text("Waiting for \(quitting.name) to quit…").foregroundStyle(.secondary)
+                Button("Stop") { model.cancelQuit() }
+                    .help("Stop waiting. Nothing is moved to the Trash.")
+            } else if model.working {
+                ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…")
+            }
             // Unticking the app row already turns the main button into Reset.
             if let app, model.trashApp {
                 let running = model.isRunning(app)

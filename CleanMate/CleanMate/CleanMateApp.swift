@@ -82,25 +82,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    /// Registered by ContentView (`isChanging`): a clean, move to the Trash, put back or launchctl change is running.
-    /// One entry per set of models, keyed by its Smart Scan model, so reopening the window replaces instead of piling up.
-    private(set) static var busyChecks: [ObjectIdentifier: () -> Bool?] = [:]
-
-    /// Drops checks whose models are all gone (nil) before adding, so the list never outgrows the live models.
-    static func registerBusyCheck(_ id: ObjectIdentifier, _ check: @escaping () -> Bool?) {
-        busyChecks = busyChecks.filter { $0.value() != nil }
-        busyChecks[id] = check
-    }
-
     /// A new instance is already open (language Restart, confirmed): quit without asking again.
     static var relaunching = false
 
-    static var isBusy: Bool { busyChecks.values.contains { $0() == true } }
+    /// A clean, move to the Trash, put back, launchctl change or Maintenance task is running, window open or not.
+    static var isBusy: Bool { AppModels.shared.isBusy }
 
     /// ⌘Q or the menu bar's Quit during that asks first: quitting stops it partway, with no report and no Undo.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard Self.isBusy, !Self.relaunching else { return .terminateNow }
-        let alert = Self.quitAlert()
+        if Self.isBusy, !Self.relaunching, !Self.confirmQuit() { return .terminateCancel }
+        // A Maintenance tool (brew) runs in its own process group and would outlive CleanMate: stop it first (≤ 2 s).
+        let maintenance = AppModels.shared.maintenance
+        guard maintenance.running != nil else { return .terminateNow }
+        Task {
+            await maintenance.stopAndWait()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
+    /// The quit-while-busy alert, run modally; true = Quit Anyway.
+    static func confirmQuit() -> Bool {
+        let alert = quitAlert(maintenanceOnly: !AppModels.shared.isChanging)
         // A button holds one key: Return is Cancel's key equivalent, Esc is caught here.
         let escape = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.keyCode == 53, event.window === alert.window else { return event }
@@ -108,15 +111,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             return nil
         }
         defer { escape.map(NSEvent.removeMonitor) }
-        return alert.runModal() == .alertSecondButtonReturn ? .terminateNow : .terminateCancel
+        return alert.runModal() == .alertSecondButtonReturn
     }
 
     /// Cancel first and on Return, Quit Anyway with no key. NSAlert alone gives a button titled
     /// "Cancel" only Esc and any other first button only Return, so the keys depend on the language.
-    static func quitAlert() -> NSAlert {
+    /// `maintenanceOnly`: only a Maintenance task runs (brew upgrade), which quitting stops partway too.
+    static func quitAlert(maintenanceOnly: Bool = false) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = String(localized: "Quit while CleanMate is still working?")
-        alert.informativeText = String(localized: "Cleaning or moving to the Trash stops partway: what is done stays done, the rest is left as it is, and there is no Undo.")
+        alert.informativeText = maintenanceOnly
+            ? String(localized: "The maintenance task that is running stops partway, as if you clicked Stop.")
+            : String(localized: "Cleaning or moving to the Trash stops partway: what is done stays done, the rest is left as it is, and there is no Undo.")
         alert.addButton(withTitle: String(localized: "Cancel"))
         alert.addButton(withTitle: String(localized: "Quit Anyway"))
         alert.layout() // NSAlert assigns its own keys on layout; set ours after

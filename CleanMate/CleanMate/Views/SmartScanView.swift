@@ -78,10 +78,18 @@ struct SmartScanView: View {
                 }
                 .transition(.opacity)
             case .cleaning:
-                ProgressView(value: Double(model.scannedItems), total: Double(max(model.totalItems, 1))) {
-                    Text("Cleaning…")
-                } currentValueLabel: {
-                    Text("Cleaning item \(min(model.scannedItems + 1, model.totalItems))/\(model.totalItems): \(model.cleaningItem.map { Text($0) } ?? Text(verbatim: ""))")
+                VStack(spacing: 12) {
+                    ProgressView(value: Double(model.scannedItems), total: Double(max(model.totalItems, 1))) {
+                        Text("Cleaning…")
+                    } currentValueLabel: {
+                        Text("Cleaning item \(min(model.scannedItems + 1, model.totalItems))/\(model.totalItems): \(model.cleaningItem.map { Text($0) } ?? Text(verbatim: ""))")
+                    }
+                    if model.stoppingClean {
+                        Text("Stopping after this item…").foregroundStyle(.secondary)
+                    } else {
+                        Button("Stop") { model.stopClean() }
+                            .help("Finish the item being cleaned and leave the rest as they are.")
+                    }
                 }
                 .frame(maxWidth: 360)
                 .transition(.opacity)
@@ -673,6 +681,9 @@ struct DoneScreen<Actions: View>: View {
             }
             if report.upTo > 0 {
                 Text("\(report.upTo, format: .fileSize) of it came from caches that share files with your projects, so less space may be freed.")
+            }
+            if report.stopped > 0 {
+                Text("Stopped: \(report.stopped) items weren’t cleaned.")
             }
             NotCleanedSummary(report: report)
             if !model.cleanedGroups.isEmpty {

@@ -16,8 +16,9 @@ struct MaintenanceView: View {
                     ForEach(model.tasks) { task in
                         let brewBusy = task == .homebrew && model.brewRunning && model.running != .homebrew
                         MaintenanceRow(task: task, result: model.results[task], canRun: !model.busy && !brewBusy,
-                                       note: brewBusy ? Text("Homebrew is already running. This can run when it finishes.") : nil) {
-                            if task.asksFirst { confirming = task } else { Task { await model.run(task) } }
+                                       note: brewBusy ? Text("Homebrew is already running. This can run when it finishes.") : nil,
+                                       stop: model.running == task ? { model.stop() } : nil) {
+                            if task.asksFirst { confirming = task } else { model.start(task) }
                         }
                     }
                 } footer: {
@@ -52,7 +53,7 @@ struct MaintenanceView: View {
             isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }),
             presenting: confirming
         ) { task in
-            Button("Restart") { Task { await model.run(task) } }
+            Button("Restart") { model.start(task) }
         } message: { task in
             if task == .iconCache {
                 Text("The Dock disappears for a moment. Icons may look blank briefly while macOS draws them again.")
@@ -69,6 +70,8 @@ private struct MaintenanceRow: View {
     let canRun: Bool
     /// Why Run is off (brew already running).
     var note: Text?
+    /// This task runs: Stop takes Run's place.
+    var stop: (() -> Void)?
     let run: () -> Void
 
     var body: some View {
@@ -89,7 +92,12 @@ private struct MaintenanceRow: View {
                     MaintenanceStatus(status: result?.status).font(.callout).padding(.top, 2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Run", action: run).disabled(!canRun)
+                if let stop {
+                    Button("Stop", action: stop)
+                        .help("End the running tool now. What it already did stays done; the steps after it don’t run.")
+                } else {
+                    Button("Run", action: run).disabled(!canRun)
+                }
             }
             MaintenanceOutput(result: result, live: task.streamsOutput).padding(.leading, 40)
         }
@@ -114,6 +122,9 @@ private struct MaintenanceStatus: View {
         case .failed(let date)?:
             Label { Text("Failed at \(date, format: .dateTime.hour().minute())") } icon: { Image(systemName: "xmark.octagon.fill") }
                 .foregroundStyle(.red)
+        case .stopped(let date)?:
+            Label { Text("Stopped at \(date, format: .dateTime.hour().minute())") } icon: { Image(systemName: "stop.circle.fill") }
+                .foregroundStyle(.orange)
         case nil:
             EmptyView()
         }

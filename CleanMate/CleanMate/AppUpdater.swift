@@ -13,13 +13,16 @@ final class AppUpdater: ObservableObject {
     private let controller: SPUStandardUpdaterController
     private var observers: Set<AnyCancellable> = []
     private let environment: [String: String]
+    /// Starts Sparkle; tests count calls instead.
+    private var startUpdater: () -> Void = {}
     /// Stays false under tests: they must never reach the network, nor show Sparkle's permission prompt.
     private(set) var isStarted = false
     @Published private(set) var canCheckForUpdates = false
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    init(environment: [String: String] = ProcessInfo.processInfo.environment, startUpdater: (() -> Void)? = nil) {
         self.environment = environment
         controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: delegate, userDriverDelegate: nil)
+        self.startUpdater = startUpdater ?? { [controller] in controller.startUpdater() }
         let updater = controller.updater
         updater.publisher(for: \.canCheckForUpdates).assign(to: &$canCheckForUpdates)
         // The settings below are stored by Sparkle (its own user defaults); refresh the views when they change,
@@ -35,8 +38,15 @@ final class AppUpdater: ObservableObject {
     /// so Sparkle's permission prompt (second launch) shown earlier left the app with only that prompt.
     func start() {
         guard !isStarted, Self.startsUpdater(environment: environment) else { return }
-        controller.startUpdater()
+        startUpdater()
         isStarted = true
+    }
+
+    /// The main window appeared. A login launch's window is hidden at once: Sparkle waits until the user opens one,
+    /// so its permission prompt or an update alert never pops up alone at login.
+    func windowShown(launchingHidden: Bool) {
+        guard !launchingHidden else { return }
+        start()
     }
 
     nonisolated static func startsUpdater(environment: [String: String]) -> Bool {

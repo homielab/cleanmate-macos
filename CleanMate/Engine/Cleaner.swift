@@ -34,6 +34,8 @@ nonisolated struct CleanReport: Sendable {
     var failed: [URL] = []
     /// Why each one in `skipped` and `locked` was left, in order. A tool's whole item (a command) has no URL.
     var failures: [CleanFailure] = []
+    /// Items a clean the user stopped never reached: left as they are, not counted in `notCleaned`.
+    var stopped = 0
 
     /// Entries or items left in place, for the done screens: one per failure listed, at least `skipped + locked`.
     var notCleaned: Int { max(failures.count, skipped + locked) }
@@ -75,6 +77,7 @@ nonisolated struct CleanReport: Sendable {
         lhs.changed += rhs.changed
         lhs.failed += rhs.failed
         lhs.failures += rhs.failures
+        lhs.stopped += rhs.stopped
     }
 
     /// `FileManager.trashItem`, returning where the item now is inside the Trash.

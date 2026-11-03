@@ -347,14 +347,14 @@ struct RaceTests {
         model.phase = .done(CleanReport(freed: 1, trashed: [item]))
         let undo = Task { await model.undoTrash() }
         try await until { gates.calls == 1 }
-        #expect(ContentView.isChanging(model, nil, nil, nil, nil, nil))
+        #expect(AppModels.isChanging(model, nil, nil, nil, nil, nil))
         await model.scan()
         guard case .done = model.phase else { Issue.record("phase \(model.phase)"); gates.open(1); return }
         gates.open(1)
         await undo.value
         guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(!model.undoing && report.undo == TrashUndo.Result(restored: 1, skipped: 0) && report.trashed.isEmpty)
-        #expect(!ContentView.isChanging(model, nil, nil, nil, nil, nil))
+        #expect(!AppModels.isChanging(model, nil, nil, nil, nil, nil))
     }
 
     /// Quit asks first while something is being changed: a clean, a move/put back, a launchctl change.
@@ -362,7 +362,7 @@ struct RaceTests {
         let smartScan = SmartScanModel.isolated(module: .smartScan), privacy = SmartScanModel.isolated(module: .privacy)
         let largeFiles = largeFiles(Gates()) { _ in false }
         let uninstaller = UninstallerModel(), spaceLens = SpaceLensModel(), loginItems = LaunchAgentsModel()
-        func changing() -> Bool { ContentView.isChanging(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems) }
+        func changing() -> Bool { AppModels.isChanging(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems) }
         #expect(!changing())
         smartScan.phase = .scanning
         #expect(!changing()) // a scan only reads: quitting loses nothing
@@ -385,43 +385,70 @@ struct RaceTests {
         #expect(!changing())
     }
 
-    /// Quit reads the models, not a flag the window mirrored: a model still cleaning after its window
-    /// closed counts until it finishes; models gone with the window never do.
-    @Test func busyFollowsModelsNotWindow() {
-        var smartScan: SmartScanModel? = SmartScanModel.isolated(module: .smartScan)
+    /// The app owns the models: a window built again gets the same ones, so a clean still running after the window
+    /// closed keeps Quit asking until it ends, and a Maintenance task counts too.
+    @Test func busyFollowsAppModelsNotWindow() {
         let privacy = SmartScanModel.isolated(module: .privacy)
-        let busy = ContentView.busyCheck(smartScan!, privacy, largeFiles(Gates()) { _ in false }, UninstallerModel(),
-                                         SpaceLensModel(), LaunchAgentsModel())
-        privacy.phase = .cleaning // the window closed; a running clean keeps `privacy` alive
-        smartScan = nil
-        #expect(busy() == true)
+        let models = AppModels(smartScan: SmartScanModel.isolated(module: .smartScan), privacy: privacy,
+                               largeFiles: largeFiles(Gates()) { _ in false })
+        #expect(ContentView(models: models).models === models)
+        privacy.phase = .cleaning
+        #expect(models.isChanging && models.isBusy)
         privacy.phase = .idle
-        #expect(busy() == false)
+        #expect(!models.isBusy)
+        #expect(ContentView().models === AppModels.shared && AppModels.shared === AppModels.shared)
     }
 
-    /// Reopening the window replaces its quit check instead of chaining one more; a set of models that
-    /// outlived its window (still cleaning) keeps asking, and drops out once all of it is gone.
-    @Test func busyChecksDoNotPileUp() {
-        func models() -> (SmartScanModel, () -> Bool?) {
-            let smartScan = SmartScanModel.isolated(module: .smartScan)
-            return (smartScan, ContentView.busyCheck(smartScan, SmartScanModel.isolated(module: .privacy), largeFiles(Gates()) { _ in false },
-                                                     UninstallerModel(), SpaceLensModel(), LaunchAgentsModel()))
+    /// Closing the window (⌘W, menu bar only) drops ContentView, not the models: a scan under way keeps going and the
+    /// window built again shows the same model with its results.
+    @Test func closingTheWindowKeepsAScanGoingAndItsResults() async throws {
+        let gates = Gates()
+        let smartScan = smartScan(gates) { $0 == 1 }
+        let models = AppModels(smartScan: smartScan, privacy: SmartScanModel.isolated(module: .privacy),
+                               largeFiles: largeFiles(Gates()) { _ in false })
+        do { // the window, closed mid-scan: the view is gone, its models are not
+            let window = ContentView(models: models)
+            smartScan.startScan()
+            try await until { gates.calls == 1 }
+            #expect(window.models.smartScan === smartScan)
         }
-        let (live, check) = models()
-        // The first registration also drops checks left by an earlier run of this test (-test-iterations).
-        AppDelegate.registerBusyCheck(ObjectIdentifier(live), check)
-        let registered = AppDelegate.busyChecks.count
-        for _ in 0..<4 { AppDelegate.registerBusyCheck(ObjectIdentifier(live), check) } // the same window appearing again
-        #expect(AppDelegate.busyChecks.count == registered)
-        live.phase = .cleaning
-        #expect(AppDelegate.isBusy)
-        live.phase = .idle
-        for _ in 0..<5 {
-            let (smartScan, check) = models()
-            AppDelegate.registerBusyCheck(ObjectIdentifier(smartScan), check)
-        } // a closed window's models, freed right after; the next registration drops them
-        #expect(AppDelegate.busyChecks.count <= registered + 1)
-        #expect(!AppDelegate.isBusy)
+        guard case .scanning = smartScan.phase else { Issue.record("phase \(smartScan.phase)"); gates.open(1); return }
+        gates.open(1)
+        try await until { if case .results = smartScan.phase { true } else { false } }
+        let reopened = ContentView(models: models)
+        #expect(reopened.models.smartScan === smartScan && smartScan.scans["x"]?.size == 100 && smartScan.selected == ["x"])
+    }
+
+    /// Stop while cleaning: the item under way finishes, the items after it are never handed to the cleaner, and the
+    /// done screen's report says how many were left.
+    @Test func stopWhileCleaningLeavesTheRestUntouched() async throws {
+        let gates = Gates()
+        let items = (1...4).map { CleanerItem(id: "stop.\($0)", title: "Item \($0)", paths: []) }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
+        model.processNames = { [] }
+        model.appBundleIDs = { [] }
+        model.freeSpace = { nil }
+        model.logHome = URL(fileURLWithPath: "/nonexistent/stop-clean")
+        let cleaned = Locked<[String]>([])
+        model.cleanItem = { item, _, _ in
+            _ = await gates.enter { $0 == 2 } // the second item takes long
+            cleaned.withLock { $0.append(item.id) }
+            return CleanReport(freed: 10)
+        }
+        model.scans = Dictionary(uniqueKeysWithValues: items.map { ($0.id, ItemScan(measuredSize: 10)) })
+        model.selected = Set(items.map(\.id))
+        model.phase = .results
+        let clean = Task { await model.clean() }
+        try await until { gates.calls == 2 }
+        model.stopClean()
+        #expect(model.stoppingClean)
+        gates.open(2)
+        await clean.value
+        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(cleaned.withLock { $0 } == ["stop.1", "stop.2"])
+        #expect(report.stopped == 2 && report.freed == 20 && report.notCleaned == 0 && !model.stoppingClean)
+        model.stopClean() // not cleaning: nothing to stop
+        #expect(!model.stoppingClean)
     }
 
     /// The quit-while-busy alert: Cancel answers Return (Esc is caught while it runs), Quit Anyway has no key.

@@ -65,6 +65,49 @@ struct MaintenanceModelTests {
         #expect(model.running == nil)
     }
 
+    /// Stop ends the running tool (a stand-in `sleep` for brew) and its process group at once, well within
+    /// `ShellCommand.termGrace`; the steps after it never run; the task shows as stopped. Quit counts it as busy.
+    @Test(.timeLimit(.minutes(2))) func stopEndsTheRunningToolAtOnce() async throws {
+        let fake = Fake()
+        let model = fake.model()
+        let pid = Locked<pid_t?>(nil), started = SignalCount()
+        model.runCommand = { command, onOutput in
+            fake.calls.append(command.arguments.joined(separator: " "))
+            // `exec`: the shell becomes `sleep`, so the pid it prints is the tool that must end.
+            let sleeper = ShellCommand(executable: "/bin/sh", arguments: ["-c", "echo $$; exec /bin/sleep 120"], timeout: .seconds(150))
+            return await sleeper.outcome { chunk in
+                await onOutput(chunk)
+                if let first = chunk.split(separator: "\n").first, let value = pid_t(first) {
+                    pid.withLock { $0 = value }
+                    started.add()
+                }
+            }
+        }
+        // A busy machine (other suites in parallel) can delay any stop by seconds, so the fastest of 3 tries counts;
+        // a stop that waits for the tool to finish would take its full 120 s every time.
+        var fastest = Duration.seconds(3600)
+        for attempt in 1...3 where fastest >= .seconds(2) {
+            model.start(.homebrew)
+            await started.reach(attempt)
+            let tool = try #require(pid.withLock { $0 })
+            #expect(model.running == .homebrew && model.busy)
+            #expect(AppModels(smartScan: .isolated(module: .smartScan), privacy: .isolated(module: .privacy), maintenance: model).isBusy)
+            // Timed when the tool ends, off the main actor: when `stopAndWait` returns depends on the main actor too.
+            let exited = Task.detached { await processExited(tool) ? ContinuousClock.now : nil }
+            let stopAt = ContinuousClock.now
+            model.stop()
+            let exitedAt = try #require(await exited.value)
+            fastest = min(fastest, exitedAt - stopAt)
+            await model.stopAndWait()
+            #expect(fake.calls == Array(repeating: "update", count: attempt)) // upgrade and cleanup never ran
+            #expect(model.results[.homebrew]?.status == .stopped(Self.date) && model.running == nil && !model.busy)
+            #expect(fake.recorded.last?.0 == .homebrew && fake.recorded.last?.1 == false)
+        }
+        #expect(fastest < .seconds(2))
+        model.stop() // nothing runs: nothing happens
+        #expect(model.running == nil)
+    }
+
     /// Font cache: the user's registry only, then the font server; icon cache: only the user's caches, then the Dock.
     @Test func fontAndIconCacheTasks() async {
         let fake = Fake()

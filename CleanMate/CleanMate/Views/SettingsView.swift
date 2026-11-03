@@ -290,7 +290,7 @@ extension AppLanguage {
     /// Opens a new CleanMate, then quits this one: the language is read only at launch.
     /// Busy → asks first, as Quit does, so a Cancel never leaves two instances; a failed open says why and keeps this one.
     static func relaunch() {
-        if AppDelegate.isBusy, AppDelegate.quitAlert().runModal() != .alertSecondButtonReturn { return }
+        if AppDelegate.isBusy, !AppDelegate.confirmQuit() { return }
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, error in

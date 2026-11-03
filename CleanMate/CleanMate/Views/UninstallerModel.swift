@@ -80,6 +80,10 @@ final class UninstallerModel: ObservableObject {
     /// Rows ticked in the Reset sheet (`resetEntries`); all of them when it opens (`prepareReset`).
     @Published var resetChecked: Set<URL> = []
     @Published var working = false
+    /// "Quit and Uninstall" / "Quit and Reset" is waiting for this app to quit; `cancelQuit()` stops waiting.
+    @Published private(set) var quitting: InstalledApp?
+    /// Stop was clicked while waiting for an app to quit.
+    private var quitCancelled = false
     @Published var outcome: Outcome?
     @Published var dropRejection: DropRejection?
     /// Unknown hidden items of ~ and ~/.config (warning only, never removed); nil until first loaded.
@@ -564,9 +568,13 @@ final class UninstallerModel: ObservableObject {
         runningApps = appBundleIDs()
         guard isRunning(app) else { return true }
         working = true
+        quitting = app
+        quitCancelled = false
         terminate(app)
         let quit = await waitUntilQuit(app)
         working = false
+        quitting = nil
+        if quitCancelled { return false } // the user stopped waiting: nothing moved, nothing to tell
         if !quit {
             outcome = .appDidNotQuit(app)
             Attention.finished()
@@ -574,11 +582,18 @@ final class UninstallerModel: ObservableObject {
         return quit
     }
 
-    /// Reads the running apps every 200 ms until `app` is gone or `quitTimeout` passes.
+    /// Stop while waiting for an app to quit: nothing is moved. The app was already asked to quit and may still do so.
+    func cancelQuit() {
+        guard quitting != nil else { return }
+        quitCancelled = true
+    }
+
+    /// Reads the running apps every 200 ms until `app` is gone, `quitTimeout` passes or the user stops waiting.
     private func waitUntilQuit(_ app: InstalledApp) async -> Bool {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: quitTimeout)
         while true {
+            if quitCancelled { return false }
             runningApps = appBundleIDs()
             if !isRunning(app) { return true }
             if clock.now >= deadline || Task.isCancelled { return false }

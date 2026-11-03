@@ -1121,6 +1121,31 @@ final class UninstallerTests {
         #expect(model.apps.isEmpty)
     }
 
+    /// Stop while "Quit and Uninstall" waits for the app: the wait ends at once (well before `quitTimeout`), nothing
+    /// is moved and no "didn't quit" alert follows. Fake running apps and fake Trash only.
+    @MainActor @Test(.timeLimit(.minutes(1))) func stopWaitingForTheAppToQuit() async throws {
+        let app = InstalledApp(url: URL(filePath: "/nonexistent/Open.app"), name: "Open", bundleID: "com.test.qqx.open",
+                               version: nil, lastUsed: nil)
+        let model = UninstallerModel()
+        model.apps = [app]
+        let running = Running([app.bundleID])
+        model.appBundleIDs = { running.ids }
+        model.runningApps = running.ids
+        model.quitTimeout = .seconds(600)
+        model.appData = { _, _, _ in [AppDataEntry(url: URL(filePath: "/nonexistent/Library/Caches/com.test.qqx.open"), size: 30)] }
+        var calls = 0
+        model.trash = { _, _ in calls += 1; return CleanReport(freed: 30) }
+        model.terminate = { _ in } // never quits (a save prompt)
+        model.selection = .app(app.url)
+        await model.loadEntries()
+        let remove = Task { await model.quitAndRemove() }
+        await until(model) { $0.quitting == app }
+        #expect(model.working)
+        model.cancelQuit()
+        await remove.value
+        #expect(model.quitting == nil && !model.working && model.outcome == nil && calls == 0 && model.apps == [app])
+    }
+
     /// "Quit and Reset", from the Reset sheet and from the main button with the app row unticked: the open app is asked
     /// to quit; it quits → its data goes to the (fake) Trash and the app stays; it doesn't → nothing moved,
     /// `.appDidNotQuit`. Fake running apps and fake Trash only.

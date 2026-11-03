@@ -87,6 +87,8 @@ final class SmartScanModel: ObservableObject {
     private var scanningSince: [String: ContinuousClock.Instant] = [:]
     /// Title of the item being cleaned; progress while cleaning reuses scannedItems/totalItems.
     @Published var cleaningItem: LocalizedStringResource?  // optional, not "": an empty literal adds a "" key to the catalog
+    /// Stop was clicked while cleaning: the clean ends after the item under way; the rest are left as they are.
+    @Published private(set) var stoppingClean = false
     private var scanTask: Task<Void, Never>?
     /// Bumped by every scan: an older scan that is still finishing never writes over a newer one.
     private var generation = 0
@@ -673,10 +675,19 @@ final class SmartScanModel: ObservableObject {
         }
     }
 
+    /// Stop (or ⌘.) while cleaning: the item under way finishes, the ones after it are not touched, and the done
+    /// screen says how many were left. Stopping inside an item could leave it half removed, so it is never cut.
+    func stopClean() {
+        guard case .cleaning = phase else { return }
+        stoppingClean = true
+    }
+
     /// Only from results: a second call, or one after a new scan started (⌘R behind the dialog), does nothing.
     func clean() async {
         guard case .results = phase else { return }
         phase = .cleaning
+        stoppingClean = false
+        defer { stoppingClean = false }
         runningApps = appBundleIDs()
         runningProcesses = await Self.readProcessNames(processNames)
         refreshDisabled() // a group turned off since the scan is not cleaned
@@ -694,7 +705,8 @@ final class SmartScanModel: ObservableObject {
         undoManager?.removeAllActions(withTarget: self)
         trashedItemNames = [:]
         freedByItem = [:]
-        for item in todo {
+        for (index, item) in todo.enumerated() {
+            if stoppingClean { report.stopped = todo.count - index; break }
             guard let scan = selectedScan(item) else { continue } // only the ticked entries
             cleaningItem = item.title
             defer { scannedItems += 1 }
