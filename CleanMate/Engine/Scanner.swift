@@ -215,7 +215,7 @@ nonisolated enum Scanner {
         // An item filtered by its probe starts walking only once the tool answered, ~1–3 s into a Smart Scan whose other
         // walks fill the thread pool: one thread per entry left a simulator's 66 k-file `data` as the scan's tail.
         return await measure(candidates, of: item, into: result, policy: policy, cutoff: cutoff,
-                             split: only != nil ? splitDepth : 0, openPaths: open)
+                             split: item.entrySplitDepth ?? (only != nil ? splitDepth : 0), openPaths: open)
     }
 
     /// `result` with `candidates` measured at once (or their database records counted), labelled, largest first.

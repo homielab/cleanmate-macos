@@ -224,6 +224,39 @@ struct CommandLineToolTests {
                                                              totalUpTo: 0, items: []), color: true).contains("\u{1B}[1m"))
     }
 
+    /// Each scanned item carries how long its scan took, the report the whole scan; the text names the slowest items.
+    @Test func scanReportsDurations() async throws {
+        let fixture = try Fixture()
+        var sources = fixture.sources()
+        sources.scanItem = { item, policy, openPaths in
+            if item.id == "cli-upto" { try? await Task.sleep(for: .milliseconds(300)) }
+            return await Scanner.scan(item, policy: policy, openPaths: openPaths)
+        }
+        let report = try await Self.scanReport([], sources)
+        let durations = Dictionary(uniqueKeysWithValues: report.items.map { ($0.id, $0.durationMs) })
+        #expect(durations.values.allSatisfy { ($0 ?? -1) >= 0 })
+        let slow = try #require(durations["cli-upto"] ?? nil)
+        #expect(slow >= 300)
+        #expect((report.durationMs ?? 0) >= slow)
+        let (_, printed) = await Self.run(["scan"], sources)
+        #expect(printed.stdout.contains("; slowest: Pruned store "))
+
+        // Written in the JSON; absent for an item that needs Full Disk Access (not scanned).
+        let (_, json) = await Self.run(["scan", "--json"], sources)
+        let raw = try #require(JSONSerialization.jsonObject(with: Data(json.stdout.utf8)) as? [String: Any])
+        #expect(raw["durationMs"] is Int)
+        #expect((raw["items"] as? [[String: Any]])?.allSatisfy { $0["durationMs"] is Int } == true)
+        let placeholder = HeadlessScan.Item(id: "x", group: "system", name: "X", size: 0, sizeIsUpperBound: false,
+                                            selectedByDefault: true, disposal: "delete", locked: true, reason: nil, entries: [])
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(placeholder)) as? [String: Any]
+        #expect(encoded?.keys.contains("durationMs") == false)
+        #expect(CommandLineTool.timingText(HeadlessScan.Report(version: "1", fullDiskAccess: true, scannedAt: "", total: 0,
+                                                               totalUpTo: 0, items: [])) == nil)
+        #expect(CommandLineTool.timingText(HeadlessScan.Report(version: "1", fullDiskAccess: true, scannedAt: "", total: 0,
+                                                               totalUpTo: 0, durationMs: 1260, items: []))
+                == "Scanned in 1.3 s.")
+    }
+
     /// Entries: largest first, at most 50, `~/` paths; a locked entry carries its reason and is left out of the size.
     @Test func itemEntriesAreCappedAndLockedOnesAnnotated() {
         let home = URL(filePath: "/Users/someone")

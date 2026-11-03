@@ -241,11 +241,13 @@ size is only a maximum, `sizeIsUpperBound`):
 
 ```json
 {
+  "durationMs" : 9840,
   "fullDiskAccess" : true,
   "items" : [
     {
       "dataLoss" : false,
       "disposal" : "delete",
+      "durationMs" : 412,
       "entries" : [
         { "path" : "~/Library/Caches/com.spotify.client", "size" : 651546624 }
       ],
@@ -272,6 +274,11 @@ may also have `records` (database rows a Privacy item erases) and `needsFullDisk
 read); an entry may have `records`, a `reason` when it alone is locked, and a `name` when its path is not a file (a
 Docker volume's name and driver, a simulator). `selectedByDefault` follows your own ticks
 in Smart Scan.
+
+`durationMs` is how long the scan took in milliseconds: the whole scan at the top, each item's own walk on the item
+(absent for an item that was not scanned, such as one waiting for Full Disk Access). Items are scanned at the same
+time, so their times overlap. The text output ends with the total and the three slowest items.
+`scripts/bench-scan.sh` (in the source repository) runs the scan three times and prints each item's median time.
 
 **Full Disk Access** belongs to the app that runs `cleanmate` (Terminal, iTerm, your AI agent's app), not to
 CleanMate. Without it the scan still runs, skips the folders macOS protects (as the app does), prints a note in text

@@ -74,6 +74,7 @@ Options for `space`, `large` and `dupes`:
     {
       "dataLoss" : false,
       "disposal" : "delete",
+      "durationMs" : 1830,
       "entries" : [ { "path" : "~/Library/Developer/Xcode/DerivedData/App-abc", "size" : 9100000000 } ],
       "group" : "dev",
       "id" : "xcode-derived-data",

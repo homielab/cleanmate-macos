@@ -127,6 +127,9 @@ scripts/smoke.sh
 
 # Compiler warnings in Debug and Release
 scripts/check-warnings.sh
+
+# Smart Scan time per item: median of 3 read-only scans of this Mac (never cleans)
+scripts/bench-scan.sh
 ```
 
 Or open `CleanMate/CleanMate.xcodeproj` in Xcode and press Run.
@@ -142,7 +145,7 @@ release notes come from the version's section in [CHANGELOG.md](CHANGELOG.md).
 - `CleanMate/CleanMate/AppIcon.icon` — the app icon (open it in Icon Composer).
 - `CleanMate/Info.plist` — Sparkle settings merged into the generated Info.plist: update feed URL and public EdDSA key.
 - `CleanMate/CleanMateTests/` — unit and end-to-end tests.
-- `scripts/` — smoke test, warning check, snapshot diff and release script.
+- `scripts/` — smoke test, warning check, scan benchmark, snapshot diff and release script.
 - `docs/` — detailed features and the README screenshots.
 
 ## Contributing

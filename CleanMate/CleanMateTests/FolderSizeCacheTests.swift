@@ -159,4 +159,32 @@ struct FolderSizeCacheTests {
             + Scanner.fileSize(transforms.appending(path: "def/output/classes.jar")))
         #expect(await scan() == measured)
     }
+
+    /// Gradle's entries are walked one level deeper in parallel (its `transforms` folders); the scan finds exactly what
+    /// the walk of each child on one thread finds: same entries, same sizes, a hard link counted once per entry.
+    @Test func gradleCachesSplitWalkFindsTheSame() async throws {
+        defer { try? fm.removeItem(at: root) }
+        let caches = home.appending(path: ".gradle/caches")
+        for (index, path) in ["9.4.1/transforms/abc/output/classes.jar", "9.4.1/transforms/def/output/a.jar",
+                              "9.4.1/transforms/def/metadata.bin", "9.4.1/kotlin-dsl/accessors/x.jar",
+                              "9.4.1/file-changes/last-build.bin", "modules-2/files-2.1/org/lib.jar",
+                              "modules-2/modules-2.lock", "jars-9/b.jar"].enumerated() {
+            try write(caches.appending(path: path), bytes: 4_096 * (index + 1))
+        }
+        try fm.linkItem(at: caches.appending(path: "9.4.1/transforms/abc/output/classes.jar"),
+                        to: caches.appending(path: "9.4.1/transforms/def/output/linked.jar"))
+        try fm.linkItem(at: caches.appending(path: "jars-9/b.jar"), to: caches.appending(path: "modules-2/b.jar"))
+        let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"))
+        func entries(split: Int?) async -> [String: Int64] {
+            var item = CleanerGroup.gradleCaches(sizes: FolderSizeCache(file: nil))
+            item.paths = [caches.path]
+            item.shellFolders = [:]
+            item.entrySplitDepth = split
+            let scan = await Scanner.scan(item, policy: policy, openPaths: EndToEndCleanTests.ownOpenPaths)
+            return Dictionary(uniqueKeysWithValues: scan.entries.map { ($0.url.lastPathComponent, $0.size) })
+        }
+        #expect(CleanerGroup.gradleCaches(sizes: FolderSizeCache(file: nil)).entrySplitDepth == 1)
+        let split = await entries(split: CleanerGroup.gradleSplitDepth), serial = await entries(split: nil)
+        #expect(split == serial && split.keys.sorted() == ["9.4.1", "jars-9", "modules-2"])
+    }
 }

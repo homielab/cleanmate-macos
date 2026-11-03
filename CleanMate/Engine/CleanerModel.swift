@@ -265,6 +265,10 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// How many levels inside an entry `entrySizes` looks for a change (`FolderSizeCache.Fingerprint`); 0 = the
     /// entry's own date and link count.
     var entrySizesDepth = 0
+    /// Folder levels below each entry's children read in parallel when it is walked (`Scanner.undatedTree`); nil = 0,
+    /// or `Scanner.splitDepth` for an item filtered by its probe. For an item with few entries holding one huge folder
+    /// each (Gradle's `transforms`), the scan's last walk otherwise. Same sizes either way.
+    var entrySplitDepth: Int? = nil
     /// Measures each folder entry as what removing it frees, with a new counter per entry (`FreeableBytes`): hard links
     /// into a store outside count 0, and APFS clones only their private bytes when the counter has `clones`.
     var freeableSize: (@Sendable (URL) -> FreeableBytes)? = nil

@@ -80,10 +80,13 @@ nonisolated enum HeadlessScan {
         var records: Int? = nil
         /// A folder could not be read without Full Disk Access; absent otherwise.
         var needsFullDiskAccess: Bool? = nil
+        /// Milliseconds this item's scan took (items are scanned at the same time, so they overlap); absent for an item
+        /// that was not scanned (one that needs Full Disk Access).
+        var durationMs: Int? = nil
 
         enum CodingKeys: String, CodingKey {
             case id, group, name, size, sizeIsUpperBound, selectedByDefault, disposal, dataLoss, locked, reason, entries,
-                 moreEntries, records, needsFullDiskAccess
+                 moreEntries, records, needsFullDiskAccess, durationMs
         }
 
         /// `reason` is written as `null` when there is none (the contract's field is always present).
@@ -103,6 +106,7 @@ nonisolated enum HeadlessScan {
             try container.encodeIfPresent(moreEntries, forKey: .moreEntries)
             try container.encodeIfPresent(records, forKey: .records)
             try container.encodeIfPresent(needsFullDiskAccess, forKey: .needsFullDiskAccess)
+            try container.encodeIfPresent(durationMs, forKey: .durationMs)
         }
     }
 
@@ -115,6 +119,8 @@ nonisolated enum HeadlessScan {
         var total: Int64
         /// The same for items whose size is only a maximum.
         var totalUpTo: Int64
+        /// Milliseconds the whole scan took; absent in reports written before it was measured.
+        var durationMs: Int? = nil
         var items: [Item]
     }
 
@@ -265,6 +271,7 @@ nonisolated enum HeadlessScan {
 
     /// `scan`, with each reported item's catalog item and scan (by id; absent for the Full Disk Access placeholders).
     static func scanned(_ options: Options, sources: Sources) async -> (report: Report, items: [String: Scanned]) {
+        let started = ContinuousClock.now
         let hasAccess = sources.hasFullDiskAccess()
         let policy = sources.policy()
         let only = options.only.map(Set.init)
@@ -289,23 +296,28 @@ nonisolated enum HeadlessScan {
         let openFiles = OpenFiles(read: sources.readOpenFiles) // read when the first item needs it, if any does
         let openPaths: OpenPaths = { await openFiles.paths(under: $0) }
         let scanItem = sources.scanItem, blockedByExclusion = sources.blockedByExclusion
-        let results = await withTaskGroup(of: (String, ItemScan, Bool).self) { tasks in
+        let results = await withTaskGroup(of: (String, ItemScan, Bool, Duration).self) { tasks in
             for item in groups.flatMap(\.items) {
-                tasks.addTask { (item.id, await scanItem(item, policy, openPaths), await blockedByExclusion(item, policy)) }
+                tasks.addTask {
+                    let start = ContinuousClock.now
+                    let scan = await scanItem(item, policy, openPaths), blocked = await blockedByExclusion(item, policy)
+                    return (item.id, scan, blocked, ContinuousClock.now - start)
+                }
             }
-            return await tasks.reduce(into: [String: (ItemScan, Bool)]()) { $0[$1.0] = ($1.1, $1.2) }
+            return await tasks.reduce(into: [String: (ItemScan, Bool, Duration)]()) { $0[$1.0] = ($1.1, $1.2, $1.3) }
         }
 
         var items: [Item] = []
         var details: [String: Scanned] = [:]
         for group in groups {
             let scanned = group.items.compactMap { item -> (Item, Int)? in
-                guard let (scan, blocked) = results[item.id],
+                guard let (scan, blocked, duration) = results[item.id],
                       item.showsWhenEmpty || scan.hasData || scan.permissionDenied || only?.contains(item.id) == true
                 else { return nil }
                 let running = item.runningBlocker(apps: apps.keys, processes: processes).map { apps[$0] ?? $0 }
-                let report = report(item, group: group.id, scan: scan, blocked: blocked, running: running,
+                var report = report(item, group: group.id, scan: scan, blocked: blocked, running: running,
                                     selected: overrides[item.id] ?? item.selectedByDefault, home: policy.homeURL)
+                report.durationMs = milliseconds(duration)
                 details[item.id] = Scanned(item: item, scan: scan)
                 return (report, scan.records ?? 0)
             }
@@ -335,8 +347,15 @@ nonisolated enum HeadlessScan {
         let report = Report(version: sources.version(), fullDiskAccess: hasAccess,
                       scannedAt: sources.now().formatted(.iso8601),
                       total: counted.filter { !$0.sizeIsUpperBound }.reduce(0) { $0 + $1.size },
-                      totalUpTo: counted.filter(\.sizeIsUpperBound).reduce(0) { $0 + $1.size }, items: items)
+                      totalUpTo: counted.filter(\.sizeIsUpperBound).reduce(0) { $0 + $1.size },
+                      durationMs: milliseconds(ContinuousClock.now - started), items: items)
         return (report, details)
+    }
+
+    /// Whole milliseconds, rounded.
+    static func milliseconds(_ duration: Duration) -> Int {
+        let (seconds, attoseconds) = duration.components
+        return Int(seconds) * 1000 + Int((Double(attoseconds) / 1e15).rounded())
     }
 
     static let needsAccess = "Needs Full Disk Access"

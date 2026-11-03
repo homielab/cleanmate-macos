@@ -434,12 +434,18 @@ extension CleanerGroup {
     /// up to 2 levels inside it changed: Gradle adds a folder per transform, jar, download or build-cache entry
     /// there, and rewrites its index files (`modules-2/metadata-*/*.bin`) there, so a build that wrote anything new
     /// is measured again; a Gradle version no build uses any more is read from the cache.
+    /// Levels inside each entry's folders walked in parallel (`CleanerItem.entrySplitDepth`): a Gradle version's
+    /// `transforms` holds ~20 k folders and ~160 k files, one thread's walk otherwise. Measured alone on 550 k files:
+    /// 0 → 4.3 s, 1 → 2.7 s, 2 → 3.7 s, 3 → 4.0 s (deeper splits cost more tasks than they save).
+    nonisolated static let gradleSplitDepth = 1
+
     nonisolated static func gradleCaches(sizes: FolderSizeCache = .shared) -> CleanerItem {
         var item = dev("gradle-caches", "Gradle caches", note: "Dependency and build caches, downloaded again on the next build",
                        ["~/.gradle/caches"], shell: ["GRADLE_USER_HOME": ["caches"]],
                        processes: ["GradleDaemon", "KotlinCompileDaemon"])
         item.entrySizes = sizes
         item.entrySizesDepth = 2
+        item.entrySplitDepth = gradleSplitDepth
         return item
     }
 

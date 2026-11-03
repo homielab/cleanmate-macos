@@ -567,10 +567,20 @@ nonisolated enum CommandLineTool {
         text += "\n" + style.bold("Ticked by default: \(size(report.total))")
             + (report.totalUpTo > 0 ? " (+ up to \(size(report.totalUpTo)))" : "") + "\n"
         text += style.dim("[x] ticked, [ ] not ticked, [-] locked. Nothing was deleted: clean in CleanMate.") + "\n"
+        if let timing = timingText(report) { text += style.dim(timing) + "\n" }
         if !report.fullDiskAccess {
             text += style.yellow("Note: no Full Disk Access, so folders macOS protects were skipped (see `cleanmate --help`).") + "\n"
         }
         return text
+    }
+
+    /// "Scanned in 4.2 s; slowest: …" with the three slowest items (`--json`: `durationMs`); nil when not measured.
+    static func timingText(_ report: HeadlessScan.Report) -> String? {
+        guard let total = report.durationMs else { return nil }
+        func seconds(_ ms: Int) -> String { String(format: "%.1f s", Double(ms) / 1000) }
+        let slowest = report.items.compactMap { item in item.durationMs.map { (item.name, $0) } }
+            .sorted { $0.1 > $1.1 }.prefix(3).map { "\($0.0) \(seconds($0.1))" }
+        return "Scanned in \(seconds(total))" + (slowest.isEmpty ? "." : "; slowest: " + slowest.joined(separator: ", ") + ".")
     }
 
     static func cleanText(_ report: HeadlessClean.Report, color: Bool) -> String {
