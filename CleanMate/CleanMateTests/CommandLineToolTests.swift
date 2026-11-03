@@ -641,6 +641,46 @@ extension CommandLineToolTests {
         #expect(media2.path == fixture.real + "/Media" && media2.items.first?.name == "build-link.bin")
     }
 
+    /// The startup disk's data volume shares the system volume's device number: `space` knows it from the policy's
+    /// mount points, never enters nor counts it, and lists it as a volume. `large`, `dupes` and `similar` never start
+    /// from "/" (and skip any volume inside their folder by `isVolume`, which the data volume has).
+    @Test func spaceNeverCountsAMountedVolumeAgain() async throws {
+        let fixture = try FilesFixture()
+        let disk = fixture.root.appending(path: "Disk")
+        for (path, bytes) in ["System/Library/k.bin": 40_960, "System/Volumes/Data/whole.bin": 3_002_368, "Users/u.bin": 409_600] {
+            let url = disk.appending(path: path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(repeating: 7, count: bytes).write(to: url)
+        }
+        let real = try #require(HeadlessFiles.realPath(disk.path))
+        let data = real + "/System/Volumes/Data"
+        let unmounted = fixture.sources(fullDiskAccess: true)
+        let base = unmounted.policy()
+        let policy = SafetyPolicy(home: base.homeURL, temp: base.tempURL, mounts: { ["/", data] })
+        var sources = unmounted
+        sources.policy = { policy }
+
+        let top = try await Self.spaceReport([disk.path], sources)
+        let system = try #require(top.items.first { $0.name == "System" }?.size)
+        #expect(system < 1_000_000 && top.size < 1_000_000, "whole.bin counted inside /System")
+        #expect(top.items.map(\.name) == ["Users", "System"] && top.items.allSatisfy { $0.kind == "folder" })
+        let volumes = try await Self.spaceReport([real + "/System/Volumes"], sources)
+        let volume = try #require(volumes.items.first)
+        #expect(volumes.items.count == 1 && volume.name == "Data" && volume.path == data && volume.kind == "volume")
+        #expect(volume.size == nil && !volume.skipped && volume.reason == HeadlessScan.mountedVolume)
+        #expect(volumes.size < 100_000 && volumes.moreItems == 0 && volumes.skipped.isEmpty)
+        let (code, text) = await Self.run(["space", real + "/System/Volumes"], sources)
+        #expect(code == 0 && text.stdout.contains("Data/") && text.stdout.contains("mounted volume, not counted"))
+        // Not a mount point: the same folder is counted.
+        let counted = try await Self.spaceReport([disk.path], unmounted)
+        #expect(counted.size > 3_000_000 && counted.items.first?.name == "System")
+
+        for arguments in [["large", "--in", "/"], ["dupes", "--in", "/"], ["similar", "/"]] {
+            let (code, printed) = await Self.run(arguments, sources)
+            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.contains("can't be searched"), "\(arguments)")
+        }
+    }
+
     @Test func withoutFullDiskAccessProtectedFoldersAreSkippedAndNeverOpened() async throws {
         let fixture = try FilesFixture()
         let report = try await Self.spaceReport([fixture.home.path], fixture.sources())

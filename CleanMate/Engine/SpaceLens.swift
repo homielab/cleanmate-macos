@@ -93,6 +93,13 @@ nonisolated enum SpaceLens {
         }
     }
 
+    /// The paths of `mounts` (mount points, as `SafetyPolicy.mountPoints` lists them) that `list` and `measure` treat as
+    /// another volume: "/" left out (it holds every folder), each also without its `/private` (/private/var/vm, /var/vm).
+    static func mountPoints(_ mounts: [String]) -> Set<String> {
+        let mounts = mounts.filter { $0 != "/" }
+        return Set(mounts + mounts.map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+    }
+
     /// Direct children of `folder`, hidden ones included (they take space too). Files carry their size; folders
     /// (not symlinks to folders) have nil, to be filled by `measure`. Unreadable folder → empty.
     /// A folder on another device than `folder`, or in `mounts`, is a mount point. The system and data volumes of the

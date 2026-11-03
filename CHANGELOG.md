@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
 
 ### Fixed
+- `cleanmate space /` no longer counts the startup disk's data volume a second time inside /System: another volume mounted in a folder is listed as a mounted volume and left out of the total, as in Space Lens.
 - **Uninstaller**: an App Store app macOS won't let CleanMate move no longer brings up an unexplained password prompt; CleanMate says to remove it in Launchpad or drag it to the Trash in Finder, with **Reveal in Finder**.
 - **Space Lens**: a volume mounted inside a folder is no longer measured with it — /System no longer counts the whole data volume again, and network shares in your home folder are not walked.
 

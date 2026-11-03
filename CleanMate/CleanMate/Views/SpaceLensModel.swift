@@ -16,10 +16,7 @@ final class SpaceLensModel: ObservableObject {
     /// Injectable for tests.
     var disk = URL(fileURLWithPath: "/")
     /// Paths volumes are mounted on, "/" left out: never measured inside a folder. Injectable for tests.
-    var mountPoints: () -> Set<String> = {
-        let mounts = SafetyPolicy.mountPoints().filter { $0 != "/" }
-        return Set(mounts + mounts.map { URL(fileURLWithPath: $0).standardizedFileURL.path }) // /private/var/… and /var/…
-    }
+    var mountPoints: () -> Set<String> = { SpaceLens.mountPoints(SafetyPolicy.mountPoints()) }
     /// Where browsing started (home, a drive, the startup disk or a chosen folder); `path` holds the folders opened below it.
     @Published private(set) var root = SafetyPolicy.current.homeURL
     @Published private(set) var path: [URL] = []

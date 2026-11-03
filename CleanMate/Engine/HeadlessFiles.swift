@@ -66,7 +66,9 @@ nonisolated enum HeadlessFiles {
         var name: String
         /// Allocated bytes; nil when `skipped`.
         var size: Int64?
-        /// "folder" or "file" (a symlink is a file: it is not followed).
+        /// "folder", "file" (a symlink is a file: it is not followed) or "volume": another volume is mounted here
+        /// (the startup disk's data volume in /System/Volumes, a drive, a network share), never measured: `size` nil,
+        /// not in the total, `reason` says so.
         var kind: String
         /// A folder macOS protects, not read without Full Disk Access.
         var skipped: Bool
@@ -95,7 +97,7 @@ nonisolated enum HeadlessFiles {
         var path: String
         /// Allocated bytes of the whole folder, without what `skipped` holds.
         var size: Int64
-        /// The biggest children first (at most the limit), then the skipped ones.
+        /// The biggest children first (at most the limit), then the skipped ones, then the mounted volumes.
         var items: [SpaceChild]
         /// Children left out by the limit, and their bytes.
         var moreItems: Int
@@ -329,17 +331,21 @@ nonisolated enum HeadlessFiles {
     }
 
     /// Children of `folder` by size, like Space Lens lists it: one `HardLinks` for the listing, protected folders
-    /// left out without Full Disk Access.
+    /// left out without Full Disk Access, mount points (the policy's) never entered nor counted: the startup disk's
+    /// data volume shares the system volume's device number, so the same-device rule alone would count it again
+    /// inside /System.
     static func space(_ folder: URL, limit: Int, sources: HeadlessScan.Sources) async -> SpaceReport {
         let access = sources.hasFullDiskAccess()
-        let home = sources.policy().homeURL
-        let skipping = protectedFolders(home: home, hasFullDiskAccess: access)
+        let policy = sources.policy()
+        let skipping = protectedFolders(home: policy.homeURL, hasFullDiskAccess: access)
+        let mounts = SpaceLens.mountPoints(policy.mounts())
+        let fenced = skipping.union(mounts)
         let links = SpaceLens.HardLinks()
-        var listed = await SpaceLens.list(folder, links: links)
+        var listed = await SpaceLens.list(folder, links: links, mounts: mounts)
         let isProtected = { (item: SpaceItem) in skipping.contains(item.url.standardizedFileURL.path) }
         let sizes = await withTaskGroup(of: (URL, Int64).self) { group in
-            for item in listed where item.isFolder && !isProtected(item) {
-                group.addTask { (item.url, (try? await SpaceLens.measure(item.url, links: links, skipping: skipping))?.size ?? 0) }
+            for item in listed where item.isFolder && !isProtected(item) && !item.isMountPoint {
+                group.addTask { (item.url, (try? await SpaceLens.measure(item.url, links: links, skipping: fenced))?.size ?? 0) }
             }
             return await group.reduce(into: [URL: Int64]()) { $0[$1.0] = $1.1 }
         }
@@ -347,7 +353,7 @@ nonisolated enum HeadlessFiles {
             listed[index].isProtected = isProtected(listed[index])
             listed[index].size = sizes[listed[index].url]
         }
-        let measured = listed.filter { !$0.isProtected }
+        let measured = listed.filter { !$0.isProtected && !$0.isMountPoint }
             .sorted { ($0.size ?? 0, $1.name) > ($1.size ?? 0, $0.name) }
         let shown = measured.prefix(limit)
         let rest = measured.dropFirst(shown.count)
@@ -358,6 +364,8 @@ nonisolated enum HeadlessFiles {
                       skipped: false, reason: nil)
         } + listed.filter(\.isProtected).sorted { $0.name < $1.name }.map { item in
             SpaceChild(path: item.url.path, name: item.name, size: nil, kind: "folder", skipped: true, reason: HeadlessScan.needsAccess)
+        } + listed.filter { $0.isMountPoint && !$0.isProtected }.sorted { $0.name < $1.name }.map { item in
+            SpaceChild(path: item.url.path, name: item.name, size: nil, kind: "volume", skipped: false, reason: HeadlessScan.mountedVolume)
         }
         return SpaceReport(version: sources.version(), fullDiskAccess: access, scannedAt: sources.now().formatted(.iso8601),
                            path: folder.path, size: ownSize + measured.reduce(0) { $0 + ($1.size ?? 0) }, items: items,

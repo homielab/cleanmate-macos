@@ -674,9 +674,11 @@ nonisolated enum CommandLineTool {
         let style = Style(color: color)
         var text = style.bold("\(shown(report.path, home: home))  \(size(report.size))") + "\n"
         for item in report.items {
-            let name = item.name + (item.kind == "folder" ? "/" : "")
+            let name = item.name + (item.kind == "file" ? "" : "/")
             if item.skipped {
                 text += "  \(rightAligned("–", 10))  \(name)  " + style.yellow("skipped: \(item.reason ?? HeadlessScan.needsAccess)") + "\n"
+            } else if item.kind == "volume" {
+                text += "  \(rightAligned("–", 10))  \(name)  " + style.dim("mounted volume, not counted") + "\n"
             } else {
                 text += "  \(rightAligned(size(item.size ?? 0), 10))  \(name)\n"
             }

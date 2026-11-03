@@ -194,7 +194,8 @@ and the numbers are what a clean would free.
     { "kind" : "folder", "name" : "Developer", "path" : "/Users/me/Developer", "reason" : null, "size" : 96000000000, "skipped" : false },
     { "kind" : "folder", "name" : "Movies", "path" : "/Users/me/Movies", "reason" : null, "size" : 38000000000, "skipped" : false },
     { "kind" : "file", "name" : "backup.zip", "path" : "/Users/me/backup.zip", "reason" : null, "size" : 2100000000, "skipped" : false },
-    { "kind" : "folder", "name" : "Documents", "path" : "/Users/me/Documents", "reason" : "Needs Full Disk Access", "size" : null, "skipped" : true }
+    { "kind" : "folder", "name" : "Documents", "path" : "/Users/me/Documents", "reason" : "Needs Full Disk Access", "size" : null, "skipped" : true },
+    { "kind" : "volume", "name" : "OrbStack", "path" : "/Users/me/OrbStack", "reason" : "Another volume is mounted here: not counted", "size" : null, "skipped" : false }
   ],
   "moreItems" : 9,
   "moreSize" : 4200000000,
@@ -209,7 +210,9 @@ and the numbers are what a clean would free.
 ```
 
 `size` is the whole folder without the skipped ones, hard links counted once. Skipped folders come after the measured
-ones, with `size` `null`.
+ones, with `size` `null`. Last come mount points (`kind` `volume`: another volume mounted there, such as the startup
+disk's data volume in `/System/Volumes`, a drive or a network share), with `size` `null` and not counted in `size`:
+their files are counted where the volume is browsed, so `cleanmate space /` adds up to the disk's used space.
 
 ## `large --json` (shortened)
 

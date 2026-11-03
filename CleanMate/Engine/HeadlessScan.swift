@@ -365,6 +365,7 @@ nonisolated enum HeadlessScan {
     }
 
     static let needsAccess = "Needs Full Disk Access"
+    static let mountedVolume = "Another volume is mounted here: not counted"
     static let blockedReason = "Blocked by a folder in Exclusions"
 
     /// One scanned item as the app would show and clean it.
