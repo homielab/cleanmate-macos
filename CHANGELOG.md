@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan** and **Privacy**: **Clean…** / **Erase…** first opens a review of everything ticked, by group, with each item's size and whether it goes to the Trash or is deleted permanently, the total of each, and what will be skipped; untick anything there before cleaning.
+- **Smart Scan** and **Privacy**: search the results with ⌘F by item name or file path; ⌘A / ⇧⌘A tick or untick the whole group of the selected row.
 - **Large & Old Files › Similar Photos**: groups photos that look alike (bursts, edits, resized or recompressed copies), compared on this Mac with Vision; each group suggests the photo to keep, nothing is ticked for you, and moved photos can be put back with `cleanmate restore`. Photos libraries and apps are never read. Stop ends the search at once, even while photos are being analyzed.
 - `cleanmate similar [PATH…] [--json]` lists the same groups of similar photos from the command line, with the photo suggested to keep; move the ones you pick with `cleanmate trash` and put them back with `cleanmate restore`. The Agent Skill uses it too.
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.

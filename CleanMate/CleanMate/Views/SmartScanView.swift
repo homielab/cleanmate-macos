@@ -5,7 +5,9 @@ import SwiftUI
 struct SmartScanView: View {
     @ObservedObject var model: SmartScanModel
     let module: Module
-    @State private var confirming = false
+    /// Clean… opens the review of what is ticked (`reviewIDs`) before anything is removed.
+    @State private var reviewing = false
+    @State private var reviewIDs: Set<String> = []
     @State private var excludedCount = 0
     @State private var hasFullDiskAccess = FullDiskAccess.isGranted
     /// Idle-screen overview source; snapshots inject fixed values instead of reading the disk.
@@ -139,12 +141,16 @@ struct SmartScanView: View {
                     OpenSettingsButton().controlSize(.small)
                 }
             }
-            ForEach(model.visibleGroups) { group in
+            if model.isSearching && model.shownGroups.isEmpty {
+                Text("No matching items").foregroundStyle(.secondary)
+            }
+            ForEach(model.shownGroups) { group in
                 // Bars compare items within their group: one huge item (DerivedData) would flatten every bar list-wide.
                 let largest = group.items.compactMap { model.scans[$0.id]?.size }.max() ?? 0
                 // Section(isExpanded:) needs macOS 14; the header draws the disclosure arrow anyway.
                 Section {
-                    if !model.collapsedGroups.contains(group.id) {
+                    // A search shows what it finds in folded groups too.
+                    if model.isSearching || !model.collapsedGroups.contains(group.id) {
                         ForEach(group.items) { item in
                             CleanerItemRow(item: item, scan: model.scans[item.id], isOn: selection(item),
                                            isRunning: model.isRunning(item), isBlocked: model.blocked.contains(item.id),
@@ -155,7 +161,8 @@ struct SmartScanView: View {
                                            highlight: { model.highlighted = [item.id] },
                                            neverClean: { url in
                                                if model.neverClean(item, url) { excludedCount += 1 }
-                                           })
+                                           },
+                                           entryFilter: entryFilter(item))
                                 .tag(item.id)
                         }
                     }
@@ -169,6 +176,11 @@ struct SmartScanView: View {
             model.toggle(ids: model.highlighted)
             return true
         }
+        .onSelectAllKeys { on in
+            model.setFocusedGroups(on)
+            return true
+        }
+        .onFindKey { focusToolbarSearch(in: $0) }
         .exclusionNotice(excludedCount)
         .safeAreaInset(edge: .bottom) {
             HStack {
@@ -186,30 +198,21 @@ struct SmartScanView: View {
                 } else {
                     scanButton("Scan Again")
                 }
-                Button(module == .privacy ? LocalizedStringKey("Erase…") : "Clean…") { confirming = true }
+                Button(module == .privacy ? LocalizedStringKey("Erase…") : "Clean…") {
+                    reviewIDs = model.selectedIDs
+                    reviewing = true
+                }
                     .keyboardShortcut(.defaultAction)
                     .disabled(isScanning || !model.hasSelection)
             }
             .padding()
             .background(.bar)
         }
-        .focusedSceneValue(\.confirming, confirming)
-        .confirmationDialog(
-            module == .privacy ? Text("Erase the selected data?")
-                : Text("Clean \(selectedTotal)?"),
-            isPresented: $confirming
-        ) {
-            Button(module == .privacy ? LocalizedStringKey("Erase") : "Clean", role: .destructive) { Task { await model.clean() } }
-        } message: {
-            switch module {
-            case .smartScan:
-                Text("Selected items are deleted permanently, except those marked “Moved to the Trash”. Apps and tools recreate caches as needed.")
-            case .privacy:
-                Text("Selected data is deleted permanently, not moved to the Trash, and cannot be recovered. Erasing cookies signs you out of websites.")
-            case .overview, .largeFiles, .uninstaller, .spaceLens, .loginItems, .maintenance:
-                EmptyView()
-            }
+        .focusedSceneValue(\.confirming, reviewing)
+        .sheet(isPresented: $reviewing) {
+            CleanReviewSheet(model: model, module: module, ids: reviewIDs)
         }
+        .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Results"))
     }
 
     private var isScanning: Bool {
@@ -245,8 +248,9 @@ struct SmartScanView: View {
         return total.size == 0 && total.upTo == 0 ? recordsText : Text("\(bytes) + \(recordsText)")
     }
 
+    /// Open while a search shows what it finds in the group, even one folded away.
     private func expanded(_ group: CleanerGroup) -> Binding<Bool> {
-        Binding { !model.collapsedGroups.contains(group.id) } set: { open in
+        Binding { model.isSearching || !model.collapsedGroups.contains(group.id) } set: { open in
             if open { model.collapsedGroups.remove(group.id) } else { model.collapsedGroups.insert(group.id) }
         }
     }
@@ -257,7 +261,7 @@ struct SmartScanView: View {
         let allOn = model.isAllSelected(group)
         let canSelect = !model.selectableItems(in: group).isEmpty
         let isExpanded = expanded(group)
-        let set = { (on: Bool) in model.setSelected(group, on) }
+        let set = { (on: Bool) in model.setShown([group], on) } // `group` holds only what a search finds
         // Two sources that disagree make the checkbox mixed: some items ticked, not all.
         let sources = [Binding { model.isAnySelected(group) } set: { set($0) }, Binding { allOn } set: { set($0) }]
         return HStack {
@@ -327,6 +331,11 @@ struct SmartScanView: View {
         Binding(get: { model.selected.contains(item.id) }, set: { model.setSelected(item, $0) })
     }
 
+    /// The entries a search finds of an item found only by some of them; nil lists them all.
+    private func entryFilter(_ item: CleanerItem) -> Set<URL>? {
+        if case .entries(let urls) = model.searchMatch(item) { urls } else { nil }
+    }
+
     private func entrySelection(_ item: CleanerItem, _ url: URL) -> Binding<Bool> {
         Binding(get: { model.isEntrySelected(item, url) }, set: { model.setEntry(item, url, $0) })
     }
@@ -355,6 +364,8 @@ struct CleanerItemRow: View {
     var highlight: (() -> Void)? = nil
     /// "Never Clean This" on an entry; nil hides it (UISnapshots).
     var neverClean: ((URL) -> Void)? = nil
+    /// A search found the item by these entries only: just they are listed, unfolded. nil lists every entry.
+    var entryFilter: Set<URL>? = nil
 
     // shortcut: only the largest entries are listed (the rest get one summary row), so huge folders don't slow the List; add paging if users need all.
     private let shownLimit = 200
@@ -415,13 +426,14 @@ struct CleanerItemRow: View {
     }
 
     var body: some View {
-        let entries = scan?.entries ?? []
+        let all = scan?.entries ?? []
+        let entries = entryFilter.map { found in all.filter { found.contains($0.url) } } ?? all
         DisclosureGroup(isExpanded: $isExpanded) {
             // Selectable items list every entry: none is cleaned without being seen.
             let shown = entryOn == nil ? Array(entries.prefix(shownLimit)) : entries
             ForEach(shown) { entry in
                 let on = entryOn?(entry.url)
-                let shared = Self.sharedText(entry: entry, in: entries, label: item.entryLabel, locale: locale)
+                let shared = Self.sharedText(entry: entry, in: all, label: item.entryLabel, locale: locale)
                 let entryLocked = isLocked || entry.lockReason != nil
                 HStack {
                     if let on {
@@ -502,7 +514,9 @@ struct CleanerItemRow: View {
                         // Icon on the title line, so it lines up with the checkbox; the note sits under the title.
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 6) {
-                                icon.frame(width: 16, height: 16).accessibilityHidden(true)
+                                CleanerItemIcon(item: item, groupImage: groupImage)
+                                    .frame(width: 16, height: 16)
+                                    .accessibilityHidden(true)
                                 Text(item.title)
                             }
                             if let note = item.note {
@@ -566,12 +580,7 @@ struct CleanerItemRow: View {
             }
             .padding(.leading, 2) // room between the disclosure arrow and the checkbox
         }
-    }
-
-    @MainActor private static func appIcon(_ bundleID: String) -> NSImage? {
-        IconCache.image("app:" + bundleID) {
-            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { NSWorkspace.shared.icon(forFile: $0.path) }
-        }
+        .onAppearAndChange(of: entryFilter) { if $0 != nil { isExpanded = true } } // show the entries found
     }
 
     private var isLocked: Bool {
@@ -594,15 +603,6 @@ struct CleanerItemRow: View {
             Text(verbatim: reason)
         } else {
             nil
-        }
-    }
-
-    /// The app's own icon when the item belongs to an installed app, else the group's symbol.
-    @ViewBuilder private var icon: some View {
-        if let image = item.runningAppBundleIDs.lazy.compactMap(Self.appIcon).first {
-            Image(nsImage: image).resizable()
-        } else {
-            Image(systemName: groupImage).foregroundStyle(.secondary)
         }
     }
 }

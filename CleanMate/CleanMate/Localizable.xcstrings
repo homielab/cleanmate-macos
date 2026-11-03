@@ -1,6 +1,16 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ deleted permanently and can’t be recovered." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ bị xoá hẳn, không thể khôi phục."
+          }
+        }
+      }
+    },
     "%@ free of %@" : {
       "localizations" : {
         "vi" : {
@@ -17,6 +27,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Trống %1$@ ngày %2$@ → %3$@ ngày %4$@."
+          }
+        }
+      }
+    },
+    "%@ to the Trash: you can put it back with Undo or from the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vào Thùng rác: lấy lại được bằng Hoàn tác hoặc từ Thùng rác."
           }
         }
       }
@@ -71,6 +91,16 @@
         }
       }
     },
+    "%lld in use or locked, skipped" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mục đang dùng hoặc bị khoá, bỏ qua"
+          }
+        }
+      }
+    },
     "%lld of %lld photos" : {
       "localizations" : {
         "vi" : {
@@ -107,6 +137,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bạn có thể đổi tất cả những mục này sau trong Cài đặt."
+          }
+        }
+      }
+    },
+    "Apps and tools recreate caches as needed." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
           }
         }
       }
@@ -151,6 +191,16 @@
         }
       }
     },
+    "Deleted permanently" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá hẳn"
+          }
+        }
+      }
+    },
     "Download history (Gatekeeper)" : {
       "localizations" : {
         "vi" : {
@@ -177,6 +227,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã bỏ bản tải về: giải phóng %@"
+          }
+        }
+      }
+    },
+    "Erasing cookies signs you out of websites." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá cookie sẽ đăng xuất bạn khỏi các trang web."
           }
         }
       }
@@ -2365,6 +2425,26 @@
         }
       }
     },
+    "Review Before Cleaning" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem lại trước khi dọn"
+          }
+        }
+      }
+    },
+    "Review Before Erasing" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem lại trước khi xoá"
+          }
+        }
+      }
+    },
     "Ruby versions other than rbenv's global one, installed again with rbenv install" : {
       "localizations" : {
         "vi" : {
@@ -2409,6 +2489,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ảnh chụp và bản quay màn hình không sửa hay mở trong %lld ngày. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "Search Results" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm trong kết quả"
           }
         }
       }
@@ -2517,6 +2607,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bỏ qua"
+          }
+        }
+      }
+    },
+    "Skipped" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ qua"
+          }
+        }
+      }
+    },
+    "Some entries left out" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã bỏ chọn một số mục con"
           }
         }
       }
@@ -2717,6 +2827,16 @@
         }
       }
     },
+    "To the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vào Thùng rác"
+          }
+        }
+      }
+    },
     "Toolchains other than rustup's default and overrides, installed again with rustup toolchain install" : {
       "localizations" : {
         "vi" : {
@@ -2813,6 +2933,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hiện tất cả ứng dụng"
+          }
+        }
+      }
+    },
+    "Untick anything you want to keep." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ chọn những gì bạn muốn giữ lại."
           }
         }
       }
@@ -3875,16 +4005,6 @@
         }
       }
     },
-    "Clean %@?" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dọn %@?"
-          }
-        }
-      }
-    },
     "Clean…" : {
       "localizations" : {
         "vi" : {
@@ -4520,16 +4640,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xoá lịch sử duyệt web, cookie và dữ liệu biểu mẫu theo từng trình duyệt, mục gần đây và lịch sử shell. Mật khẩu, dấu trang và tiện ích mở rộng không bao giờ bị đụng tới."
-          }
-        }
-      }
-    },
-    "Erase the selected data?" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xoá dữ liệu đã chọn?"
           }
         }
       }
@@ -6264,26 +6374,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chọn một ứng dụng để xem các tệp của nó trong Library. Ứng dụng và các tệp còn được đánh dấu sẽ được chuyển vào Thùng rác. Ứng dụng của Apple không được liệt kê."
-          }
-        }
-      }
-    },
-    "Selected data is deleted permanently, not moved to the Trash, and cannot be recovered. Erasing cookies signs you out of websites." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dữ liệu đã chọn bị xoá vĩnh viễn, không vào Thùng rác và không thể khôi phục. Xoá cookie sẽ đăng xuất bạn khỏi các trang web."
-          }
-        }
-      }
-    },
-    "Selected items are deleted permanently, except those marked “Moved to the Trash”. Apps and tools recreate caches as needed." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Các mục đã chọn bị xoá vĩnh viễn, trừ các mục ghi “Chuyển vào Thùng rác”. Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
           }
         }
       }

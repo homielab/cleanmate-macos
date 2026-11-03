@@ -601,34 +601,60 @@ extension View {
     /// false to let the key through. An AppKit key monitor, installed while the view is in a window: SwiftUI's
     /// key-press modifier needs macOS 14.
     func onSpaceKey(_ action: @escaping () -> Bool) -> some View {
-        modifier(SpaceKeyModifier(action: action))
+        modifier(ListKeyModifier(keys: .space) { _ in action() })
+    }
+
+    /// ⌘A (`action(true)`) and ⇧⌘A (`action(false)`) on this list while it has the keyboard focus, like `onSpaceKey`:
+    /// a search field or other text keeps ⌘A for its text.
+    func onSelectAllKeys(_ action: @escaping (Bool) -> Bool) -> some View {
+        modifier(ListKeyModifier(keys: .selectAll) { action(!$0.modifierFlags.contains(.shift)) })
+    }
+
+    /// ⌘F anywhere in the window while this view is shown and no confirmation is: `action` gets the window, puts the
+    /// focus in the search field (`focusToolbarSearch(in:)`) and returns true, or false to let the key through.
+    func onFindKey(_ action: @escaping (NSWindow?) -> Bool) -> some View {
+        modifier(ListKeyModifier(keys: .find) { action($0.window) })
     }
 }
 
-private struct SpaceKeyModifier: ViewModifier {
-    let action: () -> Bool
+/// Moves the keyboard focus to the window's toolbar search field (`.searchable(placement: .toolbar)`), as ⌘F does in
+/// Finder; false when the window has none.
+@MainActor func focusToolbarSearch(in window: NSWindow?) -> Bool {
+    guard let item = window?.toolbar?.items.lazy.compactMap({ $0 as? NSSearchToolbarItem }).first else { return false }
+    item.beginSearchInteraction()
+    return true
+}
+
+private struct ListKeyModifier: ViewModifier {
+    let keys: ListKeyMonitorView.Keys
+    let action: (NSEvent) -> Bool
     @FocusedValue(\.confirming) private var confirming
 
     func body(content: Content) -> some View {
-        content.background(SpaceKeyMonitor(action: action, blocked: confirming == true))
+        content.background(ListKeyMonitor(keys: keys, action: action, blocked: confirming == true))
     }
 }
 
 /// An empty view behind the list; its frame tells which list in the window it belongs to.
-private struct SpaceKeyMonitor: NSViewRepresentable {
-    let action: () -> Bool
+private struct ListKeyMonitor: NSViewRepresentable {
+    let keys: ListKeyMonitorView.Keys
+    let action: (NSEvent) -> Bool
     let blocked: Bool
 
-    func makeNSView(context: Context) -> SpaceKeyMonitorView { SpaceKeyMonitorView() }
+    func makeNSView(context: Context) -> ListKeyMonitorView { ListKeyMonitorView() }
 
-    func updateNSView(_ view: SpaceKeyMonitorView, context: Context) {
+    func updateNSView(_ view: ListKeyMonitorView, context: Context) {
+        view.keys = keys
         view.action = action
         view.blocked = blocked
     }
 }
 
-final class SpaceKeyMonitorView: NSView {
-    var action: () -> Bool = { false }
+final class ListKeyMonitorView: NSView {
+    /// Space; ⌘A and ⇧⌘A; or ⌘F.
+    enum Keys { case space, selectAll, find }
+    var keys = Keys.space
+    var action: (NSEvent) -> Bool = { _ in false }
     var blocked = false
     private var monitor: Any?
 
@@ -639,7 +665,7 @@ final class SpaceKeyMonitorView: NSView {
         if window != nil, monitor == nil {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 guard let self, self.handles(event) else { return event }
-                return self.action() ? nil : event
+                return self.action(event) ? nil : event
             }
         } else if window == nil, let monitor {
             NSEvent.removeMonitor(monitor)
@@ -647,12 +673,22 @@ final class SpaceKeyMonitorView: NSView {
         }
     }
 
-    /// Space without ⌘, ⌥ or ⌃ in this view's window, no sheet or confirmation shown, and the focused view is the
-    /// table (SwiftUI `List` and `Table` are `NSTableView`s) this view sits behind, not another list in the window.
+    /// The key in this view's window, no sheet or confirmation shown. Space and ⌘A also need the focused view to be the
+    /// table (SwiftUI `List` and `Table` are `NSTableView`s) this view sits behind, not another list in the window or a
+    /// text field.
     func handles(_ event: NSEvent) -> Bool {
-        guard !blocked, let window, event.window === window, window.attachedSheet == nil,
-              event.keyCode == 49, event.modifierFlags.isDisjoint(with: [.command, .option, .control]),
-              let table = window.firstResponder as? NSTableView else { return false }
+        guard !blocked, let window, event.window === window, window.attachedSheet == nil else { return false }
+        let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        let letter = event.charactersIgnoringModifiers?.lowercased()
+        switch keys {
+        case .space:
+            guard event.keyCode == 49, modifiers.isDisjoint(with: [.command, .option, .control]) else { return false }
+        case .selectAll:
+            guard letter == "a", modifiers == .command || modifiers == [.command, .shift] else { return false }
+        case .find:
+            return letter == "f" && modifiers == .command
+        }
+        guard let table = window.firstResponder as? NSTableView else { return false }
         let list = table.enclosingScrollView ?? table
         let listFrame = list.convert(list.bounds, to: nil)
         return convert(bounds, to: nil).contains(CGPoint(x: listFrame.midX, y: listFrame.midY))

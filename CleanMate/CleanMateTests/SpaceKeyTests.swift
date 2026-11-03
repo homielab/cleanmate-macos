@@ -33,7 +33,7 @@ struct SpaceKeyTests {
         try await Task.sleep(for: .milliseconds(300))
 
         func byX<T: NSView>(_ views: [T]) -> [T] { views.sorted { $0.convert($0.bounds, to: nil).minX < $1.convert($1.bounds, to: nil).minX } }
-        let monitors = byX(all(SpaceKeyMonitorView.self, in: host))
+        let monitors = byX(all(ListKeyMonitorView.self, in: host))
         let tables = byX(all(NSTableView.self, in: host))
         try #require(monitors.count == 2 && tables.count == 2)
 
@@ -49,5 +49,41 @@ struct SpaceKeyTests {
         #expect(!monitors[0].handles(event))
         monitors[1].blocked = true // a confirmation is shown
         #expect(!monitors[1].handles(try space(window)))
+    }
+
+    /// ⌘A / ⇧⌘A tick in the focused list only (a focused search field keeps ⌘A for its text); ⌘F needs no list focus.
+    @Test func selectAllNeedsTheListFocusedAndFindDoesNot() async throws {
+        let list = List(["a"], id: \.self) { Text($0) }
+            .onSelectAllKeys { _ in true }
+            .onFindKey { _ in true }
+        let host = NSHostingView(rootView: list.frame(width: 300, height: 300))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 300, height: 300), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(300))
+
+        let monitors = all(ListKeyMonitorView.self, in: host)
+        let selectAll = try #require(monitors.first { $0.keys == .selectAll })
+        let find = try #require(monitors.first { $0.keys == .find })
+        let table = try #require(all(NSTableView.self, in: host).first)
+        let a = try space(window, modifiers: .command, key: "a", code: 0)
+        let shiftA = try space(window, modifiers: [.command, .shift], key: "A", code: 0)
+        let f = try space(window, modifiers: .command, key: "f", code: 3)
+
+        #expect(!selectAll.handles(a)) // nothing focused: the key goes on to Edit › Select All
+        #expect(find.handles(f))
+        window.makeFirstResponder(table)
+        #expect(selectAll.handles(a) && selectAll.handles(shiftA))
+        #expect(!selectAll.handles(try space(window, modifiers: [.command, .option], key: "a", code: 0)))
+        #expect(!selectAll.handles(try space(window, key: "a", code: 0))) // typing "a"
+        let plainSpace = try space(window)
+        #expect(!selectAll.handles(f) && !find.handles(a) && !find.handles(plainSpace))
+        #expect(!find.handles(try space(window, modifiers: [.command, .shift], key: "F", code: 3)))
+        selectAll.blocked = true
+        find.blocked = true
+        #expect(!selectAll.handles(a) && !find.handles(f))
     }
 }

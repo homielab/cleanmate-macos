@@ -20,6 +20,8 @@ final class SmartScanModel: ObservableObject {
     @Published var collapsedGroups: Set<String> = []
     /// Item ids of the result rows highlighted with the keyboard/mouse (List selection), not the ticks.
     @Published var highlighted: Set<String> = []
+    /// The toolbar search (⌘F) over the results: item names and entry paths. Kept across scans, like the other searches.
+    @Published var search = ""
     /// Bundle ids of running apps, kept current through NSWorkspace launch/terminate notifications.
     @Published var runningApps = SmartScanModel.currentRunningApps()
     /// Names of running command-line tools; no notification exists, so refreshed at each scan and before cleaning.
@@ -205,6 +207,13 @@ final class SmartScanModel: ObservableObject {
         Preferences.remember(item, selected: on)
     }
 
+    /// The review sheet's tick: like `setSelected`, but the entries left out stay left out, so unticking an item
+    /// there and ticking it again brings back the same entries, not all of them.
+    func setReviewed(_ item: CleanerItem, _ on: Bool) {
+        if on { selected.insert(item.id) } else { selected.remove(item.id) }
+        Preferences.remember(item, selected: on)
+    }
+
     /// Ticked with none of its entries left out.
     func isFullySelected(_ item: CleanerItem) -> Bool {
         selected.contains(item.id) && excludedEntries[item.id]?.isEmpty != false
@@ -293,6 +302,141 @@ final class SmartScanModel: ObservableObject {
         let items = activeGroups.flatMap { selectableItems(in: $0) }.filter { ids.contains($0.id) }
         let on = items.contains { !isFullySelected($0) } // a partly ticked item counts as off
         for item in items where on ? !isFullySelected(item) : selected.contains(item.id) { setSelected(item, on) }
+    }
+
+    // MARK: Search
+
+    /// What the search shows of an item.
+    nonisolated enum SearchMatch: Equatable {
+        /// Its name matches, or there is no search: the whole item, every entry.
+        case whole
+        /// Only these entries match, by path or label.
+        case entries(Set<URL>)
+    }
+
+    /// nil = hidden by the search. `titles`: the item's name as shown and in English, so either one finds it.
+    /// Case and diacritics are ignored, as in Finder.
+    nonisolated static func searchMatch(titles: [String], scan: ItemScan?, query: String) -> SearchMatch? {
+        let query = query.trimmingCharacters(in: .whitespaces)
+        if query.isEmpty || titles.contains(where: { $0.localizedStandardContains(query) }) { return .whole }
+        let urls = (scan?.entries ?? []).filter {
+            $0.url.path.localizedStandardContains(query) || $0.title?.localizedStandardContains(query) == true
+        }.map(\.url)
+        return urls.isEmpty ? nil : .entries(Set(urls))
+    }
+
+    func searchMatch(_ item: CleanerItem) -> SearchMatch? {
+        Self.searchMatch(titles: [String(localized: item.title), ActivityLog.english(item.title)], scan: scans[item.id],
+                         query: search)
+    }
+
+    var isSearching: Bool { !search.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// `visibleGroups` with only the items the search finds; a group with none is hidden.
+    var shownGroups: [CleanerGroup] {
+        guard isSearching else { return visibleGroups }
+        return visibleGroups.compactMap { group in
+            let items = group.items.filter { searchMatch($0) != nil }
+            return items.isEmpty ? nil : CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage, items: items)
+        }
+    }
+
+    /// The group checkbox and ⌘A / ⇧⌘A: ticks or unticks what the list shows of `groups`. Without a search, each
+    /// group's Select All/Deselect All; with one, the items found, and of an item found only by some of its entries
+    /// that can be ticked one by one, just those entries.
+    func setShown(_ groups: [CleanerGroup], _ on: Bool) {
+        guard isSearching else {
+            for group in groups { setSelected(group, on) }
+            return
+        }
+        for item in groups.flatMap(\.items) {
+            if item.selectableEntries, case .entries(let urls) = searchMatch(item) {
+                guard scans[item.id]?.hasData == true, !isLocked(item) else { continue }
+                for url in urls.subtracting(lockedEntries(item)) where isEntrySelected(item, url) != on {
+                    setEntry(item, url, on)
+                }
+            } else if on ? scans[item.id]?.hasData == true && !isLocked(item) && !isFullySelected(item)
+                        : selected.contains(item.id) {
+                setSelected(item, on)
+            }
+        }
+    }
+
+    /// ⌘A / ⇧⌘A: the shown groups holding a highlighted row, or every shown group when no row is highlighted.
+    func setFocusedGroups(_ on: Bool) {
+        let shown = shownGroups
+        let focused = shown.filter { $0.items.contains { highlighted.contains($0.id) } }
+        setShown(focused.isEmpty ? shown : focused, on)
+    }
+
+    // MARK: Review before cleaning
+
+    /// What Clean… lists before anything is removed: every ticked item by group, with what it removes and how.
+    struct Review {
+        struct Row: Identifiable {
+            let item: CleanerItem
+            var id: String { item.id }
+            /// Ticked now. An item unticked in the review stays listed, so it can be ticked again.
+            let isOn: Bool
+            /// What it removes: its ticked entries, without the locked ones.
+            let total: Total
+            let entries: [ScanEntry]
+            /// Entries left out because they are locked or in use.
+            let lockedCount: Int
+            /// Some entries were left out by hand.
+            let isPartial: Bool
+        }
+
+        struct Group: Identifiable {
+            let id: String
+            let title: LocalizedStringResource
+            let systemImage: String
+            var rows: [Row]
+        }
+
+        var groups: [Group] = []
+        /// Ticked items that are not cleaned: their app or tool is running, an exclusion blocks them, or every entry is
+        /// locked.
+        var skipped: [CleanerItem] = []
+        /// What the ticked rows move to the Trash and what they delete for good; together the "Selected" total.
+        var trash = Total(), delete = Total()
+
+        var hasSelection: Bool { groups.contains { $0.rows.contains(where: \.isOn) } }
+    }
+
+    /// Items ticked now, kept by the review when it opens.
+    var selectedIDs: Set<String> { Set(items.lazy.filter { self.selected.contains($0.id) }.map(\.id)) }
+
+    /// The review of the items in `ids` (`selectedIDs` when it opened), read live: a tick changed there shows at once.
+    func review(of ids: Set<String>) -> Review {
+        var review = Review()
+        for group in activeGroups {
+            var rows: [Review.Row] = []
+            for item in group.items where ids.contains(item.id) {
+                if isLocked(item) {
+                    if selected.contains(item.id) { review.skipped.append(item) }
+                    continue
+                }
+                // Same check as `clean()`: a ticked item with nothing left to remove never reaches the cleaner.
+                guard let scan = selectedScan(item), scan.hasData else { continue }
+                var total = Total(records: scan.records ?? 0)
+                if item.sizeIsUpperBound { total.upTo = scan.size } else { total.size = scan.size }
+                let isOn = selected.contains(item.id)
+                if isOn {
+                    let kind = item.mode == .trash ? \Review.trash : \Review.delete
+                    review[keyPath: kind].size += total.size
+                    review[keyPath: kind].upTo += total.upTo
+                    review[keyPath: kind].records += total.records
+                }
+                rows.append(.init(item: item, isOn: isOn, total: total, entries: scan.entries,
+                                  lockedCount: lockedEntries(item).count,
+                                  isPartial: excludedEntries[item.id]?.isEmpty == false))
+            }
+            if !rows.isEmpty {
+                review.groups.append(.init(id: group.id, title: group.title, systemImage: group.systemImage, rows: rows))
+            }
+        }
+        return review
     }
 
     /// Bytes for sure, "up to" bytes and records; scanned items of a group, or the selection.

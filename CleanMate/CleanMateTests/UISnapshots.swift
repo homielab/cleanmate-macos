@@ -218,6 +218,25 @@ struct UISnapshots {
                                selectedSize: model.partialSelectedSize(item))
             }
         }
+        // ⌘F search: only the items found, folded groups opened; an item found by one entry lists just that entry.
+        try await snapshot("smartscan-3-results-search") {
+            let model = cleanerModel(.smartScan)
+            fill(model)
+            model.search = "cache"
+            model.collapsedGroups = Set(model.groups.map(\.id))
+            model.phase = .results
+            return SmartScanView(model: model, module: .smartScan)
+        }
+        // Clean…: the review sheet, an item moved to the Trash next to ones deleted for good, one unticked in the sheet.
+        try await snapshot("smartscan-3-review", size: CGSize(width: 620, height: 600)) {
+            let model = cleanerModel(.smartScan)
+            fill(model)
+            if let trash = model.groups.flatMap(\.items).first(where: { $0.mode == .trash }) { model.selected.insert(trash.id) }
+            model.phase = .results
+            let ids = model.selectedIDs
+            if let first = model.review(of: ids).groups.first?.rows.dropFirst().first { model.selected.remove(first.id) }
+            return CleanReviewSheet(model: model, module: .smartScan, ids: ids)
+        }
         try await snapshot("smartscan-4-cleaning") {
             let model = cleanerModel(.smartScan)
             model.phase = .cleaning
