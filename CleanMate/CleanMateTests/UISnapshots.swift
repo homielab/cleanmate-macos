@@ -512,6 +512,7 @@ struct UISnapshots {
         // Stable PNG: a fixed disk (the real free space changes) and sizes measured before the window opens (the bottom
         // bar's progress spinner going away mid-layout left the table header/rows a pixel off, depending on timing).
         let model = SpaceLensModel()
+        model.disk = root // opens as the root: a one-folder breadcrumb, as before
         model.start(at: root)
         model.volume = .init(name: "Macintosh HD", total: 494_000_000_000, available: 182_000_000_000)
         while model.measuring { try await Task.sleep(for: .milliseconds(50)) }

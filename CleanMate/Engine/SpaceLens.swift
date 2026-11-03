@@ -16,6 +16,14 @@ nonisolated struct SpaceItem: Identifiable, Hashable, Sendable {
     var size: Int64?
     /// A `ProtectedFolders` folder left unmeasured: listing its contents would make macOS ask for access.
     var isProtected = false
+    /// Name starts with a dot, or the hidden flag Finder honors is set (`/usr`, `/private`…).
+    var isHidden = false
+    /// Flagged `restricted`: System Integrity Protection keeps it as macOS installed it.
+    var isRestricted = false
+    /// Another volume is mounted here: never measured (as `du -x`), counted where it is mounted.
+    var isMountPoint = false
+    /// Why an item outside the home folder can't be moved to the Trash; nil inside home and on external drives.
+    var viewOnly: SpaceLens.ViewOnly?
 
     var id: URL { url }
     var name: String { url.lastPathComponent }
@@ -38,12 +46,14 @@ nonisolated enum SpaceLens {
     static let top = 8
 
     /// The biggest `top` measured, non-empty children by size, plus one "Other" slice summing the rest
-    /// (no "Other" when only one item would go in it — that item is shown instead).
-    static func slices(_ items: [SpaceItem], top: Int = SpaceLens.top) -> [Slice] {
-        let measured = items.filter { ($0.size ?? 0) > 0 }.sorted { $0.size! > $1.size! }
-        let shown = measured.count <= top + 1 ? measured[...] : measured.prefix(top)
+    /// (no "Other" when only one item would go in it — that item is shown instead). `showsHidden` false: hidden items
+    /// get no slice of their own but still count, in "Other".
+    static func slices(_ items: [SpaceItem], top: Int = SpaceLens.top, showsHidden: Bool = true) -> [Slice] {
+        let hidden = showsHidden ? 0 : items.filter(\.isHidden).reduce(Int64(0)) { $0 + ($1.size ?? 0) }
+        let measured = items.filter { ($0.size ?? 0) > 0 && (showsHidden || !$0.isHidden) }.sorted { $0.size! > $1.size! }
+        let shown = measured.count <= top + 1 && hidden == 0 ? measured[...] : measured.prefix(top)
         var slices = shown.map { Slice(item: $0, size: $0.size!) }
-        let rest = measured.dropFirst(shown.count).reduce(Int64(0)) { $0 + $1.size! }
+        let rest = measured.dropFirst(shown.count).reduce(hidden) { $0 + $1.size! }
         if rest > 0 { slices.append(Slice(item: nil, size: rest)) }
         return slices
     }
@@ -85,15 +95,61 @@ nonisolated enum SpaceLens {
 
     /// Direct children of `folder`, hidden ones included (they take space too). Files carry their size; folders
     /// (not symlinks to folders) have nil, to be filled by `measure`. Unreadable folder → empty.
-    @concurrent static func list(_ folder: URL, links: HardLinks = HardLinks()) async -> [SpaceItem] {
+    /// A folder on another device than `folder`, or in `mounts`, is a mount point. The system and data volumes of the
+    /// startup disk share one device number (`/System/Volumes/Data`), so only `mounts` tells those apart.
+    @concurrent static func list(_ folder: URL, links: HardLinks = HardLinks(), mounts: Set<String> = []) async -> [SpaceItem] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        var own = stat()
+        let device = stat(folder.path, &own) == 0 ? own.st_dev : nil
         return names.compactMap { name in
             let url = folder.appending(path: name)
             var info = stat()
             guard lstat(url.path, &info) == 0 else { return nil }
             let isFolder = info.st_mode & S_IFMT == S_IFDIR
-            return SpaceItem(url: url, isFolder: isFolder, size: isFolder ? nil : links.count(info) ? Int64(info.st_blocks) * 512 : 0)
+            var item = SpaceItem(url: url, isFolder: isFolder, size: isFolder ? nil : links.count(info) ? Int64(info.st_blocks) * 512 : 0)
+            item.isHidden = name.hasPrefix(".") || info.st_flags & UInt32(UF_HIDDEN) != 0
+            item.isRestricted = info.st_flags & UInt32(SF_RESTRICTED) != 0
+            item.isMountPoint = isFolder && (mounts.contains(url.path) || device.map { $0 != info.st_dev } == true)
+            return item
         }
+    }
+
+    /// Why an item outside the home folder stays view-only, for the lock shown next to it.
+    enum ViewOnly: Hashable, Sendable {
+        /// The home folder itself or a folder holding it (`/Users`): open it to pick what to move.
+        case holdsHome
+        /// Another volume mounted here.
+        case otherVolume
+        /// Flagged `restricted` by System Integrity Protection.
+        case systemIntegrity
+        /// `/Library`: shared by every user and macOS; Smart Scan cleans what is safe in it.
+        case systemLibrary
+        /// Another account's home folder.
+        case otherUser
+        /// `/Applications`: the Uninstaller removes apps with their data.
+        case app
+        /// Anything else outside the home folder.
+        case outsideHome
+    }
+
+    /// The lock reason of `item`, listed on the startup disk whose root is `disk`; nil inside `home` (the Space Lens
+    /// policy decides there, as in the home view). Paths only: no disk reads.
+    static func viewOnly(_ item: SpaceItem, home: URL, disk: URL) -> ViewOnly? {
+        let path = item.url.standardizedFileURL.path, home = home.standardizedFileURL.path
+        func inside(_ child: String, _ folder: String) -> Bool { child.hasPrefix(folder.hasSuffix("/") ? folder : folder + "/") }
+        if path == home || inside(home, path) { return .holdsHome }
+        if inside(path, home) { return nil }
+        if item.isMountPoint { return .otherVolume }
+        if item.isRestricted { return .systemIntegrity }
+        let disk = disk.standardizedFileURL.path
+        let library = (disk as NSString).appendingPathComponent("Library")
+        if path == library || inside(path, library) { return .systemLibrary }
+        let users = (home as NSString).deletingLastPathComponent
+        if inside(path, users), let name = path.dropFirst(users.count + 1).split(separator: "/").first,
+           !name.hasPrefix("."), name != "Shared" { return .otherUser }
+        let apps = (disk as NSString).appendingPathComponent("Applications")
+        if path == apps || inside(path, apps) { return .app }
+        return .outsideHome
     }
 
     /// Allocated size of `url` (file or whole folder tree), plus the sizes of every folder inside it of at least

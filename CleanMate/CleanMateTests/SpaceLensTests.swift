@@ -65,6 +65,7 @@ struct SpaceLensTests {
         try file("A/y/s/own.bin", bytes: 2_000_000)
         try FileManager.default.linkItem(at: big, to: home.appending(path: "A/y/s/big.bin"))
         let model = SpaceLensModel()
+        model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
         func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
         model.start(at: home.appending(path: "A"))
@@ -88,6 +89,7 @@ struct SpaceLensTests {
         try FileManager.default.linkItem(at: big, to: home.appending(path: "A/y/s/big.bin"))
         let calls = Counter()
         let model = SpaceLensModel(center: NotificationCenter())
+        model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         var access = true
         model.hasFullDiskAccess = { access }
         model.measure = { calls.add(); return try await SpaceLens.measure($0, links: $1, skipping: $2) }
@@ -122,6 +124,7 @@ struct SpaceLensTests {
         try file("A/y/big.bin", bytes: 2_000_000)
         let calls = Counter(), gate = Counter()
         let model = SpaceLensModel(center: NotificationCenter())
+        model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
         model.measure = {
             calls.add()
@@ -177,6 +180,7 @@ struct SpaceLensTests {
         try file("A/y/own.bin", bytes: 2_000)
         let calls = Counter()
         let model = SpaceLensModel(center: NotificationCenter())
+        model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
         model.measure = { calls.add(); return try await SpaceLens.measure($0, links: $1, skipping: $2) }
         func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }

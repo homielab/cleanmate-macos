@@ -14,6 +14,7 @@ struct SpaceLensView: View {
     @State private var choosingFolder = false
     /// Folders chosen with "Choose Folder…", newest first, one path per line.
     @AppStorage(Preferences.spaceLensRecentFolders) private var recentFolders = ""
+    @AppStorage(Preferences.spaceLensShowsHidden) private var showsHidden = true
     @State private var confirming = false
     @State private var excludedCount = 0
     @State private var previewURL: URL?
@@ -43,6 +44,10 @@ struct SpaceLensView: View {
             }
         }
         .onChange(of: model.search) { _ in selection = model.pruned(selection) }
+        .onAppearAndChange(of: showsHidden) { shows in
+            model.showsHidden = shows
+            selection = model.pruned(selection)
+        }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Items"))
         .task(id: selection) {
             allowed.formIntersection(selection) // until checked, nothing newly picked is movable
@@ -58,6 +63,7 @@ struct SpaceLensView: View {
             ToolbarItem {
                 Menu {
                     Button("Home") { model.start(at: SafetyPolicy.current.homeURL) }
+                    Button("Startup Disk") { model.start(at: model.disk) }
                     ForEach(volumes, id: \.self) { url in
                         Button(FileManager.default.displayName(atPath: url.path)) { model.start(at: url) }
                     }
@@ -76,6 +82,13 @@ struct SpaceLensView: View {
                 }
             }
             ToolbarItem {
+                Toggle(isOn: $showsHidden) {
+                    Label("Show Hidden Files", systemImage: showsHidden ? "eye" : "eye.slash")
+                }
+                .keyboardShortcut(".", modifiers: [.command, .shift])
+                .help("Show Hidden Files (⇧⌘.): when off, hidden items are left out of the list but still counted in the total.")
+            }
+            ToolbarItem {
                 Button { model.rescan() } label: { Label("Rescan", systemImage: "arrow.clockwise") }
                     .disabled(model.trashing)
             }
@@ -87,8 +100,10 @@ struct SpaceLensView: View {
         }
     }
 
+    /// Mounted drives but the startup disk, which has its own item.
     private var volumes: [URL] {
-        FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
+        (FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? [])
+            .filter { $0.standardizedFileURL.path != "/" }
     }
 
     // MARK: Disk overview and breadcrumb
@@ -134,7 +149,7 @@ struct SpaceLensView: View {
     /// Share of each child at a glance; clicking a folder slice drills in like double-clicking its row.
     /// Hidden from VoiceOver: the table's Share column reads the same numbers.
     @ViewBuilder private var donut: some View {
-        let slices = SpaceLens.slices(model.items)
+        let slices = SpaceLens.slices(model.items, showsHidden: model.showsHidden)
         if !slices.isEmpty {
             if #available(macOS 14, *) {
                 donutChart(slices)
@@ -203,7 +218,7 @@ struct SpaceLensView: View {
                 if case .active(let point) = phase { hovered = slice(point)?.id } else { hovered = nil }
             }
             .onTapGesture { point in
-                if let item = slice(point)?.item, item.isFolder, !item.isProtected {
+                if let item = slice(point)?.item, model.canOpen(item) {
                     hovered = nil
                     model.open(item.url)
                 }
@@ -230,11 +245,18 @@ struct SpaceLensView: View {
     private var table: some View {
         let items = model.shown.sorted(using: sortOrder)
         let total = model.total
-        let colors = Self.sliceColors(SpaceLens.slices(model.items))
+        let colors = Self.sliceColors(SpaceLens.slices(model.items, showsHidden: model.showsHidden))
         return Table(items, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Name", value: \.name) { item in
                 Label {
-                    Text(item.name).help(item.url.path)
+                    HStack(spacing: 4) {
+                        Text(item.name).help(item.url.path)
+                        if let viewOnly = item.viewOnly {
+                            Image(systemName: "lock.fill").imageScale(.small).foregroundStyle(.secondary)
+                                .help(Text(viewOnly.reason))
+                                .accessibilityLabel(Text(viewOnly.reason))
+                        }
+                    }
                 } icon: {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path)).resizable().frame(width: 20, height: 20)
                         .accessibilityHidden(true)
@@ -244,6 +266,10 @@ struct SpaceLensView: View {
             TableColumn("Size", value: \.sortSize) { item in
                 if let size = item.size {
                     Text(size, format: .fileSize).sizeColumnStyle(emphasized: true)
+                } else if item.isMountPoint {
+                    Image(systemName: "externaldrive").foregroundStyle(.secondary)
+                        .accessibilityLabel("Not measured")
+                        .help("Another volume is mounted here: it is not counted in this folder. Drives are in the Location menu.")
                 } else if item.isProtected {
                     Image(systemName: "lock").foregroundStyle(.secondary)
                         .accessibilityLabel("Not measured")
@@ -274,7 +300,7 @@ struct SpaceLensView: View {
             .width(min: 120, ideal: 180)
         }
         .contextMenu(forSelectionType: URL.self) { urls in
-            if urls.count == 1, let item = items.first(where: { urls.contains($0.url) }), item.isFolder, !item.isProtected {
+            if urls.count == 1, let item = items.first(where: { urls.contains($0.url) }), model.canOpen(item) {
                 Button("Open") { model.open(item.url) }
             }
             Button("Quick Look") { previewURL = urls.first }
@@ -304,7 +330,7 @@ struct SpaceLensView: View {
                 }
             }
         } primaryAction: { urls in
-            if urls.count == 1, let item = items.first(where: { urls.contains($0.url) }), item.isFolder, !item.isProtected {
+            if urls.count == 1, let item = items.first(where: { urls.contains($0.url) }), model.canOpen(item) {
                 model.open(item.url)
             } else {
                 NSWorkspace.shared.activateFileViewerSelecting(Array(urls))
@@ -392,5 +418,20 @@ struct SpaceLensView: View {
         if urls == selection { return !allowed.isEmpty }
         let policy = SafetyPolicy.current
         return urls.contains { policy.allowsSpaceLensItem($0, deep: false) }
+    }
+}
+
+extension SpaceLens.ViewOnly {
+    /// Tooltip of the lock next to an item outside the home folder: why it can't be moved to the Trash.
+    var reason: LocalizedStringResource {
+        switch self {
+        case .holdsHome: "Holds your home folder — open it to pick items to move to the Trash."
+        case .otherVolume: "Another volume is mounted here — view only."
+        case .systemIntegrity: "Part of macOS, protected by System Integrity Protection (SIP) — view only."
+        case .systemLibrary: "System library shared by macOS and every user — Smart Scan cleans what is safe in it."
+        case .otherUser: "Another user's folder — view only."
+        case .app: "Apps — remove them with the Uninstaller, which also finds their data."
+        case .outsideHome: "Outside your home folder — view only."
+        }
     }
 }

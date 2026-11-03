@@ -12,7 +12,15 @@ final class SpaceLensModel: ObservableObject {
     var externalVolume: (URL) -> URL? = { url in
         SafetyPolicy.current.externalVolume(SafetyPolicy.normalize(url)).map { URL(fileURLWithPath: $0) }
     }
-    /// Where browsing started (home, a volume or a chosen folder); `path` holds the folders opened below it.
+    /// Root of the startup disk: a folder outside home and off external drives opens with the breadcrumb from it.
+    /// Injectable for tests.
+    var disk = URL(fileURLWithPath: "/")
+    /// Paths volumes are mounted on, "/" left out: never measured inside a folder. Injectable for tests.
+    var mountPoints: () -> Set<String> = {
+        let mounts = SafetyPolicy.mountPoints().filter { $0 != "/" }
+        return Set(mounts + mounts.map { URL(fileURLWithPath: $0).standardizedFileURL.path }) // /private/var/… and /var/…
+    }
+    /// Where browsing started (home, a drive, the startup disk or a chosen folder); `path` holds the folders opened below it.
     @Published private(set) var root = SafetyPolicy.current.homeURL
     @Published private(set) var path: [URL] = []
     @Published private(set) var items: [SpaceItem] = []
@@ -20,6 +28,9 @@ final class SpaceLensModel: ObservableObject {
     @Published private(set) var trashing = false
     /// `trashing` is an undo: the bottom bar says "Putting back…".
     @Published private(set) var undoing = false
+    /// "Show Hidden Files": off leaves hidden items out of the table and the donut's own slices, but in the total.
+    /// The view keeps the setting.
+    @Published var showsHidden = true
     /// Toolbar search over the current folder's names; "" = all. Cleared when the folder changes.
     @Published var search = ""
     /// Item to select in the table once listed, set by `reveal`; the view clears it.
@@ -73,10 +84,17 @@ final class SpaceLensModel: ObservableObject {
     var breadcrumb: [URL] { [root] + path }
     /// Whole folder, search ignored: the donut and Share column keep the folder's real proportions.
     var total: Int64 { items.reduce(0) { $0 + ($1.size ?? 0) } }
-    /// Items the table lists: those whose name matches `search`.
+    /// Items the table lists: those whose name matches `search`, hidden ones only with `showsHidden`.
     var shown: [SpaceItem] {
         let search = search.trimmingCharacters(in: .whitespaces)
-        return search.isEmpty ? items : items.filter { $0.name.localizedStandardContains(search) }
+        let visible = showsHidden ? items : items.filter { !$0.isHidden }
+        return search.isEmpty ? visible : visible.filter { $0.name.localizedStandardContains(search) }
+    }
+
+    /// Whether `item` can be opened: a folder macOS lets CleanMate read without asking, not another volume — except
+    /// an external drive, which opens as its own location (`open`).
+    func canOpen(_ item: SpaceItem) -> Bool {
+        item.isFolder && !item.isProtected && (!item.isMountPoint || externalVolume(item.url)?.standardizedFileURL == item.url.standardizedFileURL)
     }
 
     /// Title of the Move to Trash confirmation: adds up measured sizes only and says when some are not measured.
@@ -122,13 +140,17 @@ final class SpaceLensModel: ObservableObject {
     }
 
     /// A folder inside home opens as home + each folder down to it, so the breadcrumb can go up; one on an external
-    /// drive, as the drive + each folder down to it. Elsewhere, or with a locked folder (no Full Disk Access) on the
-    /// way, it opens alone as before: never list a locked parent, and climbing to a disk root would measure system
-    /// folders the user did not ask for.
+    /// drive, as the drive + each folder down to it; anywhere else, as the startup disk + each folder down to it.
+    /// Only the folder shown is measured, never its parents. With a locked folder (no Full Disk Access) on the way
+    /// it opens alone: never list a locked parent.
     private func trail(to url: URL) -> (URL, [URL]) {
         var base = home.standardizedFileURL, target = url.standardizedFileURL
-        if !target.pathComponents.starts(with: base.pathComponents), let volume = externalVolume(url) {
-            (base, target) = (volume, URL(fileURLWithPath: SafetyPolicy.normalize(url)))
+        if !target.pathComponents.starts(with: base.pathComponents) {
+            if let volume = externalVolume(url) {
+                (base, target) = (volume, URL(fileURLWithPath: SafetyPolicy.normalize(url)))
+            } else {
+                base = disk.standardizedFileURL
+            }
         }
         guard target.pathComponents.starts(with: base.pathComponents) else { return (url, []) }
         var folder = base
@@ -139,6 +161,11 @@ final class SpaceLensModel: ObservableObject {
     }
 
     func open(_ folder: URL) {
+        // An external drive listed in /Volumes opens as the Location menu opens it: its gauge, breadcrumb and Trash.
+        if let volume = externalVolume(folder), volume.standardizedFileURL == folder.standardizedFileURL {
+            start(at: volume)
+            return
+        }
         path.append(folder)
         revealed = nil
         report = nil
@@ -272,14 +299,24 @@ final class SpaceLensModel: ObservableObject {
         let listing = listings[folder.path]
         let measure = self.measure
         let epoch = cacheEpoch
+        let mounts = mountPoints()
+        // Walks never enter a mount point: the startup disk's data volume shares the system volume's device number,
+        // so `fts`'s same-device rule alone would count it again inside /System.
+        let fenced = skipping.union(mounts)
+        // Outside home and off external drives every item is view-only: say why next to it.
+        let base = folder.standardizedFileURL
+        let locks = !base.pathComponents.starts(with: home.standardizedFileURL.pathComponents) && externalVolume(folder) == nil
+        let (home, disk) = (self.home, self.disk)
         task = Task {
             let links = SpaceLens.HardLinks() // one per listing: siblings don't count a shared hard link twice
-            var listed = await SpaceLens.list(folder, links: links)
+            var listed = await SpaceLens.list(folder, links: links, mounts: mounts)
             guard !Task.isCancelled else { return }
-            for index in listed.indices where listed[index].isFolder {
+            for index in listed.indices {
+                if locks { listed[index].viewOnly = SpaceLens.viewOnly(listed[index], home: home, disk: disk) }
+                guard listed[index].isFolder else { continue }
                 listed[index].isProtected = skipping.contains(listed[index].url.standardizedFileURL.path)
                 let path = listed[index].url.path
-                listed[index].size = listing?[path] ?? sizes[path]
+                listed[index].size = listed[index].isMountPoint ? nil : listing?[path] ?? sizes[path]
             }
             items = listed
             // Revealed item not listed (e.g. gone since): the folder stays open with nothing selected, silently.
@@ -287,9 +324,9 @@ final class SpaceLensModel: ObservableObject {
             // firstIndex(where:) per result was O(n²) URL compares: 1.2 s for a folder of 3k subfolders.
             let indexByURL = Dictionary(listed.indices.map { (listed[$0].url, $0) }) { first, _ in first }
             await withTaskGroup(of: (URL, Int64, [String: Int64])?.self) { group in
-                for item in listed where item.size == nil && !item.isProtected {
+                for item in listed where item.size == nil && !item.isProtected && !item.isMountPoint {
                     group.addTask {
-                        guard let result = try? await measure(item.url, links, skipping)
+                        guard let result = try? await measure(item.url, links, fenced)
                         else { return nil }
                         return (item.url, result.size, result.folders)
                     }

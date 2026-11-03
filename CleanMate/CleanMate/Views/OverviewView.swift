@@ -134,7 +134,8 @@ struct OverviewView: View {
                            value: Text(system, format: .fileSize), size: system, largest: largest,
                            note: model.skippedProtected
                                ? note + Text(verbatim: " ") + Text("Includes the folders skipped without Full Disk Access.")
-                               : note)
+                               : note,
+                           action: ("View in Space Lens", { ModuleRouter.shared.spaceLensFolder = URL(fileURLWithPath: "/") }))
             }
         } header: {
             HStack {

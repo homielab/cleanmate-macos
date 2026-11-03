@@ -27,6 +27,8 @@ nonisolated enum Preferences {
     static let largeFilesScope = "largeFilesScope"
     /// String: folders last chosen in Space Lens › Location, same format as `largeFilesRecentFolders`.
     static let spaceLensRecentFolders = "spaceLensRecentFolders"
+    /// Bool: Space Lens › Show Hidden Files, on by default.
+    static let spaceLensShowsHidden = "spaceLensShowsHidden"
     /// Keys older versions wrote and nothing reads any more; removed at launch.
     static let obsolete = ["smartScanLastDurations"]
     /// String (`UninstallerModel.AppSort` raw value): order of the Uninstaller's app list, Name by default.

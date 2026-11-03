@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Space Lens**: **Startup Disk** in the Location menu shows the top level of the disk (Applications, Library, System, Users…) with sizes; folders outside your home folder open with the breadcrumb from the disk, and view-only items show a lock saying why (protected by SIP, system library, another user's folder, apps). **View in Space Lens** on the Overview's **System and apps** opens it.
+- **Space Lens**: **Show Hidden Files** (⇧⌘.) hides dotfiles from the list while still counting them in the total.
 - **Large & Old Files**: the Kind filter has nine kinds with icons — videos, audio, images, documents, code & projects (also unknown files inside a project folder or Git repository), archives, disk images, installers and other — so far fewer files land in **Other**; `cleanmate large --json` reports the same kinds.
 - **Large & Old Files**, **Duplicates Only** and **Similar Photos**: **Open** a file with its app (right-click or Return, and double-click in the file list), and preview it with the eye button on each row as well as Space; **Last Used** adds **Over 1 month ago** and **Custom…** for any number of days.
 - **Similar Photos**: **Sort By** lists groups by space to free, date or number of photos.
@@ -25,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Each release also carries `CleanMate.dmg` (+ `.sha256`), so the README download link always points to the latest version.
 - **Smart Scan › Developer**: Gradle caches are measured faster (their folders are read in parallel), with the same items and sizes.
 - **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
+
+### Fixed
+- **Space Lens**: a volume mounted inside a folder is no longer measured with it — /System no longer counts the whole data volume again, and network shares in your home folder are not walked.
 
 ## [1.7] - 2026-11-02
 

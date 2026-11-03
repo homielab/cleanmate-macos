@@ -141,6 +141,36 @@
         }
       }
     },
+    "Another user's folder — view only." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục của người dùng khác — chỉ xem."
+          }
+        }
+      }
+    },
+    "Another volume is mounted here — view only." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một ổ khác được gắn ở đây — chỉ xem."
+          }
+        }
+      }
+    },
+    "Another volume is mounted here: it is not counted in this folder. Drives are in the Location menu." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một ổ khác được gắn ở đây: không tính vào thư mục này. Các ổ đĩa nằm trong menu Vị trí."
+          }
+        }
+      }
+    },
     "Apply" : {
       "localizations" : {
         "vi" : {
@@ -157,6 +187,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
+          }
+        }
+      }
+    },
+    "Apps — remove them with the Uninstaller, which also finds their data." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng — gỡ bằng Gỡ ứng dụng, công cụ này tìm cả dữ liệu đi kèm."
           }
         }
       }
@@ -417,6 +457,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hướng dẫn bắt đầu…"
+          }
+        }
+      }
+    },
+    "Holds your home folder — open it to pick items to move to the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chứa thư mục người dùng của bạn — mở ra để chọn mục chuyển vào Thùng rác."
           }
         }
       }
@@ -1679,6 +1729,16 @@
         }
       }
     },
+    "Outside your home folder — view only." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ngoài thư mục người dùng — chỉ xem."
+          }
+        }
+      }
+    },
     "Over %lld days ago" : {
       "localizations" : {
         "vi" : {
@@ -1695,6 +1755,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hơn 1 tháng trước"
+          }
+        }
+      }
+    },
+    "Part of macOS, protected by System Integrity Protection (SIP) — view only." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hệ thống được SIP (Bảo vệ toàn vẹn hệ thống) bảo vệ — chỉ xem."
           }
         }
       }
@@ -2731,6 +2801,26 @@
         }
       }
     },
+    "Show Hidden Files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tệp ẩn"
+          }
+        }
+      }
+    },
+    "Show Hidden Files (⇧⌘.): when off, hidden items are left out of the list but still counted in the total." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tệp ẩn (⇧⌘.): khi tắt, mục ẩn không hiện trong danh sách nhưng vẫn được tính vào tổng."
+          }
+        }
+      }
+    },
     "Shows here after a few days of use." : {
       "localizations" : {
         "vi" : {
@@ -2859,6 +2949,16 @@
         }
       }
     },
+    "Startup Disk" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ khởi động"
+          }
+        }
+      }
+    },
     "Step %lld of %lld" : {
       "localizations" : {
         "vi" : {
@@ -2925,6 +3025,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rác hệ thống, rác của công cụ lập trình, dữ liệu công cụ AI và bộ nhớ đệm ứng dụng trong một lần quét."
+          }
+        }
+      }
+    },
+    "System library shared by macOS and every user — Smart Scan cleans what is safe in it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư viện hệ thống dùng chung cho macOS và mọi người dùng — dùng Smart Scan để dọn phần an toàn."
           }
         }
       }
@@ -3193,6 +3303,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Các phiên bản không phải bản mới nhất của mỗi tool và không được ghim trong ~/.tool-versions hay bởi dự án trong thư mục dự án của bạn; cài lại bằng asdf install"
+          }
+        }
+      }
+    },
+    "View in Space Lens" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem trong Space Lens"
           }
         }
       }
