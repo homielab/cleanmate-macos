@@ -1001,4 +1001,129 @@ final class UninstallerTests {
         model.toggle(urls: [pane, ql])
         #expect(model.checked.isEmpty)
     }
+
+    /// Source of each fake app: the App Store receipt wins, then a Homebrew cask, then a `Setapp` folder, else downloaded.
+    @Test func installedAppsTellTheirSource() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try app("Applications/Store.app", bundleID: "com.foo.Store")
+        try make("Applications/Store.app/Contents/_MASReceipt/receipt")
+        try app("Applications/Setapp/Tool.app", bundleID: "com.foo.SetappTool")
+        try app("Applications/Plain.app", bundleID: "com.foo.Plain")
+        try make("Applications/Fake.app/Contents/_MASReceipt", folder: true) // no receipt file inside: not the App Store
+        try app("Applications/Fake.app", bundleID: "com.foo.Fake")
+        let mine = await Uninstaller.installedApps(policy: policy).filter { $0.url.path.contains(root.lastPathComponent) }
+        let sources = Dictionary(uniqueKeysWithValues: mine.map { ($0.bundleID, $0.source) })
+        #expect(sources == ["com.foo.Store": .appStore, "com.foo.SetappTool": .setapp, "com.foo.Plain": .downloaded,
+                            "com.foo.Fake": .downloaded])
+        #expect(Uninstaller.hasAppStoreReceipt(store))
+        let cask = HomebrewCask(token: "plain", prefix: "/opt/homebrew")
+        let plain = InstalledApp(url: URL(filePath: "/Applications/Plain.app"), name: "Plain", bundleID: "x", version: nil,
+                                 lastUsed: nil, cask: cask)
+        #expect(plain.source == .homebrew)
+        var both = plain
+        both.fromAppStore = true
+        #expect(both.source == .appStore)
+    }
+
+    /// The source filter keeps only apps from that source and combines with the search and "not used for" filters.
+    @Test(arguments: [
+        (UninstallerModel.SourceFilter.all, "", ["Brewed", "Set", "Store", "Web"]),
+        (.appStore, "", ["Store"]),
+        (.homebrew, "", ["Brewed"]),
+        (.setapp, "", ["Set"]),
+        (.downloaded, "", ["Web"]),
+        (.downloaded, "store", []),
+    ])
+    func filtersAppsBySource(source: UninstallerModel.SourceFilter, search: String, expected: [String]) {
+        let apps = [
+            InstalledApp(url: URL(filePath: "/Applications/Brewed.app"), name: "Brewed", bundleID: "x.brewed", version: nil,
+                         lastUsed: nil, cask: HomebrewCask(token: "brewed", prefix: "/opt/homebrew")),
+            InstalledApp(url: URL(filePath: "/Applications/Setapp/Set.app"), name: "Set", bundleID: "x.set", version: nil, lastUsed: nil),
+            InstalledApp(url: URL(filePath: "/Applications/Store.app"), name: "Store", bundleID: "x.store", version: nil,
+                         lastUsed: nil, fromAppStore: true),
+            InstalledApp(url: URL(filePath: "/Applications/Web.app"), name: "Web", bundleID: "x.web", version: nil, lastUsed: nil),
+        ]
+        #expect(UninstallerModel.filtered(apps, search: search, unused: .all, source: source).map(\.name) == expected)
+        #expect(UninstallerModel.noMatchFixes(appCount: 4, shownCount: 0, search: "", unused: .all, source: source)
+                    == (source == .all ? [] : [.showAll]))
+    }
+
+    /// An App Store app macOS won't let us move: no `recycle` (no password prompt), nothing else touched, and the model
+    /// reports it as an App Store app; the same app without a receipt still goes through `recycle`. Fake Trash only.
+    @MainActor @Test func appStoreAppIsNeverRecycled() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let appURL = try app("Applications/Store.app", bundleID: "com.foo.Store")
+        try make("Applications/Store.app/Contents/_MASReceipt/receipt")
+        let container = try make("Library/Containers/com.foo.Store", folder: true)
+        let item = InstalledApp(url: appURL, name: "Store", bundleID: "com.foo.Store", version: nil, lastUsed: nil, fromAppStore: true)
+        let moved = Moved()
+        let policy = policy
+        let refuseApp: @Sendable (URL) throws -> URL? = { url in
+            if Self.unresolved(url) == appURL { throw CocoaError(.fileWriteNoPermission) }
+            moved.add(url)
+            return url
+        }
+        let model = UninstallerModel()
+        model.apps = [item]
+        model.runningApps = []
+        model.appBundleIDs = { [] }
+        model.appData = { _, _, _ in [AppDataEntry(url: container, size: 30)] }
+        model.trash = { app, data throws(Uninstaller.AppTrashError) in
+            try await Uninstaller.trash(app: app, data: data, policy: policy, appStore: app.map(Uninstaller.hasAppStoreReceipt) ?? false,
+                                        launchctl: { _ in true }, moveToTrash: refuseApp,
+                                        recycle: { _ in Issue.record("recycle called"); return nil }, isRunning: { _ in false })
+        }
+        model.selection = .app(appURL)
+        await model.loadEntries()
+        await model.remove()
+        guard case .appStore(let a) = model.outcome, a == item else { Issue.record("\(String(describing: model.outcome))"); return }
+        #expect(moved.all.isEmpty && model.apps.count == 1 && FileManager.default.fileExists(atPath: container.path))
+        // Its data alone (Reset) still goes as before.
+        _ = try await Uninstaller.trash(app: nil, data: [AppDataEntry(url: container, size: 30)], policy: policy, appStore: true,
+                                        launchctl: { _ in true }, moveToTrash: refuseApp)
+        #expect(moved.all == [container])
+        // In a batch: skipped with its reason, the others go on.
+        model.appTicks = [appURL]
+        await model.removeBatch()
+        guard case .batch(let result) = model.outcome else { Issue.record("\(String(describing: model.outcome))"); return }
+        #expect(result.removed.isEmpty && result.skipped.map(\.reason) == [.appStore])
+    }
+
+    /// "Quit and Uninstall": the app quits within the wait → uninstalled in the same flow; it stays open → nothing
+    /// moved, `.appDidNotQuit`. Fake running apps and fake Trash only.
+    @MainActor @Test func quitAndUninstallWaitsForTheAppToQuit() async {
+        let app = InstalledApp(url: URL(filePath: "/nonexistent/Open.app"), name: "Open", bundleID: "com.test.qqx.open",
+                               version: nil, lastUsed: nil)
+        let cache = URL(filePath: "/nonexistent/Library/Caches/com.test.qqx.open")
+        let model = UninstallerModel()
+        model.apps = [app]
+        let running = Running([app.bundleID])
+        model.appBundleIDs = { running.ids }
+        model.runningApps = running.ids
+        model.quitTimeout = .milliseconds(500)
+        model.appData = { _, _, _ in [AppDataEntry(url: cache, size: 30)] }
+        var terminated = 0
+        var calls: [(URL?, [URL])] = []
+        model.trash = { calls.append(($0, $1.map(\.url))); return CleanReport(freed: 30) }
+        model.selection = .app(app.url)
+        await model.loadEntries()
+        // Refuses to quit (a save prompt): nothing moved, told why.
+        model.terminate = { _ in terminated += 1 }
+        await model.quitAndRemove()
+        guard case .appDidNotQuit(let a) = model.outcome, a == app else { Issue.record("\(String(describing: model.outcome))"); return }
+        #expect(terminated == 1 && calls.isEmpty && !model.working && model.apps.count == 1)
+        // Quits: uninstalled with its ticked data.
+        model.outcome = nil
+        model.terminate = { _ in terminated += 1; running.ids = [] }
+        await model.quitAndRemove()
+        #expect(terminated == 2 && calls.count == 1 && calls[0].0 == app.url && calls[0].1 == [cache])
+        guard case .removed = model.outcome else { Issue.record("\(String(describing: model.outcome))"); return }
+        #expect(model.apps.isEmpty)
+    }
+
+    /// Bundle ids of the fake running apps; the test changes them on the main actor only.
+    final class Running: @unchecked Sendable {
+        var ids: Set<String>
+        init(_ ids: Set<String>) { self.ids = ids }
+    }
 }

@@ -5,9 +5,9 @@ import Combine
 final class UninstallerModel: ObservableObject {
     /// `hiddenConfig` is read-only: `remove()` ignores it. `extensions` items are never ticked for the user.
     enum Selection: Hashable { case app(URL), leftovers, hiddenConfig, extensions }
-    enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), appBrewBusy(InstalledApp), restored(TrashUndo.Result), batch(BatchResult) }
+    enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), appBrewBusy(InstalledApp), appStore(InstalledApp), appDidNotQuit(InstalledApp), restored(TrashUndo.Result), batch(BatchResult) }
     /// Why an app ticked for a batch uninstall stayed.
-    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed, brewBusy }
+    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed, brewBusy, appStore }
     /// Several ticked apps uninstalled at once: what went to the Trash, and the apps left with their reason.
     struct BatchResult {
         var report = CleanReport()
@@ -20,6 +20,11 @@ final class UninstallerModel: ObservableObject {
     enum AppSort: String, CaseIterable { case name, size, lastUsed }
     /// "Not used for" filter of the app list, remembered in `Preferences.uninstallerUnused`.
     enum UnusedFilter: String, CaseIterable { case all, months3, months6, year1 }
+    /// Install source filter of the app list, remembered in `Preferences.uninstallerSource`.
+    enum SourceFilter: String, CaseIterable {
+        case all, appStore, homebrew, setapp, downloaded
+        nonisolated var source: InstalledApp.Source? { InstalledApp.Source(rawValue: rawValue) }
+    }
 
     @Published var apps: [InstalledApp] = []
     @Published var loadingApps = false
@@ -42,6 +47,8 @@ final class UninstallerModel: ObservableObject {
     @Published var search = "" { didSet { deselectUnlistedApp() } }
     /// Set by the view from `@AppStorage`; an app it hides is deselected like the search does.
     @Published var unused = UnusedFilter.all { didSet { if unused != oldValue { showUndated = false; deselectUnlistedApp() } } }
+    /// Set by the view from `@AppStorage`; an app it hides is deselected like the search does.
+    @Published var source = SourceFilter.all { didSet { if source != oldValue { deselectUnlistedApp() } } }
     /// A new selection drops the old one's rows at once (and any load still finishing for it): Uninstall must never
     /// send one app with another's ticked data before `loadEntries` runs.
     @Published var selection: Selection? {
@@ -107,10 +114,17 @@ final class UninstallerModel: ObservableObject {
     /// "Undo"; tests pass their own so the real Trash is never touched.
     var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Uninstaller") }
     /// Injected by tests so nothing real goes to the Trash. Arguments: the app (if any), the ticked data.
-    /// The app's Homebrew cask is read from Caskroom again right before it goes.
+    /// The app's Homebrew cask and App Store receipt are read again right before it goes.
     var trash: (URL?, [AppDataEntry]) async throws(Uninstaller.AppTrashError) -> CleanReport = { app, data throws(Uninstaller.AppTrashError) in
-        try await Uninstaller.trash(app: app, data: data, cask: app.flatMap { HomebrewCasks.cask(for: $0) })
+        try await Uninstaller.trash(app: app, data: data, cask: app.flatMap { HomebrewCasks.cask(for: $0) },
+                                    appStore: app.map(Uninstaller.hasAppStoreReceipt) ?? false)
     }
+    /// Injected by tests. Asks every running copy of the app to quit (never forced: it may ask to save first).
+    var terminate: (InstalledApp) -> Void = { app in
+        NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).forEach { $0.terminate() }
+    }
+    /// How long "Quit and Uninstall" waits for the app to quit.
+    var quitTimeout: Duration = .seconds(10)
 
     /// Injected by tests (a fake home instead of the real one).
     var hiddenConfig: () async -> [HiddenConfigItem] = {
@@ -146,32 +160,36 @@ final class UninstallerModel: ObservableObject {
     /// The "not used for" filter also lists apps with no last-used date (off by default: not knowing is not "unused").
     @Published var showUndated = false { didSet { if showUndated != oldValue { deselectUnlistedApp() } } }
 
-    var filteredApps: [InstalledApp] { Self.filtered(apps, search: search, unused: unused, includeUndated: showUndated) }
+    var filteredApps: [InstalledApp] {
+        Self.filtered(apps, search: search, unused: unused, source: source, includeUndated: showUndated)
+    }
 
     /// Apps the "not used for" filter leaves out for having no last-used date (0 with no filter or `showUndated`).
     var hiddenUndatedCount: Int {
         guard unused != .all, !showUndated else { return 0 }
-        return Self.filtered(apps, search: search, unused: .all).count { $0.lastUsed == nil }
+        return Self.filtered(apps, search: search, unused: .all, source: source).count { $0.lastUsed == nil }
     }
 
-    /// Search (name or bundle id) and "not used for" filter. An app with no last-used date (`InstalledApp.lastUsed`)
-    /// passes the filter only with `includeUndated`: it may well be in use.
-    nonisolated static func filtered(_ apps: [InstalledApp], search: String, unused: UnusedFilter, includeUndated: Bool = false,
-                                     now: Date = .now) -> [InstalledApp] {
+    /// Search (name or bundle id), "not used for" and install source filters. An app with no last-used date
+    /// (`InstalledApp.lastUsed`) passes the "not used for" filter only with `includeUndated`: it may well be in use.
+    nonisolated static func filtered(_ apps: [InstalledApp], search: String, unused: UnusedFilter, source: SourceFilter = .all,
+                                     includeUndated: Bool = false, now: Date = .now) -> [InstalledApp] {
         let months = switch unused { case .all: 0; case .months3: 3; case .months6: 6; case .year1: 12 }
         let cutoff = months == 0 ? nil : Calendar.current.date(byAdding: .month, value: -months, to: now)
         return apps.filter { app in
             (search.isEmpty || app.name.localizedStandardContains(search) || app.bundleID.localizedStandardContains(search))
                 && (cutoff.map { cutoff in app.lastUsed.map { $0 < cutoff } ?? includeUndated } ?? true)
+                && (source.source.map { app.source == $0 } ?? true)
         }
     }
 
-    /// What clears an Applications list emptied by the search and/or the "not used for" filter; nil when rows show or
+    /// What clears an Applications list emptied by the search and/or the filters; nil when rows show or
     /// no app was found at all (loading, or nothing installed): then "no match" would be wrong.
     enum NoMatchFix: Equatable { case clearSearch, showAll }
-    nonisolated static func noMatchFixes(appCount: Int, shownCount: Int, search: String, unused: UnusedFilter) -> [NoMatchFix]? {
+    nonisolated static func noMatchFixes(appCount: Int, shownCount: Int, search: String, unused: UnusedFilter,
+                                         source: SourceFilter = .all) -> [NoMatchFix]? {
         guard appCount > 0, shownCount == 0 else { return nil }
-        return (search.isEmpty ? [] : [.clearSearch]) + (unused == .all ? [] : [.showAll])
+        return (search.isEmpty ? [] : [.clearSearch]) + (unused == .all && source == .all ? [] : [.showAll])
     }
 
     /// Sort key of the Size order: app + data once the data is measured, else the app alone.
@@ -464,6 +482,7 @@ final class UninstallerModel: ObservableObject {
                 case .cancelled: .cancelled
                 case .notTrashed: .notTrashed
                 case .brewBusy: .brewBusy
+                case .appStore: .appStore
                 }
                 result.skipped.append((app, reason))
             }
@@ -521,6 +540,38 @@ final class UninstallerModel: ObservableObject {
         await move(app: app, data: data)
     }
 
+    /// "Quit and Uninstall": asks the open app to quit (never forced), waits up to `quitTimeout`, then uninstalls it
+    /// like `remove()`. Still open by then → `.appDidNotQuit`, nothing moved. The selection changed meanwhile → nothing.
+    func quitAndRemove() async {
+        guard let app = selectedApp, trashApp, !working else { return }
+        runningApps = appBundleIDs()
+        if isRunning(app) {
+            working = true
+            terminate(app)
+            let quit = await waitUntilQuit(app)
+            working = false
+            guard quit else {
+                outcome = .appDidNotQuit(app)
+                Attention.finished()
+                return
+            }
+        }
+        guard selectedApp?.url == app.url, trashApp else { return }
+        await remove()
+    }
+
+    /// Reads the running apps every 200 ms until `app` is gone or `quitTimeout` passes.
+    private func waitUntilQuit(_ app: InstalledApp) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: quitTimeout)
+        while true {
+            runningApps = appBundleIDs()
+            if !isRunning(app) { return true }
+            if clock.now >= deadline || Task.isCancelled { return false }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+    }
+
     /// `app` (nil: a reset, or leftovers) and `data` to the Trash, then the result alert, Undo, and the list again.
     private func move(app: InstalledApp?, data: [AppDataEntry]) async {
         working = true
@@ -535,6 +586,7 @@ final class UninstallerModel: ObservableObject {
                 case .locked: outcome = .appLocked(app)
                 case .notTrashed: outcome = .appNotTrashed(app)
                 case .brewBusy: outcome = .appBrewBusy(app)
+                case .appStore: outcome = .appStore(app)
                 }
             }
             Attention.finished()

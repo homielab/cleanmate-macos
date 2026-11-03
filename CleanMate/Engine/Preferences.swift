@@ -35,6 +35,8 @@ nonisolated enum Preferences {
     static let uninstallerSort = "uninstallerSort"
     /// String (`UninstallerModel.UnusedFilter` raw value): "not used for" filter of the Uninstaller's app list, All by default.
     static let uninstallerUnused = "uninstallerUnused"
+    /// String (`UninstallerModel.SourceFilter` raw value): install source filter of the Uninstaller's app list, All by default.
+    static let uninstallerSource = "uninstallerSource"
 
     /// String: ids of Smart Scan groups turned off in Settings › Smart Scan, one per line; never scanned nor shown.
     static let disabledScanGroups = "disabledScanGroups"

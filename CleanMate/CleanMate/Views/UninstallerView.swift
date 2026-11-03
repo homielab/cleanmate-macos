@@ -12,6 +12,7 @@ struct UninstallerView: View {
     @State private var previewURL: URL?
     @AppStorage(Preferences.uninstallerSort) private var sort = UninstallerModel.AppSort.name
     @AppStorage(Preferences.uninstallerUnused) private var unused = UninstallerModel.UnusedFilter.all
+    @AppStorage(Preferences.uninstallerSource) private var source = UninstallerModel.SourceFilter.all
 
     var body: some View {
         HStack(spacing: 0) {
@@ -22,6 +23,7 @@ struct UninstallerView: View {
         .navigationTitle(Text(Module.uninstaller.title))
         .trashUndo(model)
         .onAppearAndChange(of: unused) { model.unused = $0 }
+        .onAppearAndChange(of: source) { model.source = $0 }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Apps"))
         .onFindKey { focusToolbarSearch(in: $0) }
         .toolbar {
@@ -34,7 +36,8 @@ struct UninstallerView: View {
                 .pickerStyle(.inline)
             }
             .help("Sort By")
-            Menu("Show", systemImage: unused == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill") {
+            Menu("Show", systemImage: unused == .all && source == .all ? "line.3.horizontal.decrease.circle"
+                                                                        : "line.3.horizontal.decrease.circle.fill") {
                 Picker("Show", selection: $unused) {
                     Text("All Apps").tag(UninstallerModel.UnusedFilter.all)
                     Text("Not Used for 3 Months").tag(UninstallerModel.UnusedFilter.months3)
@@ -42,8 +45,16 @@ struct UninstallerView: View {
                     Text("Not Used for a Year").tag(UninstallerModel.UnusedFilter.year1)
                 }
                 .pickerStyle(.inline)
+                Picker("Source", selection: $source) {
+                    Text("All Sources").tag(UninstallerModel.SourceFilter.all)
+                    Text("App Store").tag(UninstallerModel.SourceFilter.appStore)
+                    Text("Homebrew").tag(UninstallerModel.SourceFilter.homebrew)
+                    Text("Setapp").tag(UninstallerModel.SourceFilter.setapp)
+                    Text("Downloaded").tag(UninstallerModel.SourceFilter.downloaded)
+                }
+                .pickerStyle(.inline)
             }
-            .help("Show apps not used for a while (apps with no last-opened date are left out)")
+            .help("Show apps not used for a while (apps with no last-opened date are left out), or from one source")
             Button("Refresh", systemImage: "arrow.clockwise") { model.refresh() }
                 .disabled(model.loadingApps || model.working)
         }
@@ -67,7 +78,7 @@ struct UninstallerView: View {
         .alert(outcomeTitle, isPresented: Binding(get: { model.outcome != nil }, set: { if !$0 { model.outcome = nil } }),
                presenting: model.outcome) { outcome in
             switch outcome {
-            case .appNotTrashed(let app), .appLocked(let app):
+            case .appNotTrashed(let app), .appLocked(let app), .appStore(let app):
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
             case .removed(let report):
                 TrashReportButtons(report: report) { await model.undo(report) }
@@ -94,6 +105,10 @@ struct UninstallerView: View {
                 Text("It is locked in Finder. Select it, choose File > Get Info, turn off Locked, then try again. Nothing was moved.")
             case .appBrewBusy:
                 Text("It was installed with Homebrew, and a brew command is running now. Wait until it finishes, then try again. Nothing was moved.")
+            case .appStore:
+                Text("It came from the App Store, and macOS only lets you remove it yourself: remove it in Launchpad or drag it to the Trash in Finder. Its data then shows under “Leftovers of Removed Apps”. Nothing was moved.")
+            case .appDidNotQuit:
+                Text("It may be waiting for you to save a document or answer a question. Switch to it, quit it, then uninstall it. Nothing was moved.")
             case .appNotTrashed:
                 Text("It may belong to the system or another user, for example an App Store app. Drag it to the Trash in Finder, which asks for your password, then remove its leftovers here. Nothing was moved.")
             case .batch(let result):
@@ -106,7 +121,8 @@ struct UninstallerView: View {
         switch model.outcome {
         case .removed(let report): Text("Moved \(report.freed, format: .fileSize) to the Trash")
         case .restored(let result): Text("Put back from the Trash: \(result.restored)")
-        case .appNotTrashed(let app), .appLocked(let app), .appBrewBusy(let app): Text("Couldn’t move \(app.name) to the Trash")
+        case .appNotTrashed(let app), .appLocked(let app), .appBrewBusy(let app), .appStore(let app): Text("Couldn’t move \(app.name) to the Trash")
+        case .appDidNotQuit(let app): Text("\(app.name) didn’t quit")
         case .appTrashCancelled(let app): Text("Uninstall of \(app.name) cancelled")
         case .batch(let result) where result.removed.isEmpty: Text("No apps were uninstalled")
         case .batch(let result): Text("Moved \(result.report.freed, format: .fileSize) to the Trash")
@@ -124,6 +140,7 @@ struct UninstallerView: View {
             case .cancelled: String(localized: "\(app.name) was not moved: the password prompt was cancelled.")
             case .notTrashed: String(localized: "\(app.name) couldn’t be moved to the Trash: it may belong to the system or another user.")
             case .brewBusy: String(localized: "\(app.name) was not moved: it was installed with Homebrew, which is running now. Try again when it finishes.")
+            case .appStore: String(localized: "\(app.name) came from the App Store: remove it in Launchpad or drag it to the Trash in Finder.")
             }
         }
         return ([result.removed.isEmpty ? nil : String(localized: "Uninstalled: \(result.removed.count)")] + skipped
@@ -164,10 +181,7 @@ struct UninstallerView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(app.name).lineLimit(1)
                             Group {
-                                if let cask = app.cask {
-                                    Text("Homebrew cask (\(cask.token))").lineLimit(1)
-                                        .help("Installed with brew install --cask")
-                                }
+                                sourceText(app).lineLimit(1)
                                 sizeText(app).lineLimit(1)
                                 if let lastUsed = app.lastUsed, app.lastUsedIsEstimate {
                                     Text("Last used ≈ \(lastUsed, format: .relative(presentation: .named))").lineLimit(1)
@@ -194,12 +208,17 @@ struct UninstallerView: View {
                     }
                 }
                 if let fixes = UninstallerModel.noMatchFixes(appCount: model.apps.count, shownCount: model.filteredApps.count,
-                                                             search: model.search, unused: unused) {
+                                                             search: model.search, unused: unused, source: source) {
                     VStack(alignment: .leading, spacing: 6) {
                         Label("No Matching Apps", systemImage: "magnifyingglass").foregroundStyle(.secondary)
                         HStack {
                             if fixes.contains(.clearSearch) { Button("Clear Search") { model.search = "" } }
-                            if fixes.contains(.showAll) { Button("Show All Apps") { unused = .all } }
+                            if fixes.contains(.showAll) {
+                                Button("Show All Apps") {
+                                    unused = .all
+                                    source = .all
+                                }
+                            }
                         }
                         .controlSize(.small)
                     }
@@ -240,6 +259,16 @@ struct UninstallerView: View {
     private func ticked(_ url: URL) -> Binding<Bool> {
         Binding(get: { model.appTicks.contains(url) },
                 set: { if $0 { model.appTicks.insert(url) } else { model.appTicks.remove(url) } })
+    }
+
+    /// Where the app came from: "App Store", "Homebrew cask (token)", "Setapp" or "Downloaded".
+    @ViewBuilder private func sourceText(_ app: InstalledApp) -> some View {
+        switch app.source {
+        case .appStore: Text("App Store").help("Installed from the App Store")
+        case .homebrew: Text("Homebrew cask (\(app.cask?.token ?? ""))").help("Installed with brew install --cask")
+        case .setapp: Text("Setapp").help("Installed with Setapp")
+        case .downloaded: Text("Downloaded").help("Not from the App Store, Homebrew or Setapp")
+        }
     }
 
     /// "45 MB · data 1.2 GB" once the app's ~/Library data is measured and not empty.
@@ -316,9 +345,13 @@ struct UninstallerView: View {
                             Button("Show the \(model.appTicks.count) Ticked Apps") { model.selection = nil }
                                 .buttonStyle(.link).font(.callout)
                         }
+                        if app.fromAppStore {
+                            Text("Installed from the App Store. If macOS doesn’t let CleanMate move it, remove it in Launchpad or drag it to the Trash in Finder.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
                         if model.isRunning(app) {
                             HStack {
-                                Text("The app is open. Quit it before uninstalling or resetting it.").foregroundStyle(.orange)
+                                Text("The app is open. “Quit and Uninstall” quits it first; quit it yourself before resetting it.").foregroundStyle(.orange)
                                 Button("Quit App") { model.quit(app) }.buttonStyle(.link)
                             }
                             .font(.callout)
@@ -329,7 +362,8 @@ struct UninstallerView: View {
                         }
                     }
                     entryList(app: app, empty: Text("No Related Files Found"))
-                    footer(button: model.trashApp ? Text("Uninstall…") : Text("Reset…"), app: app)
+                    footer(button: !model.trashApp ? Text("Reset…")
+                           : model.isRunning(app) ? Text("Quit and Uninstall…") : Text("Uninstall…"), app: app)
                 }
             }
         }
@@ -348,7 +382,8 @@ struct UninstallerView: View {
                 Text("Each app goes to the Trash with the data in your Library that surely belongs to it. Items marked “Possibly related” and config in your home folder are kept: select an app on its own to review them.")
                     .font(.callout).foregroundStyle(.secondary)
                 if !open.isEmpty {
-                    Text("Open apps are skipped. Quit them to uninstall them too.").font(.callout).foregroundStyle(.orange)
+                    Text("Open apps are skipped: \(open.map(\.name).formatted(.list(type: .and).locale(locale))). Quit them to uninstall them too.")
+                        .font(.callout).foregroundStyle(.orange)
                 }
             }
             List {
@@ -635,6 +670,7 @@ struct UninstallerView: View {
         let count = model.checkedEntries.count
         let size = model.checkedSize.formatted(.fileSize.locale(locale))
         let uninstalling = app != nil && model.trashApp
+        let open = app.map(model.isRunning) == true
         return HStack {
             // A ticked app row is in `size` too, so count it.
             Text("Selected: \(count + (uninstalling ? 1 : 0)) items, \(size)").monospacedDigit()
@@ -653,8 +689,7 @@ struct UninstallerView: View {
             }
             Button { confirming = true } label: { button }
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.working || model.loadingEntries
-                          || app.map(model.isRunning) == true || (!uninstalling && count == 0))
+                .disabled(model.working || model.loadingEntries || (open && !uninstalling) || (!uninstalling && count == 0))
         }
         .padding()
         .background(.bar)
@@ -664,16 +699,22 @@ struct UninstallerView: View {
         }
         .confirmationDialog(
             app.map { app in
-                uninstalling ? Text("Move \(app.name) and \(count) related items (\(size)) to the Trash?")
+                uninstalling && open ? Text("Quit \(app.name), then move it and \(count) related items (\(size)) to the Trash?")
+                    : uninstalling ? Text("Move \(app.name) and \(count) related items (\(size)) to the Trash?")
                     : Text("Move \(count) data items (\(size)) of \(app.name) to the Trash and keep the app?")
             } ?? Text("Move \(count) items (\(size)) to the Trash?"),
             isPresented: $confirming
         ) {
-            Button(role: .destructive) { Task { await model.remove() } } label: {
-                if app == nil { Text("Move to Trash") } else if uninstalling { Text("Uninstall") } else { Text("Reset") }
+            Button(role: .destructive) { Task { open && uninstalling ? await model.quitAndRemove() : await model.remove() } } label: {
+                if app == nil { Text("Move to Trash") } else if uninstalling && open { Text("Quit and Uninstall") }
+                else if uninstalling { Text("Uninstall") } else { Text("Reset") }
             }
         } message: {
-            Text("You can put them back from the Trash until it is emptied.")
+            if open && uninstalling {
+                Text("CleanMate asks the app to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved. You can put the items back from the Trash until it is emptied.")
+            } else {
+                Text("You can put them back from the Trash until it is emptied.")
+            }
         }
     }
 

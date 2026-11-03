@@ -18,6 +18,20 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     var executableName: String? = nil
     /// The Homebrew cask that installed the app (`brew install --cask`), read from Caskroom.
     var cask: HomebrewCask? = nil
+    /// The bundle holds the App Store's receipt (`Contents/_MASReceipt/receipt`, `Uninstaller.hasAppStoreReceipt`).
+    var fromAppStore = false
+
+    /// Where the app came from, as the list shows and filters it.
+    enum Source: String, CaseIterable, Sendable { case appStore, homebrew, setapp, downloaded }
+
+    /// App Store (receipt) first, then a Homebrew cask, then Setapp (in a `Setapp` folder of an Applications folder);
+    /// anything else was downloaded.
+    var source: Source {
+        if fromAppStore { return .appStore }
+        if cask != nil { return .homebrew }
+        if url.deletingLastPathComponent().lastPathComponent.caseInsensitiveCompare("Setapp") == .orderedSame { return .setapp }
+        return .downloaded
+    }
 
     var id: URL { url }
     /// Every name the app goes by, for `otherAppNames` of the other apps.
@@ -275,7 +289,7 @@ nonisolated enum Uninstaller {
                     version: info?["CFBundleShortVersionString"] as? String,
                     lastUsed: used.date, lastUsedIsEstimate: used.isEstimate,
                     bundleName: info?["CFBundleName"] as? String, executableName: info?["CFBundleExecutable"] as? String,
-                    cask: HomebrewCasks.cask(for: url, in: casks)))
+                    cask: HomebrewCasks.cask(for: url, in: casks), fromAppStore: hasAppStoreReceipt(url)))
             }
         }
         return apps.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -299,6 +313,11 @@ nonisolated enum Uninstaller {
 
     static func modificationDate(_ url: URL) -> Date? {
         (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+
+    /// The App Store leaves its receipt in every app it installs.
+    static func hasAppStoreReceipt(_ app: URL) -> Bool {
+        FileManager.default.fileExists(atPath: app.appending(path: "Contents/_MASReceipt/receipt").path)
     }
 
     /// Allocated size of a file or folder (symlinks not followed).
@@ -591,9 +610,10 @@ nonisolated enum Uninstaller {
     }
 
     /// Why `trash` left everything in place: the app couldn't go to the Trash, the user cancelled the password prompt,
-    /// the app is locked in Finder (`Scanner.isLocked`; `recycle` refuses it too), or it is a Homebrew cask while a
-    /// `brew` command runs (it may be installing or upgrading that very cask).
-    enum AppTrashError: Error, Equatable { case notTrashed, cancelled, locked, brewBusy }
+    /// the app is locked in Finder (`Scanner.isLocked`; `recycle` refuses it too), it is a Homebrew cask while a
+    /// `brew` command runs (it may be installing or upgrading that very cask), or it is an App Store app macOS won't
+    /// let us move (the user removes it in Launchpad or Finder instead of meeting a password prompt).
+    enum AppTrashError: Error, Equatable { case notTrashed, cancelled, locked, brewBusy, appStore }
 
     /// `NSWorkspace.recycle`: like Finder, asks for an admin password when the app is owned by root or the App Store
     ///. Returns where the app now is inside the Trash; throws `CocoaError.userCancelled` if the prompt is cancelled.
@@ -611,8 +631,9 @@ nonisolated enum Uninstaller {
     /// Moves the app (if any) and then its data and config to the Trash, re-checking the policy (`allowsAppData` or
     /// `allowsAppConfig`) right before each item, and that
     /// the app is not open (`isRunning`) right before it goes (its size walk may take seconds).
-    /// If `FileManager.trashItem` is refused for lack of permission (owned by root or another user, App Store), the
-    /// app goes through `recycle` instead. If the app still isn't trashed, nothing else is touched and it throws.
+    /// If `FileManager.trashItem` is refused for lack of permission (owned by root or another user), the app goes
+    /// through `recycle` instead, except an App Store app (`appStore`), which throws `.appStore` without a password
+    /// prompt. If the app still isn't trashed, nothing else is touched and it throws.
     /// Launch agents among the data are booted out first, so they don't keep running a removed program until logout.
     /// An app installed by Homebrew (`cask`) is refused while `brew` runs; once it is in the Trash,
     /// `brew uninstall --cask <token>` (`uninstallCask`) clears Homebrew's record (it finds the app gone and only drops
@@ -620,6 +641,7 @@ nonisolated enum Uninstaller {
     /// `moveToTrash` (app and data), `recycle` and `uninstallCask` are injectable so tests never touch a real app, the real
     /// Trash or brew.
     @concurrent static func trash(app: URL?, data: [AppDataEntry], policy: SafetyPolicy = .current, cask: HomebrewCask? = nil,
+                                  appStore: Bool = false,
                                   launchctl: LaunchAgents.Runner = LaunchAgents.launchctlRunner,
                                   moveToTrash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash,
                                   recycle: @Sendable (URL) async throws -> URL? = recycle,
@@ -637,6 +659,7 @@ nonisolated enum Uninstaller {
             let inTrash: URL?
             // Through `SafeRemoval.trash`: only the app checked moves; one swapped in during the move is logged "failed".
             do { inTrash = try SafeRemoval.trash(app, allows: policy.allowsApp, move: moveToTrash) } catch where isPermissionError(error) {
+                if appStore { throw .appStore }
                 guard policy.allowsApp(app), !isRunning(app) else { throw .notTrashed }
                 do { inTrash = try await SafeRemoval.trash(app, allows: policy.allowsApp, moveAsync: recycle) } catch {
                     if case SafeRemoval.Failure.movedOther = error { failedMove(app, home: policy.homeURL) }

@@ -1,12 +1,32 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ came from the App Store: remove it in Launchpad or drag it to the Trash in Finder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ cài từ App Store: hãy gỡ trong Launchpad hoặc kéo vào Thùng rác trong Finder."
+          }
+        }
+      }
+    },
     "%@ deleted permanently and can’t be recovered." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ bị xoá hẳn, không thể khôi phục."
+          }
+        }
+      }
+    },
+    "%@ didn’t quit" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ không thoát"
           }
         }
       }
@@ -141,6 +161,16 @@
         }
       }
     },
+    "All Sources" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi nguồn"
+          }
+        }
+      }
+    },
     "Another user's folder — view only." : {
       "localizations" : {
         "vi" : {
@@ -167,6 +197,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Một ổ khác được gắn ở đây: không tính vào thư mục này. Các ổ đĩa nằm trong menu Vị trí."
+          }
+        }
+      }
+    },
+    "App Store" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Store"
           }
         }
       }
@@ -227,6 +267,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thư mục build của các dự án có tệp và chỉ mục Git không đổi trong 90 ngày: Cargo, Gradle và Android, Maven, SwiftPM, Flutter, Next.js, Nuxt, SvelteKit, Angular, Turborepo, Haskell, Elixir và Zig, môi trường ảo Python và Pods của CocoaPods. Chuyển vào Thùng rác; công cụ build của dự án sẽ tạo lại"
+          }
+        }
+      }
+    },
+    "CleanMate asks the app to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved. You can put the items back from the Trash until it is emptied." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate yêu cầu ứng dụng thoát và chờ tối đa 10 giây; nếu nó không thoát, không có gì bị di chuyển. Bạn có thể lấy lại các mục từ Thùng rác cho tới khi dọn sạch nó."
           }
         }
       }
@@ -337,6 +387,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã bỏ bản tải về (vẫn trên iCloud)"
+          }
+        }
+      }
+    },
+    "Downloaded" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tải về"
           }
         }
       }
@@ -467,6 +527,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chứa thư mục người dùng của bạn — mở ra để chọn mục chuyển vào Thùng rác."
+          }
+        }
+      }
+    },
+    "Homebrew" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Homebrew"
           }
         }
       }
@@ -1561,6 +1631,36 @@
         }
       }
     },
+    "Installed from the App Store" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài từ App Store"
+          }
+        }
+      }
+    },
+    "Installed from the App Store. If macOS doesn’t let CleanMate move it, remove it in Launchpad or drag it to the Trash in Finder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài từ App Store. Nếu macOS không cho CleanMate chuyển nó, hãy gỡ trong Launchpad hoặc kéo vào Thùng rác trong Finder."
+          }
+        }
+      }
+    },
+    "Installed with Setapp" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài bằng Setapp"
+          }
+        }
+      }
+    },
     "Installers Zoom downloaded to update itself; downloaded again if needed" : {
       "localizations" : {
         "vi" : {
@@ -1605,6 +1705,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Image trung gian do docker build để lại; lần build sau tạo lại. Kích thước có thể tính cả lớp dùng chung với image khác"
+          }
+        }
+      }
+    },
+    "It came from the App Store, and macOS only lets you remove it yourself: remove it in Launchpad or drag it to the Trash in Finder. Its data then shows under “Leftovers of Removed Apps”. Nothing was moved." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng cài từ App Store và macOS chỉ cho bạn tự gỡ: gỡ trong Launchpad hoặc kéo nó vào Thùng rác trong Finder. Sau đó dữ liệu của nó hiện trong “Dữ liệu sót của ứng dụng đã gỡ”. Chưa có gì bị di chuyển."
+          }
+        }
+      }
+    },
+    "It may be waiting for you to save a document or answer a question. Switch to it, quit it, then uninstall it. Nothing was moved." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Có thể ứng dụng đang chờ bạn lưu tài liệu hoặc trả lời một câu hỏi. Hãy chuyển sang nó, thoát nó rồi gỡ lại. Chưa có gì bị di chuyển."
           }
         }
       }
@@ -1709,6 +1829,16 @@
         }
       }
     },
+    "Not from the App Store, Homebrew or Setapp" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không từ App Store, Homebrew hay Setapp"
+          }
+        }
+      }
+    },
     "Not Used for More Than" : {
       "localizations" : {
         "vi" : {
@@ -1725,6 +1855,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Số ảnh"
+          }
+        }
+      }
+    },
+    "Open apps are skipped: %@. Quit them to uninstall them too." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng đang mở sẽ bị bỏ qua: %@. Thoát chúng để gỡ luôn."
           }
         }
       }
@@ -1765,6 +1905,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hệ thống được SIP (Bảo vệ toàn vẹn hệ thống) bảo vệ — chỉ xem."
+          }
+        }
+      }
+    },
+    "Quit %@, then move it and %lld related items (%@) to the Trash?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát %1$@, rồi chuyển nó và %2$lld mục liên quan (%3$@) vào Thùng rác?"
+          }
+        }
+      }
+    },
+    "Quit and Uninstall" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát rồi gỡ"
+          }
+        }
+      }
+    },
+    "Quit and Uninstall…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát rồi gỡ…"
           }
         }
       }
@@ -2751,12 +2921,32 @@
         }
       }
     },
+    "Setapp" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Setapp"
+          }
+        }
+      }
+    },
     "Share CleanMate" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chia sẻ CleanMate"
+          }
+        }
+      }
+    },
+    "Show apps not used for a while (apps with no last-opened date are left out), or from one source" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện app lâu không dùng (app không có ngày mở được bỏ qua), hoặc từ một nguồn"
           }
         }
       }
@@ -2877,6 +3067,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sắp xếp nhóm theo dung lượng của các ảnh thừa, ảnh mới nhất hoặc số ảnh trong nhóm"
+          }
+        }
+      }
+    },
+    "Source" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nguồn"
           }
         }
       }
@@ -3057,12 +3257,12 @@
         }
       }
     },
-    "The app is open. Quit it before uninstalling or resetting it." : {
+    "The app is open. “Quit and Uninstall” quits it first; quit it yourself before resetting it." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ứng dụng đang mở. Hãy thoát trước khi gỡ hoặc đặt lại."
+            "value" : "Ứng dụng đang mở. “Thoát rồi gỡ” sẽ thoát nó trước; muốn đặt lại thì hãy tự thoát nó."
           }
         }
       }
@@ -3523,16 +3723,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hiện"
-          }
-        }
-      }
-    },
-    "Show apps not used for a while (apps with no last-opened date are left out)" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hiện app lâu không dùng (app không có ngày mở được bỏ qua)"
           }
         }
       }
@@ -8691,16 +8881,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mỗi ứng dụng vào Thùng rác cùng dữ liệu trong Library chắc chắn là của nó. Mục ghi “Có thể liên quan” và cấu hình trong thư mục người dùng được giữ lại: chọn riêng từng ứng dụng để xem chúng."
-          }
-        }
-      }
-    },
-    "Open apps are skipped. Quit them to uninstall them too." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ứng dụng đang mở sẽ bị bỏ qua. Thoát chúng để gỡ luôn."
           }
         }
       }
