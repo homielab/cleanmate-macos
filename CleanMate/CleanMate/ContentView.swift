@@ -68,6 +68,8 @@ final class ModuleRouter: ObservableObject {
     @Published var welcomeRequested = false
     /// "View Moved Items…": ContentView opens Moved to the Trash, also on first appearance.
     @Published var trashedItemsRequested = false
+    /// Overview › Suggestions: ContentView opens the module on what the suggestion is about.
+    @Published var suggestion: Suggestion.Target?
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
     var openMainWindow: OpenWindowAction?
 
@@ -96,6 +98,24 @@ final class ModuleRouter: ObservableObject {
     func showTrashedItems() {
         trashedItemsRequested = true
         show(nil)
+    }
+
+    /// Overview › Suggestions: the module where the user decides, showing what the suggestion is about. Nothing is
+    /// ticked or cleaned. A confirmation open on the window keeps it.
+    func open(_ target: Suggestion.Target, defaults: UserDefaults = .standard) {
+        guard Self.mainWindow?.attachedSheet == nil else { NSSound.beep(); return }
+        Self.setFilters(for: target, defaults: defaults)
+        suggestion = target
+        show(target.module)
+    }
+
+    /// The list filters a suggestion opens with, saved where the module's view reads them: the Uninstaller shows apps
+    /// not used for 3 months from every source, largest first.
+    static func setFilters(for target: Suggestion.Target, defaults: UserDefaults = .standard) {
+        guard target == .uninstallerUnused else { return }
+        defaults.set(UninstallerModel.UnusedFilter.months3.rawValue, forKey: Preferences.uninstallerUnused)
+        defaults.set(UninstallerModel.SourceFilter.all.rawValue, forKey: Preferences.uninstallerSource)
+        defaults.set(UninstallerModel.AppSort.size.rawValue, forKey: Preferences.uninstallerSort)
     }
 
     /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
@@ -182,6 +202,7 @@ struct ContentView: View {
             // Read from the models at quit time, not mirrored by this view: closing the window mid-clean left
             // a mirrored flag stuck. Weak: a model a still-running task keeps alive after the window closed counts too.
             overview.spaceLens = spaceLens
+            overview.uninstaller = uninstaller
             AppDelegate.registerBusyCheck(ObjectIdentifier(smartScan),
                                           Self.busyCheck(smartScan, privacy, largeFiles, uninstaller, spaceLens, loginItems))
         }
@@ -199,6 +220,15 @@ struct ContentView: View {
         }
         .onAppearAndChange(of: router.spaceLensFolder) { _ in
             if let url = router.spaceLensFolder { spaceLens.start(at: url); selection = .spaceLens; router.spaceLensFolder = nil }
+        }
+        .onAppearAndChange(of: router.suggestion) { _ in
+            guard let target = router.suggestion else { return }
+            router.suggestion = nil
+            switch target {
+            case .smartScanGroup(let group): smartScan.reveal(group: group)
+            case .uninstallerUnused: uninstaller.search = "" // the filters are set by `open`
+            case .maintenanceSnapshots: maintenance.revealSnapshots()
+            }
         }
         .onAppearAndChange(of: router.welcomeRequested) { _ in
             guard router.welcomeRequested else { return }

@@ -5,24 +5,37 @@ import SwiftUI
 struct MaintenanceView: View {
     @ObservedObject var model: MaintenanceModel
     @State private var confirming: MaintenanceTask?
+    private static let snapshotsID = "local-snapshots"
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Form {
-            Section {
-                ForEach(model.tasks) { task in
-                    let brewBusy = task == .homebrew && model.brewRunning && model.running != .homebrew
-                    MaintenanceRow(task: task, result: model.results[task], canRun: !model.busy && !brewBusy,
-                                   note: brewBusy ? Text("Homebrew is already running. This can run when it finishes.") : nil) {
-                        if task.asksFirst { confirming = task } else { Task { await model.run(task) } }
+        ScrollViewReader { proxy in
+            Form {
+                Section {
+                    ForEach(model.tasks) { task in
+                        let brewBusy = task == .homebrew && model.brewRunning && model.running != .homebrew
+                        MaintenanceRow(task: task, result: model.results[task], canRun: !model.busy && !brewBusy,
+                                       note: brewBusy ? Text("Homebrew is already running. This can run when it finishes.") : nil) {
+                            if task.asksFirst { confirming = task } else { Task { await model.run(task) } }
+                        }
                     }
+                } footer: {
+                    Text("These tasks need no administrator password and remove none of your files. Each run is recorded in Settings › Activity.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-            } footer: {
-                Text("These tasks need no administrator password and remove none of your files. Each run is recorded in Settings › Activity.")
-                    .font(.caption).foregroundStyle(.secondary)
+                if model.showsSnapshots { LocalSnapshotsSection(model: model).id(Self.snapshotsID) }
             }
-            if model.showsSnapshots { LocalSnapshotsSection(model: model) }
+            .formStyle(.grouped)
+            .onAppearAndChange(of: model.revealsSnapshots) { reveal in
+                guard reveal else { return }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(100)) // the module just appeared: the form is not laid out yet
+                    withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(Self.snapshotsID, anchor: .top) }
+                    model.revealsSnapshots = false
+                }
+            }
         }
-        .formStyle(.grouped)
         .overlay {
             if model.tasks.isEmpty && !model.showsSnapshots {
                 EmptyStateView(title: Text("No Matching Tasks"), systemImage: "magnifyingglass")

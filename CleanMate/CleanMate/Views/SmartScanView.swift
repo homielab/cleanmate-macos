@@ -14,6 +14,7 @@ struct SmartScanView: View {
     var readOverview: @MainActor () -> Overview = { Self.readOverview() }
     @State private var overview: Overview?
     @AppStorage(Preferences.disabledScanGroups) private var disabledText = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     struct Overview {
         var volume: SpaceLensModel.Volume
@@ -131,46 +132,49 @@ struct SmartScanView: View {
 
     private var results: some View {
         // Arrow keys move the row selection, Space ticks/unticks it; controls inside rows still take clicks.
-        List(selection: $model.highlighted) {
-            if module == .privacy && !hasFullDiskAccess {
-                fullDiskAccessBanner
-            }
-            if offCount > 0 {
-                HStack {
-                    Text("Groups turned off in Settings: \(offCount)").font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    OpenSettingsButton().controlSize(.small)
+        ScrollViewReader { proxy in
+            List(selection: $model.highlighted) {
+                if module == .privacy && !hasFullDiskAccess {
+                    fullDiskAccessBanner
                 }
-            }
-            if model.isSearching && model.shownGroups.isEmpty {
-                Text("No matching items").foregroundStyle(.secondary)
-            }
-            ForEach(model.shownGroups) { group in
-                // Bars compare items within their group: one huge item (DerivedData) would flatten every bar list-wide.
-                let largest = group.items.compactMap { model.scans[$0.id]?.size }.max() ?? 0
-                // Section(isExpanded:) needs macOS 14; the header draws the disclosure arrow anyway.
-                Section {
-                    // A search shows what it finds in folded groups too.
-                    if model.isSearching || !model.collapsedGroups.contains(group.id) {
-                        ForEach(group.items) { item in
-                            CleanerItemRow(item: item, scan: model.scans[item.id], isOn: selection(item),
-                                           isRunning: model.isRunning(item), isBlocked: model.blocked.contains(item.id),
-                                           quit: { model.quitApps(of: item) },
-                                           groupImage: group.systemImage, largestInGroup: largest,
-                                           entryOn: item.selectableEntries ? { url in entrySelection(item, url) } : nil,
-                                           selectedSize: model.partialSelectedSize(item),
-                                           highlight: { model.highlighted = [item.id] },
-                                           neverClean: { url in
-                                               if model.neverClean(item, url) { excludedCount += 1 }
-                                           },
-                                           entryFilter: entryFilter(item))
-                                .tag(item.id)
-                        }
+                if offCount > 0 {
+                    HStack {
+                        Text("Groups turned off in Settings: \(offCount)").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        OpenSettingsButton().controlSize(.small)
                     }
-                } header: {
-                    groupHeader(group)
+                }
+                if model.isSearching && model.shownGroups.isEmpty {
+                    Text("No matching items").foregroundStyle(.secondary)
+                }
+                ForEach(model.shownGroups) { group in
+                    // Bars compare items within their group: one huge item (DerivedData) would flatten every bar list-wide.
+                    let largest = group.items.compactMap { model.scans[$0.id]?.size }.max() ?? 0
+                    // Section(isExpanded:) needs macOS 14; the header draws the disclosure arrow anyway.
+                    Section {
+                        // A search shows what it finds in folded groups too.
+                        if model.isSearching || !model.collapsedGroups.contains(group.id) {
+                            ForEach(group.items) { item in
+                                CleanerItemRow(item: item, scan: model.scans[item.id], isOn: selection(item),
+                                               isRunning: model.isRunning(item), isBlocked: model.blocked.contains(item.id),
+                                               quit: { model.quitApps(of: item) },
+                                               groupImage: group.systemImage, largestInGroup: largest,
+                                               entryOn: item.selectableEntries ? { url in entrySelection(item, url) } : nil,
+                                               selectedSize: model.partialSelectedSize(item),
+                                               highlight: { model.highlighted = [item.id] },
+                                               neverClean: { url in
+                                                   if model.neverClean(item, url) { excludedCount += 1 }
+                                               },
+                                               entryFilter: entryFilter(item))
+                                    .tag(item.id)
+                            }
+                        }
+                    } header: {
+                        groupHeader(group)
+                    }
                 }
             }
+            .onAppearAndChange(of: model.revealedGroup) { reveal($0, proxy) }
         }
         .onSpaceKey {
             guard !model.highlighted.isEmpty else { return false }
@@ -247,6 +251,16 @@ struct SmartScanView: View {
         guard total.records > 0 else { return bytes }
         let recordsText = Text("\(total.records) records")
         return total.size == 0 && total.upTo == 0 ? recordsText : Text("\(bytes) + \(recordsText)")
+    }
+
+    /// Overview › Suggestions asked for `group`: scrolls to its first row once the list is laid out.
+    private func reveal(_ group: String?, _ proxy: ScrollViewProxy) {
+        guard let group, let first = model.shownGroups.first(where: { $0.id == group })?.items.first else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(100)) // the module just appeared: rows are not laid out yet
+            withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(first.id, anchor: .center) }
+            model.revealedGroup = nil
+        }
     }
 
     /// Open while a search shows what it finds in the group, even one folded away.

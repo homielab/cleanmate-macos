@@ -111,6 +111,62 @@
         }
       }
     },
+    "%lld apps you have not opened for 3 months, largest first." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld app you have not opened for 3 months."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld apps you have not opened for 3 months, largest first."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ứng dụng bạn chưa mở trong 3 tháng, lớn nhất trước."
+          }
+        }
+      }
+    },
+    "%lld files in Downloads you have not used for a while. Review them before they go to the Trash." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld file in Downloads you have not used for a while. Review it before it goes to the Trash."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld files in Downloads you have not used for a while. Review them before they go to the Trash."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld tệp trong Downloads đã lâu bạn không dùng. Xem lại trước khi chuyển vào Thùng rác."
+          }
+        }
+      }
+    },
     "%lld in use or locked, skipped" : {
       "localizations" : {
         "vi" : {
@@ -237,6 +293,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ứng dụng và công cụ sẽ tự tạo lại bộ nhớ đệm khi cần."
+          }
+        }
+      }
+    },
+    "Apps not opened for 3 months" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng không mở trong 3 tháng"
           }
         }
       }
@@ -491,6 +557,16 @@
         }
       }
     },
+    "Each one opens the place where you choose what to remove. Nothing is cleaned from here." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mỗi gợi ý mở đúng nơi bạn chọn thứ cần xoá. Không có gì bị dọn từ đây."
+          }
+        }
+      }
+    },
     "Erasing cookies signs you out of websites." : {
       "localizations" : {
         "vi" : {
@@ -531,6 +607,16 @@
         }
       }
     },
+    "Files deleted from your external drives still take space on them." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp đã xoá khỏi ổ ngoài vẫn chiếm chỗ trên các ổ đó."
+          }
+        }
+      }
+    },
     "Files in iCloud Drive never go to the Trash. Remove the download to free the space." : {
       "localizations" : {
         "vi" : {
@@ -547,6 +633,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp WhatsApp giữ trong thư mục Caches để mở nhanh hơn; app tạo lại. Trò chuyện, ảnh và tệp nằm ở thư mục khác và không bao giờ bị đụng tới"
+          }
+        }
+      }
+    },
+    "Files you deleted still take this space until the Trash is emptied." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp bạn đã xoá vẫn chiếm chỗ này cho tới khi dọn sạch Thùng rác."
           }
         }
       }
@@ -587,6 +683,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm ảnh tương tự"
+          }
+        }
+      }
+    },
+    "Found by the last Smart Scan and not cleaned since." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lần Smart Scan gần nhất tìm thấy, chưa dọn từ đó."
           }
         }
       }
@@ -707,6 +813,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ảnh"
+          }
+        }
+      }
+    },
+    "Images, stopped containers, volumes and build cache nothing uses. Docker is never started to measure them." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image, container đã dừng, volume và build cache không còn dùng. CleanMate không khởi động Docker để đo."
           }
         }
       }
@@ -1969,12 +2085,32 @@
         }
       }
     },
+    "Looking for space you can free…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang tìm chỗ có thể giải phóng…"
+          }
+        }
+      }
+    },
     "Measured %@" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đo lúc %@"
+          }
+        }
+      }
+    },
+    "Measuring their size needs administrator rights. macOS deletes them by itself when it needs the space." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đo dung lượng của chúng cần quyền quản trị. macOS tự xoá chúng khi cần chỗ."
           }
         }
       }
@@ -1995,6 +2131,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không còn trong Thùng rác."
+          }
+        }
+      }
+    },
+    "No suggestions — your disk is in good shape." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có gợi ý — ổ đĩa gọn gàng."
           }
         }
       }
@@ -2035,6 +2181,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Số ảnh"
+          }
+        }
+      }
+    },
+    "Old installers and downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ cài và tệp tải về cũ"
+          }
+        }
+      }
+    },
+    "Open %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở %@"
           }
         }
       }
@@ -3429,6 +3595,16 @@
         }
       }
     },
+    "Suggestions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gợi ý"
+          }
+        }
+      }
+    },
     "System Integrity Protection" : {
       "localizations" : {
         "vi" : {
@@ -3673,6 +3849,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bỏ chọn những gì bạn muốn giữ lại."
+          }
+        }
+      }
+    },
+    "Unused Docker data" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dữ liệu Docker không dùng"
           }
         }
       }

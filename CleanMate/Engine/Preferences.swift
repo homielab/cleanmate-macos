@@ -141,20 +141,25 @@ nonisolated enum Preferences {
     }
 }
 
-/// The last finished Smart Scan, for the menu bar item: when, what it found, what its ticked items would free, and,
-/// once cleaned, what the clean freed (the same bytes the activity log records).
+/// The last finished Smart Scan, for the menu bar item and the Overview's suggestions: when, what it found, what its
+/// ticked items would free, what was found per group and, once cleaned, what the clean freed (the same bytes the
+/// activity log records).
 nonisolated struct LastScan: Equatable, Sendable {
     var date: Date
     var size: Int64
     var cleaned: Int64?
     /// Everything the scan found, ticked or not; nil in records saved before it was kept (`junk` falls back to `size`).
     var found: Int64?
+    /// Bytes found per group id, ticked or not, less what a clean of these results freed since; nil in records saved
+    /// before it was kept. Items the Overview measures live (the Trash, Downloads, Docker) are left out.
+    var groups: [String: Int64]?
 
-    init(date: Date, size: Int64, cleaned: Int64? = nil, found: Int64? = nil) {
+    init(date: Date, size: Int64, cleaned: Int64? = nil, found: Int64? = nil, groups: [String: Int64]? = nil) {
         self.date = date
         self.size = size
         self.cleaned = cleaned
         self.found = found
+        self.groups = groups
     }
 
     /// The junk the scan found, for the menu bar item.
@@ -163,22 +168,29 @@ nonisolated struct LastScan: Equatable, Sendable {
     static func read(defaults: UserDefaults = .standard) -> LastScan? {
         let stored: [String: Any] = Preferences.dictionary(Preferences.lastSmartScan, defaults: defaults)
         guard let seconds = stored["date"] as? Double, let size = (stored["size"] as? NSNumber)?.int64Value else { return nil }
+        let groups = (stored["groups"] as? [String: NSNumber])?.mapValues(\.int64Value)
         return LastScan(date: Date(timeIntervalSince1970: seconds), size: size,
                         cleaned: (stored["cleaned"] as? NSNumber)?.int64Value,
-                        found: (stored["found"] as? NSNumber)?.int64Value)
+                        found: (stored["found"] as? NSNumber)?.int64Value, groups: groups)
     }
 
     func save(defaults: UserDefaults = .standard) {
         var stored: [String: Any] = ["date": date.timeIntervalSince1970, "size": NSNumber(value: size)]
         if let cleaned { stored["cleaned"] = NSNumber(value: cleaned) }
         if let found { stored["found"] = NSNumber(value: found) }
+        if let groups { stored["groups"] = groups.mapValues { NSNumber(value: $0) } }
         defaults.set(stored, forKey: Preferences.lastSmartScan)
     }
 
-    /// A clean of the last scan's results: keeps its date, adds what was freed.
-    static func recordClean(freed: Int64, defaults: UserDefaults = .standard) {
+    /// A clean of the last scan's results: keeps its date, adds what was freed and takes what each group freed
+    /// (`freedByGroup`, group id → bytes) off that group.
+    static func recordClean(freed: Int64, freedByGroup: [String: Int64] = [:], defaults: UserDefaults = .standard) {
         guard var last = read(defaults: defaults) else { return }
         last.cleaned = (last.cleaned ?? 0) + freed
+        if var groups = last.groups {
+            for (id, bytes) in freedByGroup where groups[id] != nil { groups[id] = max(0, groups[id]! - bytes) }
+            last.groups = groups
+        }
         last.save(defaults: defaults)
     }
 }

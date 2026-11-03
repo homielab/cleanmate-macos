@@ -1,10 +1,10 @@
 import Combine
 import Foundation
 
-/// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, space outside
-/// the user's folders, the largest folders in the home folder and whether macOS's protections are on.
-/// Read-only. Drives, freed space and the last Smart Scan are read at once; folder sizes, local snapshots and protections
-/// are read in the background. The folder sizes of the last launch (`HomeFolderSizes`) show until the new measure ends.
+/// Overview: what to do next, drives and their free space, free space over the last 30 days, what CleanMate freed,
+/// space outside the user's folders, the largest folders in the home folder and whether macOS's protections are on.
+/// Read-only. Drives, freed space and the last Smart Scan are read at once; suggestions, folder sizes, local snapshots
+/// and protections are read in the background. The folder sizes of the last launch (`HomeFolderSizes`) show until the new measure ends.
 final class OverviewModel: ObservableObject {
     nonisolated struct Disk: Identifiable, Equatable, Sendable {
         let url: URL
@@ -58,6 +58,12 @@ final class OverviewModel: ObservableObject {
     @Published private(set) var savedSizesDate: Date?
     /// The last finished Smart Scan, as in the menu bar item; nil before the first one.
     @Published private(set) var lastScan: LastScan?
+    /// Where space can be won next, largest first (`OverviewSuggestions`); nil until first read.
+    @Published private(set) var suggestions: [Suggestion]?
+    @Published private(set) var suggesting = false
+    /// When the suggestions shown were read: older than `suggestionsMaxAge`, they are read again when the Overview shows.
+    private(set) var suggestionsDate: Date?
+    static let suggestionsMaxAge: TimeInterval = 10 * 60
 
     /// Injectable for tests: the folder measured and the activity log read.
     var home = SafetyPolicy.current.homeURL
@@ -85,13 +91,18 @@ final class OverviewModel: ObservableObject {
     var readSnapshots: @Sendable () async -> LocalSnapshots = {
         OverviewModel.isTesting ? .unreadable : await LocalSnapshots.read()
     }
+    /// What the suggestions read live; under tests nothing unless a test passes its own.
+    var suggestionSources: OverviewSuggestions.Sources = OverviewModel.isTesting ? .none : .live
     nonisolated static var isTesting: Bool { ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil }
     /// Space Lens takes the sizes measured here, so opening a folder from the list is instant.
     weak var spaceLens: SpaceLensModel?
+    /// The suggestions take its app list and sizes when already loaded, so they are not read twice.
+    weak var uninstaller: UninstallerModel?
 
     private var task: Task<Void, Never>?
     private var securityTask: Task<Void, Never>?
     private var snapshotsTask: Task<Void, Never>?
+    private var suggestionsTask: Task<Void, Never>?
     private var started = false
     /// Something was removed since the last measure: measure again next time the Overview is shown.
     private var stale = false
@@ -106,9 +117,16 @@ final class OverviewModel: ObservableObject {
     }
 
     /// When the Overview is shown: everything the first time or after a removal, else drives, freed space, local
-    /// snapshots and protections only (a setting may have changed in System Settings meanwhile).
+    /// snapshots and protections (a setting may have changed in System Settings meanwhile), and the suggestions once
+    /// they are older than `suggestionsMaxAge`.
     func startIfNeeded() {
-        if !started || stale { refresh() } else { readQuick(); readSnapshotList(); readSecurityStatus() }
+        guard started, !stale else { return refresh() }
+        readQuick()
+        readSnapshotList()
+        readSecurityStatus()
+        if !suggesting, suggestionsDate.map({ now().timeIntervalSince($0) > Self.suggestionsMaxAge }) ?? true {
+            readSuggestions()
+        }
     }
 
     /// "Refresh" and ⌘R: reads everything again.
@@ -119,6 +137,7 @@ final class OverviewModel: ObservableObject {
         readSnapshotList()
         readSecurityStatus()
         measureFolders()
+        readSuggestions()
     }
 
     /// Stops measuring; the folders shown stay.
@@ -155,6 +174,27 @@ final class OverviewModel: ObservableObject {
             let status = await read()
             guard !Task.isCancelled else { return }
             security = status
+        }
+    }
+
+    /// In the background after the local snapshots (a suggestion counts them); ⌘. does not stop it. The suggestions
+    /// shown stay until the new ones replace them.
+    private func readSuggestions() {
+        suggestionsTask?.cancel()
+        let sources = suggestionSources, lastScan = lastScan, hasFullDiskAccess = hasFullDiskAccess(), now = now()
+        let apps = uninstaller.flatMap { $0.loadingApps || $0.apps.isEmpty ? nil : $0.apps }
+        let appSizes = uninstaller?.appSizes ?? [:]
+        let snapshotList = snapshotsTask
+        suggesting = true
+        suggestionsTask = Task {
+            await snapshotList?.value
+            let found = await OverviewSuggestions.read(lastScan: lastScan, snapshots: snapshots,
+                                                       hasFullDiskAccess: hasFullDiskAccess, apps: apps,
+                                                       appSizes: appSizes, now: now, sources: sources)
+            guard !Task.isCancelled else { return }
+            suggestions = found
+            suggestionsDate = now
+            suggesting = false
         }
     }
 

@@ -68,6 +68,15 @@ final class MaintenanceModel: ObservableObject {
         MaintenanceTask.allCases.filter { ($0 != .homebrew || brewInstalled) && Self.matches($0, search) }
     }
 
+    /// Overview › Suggestions asked for the local snapshots: the form scrolls to them once, then clears it.
+    @Published var revealsSnapshots = false
+
+    /// Overview › Suggestions: clears the search so the snapshots section shows, and scrolls to it.
+    func revealSnapshots() {
+        search = ""
+        revealsSnapshots = true
+    }
+
     /// The local snapshots section is shown: no search, or one that matches its title or description.
     var showsSnapshots: Bool { Self.matches(search, Self.snapshotsTitle, Self.snapshotsSummary) }
 

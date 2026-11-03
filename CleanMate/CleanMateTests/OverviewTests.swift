@@ -252,6 +252,192 @@ struct OverviewTests {
         model.startIfNeeded()
         #expect(model.lastScan == last)
     }
+
+    // MARK: Suggestions
+
+    static let gb: Int64 = 1_000_000_000
+
+    /// Apps whose last use was `daysAgo` days before `now`.
+    static func app(_ name: String, daysAgo: Double?) -> InstalledApp {
+        InstalledApp(url: URL(filePath: "/Applications/\(name).app"), name: name, bundleID: "com.test.\(name)",
+                     version: nil, lastUsed: daysAgo.map { now.addingTimeInterval(-$0 * 86_400) })
+    }
+
+    /// Trash 1 GB, Docker 5 GB and 3 apps not opened for 90 days: three suggestions, largest first, each opening its
+    /// module with the right filter. Without Full Disk Access the external Trash and Downloads are never read.
+    @MainActor @Test func trashDockerAndUnusedAppsMakeThreeSuggestions() async throws {
+        let protectedReads = Counter()
+        var sources = OverviewSuggestions.Sources.none
+        sources.trash = { Self.gb }
+        sources.docker = { 5 * Self.gb }
+        sources.externalTrash = { protectedReads.add(); return 9 * Self.gb }
+        sources.downloads = { protectedReads.add(); return (4, 9 * Self.gb) }
+        let apps = [Self.app("Old1", daysAgo: 100), Self.app("Old2", daysAgo: 200), Self.app("Old3", daysAgo: 400),
+                    Self.app("Recent", daysAgo: 10), Self.app("Undated", daysAgo: nil)]
+        let sizes: [URL: Int64] = [apps[0].url: 600_000_000, apps[1].url: 300_000_000]
+        sources.appSize = { $0 == apps[2].url ? 100_000_000 : 50 * Self.gb } // only Old3 is not measured yet
+
+        let found = await OverviewSuggestions.read(lastScan: nil, snapshots: LocalSnapshots(count: 0),
+                                                   hasFullDiskAccess: false, apps: apps, appSizes: sizes,
+                                                   now: Self.now, sources: sources)
+        #expect(found.map(\.id) == ["docker", "trash", "unused-apps"])
+        #expect(found.map(\.size) == [5 * Self.gb, Self.gb, Self.gb])
+        #expect(found[2].count == 3)
+        #expect(found.map(\.target) == [.smartScanGroup("developer"), .smartScanGroup("trash"), .uninstallerUnused])
+        #expect(found.map(\.target.module) == [.smartScan, .smartScan, .uninstaller])
+        #expect(protectedReads.value == 0)
+
+        // The Uninstaller opens on apps unused for 3 months, from every source, largest first.
+        let suite = TestDefaults.suite("CleanMateOverviewTests")
+        defer { TestDefaults.remove(suite) }
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set(UninstallerModel.UnusedFilter.all.rawValue, forKey: Preferences.uninstallerUnused)
+        defaults.set(UninstallerModel.SourceFilter.appStore.rawValue, forKey: Preferences.uninstallerSource)
+        ModuleRouter.setFilters(for: .smartScanGroup("trash"), defaults: defaults) // Smart Scan: no filter to set
+        #expect(defaults.string(forKey: Preferences.uninstallerUnused) == UninstallerModel.UnusedFilter.all.rawValue)
+        ModuleRouter.setFilters(for: .uninstallerUnused, defaults: defaults)
+        #expect(defaults.string(forKey: Preferences.uninstallerUnused) == UninstallerModel.UnusedFilter.months3.rawValue)
+        #expect(defaults.string(forKey: Preferences.uninstallerSource) == UninstallerModel.SourceFilter.all.rawValue)
+        #expect(defaults.string(forKey: Preferences.uninstallerSort) == UninstallerModel.AppSort.size.rawValue)
+        #expect(Suggestion.Target.maintenanceSnapshots.module == .maintenance)
+    }
+
+    /// With Full Disk Access the external Trash and old downloads count too; Docker not running adds nothing; the
+    /// app list is read when the Uninstaller has not loaded it.
+    @Test func fullDiskAccessAddsExternalTrashAndDownloads() async {
+        var sources = OverviewSuggestions.Sources.none
+        sources.externalTrash = { 2 * Self.gb }
+        sources.downloads = { (7, 3 * Self.gb) }
+        sources.apps = { [Self.app("Old", daysAgo: 120)] }
+        sources.appSize = { _ in 400_000_000 }
+        let found = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: true, apps: nil,
+                                                   appSizes: [:], now: Self.now, sources: sources)
+        #expect(found.map(\.id) == ["downloads", "external-trash", "unused-apps"]) // empty Trash (0) left out
+        #expect(found[0].count == 7 && found[0].target == .smartScanGroup("system-junk"))
+        #expect(found[1].target == .smartScanGroup("trash"))
+        #expect(found[2].size == 400_000_000 && found[2].count == 1)
+    }
+
+    /// The last Smart Scan's groups count while the scan is under 30 days old; the Trash group is measured live
+    /// instead; under 100 MB is left out; at most 5, largest first, snapshots (no size) kept last.
+    @Test func lastScanGroupsRankedAndCapped() async throws {
+        let groups: [String: Int64] = ["developer": 12 * Self.gb, "system-junk": 3 * Self.gb,
+                                       "applications": 2 * Self.gb, "ai-tools": 50_000_000,
+                                       "trash": 40 * Self.gb, "unknown-group": 50 * Self.gb]
+        let recent = LastScan(date: Self.now.addingTimeInterval(-86_400), size: 0, groups: groups)
+        var sources = OverviewSuggestions.Sources.none
+        sources.trash = { 4 * Self.gb }
+        let found = await OverviewSuggestions.read(lastScan: recent, snapshots: LocalSnapshots(count: 3),
+                                                   hasFullDiskAccess: false, apps: [], appSizes: [:],
+                                                   now: Self.now, sources: sources)
+        #expect(found.count == OverviewSuggestions.limit)
+        #expect(found.map(\.id) == ["junk-developer", "trash", "junk-system-junk", "junk-applications", "snapshots"])
+        #expect(found[0].target == .smartScanGroup("developer") && found[0].systemImage == "hammer")
+        let snapshots = try #require(found.last)
+        #expect(snapshots.size == nil && snapshots.count == 3 && snapshots.target == .maintenanceSnapshots)
+
+        let old = LastScan(date: Self.now.addingTimeInterval(-31 * 86_400), size: 0, groups: groups)
+        #expect(OverviewSuggestions.junk(old, now: Self.now).isEmpty)
+        #expect(OverviewSuggestions.junk(LastScan(date: Self.now, size: 5), now: Self.now).isEmpty) // older record
+
+        let none = await OverviewSuggestions.read(lastScan: nil, snapshots: .unreadable, hasFullDiskAccess: true,
+                                                  apps: [], appSizes: [:], now: Self.now, sources: .none)
+        #expect(none.isEmpty)
+    }
+
+    /// Read in the background when the Overview first shows, not again within 10 minutes, again after; ⌘R and a
+    /// clean elsewhere read them at once.
+    @MainActor @Test func suggestionsReadAgainAfterTenMinutesOrAClean() async throws {
+        let reads = Counter()
+        let clock = Locked(Self.now)
+        let center = NotificationCenter()
+        let model = OverviewModel(center: center)
+        model.home = home
+        model.readDisks = { [] }
+        model.measure = { _, _, _ in (0, [:]) }
+        model.now = { clock.withLock { $0 } }
+        model.hasFullDiskAccess = { false }
+        var sources = OverviewSuggestions.Sources.none
+        sources.trash = { reads.add(); return 2 * Self.gb }
+        model.suggestionSources = sources
+        func settle() async throws { while model.suggesting { try await Task.sleep(for: .milliseconds(5)) } }
+
+        #expect(model.suggestions == nil)
+        model.startIfNeeded()
+        #expect(model.suggesting)
+        try await settle()
+        #expect(reads.value == 1 && model.suggestions?.map(\.id) == ["trash"])
+
+        clock.withLock { $0 += 9 * 60 }
+        model.startIfNeeded()
+        try await settle()
+        #expect(reads.value == 1)
+
+        clock.withLock { $0 += 2 * 60 }
+        model.startIfNeeded()
+        try await settle()
+        #expect(reads.value == 2)
+
+        model.refresh()
+        try await settle()
+        #expect(reads.value == 3)
+
+        center.post(name: ActivityLog.didRecord, object: "Uninstaller")
+        model.startIfNeeded()
+        try await settle()
+        #expect(reads.value == 4)
+        model.cancel()
+    }
+
+    /// The last scan keeps what each group found and loses what a clean of those results freed.
+    @Test func lastScanGroupsRoundTripAndShrinkWhenCleaned() {
+        let suite = TestDefaults.suite("CleanMateOverviewTests")
+        defer { TestDefaults.remove(suite) }
+        guard let defaults = UserDefaults(suiteName: suite) else { Issue.record("no defaults"); return }
+        LastScan(date: Self.now, size: 9, groups: ["developer": 5_000, "applications": 700]).save(defaults: defaults)
+        #expect(LastScan.read(defaults: defaults)?.groups == ["developer": 5_000, "applications": 700])
+        LastScan.recordClean(freed: 1_900, freedByGroup: ["developer": 1_000, "applications": 900, "ai-tools": 5],
+                             defaults: defaults)
+        let read = LastScan.read(defaults: defaults)
+        #expect(read?.groups == ["developer": 4_000, "applications": 0] && read?.cleaned == 1_900)
+    }
+
+    /// Smart Scan per group: what was found (exact sizes only, live items left out) and what a clean freed; a
+    /// suggestion unfolds its group, clears the search and scans when there are no results.
+    @MainActor @Test func smartScanFoundAndFreedPerGroupAndReveal() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let a = CleanerItem(id: "s390.a", title: "A", paths: ["/nonexistent"])
+        let b = CleanerItem(id: "s390.b", title: "B", paths: ["/nonexistent"])
+        let upTo = CleanerItem(id: "s390.up", title: "Up", paths: ["/nonexistent"], sizeIsUpperBound: true)
+        let live = CleanerItem(id: "s390.live", title: "Live", paths: ["/nonexistent"])
+        let model = SmartScanModel.isolated(module: .smartScan) {
+            [CleanerGroup(id: "g1", title: "G1", systemImage: "x", items: [a, upTo, live]),
+             CleanerGroup(id: "g2", title: "G2", systemImage: "x", items: [b])]
+        }
+        model.processNames = { [] }
+        model.appBundleIDs = { [] }
+        model.logHome = home // not the real activity log
+        let sizes: [String: Int64] = ["s390.a": 100, "s390.b": 30, "s390.up": 500, "s390.live": 7]
+        model.scanItem = { item, _ in ItemScan(measuredSize: sizes[item.id] ?? 0) }
+        model.collapsedGroups = ["g2"]
+        model.search = "zzz"
+        #expect(model.foundByGroup().isEmpty)
+
+        model.reveal(group: "g2")
+        #expect(model.revealedGroup == "g2" && model.search.isEmpty && model.collapsedGroups.isEmpty)
+        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(5)) }
+        guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(model.foundByGroup(leavingOut: ["s390.live"]) == ["g1": 100, "g2": 30])
+
+        model.reveal(group: "g1") // results shown: no new scan
+        guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+
+        model.cleanItem = { item, scan, _ in CleanReport(freed: item.id == "s390.b" ? 0 : scan.size) }
+        model.selected = ["s390.a", "s390.b", "s390.live"]
+        await model.clean()
+        #expect(model.freedByGroup() == ["g1": 107])
+        #expect(model.freedByGroup(leavingOut: ["s390.live"]) == ["g1": 100])
+    }
 }
 
 private final class Counter: @unchecked Sendable {

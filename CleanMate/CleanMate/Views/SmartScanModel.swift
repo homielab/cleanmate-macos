@@ -18,6 +18,8 @@ final class SmartScanModel: ObservableObject {
     @Published var excludedEntries: [String: Set<URL>] = [:]
     /// Ids of result groups the user folded away; per session, kept across rescans since group ids are stable.
     @Published var collapsedGroups: Set<String> = []
+    /// Group Overview › Suggestions asked for: the results scroll to it once, then clear it.
+    @Published var revealedGroup: String?
     /// Item ids of the result rows highlighted with the keyboard/mouse (List selection), not the ticks.
     @Published var highlighted: Set<String> = []
     /// The toolbar search (⌘F) over the results: item names and entry paths. Kept across scans, like the other searches.
@@ -119,21 +121,23 @@ final class SmartScanModel: ObservableObject {
         if realSmartScan {
             disabledGroups = { Preferences.disabledGroups() }
             scanFinished = { model in
-                LastScan(date: .now, size: model.selectedSize, found: model.foundSize).save()
+                LastScan(date: .now, size: model.selectedSize, found: model.foundSize,
+                         groups: model.foundByGroup(leavingOut: OverviewSuggestions.liveItems)).save()
                 DiskHistory.shared.recordNow()
                 Task { await ScanReminderScheduler.shared.postpone() }
                 Task { await LowDiskWarningChecker.shared.check() }
-            }
-            cleanFinished = { report in
-                LastScan.recordClean(freed: report.freed)
-                DiskHistory.shared.recordNow()
-                Task { await LowDiskWarningChecker.shared.check() }
-                Task { await CleanFinishedNotifier.shared.post(report, module: module) }
             }
         }
         groups = []
         groups = enabledGroups()
         if realSmartScan {
+            cleanFinished = { [weak self] report in
+                LastScan.recordClean(freed: report.freed,
+                                     freedByGroup: self?.freedByGroup(leavingOut: OverviewSuggestions.liveItems) ?? [:])
+                DiskHistory.shared.recordNow()
+                Task { await LowDiskWarningChecker.shared.check() }
+                Task { await CleanFinishedNotifier.shared.post(report, module: module) }
+            }
             observers.append(NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil,
                                                                     queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.refreshDisabled() }
@@ -462,6 +466,32 @@ final class SmartScanModel: ObservableObject {
 
     private var items: [CleanerItem] { activeGroups.flatMap(\.items) }
 
+    /// What the last clean freed per item id.
+    private(set) var freedByItem: [String: Int64] = [:]
+
+    /// Bytes found per shown group (exact sizes only, not upper bounds), leaving out `leavingOut` item ids; groups
+    /// that found nothing are left out.
+    func foundByGroup(leavingOut: Set<String> = []) -> [String: Int64] {
+        perGroup(leavingOut: leavingOut) { item in
+            guard let scan = scans[item.id], !item.sizeIsUpperBound else { return 0 }
+            return scan.size
+        }
+    }
+
+    /// What the last clean freed per group, leaving out `leavingOut` item ids; groups that freed nothing are left out.
+    func freedByGroup(leavingOut: Set<String> = []) -> [String: Int64] {
+        perGroup(leavingOut: leavingOut) { freedByItem[$0.id] ?? 0 }
+    }
+
+    private func perGroup(leavingOut: Set<String>, _ bytes: (CleanerItem) -> Int64) -> [String: Int64] {
+        var sizes: [String: Int64] = [:]
+        for group in activeGroups {
+            let size = group.items.filter { !leavingOut.contains($0.id) }.reduce(Int64(0)) { $0 + bytes($1) }
+            if size > 0 { sizes[group.id] = size }
+        }
+        return sizes
+    }
+
     /// An item still being scanned as the "Scanning: …" line shows it: its time once it passes `slowAfter`.
     nonisolated struct ScanningItem: Equatable { let id: String; var seconds: Int? }
     /// The items shown, longest first, and how many more are being scanned.
@@ -617,6 +647,18 @@ final class SmartScanModel: ObservableObject {
         scanFinished(self)
     }
 
+    /// Overview › Suggestions: shows `group` unfolded, scanning first when there are no results to show it in
+    /// (a scan or a clean under way is left to finish). Nothing is ticked or cleaned.
+    func reveal(group: String) {
+        search = ""
+        collapsedGroups.remove(group)
+        revealedGroup = group
+        switch phase {
+        case .idle, .done: if !undoing { startScan() }
+        case .scanning, .results, .cleaning: break
+        }
+    }
+
     /// Only from results: a second call, or one after a new scan started (⌘R behind the dialog), does nothing.
     func clean() async {
         guard case .results = phase else { return }
@@ -637,6 +679,7 @@ final class SmartScanModel: ObservableObject {
         let openPaths: OpenPaths = { await openFiles.paths(under: $0) }
         undoManager?.removeAllActions(withTarget: self)
         trashedItemNames = [:]
+        freedByItem = [:]
         for item in todo {
             guard let scan = selectedScan(item) else { continue } // only the ticked entries
             cleaningItem = item.title
@@ -644,6 +687,7 @@ final class SmartScanModel: ObservableObject {
             if isLocked(item) { report.skipped += 1; continue }
             let result = await cleanItem(item, scan, openPaths)
             report += result
+            freedByItem[item.id, default: 0] += result.freed
             if let index = groups.firstIndex(where: { $0.items.contains { $0.id == item.id } }) {
                 byGroup[index].freed += result.freed
                 if item.mode == .trash { byGroup[index].trashed += result.freed }

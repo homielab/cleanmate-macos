@@ -572,16 +572,30 @@ struct UISnapshots {
         let snapshots = LocalSnapshots(count: 4, oldest: Self.today.addingTimeInterval(-86_400),
                                        newest: Self.today.addingTimeInterval(-3_600))
         model.readSnapshots = { snapshots }
-        let lastScan = LastScan(date: Self.today.addingTimeInterval(-2 * 86_400), size: 1_400_000_000, cleaned: 1_250_000_000)
+        let lastScan = LastScan(date: Self.today.addingTimeInterval(-2 * 86_400), size: 1_400_000_000, cleaned: 1_250_000_000,
+                                groups: ["developer": 12_600_000_000, "system-junk": 40_000_000])
         model.readLastScan = { lastScan }
+        // Suggestions: the Trash, Docker and three apps not opened for months, plus the local snapshots.
+        var suggestions = OverviewSuggestions.Sources.none
+        suggestions.trash = { 2_100_000_000 }
+        suggestions.docker = { 5_400_000_000 }
+        let today = Self.today
+        suggestions.apps = {
+            ["Final Cut Pro": 400.0, "Keynote": 150, "Steam": 120, "Safari": 0].map { name, days in
+                InstalledApp(url: URL(fileURLWithPath: "/Applications/\(name).app"), name: name, bundleID: "com.example.\(name)",
+                             version: nil, lastUsed: today.addingTimeInterval(-days * 86_400))
+            }
+        }
+        suggestions.appSize = { _ in 600_000_000 }
+        model.suggestionSources = suggestions
         model.introduced = Set(OverviewModel.Intro.allCases) // still, final values: no count-up or growing bars
         model.refresh()
-        while model.measuring || model.security == nil || model.snapshots == nil {
+        while model.measuring || model.security == nil || model.snapshots == nil || model.suggesting {
             try await Task.sleep(for: .milliseconds(50))
         }
         try await snapshot("overview") { OverviewView(model: model) }
-        // Tall enough for the whole form, from "Space outside your folders" down to "System protection" at the bottom.
-        try await snapshot("overview-protection", size: CGSize(width: Self.detailSize.width, height: 1_900)) {
+        // Tall enough for the whole form, from Smart Scan down to "System protection" at the bottom.
+        try await snapshot("overview-protection", size: CGSize(width: Self.detailSize.width, height: 2_550)) {
             OverviewView(model: model)
         }
     }

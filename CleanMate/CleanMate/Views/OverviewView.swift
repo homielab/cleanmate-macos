@@ -1,7 +1,7 @@
 import Charts
 import SwiftUI
 
-/// First module: drives, free space over time, what CleanMate freed, space outside the user's folders, the largest
+/// First module: what to do next, drives, free space over time, what CleanMate freed, space outside the user's folders, the largest
 /// folders in the home folder and whether macOS's protections are on. Nothing here removes files or changes a setting.
 struct OverviewView: View {
     @ObservedObject var model: OverviewModel
@@ -12,6 +12,7 @@ struct OverviewView: View {
     var body: some View {
         Form {
             smartScanSection
+            suggestionsSection
             Section("Drives") {
                 let animates = !model.introduced.contains(.drives)
                 ForEach(model.disks) { disk in
@@ -63,6 +64,37 @@ struct OverviewView: View {
         } header: {
             Text(Module.smartScan.title)
         }
+    }
+
+    /// Where space can be won next, largest first; each opens the module where the user decides.
+    private var suggestionsSection: some View {
+        Section {
+            if let suggestions = model.suggestions {
+                if suggestions.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle").foregroundStyle(.green).frame(width: 20)
+                            .accessibilityHidden(true)
+                        Text("No suggestions — your disk is in good shape.").foregroundStyle(.secondary)
+                    }
+                } else {
+                    let largest = suggestions.compactMap(\.size).max() ?? 0
+                    ForEach(suggestions) { SuggestionRow(suggestion: $0, largest: largest) }
+                }
+            } else {
+                Text("Looking for space you can free…").foregroundStyle(.secondary)
+            }
+        } header: {
+            HStack {
+                Text("Suggestions")
+                Spacer()
+                if model.suggesting { ProgressView().controlSize(.small) }
+            }
+        } footer: {
+            Text("Each one opens the place where you choose what to remove. Nothing is cleaned from here.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        // New suggestions fade and move in; none with Reduce Motion.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: model.suggestions)
     }
 
     private var historySection: some View {
@@ -259,6 +291,72 @@ private struct SecurityRow: View {
 private func openSettingsPane(_ url: URL) {
     if !NSWorkspace.shared.open(url) {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
+    }
+}
+
+/// A suggestion: icon, what and how much, a line saying why, and the button to the module where the user decides.
+private struct SuggestionRow: View {
+    let suggestion: Suggestion
+    let largest: Int64
+
+    private var title: Text {
+        switch suggestion.kind {
+        case .junk(let group): Text(group)
+        case .trash: Text("Trash")
+        case .externalTrash: Text("Trash on external drives")
+        case .downloads: Text("Old installers and downloads")
+        case .docker: Text("Unused Docker data")
+        case .unusedApps: Text("Apps not opened for 3 months")
+        case .snapshots: Text("Time Machine local snapshots")
+        }
+    }
+
+    private var note: Text {
+        let count = suggestion.count ?? 0
+        return switch suggestion.kind {
+        case .junk: Text("Found by the last Smart Scan and not cleaned since.")
+        case .trash: Text("Files you deleted still take this space until the Trash is emptied.")
+        case .externalTrash: Text("Files deleted from your external drives still take space on them.")
+        case .downloads: Text("\(count) files in Downloads you have not used for a while. Review them before they go to the Trash.")
+        case .docker: Text("Images, stopped containers, volumes and build cache nothing uses. Docker is never started to measure them.")
+        case .unusedApps: Text("\(count) apps you have not opened for 3 months, largest first.")
+        case .snapshots: Text("Measuring their size needs administrator rights. macOS deletes them by itself when it needs the space.")
+        }
+    }
+
+    private var value: Text {
+        if let size = suggestion.size { return Text(size, format: .fileSize) }
+        return Text("\(suggestion.count ?? 0) snapshots")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: suggestion.systemImage).foregroundStyle(.tint).frame(width: 20)
+                    .accessibilityHidden(true)
+                title
+                Spacer()
+                value.sizeColumnStyle(emphasized: false)
+                if let size = suggestion.size {
+                    SizeBar(size: size, largest: largest)
+                } else {
+                    Color.clear.frame(width: 48, height: 6) // keeps the value in line with the sized rows
+                }
+            }
+            .accessibilityElement(children: .combine)
+            HStack(alignment: .firstTextBaseline) {
+                note.font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+                Button { ModuleRouter.shared.open(suggestion.target) } label: {
+                    Text("Open \(Text(suggestion.target.module.title))")
+                }
+                .controlSize(.small)
+                .accessibilityHint(title)
+            }
+            .padding(.leading, 28)
+        }
+        .padding(.vertical, 2)
     }
 }
 

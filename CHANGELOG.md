@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Overview › Suggestions**: up to 5 places to free space next, largest first — junk the last Smart Scan found per group, the Trash, apps not opened for 3 months, unused Docker data, Time Machine local snapshots and, with Full Disk Access, old downloads and external drives' Trash; each opens the right module (Smart Scan at the group, Uninstaller on unused apps, Maintenance at the snapshots) and nothing is cleaned from the Overview.
 - **Smart Scan › Applications**: clean the caches of Zalo, Canva, the new Microsoft Teams and WhatsApp (Teams and WhatsApp need Full Disk Access); messages, received photos and files, designs and sign-in are never touched, and each app is skipped while it runs.
 - **Moved to the Trash**: see everything CleanMate moved to the Trash from any module, also after quitting, and put items back one by one or all at once, filtered by source or search; open it with **View Moved Items…** after a move to the Trash or in Settings › Activity.
 - **Uninstaller**: each app shows its source (App Store, Homebrew, Setapp or Downloaded) and the **Show** menu filters the list by source; an open app has **Quit and Uninstall…**, which quits it and uninstalls it in one step.
