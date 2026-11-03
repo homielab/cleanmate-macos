@@ -26,8 +26,9 @@ struct SmartScanView: View {
         bytes > 0 ? String(localized: "Freed \(bytes, format: .fileSize) in the last 30 days") : nil
     }
 
-    /// Menu bar item: the junk the last finished Smart Scan found, what cleaning it freed, and when it ran.
-    nonisolated static func lastScanLine(_ last: LastScan, locale: Locale = .current) -> String {
+    /// Menu bar item and Overview: the junk the last finished Smart Scan found, what cleaning it freed, and when it ran,
+    /// in `locale`'s language and date format (the view's `\.locale`: CleanMate's language).
+    nonisolated static func lastScanLine(_ last: LastScan, locale: Locale = AppLanguage.locale()) -> String {
         let date = last.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale))
         let size = { (bytes: Int64) in bytes.formatted(.fileSize.locale(locale)) }
         var resource: LocalizedStringResource = if let cleaned = last.cleaned {

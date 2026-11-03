@@ -8,6 +8,17 @@ import Testing
         return (UserDefaults(suiteName: name)!, name)
     }
 
+    /// Vietnamese CleanMate on an English Mac: text in Vietnamese, the Mac's region kept; the Mac's own locale (and its
+    /// format settings) whenever the languages match or none is known.
+    @Test func localeIsInCleanMatesLanguage() {
+        let mac = Locale(identifier: "en_US")
+        #expect(AppLanguage.locale(language: "vi", current: mac).identifier == "vi_US")
+        #expect(AppLanguage.locale(language: "en", current: mac) == mac)
+        #expect(AppLanguage.locale(language: nil, current: mac) == mac)
+        #expect(AppLanguage.locale(language: "en", current: Locale(identifier: "vi_VN")).identifier == "en_VN")
+        #expect(AppLanguage.locale(language: "vi", current: Locale(identifier: "vi_VN")).identifier == "vi_VN")
+    }
+
     @Test func noChoiceFollowsTheMac() {
         let (defaults, name) = makeDefaults()
         defer { TestDefaults.remove(name) }

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan › Applications**: clean the caches of Zalo, Canva, the new Microsoft Teams and WhatsApp (Teams and WhatsApp need Full Disk Access); messages, received photos and files, designs and sign-in are never touched, and each app is skipped while it runs.
 - **Moved to the Trash**: see everything CleanMate moved to the Trash from any module, also after quitting, and put items back one by one or all at once, filtered by source or search; open it with **View Moved Items…** after a move to the Trash or in Settings › Activity.
 - **Uninstaller**: each app shows its source (App Store, Homebrew, Setapp or Downloaded) and the **Show** menu filters the list by source; an open app has **Quit and Uninstall…**, which quits it and uninstalls it in one step.
+- **Uninstaller › Reset…** works on an open app: **Quit and Reset** asks it to quit, waits up to 10 seconds, then moves its data to the Trash and keeps the app; if it doesn't quit, nothing is moved.
 - CleanMate opens on the module you used last, with its window at the same place and size; a notification or the menu bar's **Scan Now** still opens Smart Scan.
 - **Similar Photos**, **Login Items** and **Maintenance** have a search field, and ⌘F goes to the search field in every list; ⌘A / ⇧⌘A tick or untick what **Large & Old Files**, **Similar Photos** and **Uninstaller** show.
 - A **Freed 1.2 GB** notification when a Smart Scan clean or a Privacy erase finishes while CleanMate is in the background (only if notifications are already allowed; it never asks).
@@ -38,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
 
 ### Fixed
+- The menu bar and Overview line **Junk found: … (scanned …)**, dates in notifications and some Settings texts now use CleanMate's language (for example Vietnamese) and its date format even when macOS is set to another language.
+- `cleanmate dupes` with a folder it can't search names `cleanmate dupes` in the error, not `cleanmate large`.
 - `cleanmate space /` no longer counts the startup disk's data volume a second time inside /System: another volume mounted in a folder is listed as a mounted volume and left out of the total, as in Space Lens.
 - **Uninstaller**: an App Store app macOS won't let CleanMate move no longer brings up an unexplained password prompt; CleanMate says to remove it in Launchpad or drag it to the Trash in Finder, with **Reveal in Finder**.
 - **Space Lens**: a volume mounted inside a folder is no longer measured with it — /System no longer counts the whole data volume again, and network shares in your home folder are not walked.

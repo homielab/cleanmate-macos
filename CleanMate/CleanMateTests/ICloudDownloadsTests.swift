@@ -104,7 +104,7 @@ final class ICloudDownloadsTests {
 
     /// Only a file iCloud says is fully uploaded, read again right before, loses its download; the others are kept
     /// with their state, and each removal is logged with the size measured right before.
-    @Test func removeEvictsOnlyUploadedFilesAndLogsThem() async throws {
+    @MainActor @Test func removeEvictsOnlyUploadedFilesAndLogsThem() async throws {
         let uploaded = try file("Library/Mobile Documents/com~apple~CloudDocs/a.mov")
         let syncing = try file("Library/Mobile Documents/com~apple~CloudDocs/b.mov")
         let conflict = try file("Library/Mobile Documents/com~apple~CloudDocs/c.mov")
@@ -134,8 +134,8 @@ final class ICloudDownloadsTests {
         #expect(lines.count == 1 && lines[0].contains("\tevicted\t") && lines[0].contains(uploaded.path))
         #expect(ActivityLog.freed(home: home).deleted == 4_096_000)
         #expect(ActivityLog.cleanups(home: home).total == 4_096_000)
-        #expect(ActivitySettings.kindLabel("evicted", locale: Locale(identifier: "vi")).title
-                == "Đã bỏ bản tải về (vẫn trên iCloud)")
+        let evictedLabel = ActivitySettings.kindLabel("evicted", locale: Locale(identifier: "vi"))
+        #expect(evictedLabel.title == "Đã bỏ bản tải về (vẫn trên iCloud)")
     }
 
     /// The model only removes downloads with Full Disk Access and of uploaded files; removed rows leave the list,

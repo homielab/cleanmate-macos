@@ -14,18 +14,19 @@ struct CleanMateApp: App {
         // so a MenuBarExtra listed first started the app with no window.
         // Window (not WindowGroup): one main window only, no File › New Window, so two windows
         // can't scan/clean in parallel with separate models.
+        // Text, dates and sizes in CleanMate's language, also when it differs from the Mac's (`Locale.current`).
         Window(appName, id: "main") {
-            ContentView()
+            ContentView().environment(\.locale, AppLanguage.locale())
         }
         .commands {
             AppCommands()
             HelpCommands()
         }
         MenuBarExtra(appName, systemImage: "internaldrive", isInserted: $showMenuBarExtra) {
-            MenuBarContent()
+            MenuBarContent().environment(\.locale, AppLanguage.locale())
         }
         Settings {
-            SettingsView()
+            SettingsView().environment(\.locale, AppLanguage.locale())
         }
     }
 }
@@ -173,6 +174,7 @@ private struct AppCommands: Commands {
 /// `.menu` style: the content is built when the menu opens, so free space is read then; no timers.
 private struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.locale) private var locale
 
     var body: some View {
         let volume = SpaceLensModel.Volume.read(SafetyPolicy.current.homeURL)
@@ -182,7 +184,7 @@ private struct MenuBarContent: View {
             .foregroundStyle(volume.level == .critical ? Color.red : volume.level == .low ? Color.orange : Color.primary)
         if let last = LastScan.read() {
             // Opens Smart Scan on its results (or its start screen after a relaunch); it does not scan again.
-            Button(SmartScanView.lastScanLine(last)) { ModuleRouter.shared.show(.smartScan, openWindow: openWindow) }
+            Button(SmartScanView.lastScanLine(last, locale: locale)) { ModuleRouter.shared.show(.smartScan, openWindow: openWindow) }
         }
         if let freed = SmartScanView.freedLine(FreedCache.shared.bytes()) {
             Text(freed)

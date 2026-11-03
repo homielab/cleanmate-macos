@@ -677,7 +677,9 @@ extension CommandLineToolTests {
 
         for arguments in [["large", "--in", "/"], ["dupes", "--in", "/"], ["similar", "/"]] {
             let (code, printed) = await Self.run(arguments, sources)
-            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.contains("can't be searched"), "\(arguments)")
+            // The message names the command that was run.
+            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.contains("can't be searched: \(arguments[0]) looks"),
+                    "\(arguments): \(printed.stderr)")
         }
     }
 

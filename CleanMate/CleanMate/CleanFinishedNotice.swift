@@ -19,7 +19,7 @@ enum CleanFinishedNotice {
     }
 
     /// nil for a module that cleans nothing (only Smart Scan and Privacy post it).
-    static func request(_ report: CleanReport, module: Module, locale: Locale = .current) -> ScanReminder.Request? {
+    static func request(_ report: CleanReport, module: Module, locale: Locale = AppLanguage.locale()) -> ScanReminder.Request? {
         let size = report.freed.formatted(.fileSize.locale(locale))
         func text(_ resource: LocalizedStringResource) -> String {
             var resource = resource

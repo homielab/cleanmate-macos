@@ -443,7 +443,7 @@ nonisolated enum HeadlessFiles {
 
     /// The folder `dupes` searches: the same rules as `large` (`largeFolder`).
     static func dupesFolder(_ options: DupesOptions, sources: HeadlessScan.Sources) throws(PathError) -> URL {
-        try largeFolder(LargeOptions(root: options.root, minSize: options.minSize), sources: sources)
+        try largeFolder(LargeOptions(root: options.root, minSize: options.minSize), sources: sources, command: "dupes")
     }
 
     /// Duplicates among the files `large` finds, as the Duplicates Only filter of Large & Old Files finds them

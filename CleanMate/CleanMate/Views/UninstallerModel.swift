@@ -123,7 +123,7 @@ final class UninstallerModel: ObservableObject {
     var terminate: (InstalledApp) -> Void = { app in
         NSRunningApplication.runningApplications(withBundleIdentifier: app.bundleID).forEach { $0.terminate() }
     }
-    /// How long "Quit and Uninstall" waits for the app to quit.
+    /// How long "Quit and Uninstall" and "Quit and Reset" wait for the app to quit.
     var quitTimeout: Duration = .seconds(10)
 
     /// Injected by tests (a fake home instead of the real one).
@@ -514,7 +514,8 @@ final class UninstallerModel: ObservableObject {
     var resetSize: Int64 { resetEntries.filter { resetChecked.contains($0.url) }.reduce(0) { $0 + $1.size } }
 
     /// "Reset…": moves the ticked `resetEntries` to the Trash and keeps the app, whatever its row in the detail says.
-    /// Refused while the app is open (it would rewrite its data while it goes). One Undo puts them back.
+    /// Refused while the app is open (it would rewrite its data while it goes; `quitAndReset` quits it first). One Undo
+    /// puts them back.
     func reset() async {
         guard let app = selectedApp else { return }
         runningApps = appBundleIDs() // a launch may not have been notified yet
@@ -531,7 +532,7 @@ final class UninstallerModel: ObservableObject {
         if selection == .extensions { return await removeExtensions() }
         let selected = selectedApp
         runningApps = appBundleIDs() // a launch may not have been notified yet
-        // Also for a reset: an open app rewrites its data while it goes (the view only allows this once it has quit).
+        // Also for a reset: an open app rewrites its data while it goes (`quitAndRemove` quits it first).
         if let selected, isRunning(selected) { return }
         guard !working else { return }
         let app = trashApp ? selected : nil
@@ -540,24 +541,37 @@ final class UninstallerModel: ObservableObject {
         await move(app: app, data: data)
     }
 
-    /// "Quit and Uninstall": asks the open app to quit (never forced), waits up to `quitTimeout`, then uninstalls it
-    /// like `remove()`. Still open by then → `.appDidNotQuit`, nothing moved. The selection changed meanwhile → nothing.
+    /// "Quit and Uninstall" (app row ticked) or "Quit and Reset" (unticked): asks the open app to quit (never forced),
+    /// waits up to `quitTimeout`, then goes on like `remove()`. Still open by then → `.appDidNotQuit`, nothing moved.
+    /// The selection or the app row's tick changed meanwhile → nothing.
     func quitAndRemove() async {
-        guard let app = selectedApp, trashApp, !working else { return }
-        runningApps = appBundleIDs()
-        if isRunning(app) {
-            working = true
-            terminate(app)
-            let quit = await waitUntilQuit(app)
-            working = false
-            guard quit else {
-                outcome = .appDidNotQuit(app)
-                Attention.finished()
-                return
-            }
-        }
-        guard selectedApp?.url == app.url, trashApp else { return }
+        guard let app = selectedApp, !working else { return }
+        let uninstalling = trashApp
+        guard await quitFirst(app), selectedApp?.url == app.url, trashApp == uninstalling else { return }
         await remove()
+    }
+
+    /// "Quit and Reset" in the Reset sheet: quits the open app like `quitAndRemove`, then `reset()`; the app stays.
+    func quitAndReset() async {
+        guard let app = selectedApp, !working else { return }
+        guard await quitFirst(app), selectedApp?.url == app.url else { return }
+        await reset()
+    }
+
+    /// True once `app` is not running: at once when it isn't, else after asking it to quit and it did within
+    /// `quitTimeout`. False → `.appDidNotQuit`.
+    private func quitFirst(_ app: InstalledApp) async -> Bool {
+        runningApps = appBundleIDs()
+        guard isRunning(app) else { return true }
+        working = true
+        terminate(app)
+        let quit = await waitUntilQuit(app)
+        working = false
+        if !quit {
+            outcome = .appDidNotQuit(app)
+            Attention.finished()
+        }
+        return quit
     }
 
     /// Reads the running apps every 200 ms until `app` is gone or `quitTimeout` passes.

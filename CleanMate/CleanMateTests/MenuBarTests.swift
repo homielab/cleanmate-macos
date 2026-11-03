@@ -38,8 +38,16 @@ struct MenuBarTests {
         #expect(SmartScanView.lastScanLine(LastScan(date: Self.date, size: 0), locale: en).hasPrefix("No junk found (scanned "))
         let cleaned = SmartScanView.lastScanLine(LastScan(date: Self.date, size: 5_000_000, cleaned: 4_000_000), locale: en)
         #expect(cleaned.hasPrefix("Junk found: 5 MB, cleaned 4 MB (scanned "), "\(cleaned)")
+        // Vietnamese words and date, also on an English Mac (the locale CleanMate's views pass).
+        let viDate = Self.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(vi))
         let foundVI = SmartScanView.lastScanLine(LastScan(date: Self.date, size: 5_000_000), locale: vi)
-        #expect(foundVI.hasPrefix("Rác tìm thấy: 5 MB (quét lúc "), "\(foundVI)")
+        #expect(foundVI == "Rác tìm thấy: 5 MB (quét lúc \(viDate))", "\(foundVI)")
+        let onEnglishMac = AppLanguage.locale(language: "vi", current: en)
+        let cleanedVI = SmartScanView.lastScanLine(LastScan(date: Self.date, size: 5_000_000, cleaned: 4_000_000), locale: onEnglishMac)
+        #expect(cleanedVI.hasPrefix("Rác tìm thấy: 5 MB, đã dọn 4 MB (quét lúc ") && !cleanedVI.contains("Jan"), "\(cleanedVI)")
+        let noneVI = SmartScanView.lastScanLine(LastScan(date: Self.date, size: 0), locale: onEnglishMac)
+        #expect(noneVI.hasPrefix("Không tìm thấy rác (quét lúc "), "\(noneVI)")
+        #expect(![foundVI, cleanedVI, noneVI].contains { $0.contains("Junk") })
     }
 
     /// Like ⌘R: off while a confirmation is open or something is being removed.

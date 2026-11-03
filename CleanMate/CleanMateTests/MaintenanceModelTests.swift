@@ -360,16 +360,18 @@ struct MaintenanceModelTests {
         #expect(MaintenanceTask.homebrewSummary("==> Upgrading git\n  2.40 -> 2.41\n==> Upgrading node\n==> Upgrading git\n") == .init(upgraded: 2, freed: 0))
     }
 
-    /// Lines come out while the tool runs: the tool waits (up to 10 s) until the first lines have been handed over.
-    @Test func streamedOutputArrivesWhileTheToolRuns() async throws {
+    /// Lines come out while the tool runs: the tool waits until the first lines have been handed over (the signal), not
+    /// for a number of seconds — on a loaded Mac the reading task can sleep well past any short wait. The 120 s bound
+    /// only stops a tool left behind if the test process dies.
+    @Test(.timeLimit(.minutes(3))) func streamedOutputArrivesWhileTheToolRuns() async throws {
         let folder = TestTemp.url("CleanMateMaintenanceStream")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let flag = folder.appending(path: "go").path
         let chunks = Chunks()
         let command = ShellCommand(executable: "/bin/sh", arguments: ["-c", """
-            echo one; echo two; i=0; while [ ! -f "$0" ] && [ $i -lt 200 ]; do sleep 0.05; i=$((i+1)); done; echo three; printf four
-            """, flag], timeout: .seconds(30))
+            echo one; echo two; i=0; while [ ! -f "$0" ] && [ $i -lt 2400 ]; do sleep 0.05; i=$((i+1)); done; echo three; printf four
+            """, flag], timeout: .seconds(150))
         let outcome = await command.outcome { chunk in
             await chunks.add(chunk)
             if chunk.contains("two") { FileManager.default.createFile(atPath: flag, contents: nil) }
@@ -390,7 +392,7 @@ struct MaintenanceModelTests {
     }
 
     /// A stand-in `brew` that logs its arguments, environment and stdin, and prints like brew; `upgrade` pauses after
-    /// its first lines until the runner has handed them over (`go`, at most 10 s); `fail-<step>` in its folder makes
+    /// its first lines until the runner has handed them over (`go`; 2 min only stops a fake left behind); `fail-<step>` in its folder makes
     /// that step exit 1.
     final class FakeBrew {
         let folder = TestTemp.url("CleanMateMaintenanceBrew")
@@ -409,7 +411,7 @@ struct MaintenanceModelTests {
                 case "$1" in
                   update) echo "Already up-to-date." ;;
                   upgrade) echo "==> Upgrading 2 outdated packages:"; echo "git 2.40 -> 2.41"
-                           i=0; while [ ! -f "$dir/go" ] && [ $i -lt 200 ]; do sleep 0.05; i=$((i+1)); done
+                           i=0; while [ ! -f "$dir/go" ] && [ $i -lt 2400 ]; do sleep 0.05; i=$((i+1)); done
                            echo "==> Upgrading git"; echo "==> Upgrading node" ;;
                   cleanup) echo "Removing: /opt/homebrew/Cellar/git/2.40 (1,234 files, 50MB)"
                            echo "==> This operation has freed approximately 1.5GB of disk space." ;;

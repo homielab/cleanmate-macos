@@ -135,9 +135,10 @@ import UniformTypeIdentifiers
         }
     }
 
-    /// Stop while Vision is slow (a fake taking 3 s a photo): the search ends at once instead of waiting for the photos
-    /// being analyzed, their requests are told to stop and no other photo is started.
-    @Test func stoppingDoesNotWaitForPhotosBeingAnalyzed() async throws {
+    /// Stop while Vision is slow (fakes that block until the test lets them go): the search ends at once instead of
+    /// waiting for the photos being analyzed, their requests are told to stop and no other photo is started. Waits on
+    /// what the fakes signal, never on the clock; a search that waited for them would hang (the time limit fails it).
+    @Test(.timeLimit(.minutes(1))) func stoppingDoesNotWaitForPhotosBeingAnalyzed() async throws {
         for index in 0..<20 {
             let url = home.appending(path: "Pictures/IMG_\(index).jpg")
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -145,50 +146,46 @@ import UniformTypeIdentifiers
         }
         let photos = try await SimilarPhotos.photos(in: home, policy: policy)
         try #require(photos.count == 20)
+        // The photos `find` analyzes at once (its own rule); all of them are blocked in the fake before the stop.
+        let inFlight = max(2, min(ProcessInfo.processInfo.activeProcessorCount, 8))
 
-        func stopped(_ make: @escaping SimilarPhotos.PrintMaker, started: Locked<Int>) async throws -> Duration {
+        func stop(_ make: @escaping SimilarPhotos.PrintMaker, started: SignalCount) async {
             let task = Task { try await SimilarPhotos.find(photos, makePrint: make) }
-            for _ in 0..<300 where started.withLock({ $0 }) == 0 { try await Task.sleep(for: .milliseconds(10)) }
-            try #require(started.withLock { $0 } > 0)
-            let clock = ContinuousClock()
-            let stop = clock.now
+            await started.reach(inFlight)
             task.cancel()
             do {
                 _ = try await task.value
                 Issue.record("expected Cancelled")
-            } catch is SimilarPhotos.Cancelled {}
-            return clock.now - stop
+            } catch {
+                #expect(error is SimilarPhotos.Cancelled, "\(error)")
+            }
         }
 
         // A fake that stops when told, like a cancelled Vision request.
-        let (started, told) = (Locked(0), Locked(0))
-        let elapsed = try await stopped({ _, _, stop in
-            started.withLock { $0 += 1 }
-            let until = Date.now.addingTimeInterval(3)
-            while Date.now < until {
-                if stop.isStopped { told.withLock { $0 += 1 }; return nil }
-                usleep(2_000)
-            }
+        let (started, told, released) = (SignalCount(), SignalCount(), ThreadGate())
+        defer { released.open() }
+        await stop({ _, _, stop in
+            started.add()
+            while !stop.isStopped && !released.isOpen { usleep(1_000) }
+            if stop.isStopped { told.add() }
             return nil
         }, started: started)
-        #expect(elapsed < .seconds(1), "\(elapsed)")
-        // A photo whose thread was already past the stop check may begin just after the stop: wait until every photo
-        // begun has been told. No other photo starts, so it stays at most the 8 in flight (without the stop, the fakes
-        // returning would let all 20 start).
-        try await Task.sleep(for: .milliseconds(100))
-        for _ in 0..<200 where told.withLock({ $0 }) < started.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(10)) }
-        let running = started.withLock { $0 }
-        #expect(running <= 8)
-        #expect(told.withLock { $0 } == running)
+        await told.reach(inFlight)
+        // None of them returned, so no other photo started (without the stop, each one returning starts the next).
+        #expect(started.value == inFlight && told.value == inFlight)
 
-        // A fake that never looks at the stop: still not waited for.
-        let ignoring = Locked(0)
-        let ignored = try await stopped({ _, _, _ in
-            ignoring.withLock { $0 += 1 }
-            Thread.sleep(forTimeInterval: 1.5)
+        // A fake that never looks at the stop: the search still ended while every one of them was blocked.
+        let (ignoring, finished, gate) = (SignalCount(), SignalCount(), ThreadGate())
+        defer { gate.open() }
+        await stop({ _, _, _ in
+            ignoring.add()
+            gate.wait()
+            finished.add()
             return nil
         }, started: ignoring)
-        #expect(ignored < .seconds(1), "\(ignored)")
+        #expect(finished.value == 0 && ignoring.value == inFlight)
+        gate.open()
+        await finished.reach(inFlight) // their threads are done before the test ends
 
         // A stopped photo is never decoded nor sent to Vision.
         let stop = SimilarPhotos.Stop()
@@ -317,20 +314,16 @@ import UniformTypeIdentifiers
         return model
     }
 
-    func results(_ model: SimilarPhotosModel) async throws {
-        for _ in 0..<600 {
-            if case .results = model.phase { return }
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        Issue.record("no results")
+    func results(_ model: SimilarPhotosModel) async {
+        await until(model) { if case .results = $0.phase { true } else { false } }
     }
 
-    @Test func modelTicksNothingWarnsForAWholeGroupAndTrashesWithUndo() async throws {
+    @Test(.timeLimit(.minutes(1))) func modelTicksNothingWarnsForAWholeGroupAndTrashesWithUndo() async throws {
         let set = try writeSet()
         let model = model()
         #expect(model.cacheURL == nil) // never the real cache under a test host
         model.find(in: home, policy: policy, skipping: [])
-        try await results(model)
+        await results(model)
         try #require(model.groups.count == 1)
         #expect(model.checked.isEmpty && model.groupsLosingEveryPhoto.isEmpty)
 
@@ -358,7 +351,7 @@ import UniformTypeIdentifiers
         for url in [set.original, set.resized, set.recompressed] { #expect(FileManager.default.fileExists(atPath: url.path)) }
     }
 
-    @Test func modelStopsMidSearchAndFindsAgain() async throws {
+    @Test(.timeLimit(.minutes(1))) func modelStopsMidSearchAndFindsAgain() async throws {
         _ = try writeSet()
         let model = model()
         model.find(in: home, policy: policy, skipping: [])
@@ -366,25 +359,25 @@ import UniformTypeIdentifiers
         model.stop()
         guard case .idle = model.phase else { Issue.record("not idle"); return }
         model.findAgain()
-        try await results(model)
+        await results(model)
         #expect(model.groups.count == 1)
     }
 
     /// The Duplicates menu: Similar Photos replaces the file list and searches the scanned scope (with the files'
     /// FDA skips); going back to the file list drops the photo results and ticks.
-    @Test func largeFilesListingSwitchesToSimilarPhotos() async throws {
+    @Test(.timeLimit(.minutes(1))) func largeFilesListingSwitchesToSimilarPhotos() async throws {
         let set = try writeSet()
         let model = LargeFilesModel()
         model.home = home
         model.hasFullDiskAccess = { true }
         model.scanFiles = { _, _, _, _ in [] }
         model.scan()
-        for _ in 0..<200 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(20)) }
+        await until(model) { if case .results = $0.phase { true } else { false } }
         model.listing = .duplicates
         #expect(model.duplicatesOnly && !model.similarPhotosShown)
         model.listing = .similarPhotos
         #expect(!model.duplicatesOnly && model.similarPhotosShown && model.listing == .similarPhotos)
-        try await results(model.similarPhotos)
+        await results(model.similarPhotos)
         #expect(model.similarPhotos.photoCount == 3)
         #expect(Set(model.similarPhotos.groups.flatMap(\.photos).map(\.url.lastPathComponent))
                 == Set([set.original, set.resized, set.recompressed].map(\.lastPathComponent)))

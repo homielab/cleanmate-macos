@@ -309,7 +309,7 @@ extension AppLanguage {
 
 extension GeneralSettings {
     /// Read by VoiceOver after "Reset Choices": the row only swaps back to "Reset…", which says nothing happened.
-    nonisolated static func resetDone(locale: Locale = .current) -> String {
+    nonisolated static func resetDone(locale: Locale = AppLanguage.locale()) -> String {
         String(localized: LocalizedStringResource("Remembered choices reset", locale: locale))
     }
 }
@@ -417,7 +417,7 @@ struct ExclusionSettings: View {
     }
 
     /// Shown and read by VoiceOver when a broad folder waits for "Add Anyway".
-    nonisolated static func broadWarning(_ url: URL, locale: Locale = .current) -> String {
+    nonisolated static func broadWarning(_ url: URL, locale: Locale = AppLanguage.locale()) -> String {
         let path = (url.path as NSString).abbreviatingWithTildeInPath
         return String(localized: LocalizedStringResource("Excluding \(path) means CleanMate cleans nothing inside it.", locale: locale))
     }

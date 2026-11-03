@@ -2025,16 +2025,6 @@
         }
       }
     },
-    "It may be waiting for you to save a document or answer a question. Switch to it, quit it, then uninstall it. Nothing was moved." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Có thể ứng dụng đang chờ bạn lưu tài liệu hoặc trả lời một câu hỏi. Hãy chuyển sang nó, thoát nó rồi gỡ lại. Chưa có gì bị di chuyển."
-          }
-        }
-      }
-    },
     "Item" : {
       "localizations" : {
         "vi" : {
@@ -3101,16 +3091,6 @@
         }
       }
     },
-    "Quit %@ first." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hãy thoát %@ trước."
-          }
-        }
-      }
-    },
     "Read from macOS. CleanMate does not change these settings." : {
       "localizations" : {
         "vi" : {
@@ -3759,16 +3739,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản sao thiết bị test"
-          }
-        }
-      }
-    },
-    "The app is open. “Quit and Uninstall” quits it first; quit it yourself before resetting it." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ứng dụng đang mở. “Thoát rồi gỡ” sẽ thoát nó trước; muốn đặt lại thì hãy tự thoát nó."
           }
         }
       }
@@ -10609,6 +10579,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không có tác vụ khớp"
+          }
+        }
+      }
+    },
+    "It may be waiting for you to save a document or answer a question. Switch to it, quit it, then try again. Nothing was moved." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Có thể ứng dụng đang chờ bạn lưu tài liệu hoặc trả lời một câu hỏi. Hãy chuyển sang nó, thoát nó rồi thử lại. Chưa có gì bị di chuyển."
+          }
+        }
+      }
+    },
+    "The app is open. “Quit and Uninstall” and “Quit and Reset” quit it first." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng đang mở. “Thoát rồi gỡ” và “Thoát rồi đặt lại” sẽ thoát nó trước."
+          }
+        }
+      }
+    },
+    "Quit and Reset" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát rồi đặt lại"
+          }
+        }
+      }
+    },
+    "Quit and Reset…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát rồi đặt lại…"
+          }
+        }
+      }
+    },
+    "Quit %@, then move its settings, caches and saved data to the Trash and keep it" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát %@, rồi chuyển cài đặt, bộ nhớ đệm và dữ liệu đã lưu của nó vào Thùng rác, giữ lại ứng dụng"
+          }
+        }
+      }
+    },
+    "Quit %@, then move %lld data items (%@) to the Trash and keep the app?" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Quit %1$@, then move %2$lld data item (%3$@) to the Trash and keep the app?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Quit %1$@, then move %2$lld data items (%3$@) to the Trash and keep the app?"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát %1$@, rồi chuyển %2$lld mục dữ liệu (%3$@) vào Thùng rác, giữ lại ứng dụng?"
+          }
+        }
+      }
+    },
+    "%@ is open. CleanMate asks it to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ đang mở. CleanMate yêu cầu nó thoát và chờ tối đa 10 giây; nếu nó không thoát, không có gì bị di chuyển."
           }
         }
       }

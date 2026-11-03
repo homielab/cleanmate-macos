@@ -29,4 +29,15 @@ nonisolated enum AppLanguage: String, CaseIterable, Identifiable {
 
     /// The choice CleanMate started with: the picker shows Restart once the stored one differs.
     @MainActor static let atLaunch = current()
+
+    /// The locale of CleanMate's own text: the language its strings are shown in (`language`, the bundle's pick from
+    /// Settings › General or the Mac's languages) with the Mac's region; the Mac's own locale when the languages match.
+    /// `Locale.current` keeps the Mac's language when only CleanMate's is set, so text looked up with it
+    /// (`LocalizedStringResource.locale`) came out in English in a Vietnamese CleanMate.
+    static func locale(language: String? = Bundle.main.preferredLocalizations.first,
+                       current: Locale = .autoupdatingCurrent) -> Locale {
+        guard let code = language.flatMap({ Locale.Language(identifier: $0).languageCode?.identifier }),
+              code != current.language.languageCode?.identifier else { return current }
+        return Locale(identifier: current.region.map { "\(code)_\($0.identifier)" } ?? code)
+    }
 }

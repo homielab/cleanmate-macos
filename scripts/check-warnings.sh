@@ -22,8 +22,20 @@ build Debug build-for-testing
 build Release build
 
 # Only "<path in the project>:<line>:<col>: warning: ..." lines; the same warning repeats per arch/config.
-grep -h -F "$SRC" "$TMP"/*.log | grep -E '^[^ ]+:[0-9]+(:[0-9]+)?: warning: ' \
-  | sed "s|^$ROOT/||" | sort -u >"$TMP/warnings.txt" || true
+{
+  grep -h -F "$SRC" "$TMP"/*.log | grep -E '^[^ ]+:[0-9]+(:[0-9]+)?: warning: ' | sed "s|^$ROOT/||" || true
+  # A warning inside a macro expansion (#expect, #require) starts "macro expansion #expect:…: warning: …"; its place
+  # in the project is on the "expanded code originates here" note that follows.
+  awk -v src="$SRC" -v root="$ROOT/" '
+    /^macro expansion .*: warning: / { msg = $0; sub(/^.*: warning: /, "", msg); next }
+    /expanded code originates here/ {
+      if (msg != "" && index($0, src)) {
+        loc = substr($0, index($0, src) + length(root)); sub(/: note: .*/, "", loc)
+        print loc ": warning: " msg " (in a macro expansion)"
+      }
+      msg = ""
+    }' "$TMP"/*.log
+} | sort -u >"$TMP/warnings.txt"
 
 N=$(wc -l <"$TMP/warnings.txt" | tr -d ' ')
 if [[ $N -gt 0 ]]; then

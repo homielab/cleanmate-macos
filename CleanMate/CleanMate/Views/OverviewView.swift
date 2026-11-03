@@ -8,6 +8,7 @@ struct OverviewView: View {
     /// What Smart Scan's ticked results would free; nil when it has no results to clean.
     var cleanable: Int64?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.locale) private var locale
 
     var body: some View {
         Form {
@@ -45,7 +46,7 @@ struct OverviewView: View {
                 Image(systemName: Module.smartScan.systemImage).font(.title2).foregroundStyle(.tint)
                     .frame(width: 28).accessibilityHidden(true)
                 if let last = model.lastScan {
-                    Text(verbatim: SmartScanView.lastScanLine(last))
+                    Text(verbatim: SmartScanView.lastScanLine(last, locale: locale))
                 } else {
                     Text("Scan your Mac to see how much space you can free up.").foregroundStyle(.secondary)
                 }

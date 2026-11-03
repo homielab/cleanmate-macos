@@ -250,8 +250,9 @@ final class UnityEditorsTests {
         let old = try editor("2022.3.10f1")
         #expect(policy.allowsUnityEditor(old, in: [editors]))
         #expect(!policy.allowsUnityEditor(old, in: [home.appending(path: "Applications")])) // not directly in the folder
-        #expect(!policy.allowsUnityEditor(old, in: [editors], owner: { _ in 0 }))
-        #expect(policy.allowsUnityEditor(old, in: [editors], writableOnly: false, owner: { _ in 0 }))
+        let rootOwned: SafetyPolicy.OwnerID = { _ in 0 }
+        #expect(!policy.allowsUnityEditor(old, in: [editors], owner: rootOwned))
+        #expect(policy.allowsUnityEditor(old, in: [editors], writableOnly: false, owner: rootOwned))
         #expect(!policy.allowsUnityEditor(try editor("2021.3.30f1", id: "com.example.other"), in: [editors]))
         #expect(!policy.allowsUnityEditor(try editor("Custom"), in: [editors]))
         #expect(!policy.allowsUnityEditor(editors.appending(path: "2020.3.48f1"), in: [editors])) // missing

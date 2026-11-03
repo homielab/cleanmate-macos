@@ -119,13 +119,14 @@ updates, fetched by Swift Package Manager on the first build. Tests and the smok
 # Build
 xcodebuild -project CleanMate/CleanMate.xcodeproj -scheme CleanMate -destination 'platform=macOS' build
 
-# Tests (Swift Testing; they only use temporary folders, never your real files)
+# Tests (Swift Testing; they only use temporary folders, never your real files). Tests wait on what the
+# code signals (CleanMateTests/TestSignals.swift), never a fixed number of seconds
 xcodebuild -project CleanMate/CleanMate.xcodeproj -scheme CleanMate -destination 'platform=macOS' test
 
 # Launch smoke test of the real app (prints PASS/FAIL; never scans or cleans)
 scripts/smoke.sh
 
-# Compiler warnings in Debug and Release
+# Compiler warnings in Debug (with tests) and Release, also those inside #expect / #require
 scripts/check-warnings.sh
 
 # Smart Scan time per item: median of 3 read-only scans of this Mac (never cleans)

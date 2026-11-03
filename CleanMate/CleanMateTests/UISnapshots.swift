@@ -415,6 +415,17 @@ struct UISnapshots {
             model.resetChecked.remove(data[3].url)
             return ResetSheet(model: model, app: apps[0])
         }
+        // Same sheet while the app is open: "Quit and Reset" asks it to quit first.
+        try await snapshot("uninstaller-reset-sheet-open", size: CGSize(width: 520, height: 440)) {
+            let model = UninstallerModel()
+            model.apps = apps
+            model.runningApps = [apps[0].bundleID]
+            model.selection = .app(apps[0].url)
+            model.entries = data
+            model.prepareReset()
+            model.resetChecked.remove(data[3].url)
+            return ResetSheet(model: model, app: apps[0])
+        }
         // Read-only list of unknown hidden config: no checkbox, no footer.
         let home = URL(fileURLWithPath: "/Users/Shared/Sample")
         let hidden = [(".mysterytool", true, true), (".config/oddsync", false, true), (".legacy-cache", false, false)].map {
@@ -645,9 +656,19 @@ struct UISnapshots {
         }
     }
 
+    /// Tall enough for every task and the local snapshots section, which a 600 pt window scrolls to.
+    nonisolated static let maintenanceSize = CGSize(width: detailSize.width, height: 1_000)
+
     @Test func maintenance() async throws {
-        try await snapshot("maintenance-idle") { MaintenanceView(model: MaintenanceModel()) }
+        let brew: @Sendable () async -> MaintenanceTask.BrewState = { .init(installed: true, running: false) } // shows the Homebrew row
+        try await snapshot("maintenance-idle", size: Self.maintenanceSize) {
+            let model = MaintenanceModel()
+            model.readBrew = brew
+            model.readSnapshots = { LocalSnapshots.parse("") } // none, not "couldn't read"
+            return MaintenanceView(model: model)
+        }
         let model = MaintenanceModel()
+        model.readBrew = brew
         model.now = { Self.today }
         model.record = { _, _ in }
         model.runCommand = { command, _ in
@@ -662,17 +683,17 @@ struct UISnapshots {
             LocalSnapshots.parse("com.apple.TimeMachine.2026-10-29-080000.local\ncom.apple.TimeMachine.2026-10-30-101112.local")
         }
         await model.loadSnapshots()
-        try await snapshot("maintenance-results") { MaintenanceView(model: model) }
+        try await snapshot("maintenance-results", size: Self.maintenanceSize) { MaintenanceView(model: model) }
     }
 
     /// General tab only (the default one); it shows this Mac's real settings, nothing is scanned.
     @Test func settings() async throws {
-        try await snapshot("settings", size: CGSize(width: 520, height: 590)) { SettingsView() }
+        try await snapshot("settings", size: SettingsView.size) { SettingsView() }
     }
 
     /// Settings › Smart Scan tab alone; shows this Mac's real choices.
     @Test func settingsSmartScan() async throws {
-        try await snapshot("settings-smartscan", size: CGSize(width: 520, height: 590)) { SmartScanSettings() }
+        try await snapshot("settings-smartscan", size: SettingsView.size) { SmartScanSettings() }
     }
 
     /// Settings › Activity tab alone, from a sample log in a temporary home (not this Mac's log).
@@ -695,7 +716,7 @@ struct UISnapshots {
         let url = ActivityLog.url(home: home)
         let text = ActivityLog.read(home: home)
         try (old + text).write(to: url, atomically: true, encoding: .utf8)
-        try await snapshot("settings-activity", size: CGSize(width: 520, height: 590)) { ActivitySettings(home: home, now: Self.today) }
+        try await snapshot("settings-activity", size: SettingsView.size) { ActivitySettings(home: home, now: Self.today) }
     }
 
     /// Moved to the Trash, from sample records in a temporary home and Trash (never this Mac's); one item can't go back

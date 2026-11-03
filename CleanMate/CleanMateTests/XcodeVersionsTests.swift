@@ -232,8 +232,9 @@ final class XcodeVersionsTests {
     @Test func policyRule() throws {
         let old = try xcode("Xcode-15.4.app", version: "15.4")
         #expect(policy.allowsXcodeApp(old))
-        #expect(!policy.allowsXcodeApp(old, owner: { _ in 0 }))
-        #expect(policy.allowsXcodeApp(old, writableOnly: false, owner: { _ in 0 }))
+        let rootOwned: SafetyPolicy.OwnerID = { _ in 0 } // owned by root; outside #expect, which wants a Sendable closure
+        #expect(!policy.allowsXcodeApp(old, owner: rootOwned))
+        #expect(policy.allowsXcodeApp(old, writableOnly: false, owner: rootOwned))
         #expect(!policy.allowsXcodeApp(try xcode("Other.app", version: "1.0", id: "com.apple.Safari")))
         #expect(!policy.allowsXcodeApp(try xcode("Xcode.app", version: "16.0", in: home.appending(path: "Downloads"))))
         #expect(!policy.allowsXcodeApp(try xcode("Xcode.app", version: "16.0", in: applications.appending(path: "Sub"))))

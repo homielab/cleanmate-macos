@@ -1121,6 +1121,52 @@ final class UninstallerTests {
         #expect(model.apps.isEmpty)
     }
 
+    /// "Quit and Reset", from the Reset sheet and from the main button with the app row unticked: the open app is asked
+    /// to quit; it quits → its data goes to the (fake) Trash and the app stays; it doesn't → nothing moved,
+    /// `.appDidNotQuit`. Fake running apps and fake Trash only.
+    @MainActor @Test func quitAndResetWaitsForTheAppToQuit() async {
+        let app = InstalledApp(url: URL(filePath: "/nonexistent/Open.app"), name: "Open", bundleID: "com.test.qqx.open",
+                               version: nil, lastUsed: nil)
+        let cache = URL(filePath: "/nonexistent/Library/Caches/com.test.qqx.open")
+        let prefs = URL(filePath: "/nonexistent/Library/Preferences/com.test.qqx.open.plist")
+        let model = UninstallerModel()
+        model.apps = [app]
+        let running = Running([app.bundleID])
+        model.appBundleIDs = { running.ids }
+        model.runningApps = running.ids
+        model.quitTimeout = .milliseconds(500)
+        model.appData = { _, _, _ in [AppDataEntry(url: cache, size: 30), AppDataEntry(url: prefs, size: 2)] }
+        var terminated = 0
+        var calls: [(URL?, [URL])] = []
+        model.trash = { calls.append(($0, $1.map(\.url))); return CleanReport(freed: 30) }
+        model.selection = .app(app.url)
+        await model.loadEntries()
+        model.prepareReset()
+        model.resetChecked.remove(prefs)
+
+        // Refuses to quit (a save prompt): nothing moved, told why.
+        model.terminate = { _ in terminated += 1 }
+        await model.quitAndReset()
+        guard case .appDidNotQuit(let a) = model.outcome, a == app else { Issue.record("\(String(describing: model.outcome))"); return }
+        #expect(terminated == 1 && calls.isEmpty && !model.working)
+        // Quits: only the ticked data goes, never the app, which stays listed and selected.
+        model.outcome = nil
+        model.terminate = { _ in terminated += 1; running.ids = [] }
+        await model.quitAndReset()
+        #expect(terminated == 2 && calls.count == 1 && calls[0].0 == nil && calls[0].1 == [cache])
+        guard case .removed = model.outcome else { Issue.record("\(String(describing: model.outcome))"); return }
+        #expect(model.apps == [app] && model.selection == .app(app.url))
+
+        // The main button with the app row unticked is a reset too: "Quit and Reset…" moves the ticked data only.
+        running.ids = [app.bundleID]
+        model.runningApps = running.ids
+        model.trashApp = false
+        model.checked = [prefs]
+        await model.quitAndRemove()
+        #expect(terminated == 3 && calls.count == 2 && calls[1].0 == nil && calls[1].1 == [prefs])
+        #expect(model.apps == [app])
+    }
+
     /// Bundle ids of the fake running apps; the test changes them on the main actor only.
     final class Running: @unchecked Sendable {
         var ids: Set<String>

@@ -108,7 +108,7 @@ struct UninstallerView: View {
             case .appStore:
                 Text("It came from the App Store, and macOS only lets you remove it yourself: remove it in Launchpad or drag it to the Trash in Finder. Its data then shows under “Leftovers of Removed Apps”. Nothing was moved.")
             case .appDidNotQuit:
-                Text("It may be waiting for you to save a document or answer a question. Switch to it, quit it, then uninstall it. Nothing was moved.")
+                Text("It may be waiting for you to save a document or answer a question. Switch to it, quit it, then try again. Nothing was moved.")
             case .appNotTrashed:
                 Text("It may belong to the system or another user, for example an App Store app. Drag it to the Trash in Finder, which asks for your password, then remove its leftovers here. Nothing was moved.")
             case .batch(let result):
@@ -351,7 +351,7 @@ struct UninstallerView: View {
                         }
                         if model.isRunning(app) {
                             HStack {
-                                Text("The app is open. “Quit and Uninstall” quits it first; quit it yourself before resetting it.").foregroundStyle(.orange)
+                                Text("The app is open. “Quit and Uninstall” and “Quit and Reset” quit it first.").foregroundStyle(.orange)
                                 Button("Quit App") { model.quit(app) }.buttonStyle(.link)
                             }
                             .font(.callout)
@@ -362,7 +362,7 @@ struct UninstallerView: View {
                         }
                     }
                     entryList(app: app, empty: Text("No Related Files Found"))
-                    footer(button: !model.trashApp ? Text("Reset…")
+                    footer(button: !model.trashApp ? (model.isRunning(app) ? Text("Quit and Reset…") : Text("Reset…"))
                            : model.isRunning(app) ? Text("Quit and Uninstall…") : Text("Uninstall…"), app: app)
                 }
             }
@@ -683,13 +683,13 @@ struct UninstallerView: View {
                     model.prepareReset()
                     resetting = true
                 }
-                .disabled(model.working || model.loadingEntries || running || model.resetEntries.isEmpty)
-                .help(running ? Text("Quit \(app.name) first.")
+                .disabled(model.working || model.loadingEntries || model.resetEntries.isEmpty)
+                .help(running ? Text("Quit \(app.name), then move its settings, caches and saved data to the Trash and keep it")
                       : Text("Move the app’s settings, caches and saved data to the Trash and keep the app"))
             }
             Button { confirming = true } label: { button }
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.working || model.loadingEntries || (open && !uninstalling) || (!uninstalling && count == 0))
+                .disabled(model.working || model.loadingEntries || (!uninstalling && count == 0))
         }
         .padding()
         .background(.bar)
@@ -701,16 +701,17 @@ struct UninstallerView: View {
             app.map { app in
                 uninstalling && open ? Text("Quit \(app.name), then move it and \(count) related items (\(size)) to the Trash?")
                     : uninstalling ? Text("Move \(app.name) and \(count) related items (\(size)) to the Trash?")
+                    : open ? Text("Quit \(app.name), then move \(count) data items (\(size)) to the Trash and keep the app?")
                     : Text("Move \(count) data items (\(size)) of \(app.name) to the Trash and keep the app?")
             } ?? Text("Move \(count) items (\(size)) to the Trash?"),
             isPresented: $confirming
         ) {
-            Button(role: .destructive) { Task { open && uninstalling ? await model.quitAndRemove() : await model.remove() } } label: {
+            Button(role: .destructive) { Task { open ? await model.quitAndRemove() : await model.remove() } } label: {
                 if app == nil { Text("Move to Trash") } else if uninstalling && open { Text("Quit and Uninstall") }
-                else if uninstalling { Text("Uninstall") } else { Text("Reset") }
+                else if uninstalling { Text("Uninstall") } else if open { Text("Quit and Reset") } else { Text("Reset") }
             }
         } message: {
-            if open && uninstalling {
+            if open {
                 Text("CleanMate asks the app to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved. You can put the items back from the Trash until it is emptied.")
             } else {
                 Text("You can put them back from the Trash until it is emptied.")
@@ -768,19 +769,23 @@ struct ResetSheet: View {
             }
             .frame(minHeight: 150, idealHeight: 240)
             if running {
-                Text("Quit \(app.name) first.").font(.callout).foregroundStyle(.orange)
+                Text("\(app.name) is open. CleanMate asks it to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved.")
+                    .font(.callout).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
                 Text("Selected: \(count) items, \(model.resetSize.formatted(.fileSize.locale(locale)))").monospacedDigit()
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("Reset") {
+                Button {
                     dismiss()
-                    Task { await model.reset() }
+                    Task { running ? await model.quitAndReset() : await model.reset() }
+                } label: {
+                    running ? Text("Quit and Reset") : Text("Reset")
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(count == 0 || running || model.working)
+                .disabled(count == 0 || model.working)
             }
         }
         .padding(20)

@@ -419,7 +419,7 @@ struct ScannerCleanerTests {
     }
 
     /// A background child holding the output pipe doesn't hang the read; a timeout kills the whole group.
-    @Test func backgroundChildDoesNotHangAndTimeoutKillsGroup() async throws {
+    @Test(.timeLimit(.minutes(2))) func backgroundChildDoesNotHangAndTimeoutKillsGroup() async throws {
         let start = ContinuousClock.now
         let output = await ShellCommand(executable: "/bin/sh", arguments: ["-c", "sleep 30 & echo x"]).output()
         #expect(output == "x\n")
@@ -445,8 +445,7 @@ struct ScannerCleanerTests {
         #expect(fastest < .milliseconds(300) + ShellCommand.termGrace) // no SIGKILL wait (not a fixed 1.5 s)
         let grandchild = try #require(pid_t(String(contentsOf: pidFile, encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)))
-        for _ in 0..<3000 where kill(grandchild, 0) == 0 { try await Task.sleep(for: .milliseconds(10)) } // reaping can lag under load
-        #expect(kill(grandchild, 0) == -1 && errno == ESRCH)
+        #expect(await processExited(grandchild)) // killed with the group: exited (its reaping by launchd may lag)
     }
 }
 
@@ -2098,7 +2097,7 @@ struct AppCatalogTests {
         #expect((model.scans["x"]?.size ?? 0) > 0)
     }
 
-    @MainActor @Test func modelSortsItemsBySizeOnlyAfterTheScan() async throws {
+    @MainActor @Test(.timeLimit(.minutes(1))) func modelSortsItemsBySizeOnlyAfterTheScan() async throws {
         let ids = ["small", "records", "big", "upTo", "few", "tie"]
         let items = ids.map { CleanerItem(id: $0, title: "\($0)", paths: ["/nonexistent"], sizeIsUpperBound: $0 == "upTo") }
         let results: [String: ItemScan] = [
@@ -2115,7 +2114,7 @@ struct AppCatalogTests {
             return results[item.id]!
         }
         let scan = Task { await model.scan() }
-        for _ in 0..<3000 where model.scannedItems < 5 { try await Task.sleep(for: .milliseconds(10)) }
+        await until(model) { $0.scannedItems >= 5 }
         #expect(model.visibleGroups.first?.items.map(\.id) == ids) // catalog order while scanning
         open.yield()
         await scan.value
@@ -2123,7 +2122,7 @@ struct AppCatalogTests {
         #expect(model.visibleGroups.first?.items.map(\.id) == ["big", "upTo", "small", "tie", "records", "few"])
     }
 
-    @MainActor @Test func modelShowsEachItemAsSoonAsItIsScanned() async throws {
+    @MainActor @Test(.timeLimit(.minutes(1))) func modelShowsEachItemAsSoonAsItIsScanned() async throws {
         let fast = CleanerItem(id: "fast", title: "Fast", paths: ["/nonexistent"])
         let slow = CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"])
         let (gate, open) = AsyncStream<Void>.makeStream()
@@ -2136,7 +2135,7 @@ struct AppCatalogTests {
             return ItemScan(measuredSize: 1000)
         }
         let scan = Task { await model.scan() }
-        for _ in 0..<3000 where model.scans["fast"] == nil { try await Task.sleep(for: .milliseconds(10)) }
+        await until(model) { $0.scans["fast"] != nil }
         guard case .scanning = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(model.scans["fast"]?.size == 1000 && model.scans["slow"] == nil)
         #expect(model.selected == ["fast"] && model.scannedItems == 1 && model.totalItems == 2)
@@ -2147,7 +2146,7 @@ struct AppCatalogTests {
         #expect(model.selected == ["fast", "slow"])
     }
 
-    @MainActor @Test func scanProgressCountsEveryItemThatReturned() async throws {
+    @MainActor @Test(.timeLimit(.minutes(1))) func scanProgressCountsEveryItemThatReturned() async throws {
         let items = [
             CleanerItem(id: "empty", title: "Empty", paths: ["/nonexistent"]),
             CleanerItem(id: "open", title: "Open", paths: ["/nonexistent"], runningAppBundleIDs: ["com.example.open"]),
@@ -2163,7 +2162,7 @@ struct AppCatalogTests {
             return item.id == "empty" ? ItemScan() : ItemScan(measuredSize: 1000)
         }
         let scan = Task { await model.scan() }
-        for _ in 0..<3000 where model.scannedItems < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        await until(model) { $0.scannedItems >= 2 }
         guard case .scanning = model.phase else { Issue.record("phase \(model.phase)"); return }
         // Nothing found and skipped because its app is open still count as scanned.
         #expect(model.scannedItems == 2 && model.totalItems == 3)
@@ -2190,7 +2189,7 @@ struct AppCatalogTests {
         #expect(SmartScanModel.scanningLine(since: ["a": now - .seconds(10)], order: order, now: now).items == [.init(id: "a")])
     }
 
-    @MainActor @Test func scanningLineIsSampledWhileAnItemIsSlow() async throws {
+    @MainActor @Test(.timeLimit(.minutes(1))) func scanningLineIsSampledWhileAnItemIsSlow() async throws {
         let fast = CleanerItem(id: "fast", title: "Fast", paths: ["/nonexistent"])
         let slow = CleanerItem(id: "slow", title: "Slow", paths: ["/nonexistent"])
         let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [fast, slow])] }
@@ -2201,8 +2200,10 @@ struct AppCatalogTests {
             return ItemScan(measuredSize: 1)
         }
         let scan = Task { await model.scan() }
-        for _ in 0..<3000 where model.scanningNow.items.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
-        #expect(model.scanningNow == .init(items: [.init(id: "slow")]))
+        // The fast item is listed too until its result is in, so wait for that first, then for the next sample.
+        await until(model) { $0.scans["fast"] != nil }
+        await until(model) { !$0.scanningNow.items.isEmpty && $0.scanningNow.items.allSatisfy { $0.id == "slow" } }
+        #expect(model.scanningNow.items.map(\.id) == ["slow"] && model.scanningNow.more == 0)
         #expect(model.title(ofItem: "slow")?.key == "Slow")
         open.yield()
         await scan.value

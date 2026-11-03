@@ -140,7 +140,8 @@ final class MacOSInstallersTests {
         #expect(scanRoot.entries[0].size >= 65_536)
         let reason = String(localized: "Administrator privileges required — delete with Finder")
         #expect(scanRoot.entries[0].lockReason == reason)
-        #expect(!policy.allowsMacOSInstaller(applications.appending(path: "Install macOS Sequoia.app"), owner: { _ in 0 }))
+        let rootOwned: SafetyPolicy.OwnerID = { _ in 0 }
+        #expect(!policy.allowsMacOSInstaller(applications.appending(path: "Install macOS Sequoia.app"), owner: rootOwned))
 
         // In SmartScanModel: locked entry cannot be selected, selectedScan has 0 entries
         let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: [itemRoot])] }
