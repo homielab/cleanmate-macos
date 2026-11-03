@@ -1,6 +1,7 @@
 import Foundation
 
-/// What `cleanmate space`, `cleanmate large` and `cleanmate dupes` report: Space Lens and Large & Old Files without a window, read-only.
+/// What `cleanmate space`, `cleanmate large`, `cleanmate dupes` and `cleanmate similar` report: Space Lens and Large &
+/// Old Files (with Similar Photos) without a window, read-only.
 /// Same engines, scope and rules as the app (`SpaceLens.measure`, `LargeFileScanner.scan`): sizes like `du -x` with a
 /// hard link counted once, Settings › Exclusions for large files, and without Full Disk Access the folders macOS
 /// protects (`ProtectedFolders`) are never entered, so no "allow access" dialog appears. Nothing is moved or deleted.
@@ -31,6 +32,13 @@ nonisolated enum HeadlessFiles {
         /// Bytes; nil = `defaultMinSize`.
         var minSize: Int64? = nil
         /// Groups listed, most wasted space first.
+        var limit = 20
+    }
+
+    struct SimilarOptions: Equatable, Sendable {
+        /// The folders to search, as typed; empty = the home folder.
+        var roots: [String] = []
+        /// Groups listed, most space to free first.
         var limit = 20
     }
 
@@ -206,6 +214,52 @@ nonisolated enum HeadlessFiles {
         var skipped: [Skipped]
     }
 
+    struct SimilarPhoto: Codable, Equatable, Sendable {
+        var path: String
+        /// Allocated bytes: what moving it to the Trash frees.
+        var size: Int64
+        /// Pixels as shown (orientation applied); 0 when the file does not say.
+        var width: Int
+        var height: Int
+        /// ISO 8601, UTC.
+        var modified: String
+        /// The photo suggested to keep (most pixels, then largest, then newest): the first of its group. Nothing
+        /// is chosen to go; the user picks.
+        var suggested: Bool
+    }
+
+    struct SimilarGroup: Codable, Equatable, Sendable {
+        var count: Int
+        /// Bytes freed by moving every photo but the suggested one to the Trash.
+        var freeable: Int64
+        /// The suggested photo first.
+        var photos: [SimilarPhoto]
+    }
+
+    struct SimilarReport: Codable, Equatable, Sendable {
+        var version: String
+        var fullDiskAccess: Bool
+        /// ISO 8601, UTC.
+        var scannedAt: String
+        /// Milliseconds the search took: listing the photos and comparing them.
+        var durationMs: Int
+        /// The folders searched, absolute, symlinks resolved.
+        var roots: [String]
+        /// Image files of at least this many bytes are compared.
+        var minSize: Int64
+        /// Photos compared, and how many of them were analyzed now (the others were known from CleanMate's cache).
+        var photos: Int
+        var analyzed: Int
+        /// Every group found and their freeable bytes, also those past the limit.
+        var count: Int
+        var freeable: Int64
+        /// Most space to free first, at most the limit.
+        var groups: [SimilarGroup]
+        var moreGroups: Int
+        /// Folders macOS protects inside `roots` that were not searched (no Full Disk Access).
+        var skipped: [Skipped]
+    }
+
     // MARK: - Folders
 
     /// `argument` as an absolute, standardized URL: nil → `home`, a leading `~` → `home`, relative → from `current`.
@@ -315,14 +369,15 @@ nonisolated enum HeadlessFiles {
 
     /// The folder `large` searches, checked like the app's Scope menu: the home folder, a folder in it (not in
     /// ~/Library nor hidden) or an external drive; `--min-size` at least 50 MB for the home folder, 1 MB for a folder.
-    static func largeFolder(_ options: LargeOptions, sources: HeadlessScan.Sources) throws(PathError) -> URL {
+    static func largeFolder(_ options: LargeOptions, sources: HeadlessScan.Sources,
+                            command: String = "large") throws(PathError) -> URL {
         let policy = sources.policy()
         let home = policy.homeURL
         let skipping = protectedFolders(home: home, hasFullDiskAccess: sources.hasFullDiskAccess())
         _ = try folder(options.root, home: home, skipping: skipping)
         let url = resolve(options.root, home: home)
         guard LargeFileScanner.allowsRoot(url, policy: policy) else {
-            throw PathError(message: "\(options.root ?? "~") can't be searched: large looks in your home folder (not in "
+            throw PathError(message: "\(options.root ?? "~") can't be searched: \(command) looks in your home folder (not in "
                             + "~/Library or hidden folders) or on an external drive")
         }
         let isHome = url.standardizedFileURL.path == home.standardizedFileURL.path
@@ -355,9 +410,6 @@ nonisolated enum HeadlessFiles {
         let shown = matches.prefix(options.limit)
         let lastUsed = opened.withLock { $0 }
         let real = realPath(root.path) ?? root.path
-        // ~/Library is never searched, with or without Full Disk Access: its protected folders aren't skipped by it.
-        let library = [policy.homeURL, URL(fileURLWithPath: realPath(policy.homeURL.path) ?? policy.homeURL.path)]
-            .map { $0.appending(path: "Library").standardizedFileURL.path + "/" }
         return LargeReport(version: sources.version(), fullDiskAccess: access, scannedAt: now.formatted(.iso8601), root: real,
                            minSize: minSize, olderThanDays: options.olderThanDays, count: matches.count,
                            size: matches.reduce(0) { $0 + $1.size },
@@ -368,8 +420,15 @@ nonisolated enum HeadlessFiles {
                                              icloud: file.icloud?.rawValue)
                            },
                            moreFiles: matches.count - shown.count,
-                           skipped: skipped(skipping, inside: URL(fileURLWithPath: real))
-                            .filter { skipped in !library.contains { skipped.path.hasPrefix($0) } })
+                           skipped: skippedOutsideLibrary(skipping, inside: URL(fileURLWithPath: real), home: policy.homeURL))
+    }
+
+    /// `skipped` without the folders in ~/Library: Large & Old Files never searches it, with or without Full Disk
+    /// Access, so its protected folders aren't skipped because of it.
+    private static func skippedOutsideLibrary(_ skipping: Set<String>, inside folder: URL, home: URL) -> [Skipped] {
+        let library = [home, URL(fileURLWithPath: realPath(home.path) ?? home.path)]
+            .map { $0.appending(path: "Library").standardizedFileURL.path + "/" }
+        return skipped(skipping, inside: folder).filter { skipped in !library.contains { skipped.path.hasPrefix($0) } }
     }
 
     // MARK: - dupes
@@ -404,6 +463,68 @@ nonisolated enum HeadlessFiles {
                            root: large.root, minSize: large.minSize, count: groups.count,
                            wasted: groups.reduce(0) { $0 + $1.wasted }, groups: Array(shown),
                            moreGroups: groups.count - shown.count, skipped: large.skipped)
+    }
+
+    // MARK: - similar
+
+    /// The folders `similar` searches, each checked like `large --in` (`largeFolder`); none = the home folder.
+    static func similarFolders(_ options: SimilarOptions, sources: HeadlessScan.Sources) throws(PathError) -> [URL] {
+        let named: [String?] = options.roots.isEmpty ? [nil] : options.roots
+        var folders: [URL] = []
+        for root in named {
+            let url = try largeFolder(LargeOptions(root: root), sources: sources, command: "similar")
+            if !folders.contains(url) { folders.append(url) }
+        }
+        return folders
+    }
+
+    /// Similar photos in `roots`, as Similar Photos in Large & Old Files finds them (`SimilarPhotos`: image files of
+    /// 20 KB or more, never inside a Photos library or an app, Settings › Exclusions left out, compared with Vision on
+    /// this Mac). Prints the app already made are reused; none are saved. `progress` gets (done, total) while
+    /// comparing. Throws when a search fails or the task is cancelled.
+    static func similar(_ roots: [URL], options: SimilarOptions, sources: HeadlessScan.Sources,
+                        progress: (@Sendable (Int, Int) -> Void)? = nil) async throws -> SimilarReport {
+        let started = ContinuousClock.now
+        let access = sources.hasFullDiskAccess()
+        let policy = sources.policy()
+        let skipping = protectedFolders(home: policy.homeURL, hasFullDiskAccess: access)
+        var files: [LargeFile] = []
+        var seen = Set<String>()
+        for root in roots {
+            for file in try await SimilarPhotos.photos(in: root, policy: policy, skipping: skipping)
+            where seen.insert(file.url.standardizedFileURL.path).inserted {
+                files.append(file)
+            }
+        }
+        let result: SimilarPhotos.Result
+        do {
+            result = try await SimilarPhotos.find(files, cache: await sources.featurePrints(), makePrint: sources.makePrint,
+                                                  progress: progress)
+        } catch is SimilarPhotos.Cancelled {
+            throw CancellationError()
+        }
+        let groups = result.groups.map { group in
+            SimilarGroup(count: group.photos.count, freeable: group.extraSize,
+                         photos: group.photos.enumerated().map { index, photo in
+                SimilarPhoto(path: photo.url.path, size: photo.size, width: photo.width, height: photo.height,
+                             modified: photo.modified.formatted(.iso8601), suggested: index == 0)
+            })
+        }
+        let shown = groups.prefix(options.limit)
+        let reals = roots.map { realPath($0.path) ?? $0.path }
+        var skippedFolders: [Skipped] = []
+        for real in reals {
+            for folder in skippedOutsideLibrary(skipping, inside: URL(fileURLWithPath: real), home: policy.homeURL)
+            where !skippedFolders.contains(folder) {
+                skippedFolders.append(folder)
+            }
+        }
+        return SimilarReport(version: sources.version(), fullDiskAccess: access, scannedAt: sources.now().formatted(.iso8601),
+                             durationMs: HeadlessScan.milliseconds(ContinuousClock.now - started),
+                             roots: reals, minSize: SimilarPhotos.minSize,
+                             photos: files.count, analyzed: result.analyzedCount, count: groups.count,
+                             freeable: groups.reduce(0) { $0 + $1.freeable }, groups: Array(shown),
+                             moreGroups: groups.count - shown.count, skipped: skippedFolders)
     }
 
     // MARK: - Arguments

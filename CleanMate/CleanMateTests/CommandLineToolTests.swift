@@ -584,6 +584,7 @@ extension CommandLineToolTests {
             sources.hasFullDiskAccess = { fullDiskAccess }
             sources.now = { now }
             sources.version = { "9.9" }
+            sources.featurePrints = { [:] } // never the app's real feature print cache
             // Like Finder: a name already in the Trash gets a number.
             sources.trash = { url in
                 var target = trash.appending(path: url.lastPathComponent)
@@ -806,5 +807,34 @@ extension CommandLineToolTests {
         #expect(help.stdout.contains("cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]"))
         let (_, dupesHelp) = await Self.run(["dupes", "--help"], fixture.sources())
         #expect(dupesHelp.stdout.contains("dupes           Duplicate files"))
+    }
+
+    @Test func similarArgumentsAndExitCodes() async throws {
+        let fixture = try FilesFixture()
+        let home = fixture.home.path
+        for arguments in [["similar", home + "/nope"], ["similar", home + "/Library"], ["similar", home + "/top.bin"],
+                          ["similar", "--min-size", "1MB"], ["similar", "--limit", "0"], ["similar", "--older-than", "3"],
+                          ["similar", "--in"], ["similar", "--yes"]] {
+            let (code, printed) = await Self.run(arguments, fixture.sources(fullDiskAccess: true))
+            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.hasPrefix("cleanmate: "), "\(arguments)")
+        }
+        let (_, library) = await Self.run(["similar", "~/Library"], fixture.sources(fullDiskAccess: true))
+        #expect(library.stderr.contains("can't be searched: similar looks in your home folder"))
+        let (code, _) = await Self.run(["similar", "~/Media", home + "/Documents"], fixture.sources())
+        #expect(code == 3)
+        #expect(try CommandLineTool.parse(["similar"]) == .similar(HeadlessFiles.SimilarOptions(), json: false))
+        #expect(try CommandLineTool.parse(["similar", "a", "--in", "b", "--limit=5", "--json"])
+                == .similar(HeadlessFiles.SimilarOptions(roots: ["a", "b"], limit: 5), json: true))
+        let (_, help) = await Self.run(["--help"], fixture.sources())
+        #expect(help.stdout.contains("cleanmate similar [PATH…] [--limit N] [--json]"))
+        #expect(help.stdout.contains("similar         Similar photos"))
+
+        // No photos: an empty answer, not an error; a folder named twice is searched once.
+        let (emptyCode, empty) = await Self.run(["similar", "--json", "~/Media", home + "/Media"], fixture.sources())
+        let report = try JSONDecoder().decode(HeadlessFiles.SimilarReport.self, from: Data(empty.stdout.utf8))
+        #expect(emptyCode == 0 && report.count == 0 && report.groups.isEmpty && report.photos == 0)
+        #expect(report.roots == [fixture.real + "/Media"] && report.minSize == SimilarPhotos.minSize)
+        let (_, text) = await Self.run(["similar", "~/Media"], fixture.sources())
+        #expect(text.stdout.contains("No similar photos found.") && text.stdout.contains("Nothing was moved."))
     }
 }

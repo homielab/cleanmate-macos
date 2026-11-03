@@ -79,10 +79,15 @@ nonisolated enum SimilarPhotos {
                                         spotlightLastUsed: { _ in nil }, icloudStatus: { _ in nil }, progress: progress)
     }
 
+    /// Makes one photo's print on a GCD thread; `Stop` is set when the search stops. `featurePrint`, or a fake in tests.
+    typealias PrintMaker = @Sendable (_ url: URL, _ revision: Int, _ stop: Stop) -> Print?
+
     /// Groups the photos among `files` that look alike. Hard links to one file count once. Prints in `cache` for the
     /// same path, size, modification date and inode are reused; the others are made a few at a time. A file that
-    /// can't be read or decoded is left out. `progress` gets (done, total). Throws `Cancelled` when cancelled.
+    /// can't be read or decoded is left out. `progress` gets (done, total). Throws `Cancelled` when cancelled, at once:
+    /// photos being analyzed are given up (their Vision requests cancelled), not waited for.
     @concurrent static func find(_ files: [LargeFile], cache: [DuplicateFinder.Key: Print] = [:], revision: Int = revision,
+                                 makePrint: @escaping PrintMaker = featurePrint,
                                  progress: (@Sendable (Int, Int) -> Void)? = nil) async throws -> Result {
         var result = Result(prints: cache)
         var seen = Set<[UInt64]>()
@@ -107,12 +112,13 @@ nonisolated enum SimilarPhotos {
                 func add() {
                     let index = missing[next]
                     let url = todo[index].file.url
-                    group.addTask { (index, await featurePrintOffPool(of: url, revision: revision)) }
+                    group.addTask { (index, await featurePrintOffPool(of: url, revision: revision, make: makePrint)) }
                     next += 1
                 }
                 // Vision runs on the GPU / Neural Engine: a few at a time keep it busy without decoding dozens of
                 // 24 MP photos at once.
                 for _ in 0..<min(missing.count, max(2, min(ProcessInfo.processInfo.activeProcessorCount, 8))) { add() }
+                try Task.checkCancellation()
                 while let (index, print) = try await group.next() {
                     try Task.checkCancellation()
                     prints[index] = print
@@ -202,19 +208,65 @@ nonisolated enum SimilarPhotos {
         return members.filter { $0.count >= 2 }.map { $0.sorted() }.sorted { $0[0] < $1[0] }
     }
 
-    /// `featurePrint` on a GCD thread: Vision blocks the calling thread while it waits for its own workers, and with
-    /// every thread of the Swift concurrency pool waiting there nothing is left to run them (a deadlock).
-    static func featurePrintOffPool(of url: URL, revision: Int) async -> Print? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(returning: featurePrint(of: url, revision: revision))
+    /// Stops one photo's analysis: a print not started yet is never made, a running Vision request is cancelled.
+    final class Stop: @unchecked Sendable {
+        private let state = Locked((stopped: false, request: VNRequest?.none))
+
+        var isStopped: Bool { state.withLock { $0.stopped } }
+
+        func stop() {
+            state.withLock { state -> VNRequest? in
+                state.stopped = true
+                return state.request
+            }?.cancel()
+        }
+
+        /// Holds `request` so `stop` cancels it; false when already stopped (don't perform it).
+        func running(_ request: VNRequest) -> Bool {
+            state.withLock { state in
+                guard !state.stopped else { return false }
+                state.request = request
+                return true
             }
         }
     }
 
+    /// `make` on a GCD thread: Vision blocks the calling thread while it waits for its own workers, and with every
+    /// thread of the Swift concurrency pool waiting there nothing is left to run them (a deadlock). Cancelling the
+    /// task returns nil at once and stops `make` (its Vision request is cancelled); its thread is not waited for.
+    static func featurePrintOffPool(of url: URL, revision: Int, make: @escaping PrintMaker = featurePrint) async -> Print? {
+        let stop = Stop()
+        let waiting = Locked(CheckedContinuation<Print?, Never>?.none)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                // Stored unless already cancelled; whoever takes it out (the result or the cancel) resumes it once.
+                let cancelled = waiting.withLock { slot in
+                    if stop.isStopped { return true }
+                    slot = continuation
+                    return false
+                }
+                guard !cancelled else { return continuation.resume(returning: nil) }
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let print = stop.isStopped ? nil : make(url, revision, stop)
+                    waiting.withLock { $0.take() }?.resume(returning: print)
+                }
+            }
+        } onCancel: {
+            stop.stop()
+            waiting.withLock { $0.take() }?.resume(returning: nil)
+        }
+    }
+
+    /// `featurePrint(of:revision:running:)` unless `stop` is set; `stop` cancels its Vision request.
+    static func featurePrint(of url: URL, revision: Int, stop: Stop) -> Print? {
+        guard !stop.isStopped else { return nil }
+        return featurePrint(of: url, revision: revision, running: stop.running)
+    }
+
     /// The feature print of the image at `url`, made from a 512 px rendition (the full image decoded at that size,
-    /// orientation applied); nil when it can't be read or decoded. The file's access date is put back.
-    static func featurePrint(of url: URL, revision: Int) -> Print? {
+    /// orientation applied); nil when it can't be read or decoded, or `running` refuses the Vision request. The file's
+    /// access date is put back.
+    static func featurePrint(of url: URL, revision: Int, running: (VNRequest) -> Bool = { _ in true }) -> Print? {
         DuplicateFinder.keepingAccessDate(of: url) {
             autoreleasepool { () -> Print? in
                 guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
@@ -231,7 +283,7 @@ nonisolated enum SimilarPhotos {
                 guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
                 let request = VNGenerateImageFeaturePrintRequest()
                 request.revision = revision
-                guard (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil,
+                guard running(request), (try? VNImageRequestHandler(cgImage: image).perform([request])) != nil,
                       let observation = request.results?.first, observation.elementType == .float,
                       observation.data.count == observation.elementCount * MemoryLayout<Float>.size
                 else { return nil }

@@ -66,8 +66,8 @@ import UniformTypeIdentifiers
     }
 
     @discardableResult
-    func write(_ image: CGImage, to path: String, type: UTType = .jpeg, quality: Double = 0.9) throws -> URL {
-        let url = home.appending(path: path)
+    func write(_ image: CGImage, to path: String, type: UTType = .jpeg, quality: Double = 0.9, in folder: URL? = nil) throws -> URL {
+        let url = (folder ?? home).appending(path: path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil))
         CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
@@ -133,6 +133,65 @@ import UniformTypeIdentifiers
         } catch let cancelled as SimilarPhotos.Cancelled {
             #expect(cancelled.prints.count <= photos.count)
         }
+    }
+
+    /// Stop while Vision is slow (a fake taking 3 s a photo): the search ends at once instead of waiting for the photos
+    /// being analyzed, their requests are told to stop and no other photo is started.
+    @Test func stoppingDoesNotWaitForPhotosBeingAnalyzed() async throws {
+        for index in 0..<20 {
+            let url = home.appending(path: "Pictures/IMG_\(index).jpg")
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(repeating: UInt8(index), count: 30_000).write(to: url)
+        }
+        let photos = try await SimilarPhotos.photos(in: home, policy: policy)
+        try #require(photos.count == 20)
+
+        func stopped(_ make: @escaping SimilarPhotos.PrintMaker, started: Locked<Int>) async throws -> Duration {
+            let task = Task { try await SimilarPhotos.find(photos, makePrint: make) }
+            for _ in 0..<300 where started.withLock({ $0 }) == 0 { try await Task.sleep(for: .milliseconds(10)) }
+            try #require(started.withLock { $0 } > 0)
+            let clock = ContinuousClock()
+            let stop = clock.now
+            task.cancel()
+            do {
+                _ = try await task.value
+                Issue.record("expected Cancelled")
+            } catch is SimilarPhotos.Cancelled {}
+            return clock.now - stop
+        }
+
+        // A fake that stops when told, like a cancelled Vision request.
+        let (started, told) = (Locked(0), Locked(0))
+        let elapsed = try await stopped({ _, _, stop in
+            started.withLock { $0 += 1 }
+            let until = Date.now.addingTimeInterval(3)
+            while Date.now < until {
+                if stop.isStopped { told.withLock { $0 += 1 }; return nil }
+                usleep(2_000)
+            }
+            return nil
+        }, started: started)
+        #expect(elapsed < .seconds(1), "\(elapsed)")
+        let running = started.withLock { $0 }
+        #expect(running <= 8)
+        for _ in 0..<100 where told.withLock({ $0 }) < running { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(told.withLock { $0 } == running)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(started.withLock { $0 } == running) // nothing started after the stop
+
+        // A fake that never looks at the stop: still not waited for.
+        let ignoring = Locked(0)
+        let ignored = try await stopped({ _, _, _ in
+            ignoring.withLock { $0 += 1 }
+            Thread.sleep(forTimeInterval: 1.5)
+            return nil
+        }, started: ignoring)
+        #expect(ignored < .seconds(1), "\(ignored)")
+
+        // A stopped photo is never decoded nor sent to Vision.
+        let stop = SimilarPhotos.Stop()
+        stop.stop()
+        #expect(SimilarPhotos.featurePrint(of: photos[0].url, revision: SimilarPhotos.revision, stop: stop) == nil)
     }
 
     /// Complete linkage: a chain of close pairs whose ends are far apart is not one group.
@@ -296,6 +355,50 @@ import UniformTypeIdentifiers
         model.listing = .allFiles
         guard case .idle = model.similarPhotos.phase else { Issue.record("not reset"); return }
         #expect(!model.similarPhotosShown && !model.duplicatesOnly && model.similarPhotos.checked.isEmpty)
+    }
+
+    /// `cleanmate similar --json` groups what the app groups (Settings › Exclusions left out, nothing chosen), and the
+    /// photos the user picks go to the Trash with `cleanmate trash` and come back with `cleanmate restore`.
+    @Test func commandLineFindsSimilarPhotosAndTrashedOnesComeBack() async throws {
+        let fixture = try CommandLineToolTests.FilesFixture()
+        let scene = Self.scene(seed: 1)
+        try write(scene, to: "Pictures/IMG_0001.jpg", in: fixture.home)
+        try write(Self.resized(scene, by: 0.5), to: "Pictures/IMG_0001 small.png", type: .png, in: fixture.home)
+        try write(scene, to: "Media/IMG_0001 (1).jpg", quality: 0.4, in: fixture.home)
+        try write(Self.scene(seed: 2), to: "Pictures/IMG_0002.jpg", in: fixture.home)
+        try write(scene, to: "Media/Excluded/IMG_0001 copy.jpg", in: fixture.home) // in Settings › Exclusions
+        let sources = fixture.sources(fullDiskAccess: true)
+
+        let (code, printed) = await CommandLineToolTests.run(["similar", "--json", fixture.home.appending(path: "Pictures").path,
+                                                              "~/Media"], sources)
+        try #require(code == 0, "\(printed.stderr)")
+        let report = try JSONDecoder().decode(HeadlessFiles.SimilarReport.self, from: Data(printed.stdout.utf8))
+        #expect(report.version == "9.9" && report.fullDiskAccess && report.skipped.isEmpty)
+        #expect(report.roots == [fixture.real + "/Pictures", fixture.real + "/Media"])
+        #expect(report.photos == 4 && report.analyzed == 4 && report.count == 1 && report.moreGroups == 0)
+        let group = try #require(report.groups.first)
+        #expect(Set(group.photos.map { URL(filePath: $0.path).lastPathComponent })
+                == ["IMG_0001.jpg", "IMG_0001 small.png", "IMG_0001 (1).jpg"])
+        #expect(group.count == 3 && group.photos.map(\.suggested) == [true, false, false])
+        #expect(group.photos[0].width == 1200 && group.photos[0].height == 900 && group.photos.last?.width == 600)
+        #expect(group.freeable == group.photos.dropFirst().reduce(0) { $0 + $1.size } && report.freeable == group.freeable)
+        // The same kinds of fields as the other commands: version a string, durationMs a whole number.
+        let object = try #require(try JSONSerialization.jsonObject(with: Data(printed.stdout.utf8)) as? [String: Any])
+        #expect(object["version"] is String && object["durationMs"] is Int && object["scannedAt"] is String)
+
+        // Nothing moved by `similar`; the user's pick goes with `trash` and comes back with `restore`.
+        let picked = group.photos.filter { !$0.suggested }.map(\.path)
+        #expect(picked.allSatisfy { FileManager.default.fileExists(atPath: $0) })
+        let trashed = try await CommandLineToolTests.trashReport(picked, sources)
+        #expect(trashed.count == 2 && trashed.items.allSatisfy { !$0.skipped })
+        #expect(picked.allSatisfy { !FileManager.default.fileExists(atPath: $0) })
+        #expect(FileManager.default.fileExists(atPath: group.photos[0].path))
+        let restored = try await CommandLineToolTests.restoreReport(trashed.items.compactMap(\.trashed), sources)
+        #expect(restored.count == 2 && picked.allSatisfy { FileManager.default.fileExists(atPath: $0) })
+
+        let (textCode, text) = await CommandLineToolTests.run(["similar", "~/Pictures", "--in", "~/Media"], sources)
+        #expect(textCode == 0 && text.stdout.contains("(suggested to keep)") && text.stdout.contains("1200×900"))
+        #expect(text.stdout.contains("1 group, ") && text.stdout.contains("Nothing was moved."))
     }
 
     /// What Similar Photos moves is listed by `cleanmate restore --list` and put back by `cleanmate restore`.

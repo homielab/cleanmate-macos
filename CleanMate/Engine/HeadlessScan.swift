@@ -168,6 +168,12 @@ nonisolated enum HeadlessScan {
         var trash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash
         /// Spotlight's last-opened date of a file, for `cleanmate large`.
         var spotlightLastUsed: @Sendable (URL) -> Date? = { LargeFileScanner.spotlightLastUsedDate($0) }
+        /// Feature prints the app already made (its cache, read, never written), for `cleanmate similar`.
+        var featurePrints: @Sendable () async -> [DuplicateFinder.Key: SimilarPhotos.Print] = {
+            await SimilarPhotos.Cache.load(from: SimilarPhotos.Cache.defaultURL)
+        }
+        /// Makes a photo's feature print for `cleanmate similar` (Vision); tests may pass a fake.
+        var makePrint: SimilarPhotos.PrintMaker = SimilarPhotos.featurePrint
     }
 
     /// The app's version (`appBundle`).

@@ -11,6 +11,7 @@
 | `cleanmate space [PATH] --json` | a folder's children by size, like Space Lens (default: the home folder); read-only |
 | `cleanmate large --json` | large files, like Large & Old Files (default: 50 MB or more in the home folder); read-only |
 | `cleanmate dupes --json` | duplicate files among those `large` finds, like the Duplicates Only filter; read-only |
+| `cleanmate similar [PATH…] --json` | photos that look alike, like Similar Photos (default: the home folder); read-only |
 | `cleanmate trash --yes --json PATH…` | moves exactly those files and folders to the Trash, after the user confirmed them |
 | `cleanmate restore --list --json` | what CleanMate (the app and `cleanmate`) moved to the Trash and is still there, newest first; read-only |
 | `cleanmate restore --json TRASHED…` | puts items CleanMate moved back at their old place, never overwriting |
@@ -33,14 +34,16 @@ Options for `scan` and `clean`:
   app's Smart Scan stay in the app: `clean` does not see them, so it takes all of them. To keep some (a database), the
   user cleans them in the app instead, ticking only the ones to remove.
 
-Options for `space`, `large` and `dupes`:
+Options for `space`, `large`, `dupes` and `similar`:
 
-- `--limit N`: show the N biggest (`space` 20, `large` 50, `dupes` 20 groups); the rest is counted in `moreItems` /
-  `moreSize`, `moreFiles` or `moreGroups`.
+- `--limit N`: show the N biggest (`space` 20, `large` 50, `dupes` and `similar` 20 groups); the rest is counted in
+  `moreItems` / `moreSize`, `moreFiles` or `moreGroups`.
 - `large` / `dupes --min-size SIZE`: `50MB` by default, `1GB`, `500MB`… (1 MB = 10⁶ bytes). At least 50 MB for the whole home
   folder, 1 MB with `--in`.
 - `large --older-than DAYS`: only files not opened or changed for that many days.
 - `large` / `dupes --in PATH`: search this folder (in the home folder but not in `~/Library`, or an external drive).
+- `similar PATH…`: search these folders (same rules as `--in`; `--in PATH` works too). Photos of 20 KB or more;
+  `--min-size` and `--older-than` do not apply.
 - Without Full Disk Access, the folders macOS protects are listed in `skipped` and never read; a PATH inside one exits
   with code 3. A PATH that does not exist, is not a folder or can't be read exits with code 2.
 
@@ -264,6 +267,41 @@ download: for an `uploaded` file, point to **Remove Download** in Large & Old Fi
 `count` and `wasted` cover every group found, `groups` the `--limit` wasting the most. `wasted` is what moving every
 copy but the oldest to the Trash frees; `freeable` 0 marks an APFS clone or a file with other hard links.
 
+## `similar --json` (shortened)
+
+```json
+{
+  "analyzed" : 3,
+  "count" : 1,
+  "durationMs" : 2140,
+  "freeable" : 2900000,
+  "fullDiskAccess" : true,
+  "groups" : [
+    {
+      "count" : 3,
+      "freeable" : 2900000,
+      "photos" : [
+        { "height" : 3024, "modified" : "2025-07-14T09:12:00Z", "path" : "/Users/me/Pictures/IMG_0412.jpg", "size" : 3100000, "suggested" : true, "width" : 4032 },
+        { "height" : 3024, "modified" : "2025-07-14T09:12:01Z", "path" : "/Users/me/Pictures/IMG_0413.jpg", "size" : 2400000, "suggested" : false, "width" : 4032 },
+        { "height" : 1512, "modified" : "2025-08-01T18:30:00Z", "path" : "/Users/me/Desktop/IMG_0412 small.jpg", "size" : 500000, "suggested" : false, "width" : 2016 }
+      ]
+    }
+  ],
+  "minSize" : 20000,
+  "moreGroups" : 0,
+  "photos" : 3,
+  "roots" : [ "/Users/me/Pictures", "/Users/me/Desktop" ],
+  "scannedAt" : "2026-11-02T08:00:00Z",
+  "skipped" : [ ],
+  "version" : "1.5"
+}
+```
+
+`count` and `freeable` cover every group found, `groups` the `--limit` freeing the most. In each group the `suggested`
+photo comes first (most pixels, then largest, then newest); `freeable` is what moving the other photos frees. Nothing
+is ticked: the user picks. `photos` is how many were compared, `analyzed` how many of them were not yet in CleanMate's
+cache (the app's; `similar` reads it but never writes it).
+
 ## `trash --yes --json` (shortened)
 
 ```json
@@ -325,6 +363,6 @@ are not listed. Each `trashed` is an argument for `restore`. `version` is the ap
 
 `cleanmate` cleans only the locations of CleanMate's catalog, with the app's safety rules and the user's exclusions
 (Settings › Exclusions). It never runs as root, never touches system files macOS protects, and never connects to the
-network. Every clean is written to the activity log. `space`, `large` and `dupes` only read. `trash` only moves to the
+network. Every clean is written to the activity log. `space`, `large`, `dupes` and `similar` only read. `trash` only moves to the
 Trash, never deletes, and only the paths named that pass the same rules as Space Lens in the app; `trash` and `restore`
 are written to the activity log too.

@@ -1,6 +1,6 @@
 ---
 name: cleanmate
-description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space or which files are large or duplicated, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans or moves to the Trash only what the user confirms.
+description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space, which files are large or duplicated or which photos look alike, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans or moves to the Trash only what the user confirms.
 ---
 
 # CleanMate for macOS
@@ -25,7 +25,7 @@ apps are skipped. This skill drives it with `--json`.
 6. Never pass `--privacy` (browser history, cookies, recent items) unless the user asked for privacy cleaning.
 7. Do not offer `locked` items: tell the user the `reason` (`"Google Chrome is running"`), to quit that app and rescan.
 8. When unsure, run the same clean with `--dry-run` first. Never delete files by hand instead of using `cleanmate`.
-   Move a file `space`, `large` or `dupes` found to the Trash only with `cleanmate trash --yes PATH…`, only the exact paths
+   Move a file `space`, `large`, `dupes` or `similar` found to the Trash only with `cleanmate trash --yes PATH…`, only the exact paths
    the user confirmed (see "Move to the Trash").
 9. After cleaning, report `freed`, what is in the Trash (`inTrash`: still on disk until the Trash is emptied) and every
    `skipped` path with its `reason`.
@@ -88,9 +88,9 @@ with `--require-fda`, 4 `clean` or `trash` without `--yes` and without a termina
 
 ## What takes space
 
-When the user asks what fills the disk, which files are big or which are duplicates, measure with these instead of `du` or `find`: they
-follow the app's rules (exclusions, hard links counted once, protected folders never opened without Full Disk Access).
-All three are read-only.
+When the user asks what fills the disk, which files are big, which are duplicates or which photos look alike, measure
+with these instead of `du` or `find`: they follow the app's rules (exclusions, hard links counted once, protected
+folders never opened without Full Disk Access). All four are read-only.
 
 ```bash
 cleanmate space --json                       # the home folder's children by size, like Space Lens
@@ -99,6 +99,7 @@ cleanmate large --json                       # files of 50 MB or more in the hom
 cleanmate large --json --min-size 1GB --older-than 180 --in ~/Downloads
 cleanmate dupes --json                       # duplicate files among those, like the Duplicates Only filter
 cleanmate dupes --json --in ~/Pictures --min-size 1MB --limit 10
+cleanmate similar --json ~/Pictures ~/Desktop # photos that look alike, like Similar Photos (default: the home folder)
 ```
 
 `space` lists `items` biggest first (`size` in bytes, `kind` `folder` or `file`), then `moreItems` / `moreSize` for
@@ -113,7 +114,14 @@ the oldest would free); each group has the copies' `size`, `count` and `files` (
 `oldest` first). A copy with `freeable` 0 is an APFS clone or has other hard links: removing it frees nothing. Show
 sizes human readable and paths with `~`.
 
-All three report `skipped` folders (no Full Disk Access): say they were not measured. A path inside one exits with code 3,
+`similar` compares photos of 20 KB or more on this Mac (Vision; nothing leaves the Mac) in the folders named, like
+Similar Photos: the same shot resized, recompressed or converted, burst shots that barely differ. It never reads a
+Photos library or an app. It lists `groups`, most `freeable` bytes first; each has `count` and `photos` (`path`,
+`size`, `width`, `height`, `modified`, `suggested`). The `suggested` photo (most pixels, then largest, then newest) is
+the one to keep; `freeable` is what moving the others frees. Unlike `dupes` the photos are not identical: show the
+user the group and let them choose. `photos` is how many were compared; the first run on many photos takes a while.
+
+All four report `skipped` folders (no Full Disk Access): say they were not measured. A path inside one exits with code 3,
 a path that does not exist or is not a folder with code 2.
 
 None of them deletes anything. If it is junk Smart Scan covers (DerivedData, caches, `node_modules`), scan and clean
@@ -121,11 +129,12 @@ that item instead.
 
 ## Move to the Trash
 
-To remove files or folders that `space`, `large` or `dupes` found, move them to the Trash with `cleanmate trash PATH…`.
+To remove files or folders that `space`, `large`, `dupes` or `similar` found, move them to the Trash with `cleanmate trash PATH…`.
 Never delete or move these files yourself, by hand or with `rm`, `mv` or Finder scripting.
 
 1. Show the user the exact paths and sizes you propose (for duplicates: every copy but the one they keep, by default
-   the `oldest`). Never pick files on your own beyond what you showed.
+   the `oldest`; for similar photos: the others of a group, keeping the `suggested` one unless the user picks another,
+   and only after the user looked at that group). Never pick files on your own beyond what you showed.
 2. Run `trash` only after the user confirmed in this conversation, and only with the exact paths they confirmed, one
    argument each, quoted. No wildcards, no parent folder instead of the files.
 3. Say the items are in the Trash and can be put back with `cleanmate restore TRASHED…`, until the Trash is emptied.

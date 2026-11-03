@@ -1,8 +1,8 @@
 import Foundation
 
 /// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, the read-only
-/// `space`, `large` and `dupes` (what takes the disk space), and `trash` / `restore` for exactly the paths named, as
-/// text or JSON. Stdin only for the confirmation of `clean` and `trash` on a terminal; no network; colours only on a
+/// `space`, `large`, `dupes` and `similar` (what takes the disk space), and `trash` / `restore` for exactly the paths
+/// named, as text or JSON. Stdin only for the confirmation of `clean` and `trash` on a terminal; no network; colours only on a
 /// terminal without `NO_COLOR`.
 nonisolated enum CommandLineTool {
     enum Exit: Int32 {
@@ -46,6 +46,7 @@ nonisolated enum CommandLineTool {
         case space(HeadlessFiles.SpaceOptions, json: Bool)
         case large(HeadlessFiles.LargeOptions, json: Bool)
         case dupes(HeadlessFiles.DupesOptions, json: Bool)
+        case similar(HeadlessFiles.SimilarOptions, json: Bool)
         case trash(paths: [String], json: Bool, yes: Bool)
         case restore(paths: [String], json: Bool)
         case restoreList(limit: Int, json: Bool)
@@ -61,6 +62,7 @@ nonisolated enum CommandLineTool {
           cleanmate space [PATH] [--limit N] [--json]
           cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]
           cleanmate dupes [--min-size SIZE] [--in PATH] [--limit N] [--json]
+          cleanmate similar [PATH…] [--limit N] [--json]
           cleanmate trash [--yes] [--json] [--] PATH…
           cleanmate restore [--json] [--] TRASHED…
           cleanmate restore --list [--limit N] [--json]
@@ -71,7 +73,7 @@ nonisolated enum CommandLineTool {
 
     static let help = """
         cleanmate: CleanMate's Smart Scan, Space Lens and Large & Old Files on the command line, for scripts
-        and AI agents. list, scan, space, large and dupes are read-only. clean removes what scan finds with the
+        and AI agents. list, scan, space, large, dupes and similar are read-only. clean removes what scan finds with the
         app's safety rules; trash moves exactly the files and folders you name to the Trash, and restore puts
         them back. Both write the app's activity log. It never connects to the network.
 
@@ -103,6 +105,13 @@ nonisolated enum CommandLineTool {
                           a hard-linked file counted once, APFS clones freeing nothing. Groups by space
                           wasted (what moving every copy but the oldest would free). Read-only: to move
                           copies to the Trash, use `cleanmate trash`.
+          similar         Similar photos, like Similar Photos in Large & Old Files: bursts, edits, resized
+                          or recompressed copies of a photo (JPEG, HEIC, PNG, TIFF or WebP of 20 KB or more),
+                          compared with Vision on this Mac, never uploaded. Searches your home folder or the
+                          folders named (as large --in does), never inside the Photos library or an app,
+                          Settings › Exclusions left out. Each group lists the photo suggested to keep first
+                          and what moving the others would free. Read-only and nothing chosen for you: to
+                          move the photos you pick to the Trash, use `cleanmate trash`.
           trash           Moves the files and folders named, and only those, to the Trash: no wildcards,
                           nothing deleted. Each must be in your home folder, not in ~/Library, not hidden
                           (like ~/.ssh), not inside an app or package, not a top-level folder of your home
@@ -128,6 +137,7 @@ nonisolated enum CommandLineTool {
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
           --limit N       space, large: list the N biggest (default 20 for space, 50 for large);
                           dupes: the N groups wasting the most space (default 20);
+                          similar: the N groups freeing the most space (default 20);
                           restore --list: the N newest (default 200).
           --list          restore: list what can be put back instead of putting anything back.
           --min-size SIZE large, dupes: only files of at least SIZE, like 100MB or 1.5GB (1 MB = 1,000,000 bytes).
@@ -135,6 +145,7 @@ nonisolated enum CommandLineTool {
           --older-than DAYS
                           large: only files not opened or changed for DAYS days.
           --in PATH       large, dupes: search this folder (in your home folder or on an external drive) instead.
+                          similar: the same as naming PATH.
           --              trash, restore: every argument after it is a path, even one starting with -.
           -h, --help      Show this help.
           --version       Show the version.
@@ -142,7 +153,7 @@ nonisolated enum CommandLineTool {
         Full Disk Access:
           macOS grants it to the app that runs cleanmate (Terminal, iTerm, your AI agent's app), not to
           CleanMate. Without it the scan skips the folders macOS protects (Desktop, Documents, Downloads,
-          the Trash, Mail, other apps' data) and reports "fullDiskAccess": false; space, large and dupes list
+          the Trash, Mail, other apps' data) and reports "fullDiskAccess": false; space, large, dupes and similar list
           them as skipped, and refuse a PATH inside one (exit code 3). To grant it: System
           Settings › Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
@@ -157,7 +168,8 @@ nonisolated enum CommandLineTool {
           0  OK (also when some items or files were skipped)
           1  Error
           2  Invalid arguments (also a PATH that is missing, not a folder or can't be read)
-          3  No Full Disk Access with --require-fda, or space, large or dupes asked for a folder macOS protects
+          3  No Full Disk Access with --require-fda, or space, large, dupes or similar asked for a folder macOS
+             protects
           4  clean or trash without --yes and without a terminal: nothing was deleted or moved
 
         """
@@ -238,6 +250,8 @@ nonisolated enum CommandLineTool {
             guard let text = json ? encode(report) : dupesText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
+        case .similar(let options, let json):
+            return await similar(options, json: json, sources: sources, output: output)
         case .trash(let paths, let json, let yes):
             return await trash(paths, json: json, yes: yes, sources: sources, output: output)
         case .restore(let paths, let json):
@@ -294,6 +308,35 @@ nonisolated enum CommandLineTool {
         let report = await HeadlessClean.clean(plan, dryRun: dryRun, sources: sources)
         if showsProgress && !dryRun { output.err("\r\u{1B}[K") }
         guard let text = json ? encode(report) : cleanText(report, color: output.color) else { return Exit.failure.rawValue }
+        output.out(text)
+        return Exit.ok.rawValue
+    }
+
+    private static func similar(_ options: HeadlessFiles.SimilarOptions, json: Bool, sources: HeadlessScan.Sources,
+                                output: Output) async -> Int32 {
+        let roots: [URL]
+        do { roots = try HeadlessFiles.similarFolders(options, sources: sources) } catch { return pathError(error, output) }
+        let showsProgress = output.progress && !json
+        if showsProgress { output.err("Searching…") }
+        // At most ~10 progress lines a second.
+        let shown = Locked<ContinuousClock.Instant>(ContinuousClock.now - .seconds(1))
+        let progress: @Sendable (Int, Int) -> Void = { done, total in
+            let due = shown.withLock { (last: inout ContinuousClock.Instant) -> Bool in
+                guard done == total || ContinuousClock.now - last >= .milliseconds(100) else { return false }
+                last = .now
+                return true
+            }
+            if due { output.err("\r\u{1B}[KComparing photos… \(done)/\(total)") }
+        }
+        let found = try? await HeadlessFiles.similar(roots, options: options, sources: sources,
+                                                     progress: showsProgress ? progress : nil)
+        if showsProgress { output.err("\r\u{1B}[K") }
+        guard let report = found else {
+            output.err("cleanmate: could not search \(options.roots.isEmpty ? "~" : options.roots.joined(separator: ", "))\n")
+            return Exit.failure.rawValue
+        }
+        guard let text = json ? encode(report) : similarText(report, home: sources.policy().homeURL, color: output.color)
+        else { return Exit.failure.rawValue }
         output.out(text)
         return Exit.ok.rawValue
     }
@@ -397,9 +440,10 @@ nonisolated enum CommandLineTool {
             case "scan": return .scan(options, json: json, requireFullDiskAccess: requireAccess)
             default: return .clean(options, json: json, requireFullDiskAccess: requireAccess, dryRun: dryRun, yes: yes)
             }
-        case "space", "large", "dupes":
+        case "space", "large", "dupes", "similar":
             var json = false
             var space = HeadlessFiles.SpaceOptions(), large = HeadlessFiles.LargeOptions(), dupes = HeadlessFiles.DupesOptions()
+            var similar = HeadlessFiles.SimilarOptions()
             while let argument = rest.popFirst() {
                 let (name, inline) = split(argument)
                 func value() throws -> String {
@@ -420,7 +464,7 @@ nonisolated enum CommandLineTool {
                 case ("--json", _) where inline == nil: json = true
                 case ("--limit", _):
                     let limit = try number(minimum: 1)
-                    (space.limit, large.limit, dupes.limit) = (limit, limit, limit)
+                    (space.limit, large.limit, dupes.limit, similar.limit) = (limit, limit, limit, limit)
                 case ("--min-size", "large"), ("--min-size", "dupes"):
                     let text = try value()
                     guard let size = HeadlessFiles.parseSize(text) else {
@@ -433,6 +477,8 @@ nonisolated enum CommandLineTool {
                     large.root = try value()
                     dupes.root = large.root
                 case (_, "space") where !argument.hasPrefix("-") && space.path == nil: space.path = argument
+                case ("--in", "similar"): similar.roots.append(try value())
+                case (_, "similar") where !argument.hasPrefix("-"): similar.roots.append(argument)
                 default:
                     throw UsageError(message: argument.hasPrefix("-") ? "unknown option `\(name)` for \(first)"
                                                                       : "unexpected argument `\(argument)`")
@@ -441,6 +487,7 @@ nonisolated enum CommandLineTool {
             switch first {
             case "space": return .space(space, json: json)
             case "large": return .large(large, json: json)
+            case "similar": return .similar(similar, json: json)
             default: return .dupes(dupes, json: json)
             }
         case "trash", "restore":
@@ -687,6 +734,27 @@ nonisolated enum CommandLineTool {
             + " (files of \(size(report.minSize)) or larger) in \(shown(report.root, home: home))\n"
         text += skippedNote(report.skipped, home: home, style: style)
         return text + style.dim("Nothing was deleted. To move copies to the Trash, use `cleanmate trash PATH…`.") + "\n"
+    }
+
+    static func similarText(_ report: HeadlessFiles.SimilarReport, home: URL, color: Bool) -> String {
+        let style = Style(color: color)
+        var text = ""
+        for group in report.groups {
+            text += style.bold("\(rightAligned(size(group.freeable), 10))  to free: \(group.count) similar photos") + "\n"
+            for photo in group.photos {
+                let pixels = photo.width > 0 && photo.height > 0 ? "\(photo.width)×\(photo.height), " : ""
+                text += "              \(shown(photo.path, home: home))  " + style.dim("\(pixels)\(size(photo.size))")
+                    + (photo.suggested ? "  " + style.dim("(suggested to keep)") : "") + "\n"
+            }
+        }
+        if report.groups.isEmpty { text += "No similar photos found.\n" }
+        if report.moreGroups > 0 { text += style.dim("  … \(report.moreGroups) more groups") + "\n" }
+        let roots = report.roots.map { shown($0, home: home) }.joined(separator: ", ")
+        text += "\n" + style.bold("\(report.count) group\(report.count == 1 ? "" : "s"), \(size(report.freeable)) to free")
+            + " (\(report.photos) photo\(report.photos == 1 ? "" : "s") of \(size(report.minSize)) or larger compared) in \(roots)\n"
+        text += skippedNote(report.skipped, home: home, style: style)
+        return text + style.dim("Nothing was moved. To move the photos you pick to the Trash, use `cleanmate trash PATH…`; "
+                                + "`cleanmate restore` puts them back.") + "\n"
     }
 
     static func trashText(_ report: HeadlessTrash.TrashReport, home: URL, color: Bool) -> String {
