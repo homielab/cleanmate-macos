@@ -1,16 +1,42 @@
 # CleanMate
 
-A native macOS app that frees disk space and clears privacy traces — fast, simple and careful.
+[![Release](https://img.shields.io/github/v/release/homielab/cleanmate-macos)][releases] [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Notarized: Developer ID](https://img.shields.io/badge/notarized-Developer_ID-orange.svg)](#install)
 
-Website: [cleanmate.homielab.com](https://cleanmate.homielab.com)
+CleanMate is a free, open-source (MIT) cleaner for your Mac: it frees disk space and clears privacy traces —
+system junk, developer junk (Xcode, Docker, Homebrew…), downloaded AI models and AI tool data, apps with
+their leftovers — and shows what fills your disk. Everything is previewed first and only removed after you
+confirm. It runs entirely on your Mac: no account, no telemetry; its only network connection is the update
+check, which you can turn off.
+
+[**Website**](https://cleanmate.homielab.com) · [**Download CleanMate-1.7.dmg**](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate-1.7.dmg) · [All releases][releases] · [Ubuntu version](https://github.com/homielab/cleanmate-linux)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/1-smart-scan-dark.png">
   <img src="docs/images/1-smart-scan-light.png" alt="CleanMate Smart Scan results with system junk, developer junk and AI tool data">
 </picture>
 
-Everything is previewed first and only removed after you confirm. CleanMate runs entirely on your Mac:
-no account, no telemetry; its only network connection is the update check, which you can turn off.
+## Install
+
+1. Download [CleanMate-1.7.dmg](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate-1.7.dmg)
+   (verify the [`.sha256` checksum](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate-1.7.dmg.sha256)) —
+   signed with a Developer ID and notarized by Apple. Open the disk image and drag **CleanMate** to **Applications**.
+   Requires **macOS 13** or later. Later versions install from the app: **CleanMate › Check for Updates…**
+   (offered at the second launch; off until then — Settings › General › Updates).
+2. The `cleanmate` command line for scripts and AI agents (Claude Code, Codex…) is inside the app
+   (`/Applications/CleanMate.app/Contents/Helpers/cleanmate`). Put it on your `PATH`:
+
+```sh
+mkdir -p ~/.local/bin
+ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanmate
+cleanmate --help
+```
+
+When the Homebrew tap is published, `brew install --cask homielab/tap/cleanmate` will install the app and
+link `cleanmate` for you (planned; the cask lives in `packaging/Casks/cleanmate.rb`).
+
+Everything the command does — `list`, `scan`, `clean`, `space`, `large`, `dupes`, `trash`, `restore`, `--json`,
+Full Disk Access — and installing it for [AI agents](https://agentskills.io) (`bunx skills add homielab/cleanmate-macos`):
+[docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
 
 > CleanMate is an independent open-source project, not affiliated with MacPaw or CleanMyMac.
 
@@ -32,46 +58,18 @@ no account, no telemetry; its only network connection is the update check, which
 Undo (⌘Z) puts back what a module just moved to the Trash, and an activity log records every removal.
 See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and shortcut in detail.
 
-## Command line
+## How it compares
 
-The app includes a `cleanmate` command for scripts and AI agents (Claude Code, Codex…): `cleanmate list` shows every
-Smart Scan item, `cleanmate scan --json` measures them like Smart Scan, and `cleanmate clean` cleans them with the
-same safety rules, exclusions and activity log as the app (`--dry-run` to preview; without a terminal it needs
-`--yes`). `cleanmate space [PATH]` shows what fills a folder, like Space Lens, `cleanmate large` lists large files,
-like Large & Old Files, and `cleanmate dupes` finds duplicate files among them; all three only read.
-`cleanmate trash PATH…` moves exactly the files and folders you name to the Trash, with the same safety rules as
-Space Lens (never `~/Library`, hidden files or anything excluded), and `cleanmate restore` puts them back. `cleanmate restore --list` shows everything CleanMate (the app or the command)
-moved to the Trash that is still there, so it can be put back later. Docker volumes and stopped containers, which may hold data, are cleaned only when named with `--only`, even
-if ticked in the app. It never connects to the network. Installed with Homebrew, `cleanmate` is already on your PATH. Otherwise
-link it into a folder on your PATH:
+| | CleanMate | CleanMyMac | OnyX | BleachBit |
+|---|---|---|---|---|
+| Price | Free | Paid subscription | Free (freeware) | Free |
+| License | MIT, open source | Proprietary | Proprietary | GPL-3.0, open source |
+| Platforms | macOS 13+, Ubuntu (separate app) | macOS | macOS | Linux, Windows; macOS experimental |
+| Command line for cleaning | In the app | Separately (CleanMyMac CLI) | — | yes |
+| Uninstall apps with their leftovers | yes | yes | yes | no |
 
-```sh
-mkdir -p ~/.local/bin
-ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanmate
-cleanmate --help
-```
-
-Commands, options, the JSON format and Full Disk Access: [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
-
-**AI agents.** An [Agent Skill](https://agentskills.io) in `skills/cleanmate/` teaches Claude Code, Codex, Cursor and
-others to scan first, show you the result and clean only what you confirm, to answer "what takes space?" with
-`space`, `large` and `dupes`, and to move to the Trash only the files you confirm: `bunx skills add homielab/cleanmate-macos`.
-
-## Install
-
-1. Download the latest `CleanMate-<version>.dmg` from
-   [GitHub Releases](https://github.com/homielab/cleanmate-macos/releases/latest).
-   It is signed with a Developer ID and notarized by Apple; a `.sha256` checksum is published next to it.
-2. Open the disk image and drag **CleanMate** to **Applications**.
-3. Later versions install from the app: **CleanMate › Check for Updates…**. On the second launch CleanMate asks
-   whether to check automatically; change it any time in Settings › General › Updates.
-
-Homebrew (coming soon, once the tap is published): `brew install --cask homielab/tap/cleanmate`. It also links
-the `cleanmate` command into Homebrew's `bin`. The cask is in `packaging/Casks/cleanmate.rb`.
-
-Requires **macOS 13** or later.
-
-CleanMate is also available for Ubuntu: [homielab/cleanmate-linux](https://github.com/homielab/cleanmate-linux).
+Checked against each app's own website and documentation (November 2026); "—" = its site lists no command line.
+More comparisons and sources: [cleanmate.homielab.com/compare](https://cleanmate.homielab.com/compare/).
 
 ## Safety
 
@@ -171,3 +169,5 @@ CleanMate is free and open source. If it saved you time or disk space, you can s
 ## License
 
 CleanMate is released under the [MIT License](LICENSE). Copyright © 2026 HomieLab.
+
+[releases]: https://github.com/homielab/cleanmate-macos/releases/latest
