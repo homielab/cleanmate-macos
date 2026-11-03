@@ -32,6 +32,38 @@ nonisolated struct CleanReport: Sendable {
     /// Skipped (in `skipped`) because what reached the Trash is not the item checked: swapped in during the move
     /// (`SafeRemoval.Failure.movedOther`). Not freed, no "Undo"; logged as "failed".
     var failed: [URL] = []
+    /// Why each one in `skipped` and `locked` was left, in order. A tool's whole item (a command) has no URL.
+    var failures: [CleanFailure] = []
+
+    /// Entries or items left in place, for the done screens: one per failure listed, at least `skipped + locked`.
+    var notCleaned: Int { max(failures.count, skipped + locked) }
+
+    /// Leaves `url` in place for `reason`: counted in `skipped` and listed in `failures`.
+    mutating func skip(_ url: URL?, _ reason: CleanFailure.Reason) {
+        skipped += 1
+        failures.append(CleanFailure(url, reason))
+    }
+
+    /// Leaves `url` in place, locked in Finder: counted in `locked` and listed in `failures`.
+    mutating func lock(_ url: URL) {
+        locked += 1
+        failures.append(CleanFailure(url, .locked))
+    }
+
+    /// Logs each of `failures` (as "skipped" when it only changed since the scan, else "failed") with its reason.
+    /// `item`: the log's item column of one without a URL (a tool's whole item).
+    func logFailures(module: LocalizedStringResource, home: URL, item: (CleanFailure) -> String = {
+        $0.title.map(ActivityLog.english) ?? "—"
+    }) {
+        for failure in failures {
+            let name = failure.url?.path ?? item(failure)
+            if failure.reason.isSkip {
+                ActivityLog.recordSkipped(module: module, item: name, reason: failure.reason.logText, home: home)
+            } else {
+                ActivityLog.recordFailed(module: module, item: name, reason: failure.reason.logText, home: home)
+            }
+        }
+    }
 
     static func += (lhs: inout CleanReport, rhs: CleanReport) {
         lhs.freed += rhs.freed
@@ -42,6 +74,7 @@ nonisolated struct CleanReport: Sendable {
         lhs.casksLeft += rhs.casksLeft
         lhs.changed += rhs.changed
         lhs.failed += rhs.failed
+        lhs.failures += rhs.failures
     }
 
     /// `FileManager.trashItem`, returning where the item now is inside the Trash.
@@ -53,7 +86,7 @@ nonisolated struct CleanReport: Sendable {
 
     /// Moves each item to the Trash (never deletes) if `allows` its real path right before, through
     /// `SafeRemoval.trash`: only the item checked is moved. Logs each one moved, each one that changed since the check
-    /// ("skipped") and each move that took something else ("failed"), and keeps a record of each one moved
+    /// ("skipped") and each one not moved ("failed", with its reason), and keeps a record of each one moved
     /// (`TrashRecords`, for `cleanmate restore`). `trash` is injectable so tests use a fake Trash folder; `beforeMove`
     /// lets them swap an item between check and move.
     static func trashing(_ items: [(url: URL, size: Int64)], module: LocalizedStringResource, home: URL,
@@ -68,19 +101,14 @@ nonisolated struct CleanReport: Sendable {
                 ActivityLog.record(module: module, item: url.path, size: size, mode: .trash, home: home)
             } catch SafeRemoval.Failure.locked {
                 // A folder that only contains a locked file still moves; the locked item itself can't.
-                report.locked += 1
-            } catch SafeRemoval.Failure.changed {
-                report.skipped += 1
-                report.changed.append(url)
-                ActivityLog.recordSkipped(module: module, item: url.path, home: home)
-            } catch SafeRemoval.Failure.movedOther {
-                report.skipped += 1
-                report.failed.append(url)
-                ActivityLog.recordFailed(module: module, item: url.path, home: home)
+                report.lock(url)
             } catch {
-                report.skipped += 1
+                if case SafeRemoval.Failure.changed = error { report.changed.append(url) }
+                if case SafeRemoval.Failure.movedOther = error { report.failed.append(url) }
+                report.skip(url, .from(error, at: url))
             }
         }
+        report.logFailures(module: module, home: home)
         TrashRecords.add(report.trashed, module: module, home: home)
         return report
     }
@@ -192,6 +220,9 @@ nonisolated enum Cleaner {
     ) async -> CleanReport {
         var report = await remove(item, scan: scan, policy: policy, trash: trash, openPaths: openPaths)
         if item.sizeIsUpperBound { report.upTo = report.freed }
+        for index in report.failures.indices where report.failures[index].title == nil {
+            report.failures[index].title = item.title
+        }
         return report
     }
 
@@ -230,42 +261,51 @@ nonisolated enum Cleaner {
     private static func remove(_ item: CleanerItem, scan: ItemScan, policy: SafetyPolicy,
                                trash: @Sendable (URL) throws -> URL?,
                                openPaths: OpenPaths) async -> CleanReport {
-        if item.probe?.precondition() == false { return CleanReport(skipped: 1) } // e.g. Docker stopped since the scan
+        // The item's tool, named in its reasons.
+        let tool = ((item.command?.executable ?? item.paths.first ?? "") as NSString).lastPathComponent
+        func skipped(_ reason: CleanFailure.Reason) -> CleanReport {
+            var report = CleanReport()
+            report.skip(nil, reason)
+            return report
+        }
+        if item.probe?.precondition() == false { return skipped(.notRunning(tool)) } // e.g. Docker stopped since the scan
         if item.externalTrash { return await ExternalTrash.empty(item, scan: scan, policy: policy, openPaths: openPaths) }
         if let entryCommand = item.entryCommand {
             // A tool the item names must be installed (`docker`); an item without one runs only its entries' commands.
             if let command = item.command {
-                guard command.resolvedPath != nil else { return CleanReport(skipped: 1) }
-                if await blockedByExclusion(item, policy: policy) { return CleanReport(skipped: 1) }
+                guard command.resolvedPath != nil else { return skipped(.toolMissing(tool)) }
+                if await blockedByExclusion(item, policy: policy) { return skipped(.refused) }
             }
             var report = CleanReport()
             for entry in scan.entries {
                 // An entry in the item's folders (a simulator's) is checked again like a file before its command runs:
                 // the policy (Settings › Exclusions), and a fresh skip and lock (a simulator booted since the scan).
-                guard item.paths.isEmpty || policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
-                      item.locksEntry?()(entry.url) == nil else {
-                    report.skipped += 1
+                if let reason = kept(entry.url, item: item, policy: policy, checksPolicy: !item.paths.isEmpty) {
+                    report.skip(entry.url, reason)
                     continue
                 }
-                if let command = entryCommand(entry.url), await command.run() {
-                    report.freed += entry.size
+                guard let command = entryCommand(entry.url) else { report.skip(entry.url, .changed); continue }
+                if let failure = await command.attempt() {
+                    report.skip(entry.url, .command(failure))
                 } else {
-                    report.skipped += 1
+                    report.freed += entry.size
                 }
             }
             item.probe?.forgetOutput()
             return report
         }
         if let command = item.command, command.resolvedPath != nil {
-            if await blockedByExclusion(item, policy: policy) { return CleanReport(skipped: 1) }
-            let ok = await command.run()
+            if await blockedByExclusion(item, policy: policy) { return skipped(.refused) }
+            let failure = await command.attempt()
             item.probe?.forgetOutput()
             let after = await Scanner.scan(item, policy: policy)
-            return CleanReport(freed: max(0, scan.size - after.size), skipped: ok ? 0 : 1)
+            var report = failure.map { skipped(.command($0)) } ?? CleanReport()
+            report.freed = max(0, scan.size - after.size)
+            return report
         }
         // A command item without paths has no files of its own, and a probe-measured scan (`.bytes`) lists no files:
         // their entries (if any) are display-only, so a tool uninstalled since the scan skips the item.
-        if item.command != nil && item.paths.isEmpty || scan.measuredSize != nil { return CleanReport(skipped: 1) }
+        if item.command != nil && item.paths.isEmpty || scan.measuredSize != nil { return skipped(.toolMissing(tool)) }
         var report = CleanReport()
         // Open files: asked of `openPaths` per entry; Smart Scan's table is at most `OpenFiles.cleanMaxAge` old, not
         // read per entry (~30 ms a read: seconds for hundreds of entries). A file opened since that read may be missed,
@@ -284,16 +324,22 @@ nonisolated enum Cleaner {
             let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: roots, read: openPaths) : []
             // A fresh check per entry: an app launched since the scan (or during this loop) keeps its entry.
             // `included` and `excluded` again too: only names the item may remove, whatever the scan handed in.
-            guard item.allowsEntry?(policy, entry.url) ?? policy.allows(entry.url), item.skipsEntry?()(entry.url) != true,
-                  item.locksEntry?()(entry.url) == nil, open.isEmpty || !Scanner.holdsOpenFile(entry.url, of: item, openPaths: open),
-                  item.included?.contains(where: { fnmatch($0, entry.url.lastPathComponent, 0) == 0 }) != false,
+            if let reason = kept(entry.url, item: item, policy: policy, checksPolicy: true) {
+                report.skip(entry.url, reason)
+                continue
+            }
+            if !open.isEmpty && Scanner.holdsOpenFile(entry.url, of: item, openPaths: open) {
+                report.skip(entry.url, .inUse)
+                continue
+            }
+            guard item.included?.contains(where: { fnmatch($0, entry.url.lastPathComponent, 0) == 0 }) != false,
                   !isExcluded(entry.url, excluded: item.excluded, roots: rootPaths),
                   only.map({ isListed(entry.url, names: $0, roots: rootPaths) }) != false
-            else { report.skipped += 1; continue }
+            else { report.skip(entry.url, .refused); continue }
             // Re-checked now: something written inside since the scan keeps the entry. Before a database erase
             // too, which would otherwise wipe a database in use.
             if let minAge = item.minAge, await Scanner.entry(at: entry.url, olderThan: .now.addingTimeInterval(-minAge)) == nil {
-                report.skipped += 1
+                report.skip(entry.url, .modified)
                 continue
             }
             if let database = item.database, database.applies(to: entry.url) {
@@ -307,8 +353,8 @@ nonisolated enum Cleaner {
             // Checked again through its open folder (`SafeRemoval`): the real path must pass `allows`, and the item be
             // what the scan saw when known. Deleted in that folder; a move to the Trash takes a path, so the item is
             // held open and must still be at its real path right before, and in the Trash after. A change is skipped
-            // and listed in `changed`, a move that took something else in `failed`; any other failure (permission,
-            // SIP, in use) is skipped quietly, as before.
+            // and listed in `changed`, a move that took something else in `failed`; every failure is listed in
+            // `failures` with its reason (permission, SIP, in use, no Trash on the drive).
             func remove(_ url: URL, size: Int64, expected: SafeRemoval.FileID? = nil, regularFileOnly: Bool = false,
                         allows: (URL) -> Bool) -> Bool {
                 do {
@@ -323,10 +369,11 @@ nonisolated enum Cleaner {
                     return true
                 } catch SafeRemoval.Failure.changed, SafeRemoval.Failure.refused {
                     report.changed.append(url)
-                } catch SafeRemoval.Failure.movedOther {
-                    report.failed.append(url)
-                } catch {}
-                report.skipped += 1
+                    report.skip(url, .changed)
+                } catch {
+                    if case SafeRemoval.Failure.movedOther = error { report.failed.append(url) }
+                    report.skip(url, .from(error, at: url))
+                }
                 return false
             }
             // The entry stays (a video library): only its parts go, each listed again now and measured as it is.
@@ -335,9 +382,9 @@ nonisolated enum Cleaner {
                 let listed = parts(policy, entry.url)
                 let allowed = Set(listed.map(SafetyPolicy.normalize))
                 for part in listed {
-                    guard !Scanner.isLocked(part), open.isEmpty || !RunningProcesses.holdsOpenFile(part, openPaths: open),
-                          let size = await Scanner.entry(at: part, olderThan: nil)?.size
-                    else { report.skipped += 1; continue }
+                    if Scanner.isLocked(part) { report.skip(part, .locked); continue }
+                    if !open.isEmpty && RunningProcesses.holdsOpenFile(part, openPaths: open) { report.skip(part, .inUse); continue }
+                    guard let size = await Scanner.entry(at: part, olderThan: nil)?.size else { report.skip(part, .changed); continue }
                     if remove(part, size: size, allows: { allowed.contains(SafetyPolicy.normalize($0)) }) {
                         report.freed += size
                     }
@@ -359,14 +406,21 @@ nonisolated enum Cleaner {
                 var info = stat()
                 guard lstat(file.path, &info) == 0 else { continue } // already gone
                 let size = Int64(info.st_blocks) * 512
-                guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file), !Scanner.isLocked(file) else {
-                    report.skipped += 1 // kept, so not freed
-                    continue
-                }
+                guard info.st_mode & S_IFMT == S_IFREG, policy.allows(file) else { report.skip(file, .changed); continue }
+                guard !Scanner.isLocked(file) else { report.skip(file, .locked); continue } // kept, so not freed
                 if remove(file, size: size, regularFileOnly: true, allows: policy.allows) { report.freed += size }
             }
         }
         return report
+    }
+
+    /// Why an entry is kept by the checks made again right before it goes: the safety policy (or the item's own,
+    /// `allowsEntry`; only with `checksPolicy`), the item's skip and its lock. nil: it may go.
+    private static func kept(_ url: URL, item: CleanerItem, policy: SafetyPolicy, checksPolicy: Bool) -> CleanFailure.Reason? {
+        if checksPolicy, !(item.allowsEntry?(policy, url) ?? policy.allows(url)) { return .refused }
+        if item.skipsEntry?()(url) == true { return item.skipNote.map { .kept(String(localized: $0)) } ?? .inUse }
+        if let lock = item.locksEntry?()(url) { return .kept(lock) }
+        return nil
     }
 
     /// Whether `url` is, or lies inside, a top-level child of one of `roots` named in `names`.
@@ -417,21 +471,29 @@ nonisolated enum Cleaner {
         var info = stat()
         guard lstat(url.path, &info) == 0 else { return CleanReport() }
         // ...and would write through a symlink or into a hard-linked file put there since the scan.
-        guard info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1 else { return CleanReport(skipped: 1) }
+        var report = CleanReport()
+        guard info.st_mode & S_IFMT == S_IFREG, info.st_nlink == 1 else { report.skip(url, .changed); return report }
         // ...and VACUUM would turn an empty file into a 4 KB database without tables.
         guard info.st_size > 0 else { return CleanReport() }
         var sql = database.erase
         if !database.tables.isEmpty {
-            guard let names = await ShellCommand(executable: DatabaseErase.sqlite, arguments:
-                    [url.path, DatabaseErase.tableQuery], timeout: .seconds(10)).output()
-            else { return CleanReport(skipped: 1) }
+            let query = ShellCommand(executable: DatabaseErase.sqlite, arguments: [url.path, DatabaseErase.tableQuery],
+                                     timeout: .seconds(10))
+            guard let names = await query.output() else {
+                report.skip(url, await query.attempt().map { .command($0) } ?? .inUse)
+                return report
+            }
             sql = "BEGIN; " + database.matching(names).map { "DELETE FROM \($0); " }.joined() + "COMMIT;"
         }
         // stat, not URL resource values: those are cached per URL, so "after" would read the "before" size.
         let size = { var now = stat(); return lstat(url.path, &now) == 0 ? Int64(now.st_blocks) * 512 : 0 }
         let before = size()
-        guard await ShellCommand(executable: DatabaseErase.sqlite, arguments: ["-bail", url.path, sql],
-                                 timeout: .seconds(60)).run() else { return CleanReport(freed: max(0, before - size()), skipped: 1) }
+        if let failure = await ShellCommand(executable: DatabaseErase.sqlite, arguments: ["-bail", url.path, sql],
+                                            timeout: .seconds(60)).attempt() {
+            report.freed = max(0, before - size())
+            report.skip(url, .command(failure))
+            return report
+        }
         // Records are erased; VACUUM only shrinks the file. Skipped without room for its copy, and its failure is
         // not a skip: freed then stays ~0, which is the truth.
         let free = (try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey]))?.volumeAvailableCapacity ?? 0

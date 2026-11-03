@@ -159,14 +159,14 @@ struct RaceTests {
                                 program: nil, programMissing: false, owner: nil, state: .loaded)
         let model = LaunchAgentsModel()
         model.scan = { [agent] }
-        model.run = { _, _ in _ = await gates.enter(); return true } // never the real launchctl
+        model.run = { _, _ in _ = await gates.enter(); return .done } // never the real launchctl
         let disabling = Task { await model.disable(agent) }
         try await until { gates.calls == 1 }
         await model.remove(agent) // overlaps the running Disable: refused
         #expect(gates.calls == 1 && model.working)
         gates.open(1)
         await disabling.value
-        #expect(!model.working && model.failed == nil)
+        #expect(!model.working && model.problem == nil)
     }
 
     @Test func previousAppLoadNeverEndsTheCurrentOne() async throws {
@@ -367,7 +367,7 @@ struct RaceTests {
         uninstaller.working = false
         let gates = Gates()
         loginItems.scan = { [] }
-        loginItems.run = { _, _ in _ = await gates.enter(); return true }
+        loginItems.run = { _, _ in _ = await gates.enter(); return .done }
         let agent = LaunchAgent(url: URL(fileURLWithPath: "/nonexistent/com.example.a.plist"), label: "com.example.a",
                                 scope: .user, program: nil, programMissing: false, owner: nil, state: .loaded)
         let remove = Task { await loginItems.remove(agent) }

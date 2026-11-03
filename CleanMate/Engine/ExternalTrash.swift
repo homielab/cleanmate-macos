@@ -41,14 +41,24 @@ nonisolated enum ExternalTrash {
         for entry in scan.entries {
             // Checked now, per drive: Finder may have started moving files there since the scan.
             let open = item.skipsOpenFiles ? await RunningProcesses.openPaths(under: [entry.url], read: openPaths) : []
-            guard folders.contains(SafetyPolicy.normalize(entry.url)), !Scanner.isLocked(entry.url),
-                  !RunningProcesses.holdsOpenFile(entry.url, openPaths: open),
-                  let children = try? FileManager.default.contentsOfDirectory(at: entry.url, includingPropertiesForKeys: nil)
-            else { report.skipped += 1; continue }
+            guard folders.contains(SafetyPolicy.normalize(entry.url)) else { report.skip(entry.url, .changed); continue }
+            if Scanner.isLocked(entry.url) { report.skip(entry.url, .locked); continue }
+            if RunningProcesses.holdsOpenFile(entry.url, openPaths: open) { report.skip(entry.url, .inUse); continue }
+            let children: [URL]
+            do {
+                children = try FileManager.default.contentsOfDirectory(at: entry.url, includingPropertiesForKeys: nil)
+            } catch {
+                report.skip(entry.url, .from(error, at: entry.url))
+                continue
+            }
             for child in children {
-                guard policy.allowsExternalTrash(child), !Scanner.isLocked(child),
-                      (try? SafeRemoval.remove(child, allows: policy.allowsExternalTrash)) != nil
-                else { report.skipped += 1; continue }
+                guard policy.allowsExternalTrash(child) else { report.skip(child, .refused); continue }
+                if Scanner.isLocked(child) { report.skip(child, .locked); continue }
+                do {
+                    try SafeRemoval.remove(child, allows: policy.allowsExternalTrash)
+                } catch {
+                    report.skip(child, .from(error, at: child))
+                }
             }
             let left = await Scanner.entry(at: entry.url, olderThan: nil)?.size ?? 0
             report.freed += max(0, entry.size - left)

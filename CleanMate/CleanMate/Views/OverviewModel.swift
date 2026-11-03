@@ -47,6 +47,10 @@ final class OverviewModel: ObservableObject {
     @Published private(set) var measured = false
     /// Folders macOS protects were left out (no Full Disk Access): the view shows a note.
     @Published private(set) var skippedProtected = false
+    /// Folders of the home folder macOS didn't let CleanMate read, and those whose measure failed: not in `folders`,
+    /// named instead so a short list is not taken for an empty home.
+    @Published private(set) var unreadableFolders: [String] = []
+    @Published private(set) var unmeasuredFolders: [String] = []
     /// Gatekeeper, firewall, SIP, FileVault, XProtect; nil until first read.
     @Published private(set) var security: SecurityStatus?
     /// Time Machine's local snapshots of the startup disk; nil until first read.
@@ -240,10 +244,11 @@ final class OverviewModel: ObservableObject {
             var listed = entries.filter(\.isFolder)
             for index in listed.indices {
                 listed[index].isProtected = skipping.contains(listed[index].url.standardizedFileURL.path)
+                if !listed[index].isProtected { listed[index].isUnreadable = SpaceLens.isUnreadable(listed[index].url) }
             }
             var nested: [String: Int64] = [:]
             await withTaskGroup(of: (URL, Int64, [String: Int64])?.self) { group in
-                for item in listed where !item.isProtected {
+                for item in listed where !item.isProtected && !item.isUnreadable {
                     group.addTask {
                         guard let result = try? await measure(item.url, links, skipping) else { return nil }
                         return (item.url, result.size, result.folders)
@@ -259,6 +264,8 @@ final class OverviewModel: ObservableObject {
             let sized = listed.filter { $0.size != nil }
             folders = Array(sized.filter { $0.sortSize > 0 }.sorted { $0.sortSize > $1.sortSize }.prefix(Self.folderLimit))
             skippedProtected = listed.contains(where: \.isProtected)
+            unreadableFolders = listed.filter(\.isUnreadable).map(\.name)
+            unmeasuredFolders = listed.filter { !$0.isProtected && !$0.isUnreadable && $0.size == nil }.map(\.name)
             homeSize = sized.reduce(looseFiles) { $0 + max($1.sortSize, 0) }
             measured = true
             measuring = false

@@ -684,7 +684,14 @@ final class SmartScanModel: ObservableObject {
             guard let scan = selectedScan(item) else { continue } // only the ticked entries
             cleaningItem = item.title
             defer { scannedItems += 1 }
-            if isLocked(item) { report.skipped += 1; continue }
+            if isLocked(item) {
+                var kept = CleanReport()
+                kept.skip(nil, isRunning(item) ? .inUse : blocked.contains(item.id) ? .refused : .changed)
+                kept.failures[0].title = item.title
+                kept.logFailures(module: module.title, home: logHome)
+                report += kept
+                continue
+            }
             let result = await cleanItem(item, scan, openPaths)
             report += result
             freedByItem[item.id, default: 0] += result.freed
@@ -699,8 +706,7 @@ final class SmartScanModel: ObservableObject {
                                    size: result.freed, mode: item.mode, home: logHome)
             }
             TrashRecords.add(result.trashed, module: module.title, home: logHome) { _ in ActivityLog.english(item.title) }
-            for url in result.changed { ActivityLog.recordSkipped(module: module.title, item: url.path, home: logHome) }
-            for url in result.failed { ActivityLog.recordFailed(module: module.title, item: url.path, home: logHome) }
+            result.logFailures(module: module.title, home: logHome)
         }
         scans = [:]
         selected = []

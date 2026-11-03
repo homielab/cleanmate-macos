@@ -6,8 +6,12 @@ final class LaunchAgentsModel: ObservableObject {
     @Published private(set) var agents: [LaunchAgent] = []
     @Published private(set) var loading = false
     @Published private(set) var working = false
-    /// Set when an action failed, shown as an alert.
-    @Published var failed: LaunchAgent?
+    /// Set when an action or its Undo failed, shown as an alert with the reason.
+    @Published var problem: Problem?
+    /// The agent last moved to the Trash, until its Undo or another action: the bar offers "Undo".
+    @Published private(set) var removed: Removed?
+    /// Edit › Undo / ⌘Z of the last removal.
+    var undoManager: UndoManager?
     private var started = false
     /// Bumped by every load: a slower, older listing never replaces a newer one.
     private var generation = 0
@@ -17,8 +21,24 @@ final class LaunchAgentsModel: ObservableObject {
     }
 
     /// Runs a launchctl action; injected by tests so no real launchctl runs.
-    var run: (_ action: (LaunchAgent, SafetyPolicy) async -> Bool, _ agent: LaunchAgent) async -> Bool = {
+    var run: (_ action: (LaunchAgent, SafetyPolicy) async -> LaunchAgents.Outcome, _ agent: LaunchAgent) async -> LaunchAgents.Outcome = {
         await $0($1, .current)
+    }
+    /// Puts a removed agent's plist back and loads it again; injected by tests.
+    var restore: (TrashedItem, String) async -> TrashUndo.Outcome = { await LaunchAgents.restore($0, label: $1) }
+
+    /// Why an action on `label` failed: launchctl's error, the file system's, or Undo's.
+    struct Problem: Identifiable {
+        let id = UUID()
+        var label: String
+        var kind: Kind
+        enum Kind { case action(CleanFailure.Reason), undo(TrashUndo.Outcome) }
+    }
+
+    /// An agent moved to the Trash by "Remove…".
+    struct Removed: Equatable {
+        var label: String
+        var trashed: TrashedItem
     }
 
     /// Toolbar search: label, app or program; "" = no search.
@@ -55,16 +75,41 @@ final class LaunchAgentsModel: ObservableObject {
     func enable(_ agent: LaunchAgent) async { await perform(agent) { await LaunchAgents.enable($0, policy: $1) } }
     func remove(_ agent: LaunchAgent) async { await perform(agent) { await LaunchAgents.remove($0, policy: $1) } }
 
-    private func perform(_ agent: LaunchAgent, _ action: (LaunchAgent, SafetyPolicy) async -> Bool) async {
+    private func perform(_ agent: LaunchAgent, _ action: (LaunchAgent, SafetyPolicy) async -> LaunchAgents.Outcome) async {
         guard !working else { return } // one launchctl action at a time (e.g. Disable + Move to Trash on the same agent)
         working = true
-        let ok = await run(action, agent)
+        let outcome = await run(action, agent)
         working = false
-        if !ok { failed = agent }
+        if let reason = outcome.failure { problem = Problem(label: agent.label, kind: .action(reason)) }
+        if let trashed = outcome.trashed {
+            removed = Removed(label: agent.label, trashed: trashed)
+            undoManager?.registerTrashUndo(self, name: String(localized: "Remove")) { await $0.undoRemove() }
+        } else if outcome.succeeded {
+            // Disable or Enable: an Undo of an older removal would now act on a list that changed under it.
+            dropUndo()
+        }
         await load()
+    }
+
+    /// "Undo" of the last removal: the plist back from the Trash, loaded again. Why not, as an alert.
+    func undoRemove() async {
+        guard let removed, !working else { return }
+        dropUndo()
+        working = true
+        let outcome = await restore(removed.trashed, removed.label)
+        working = false
+        if outcome != .restored { problem = Problem(label: removed.label, kind: .undo(outcome)) }
+        await load()
+    }
+
+    private func dropUndo() {
+        removed = nil
+        undoManager?.removeAllActions(withTarget: self)
     }
 
     static func openLoginItemsSettings() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
     }
 }
+
+extension LaunchAgentsModel: TrashUndoing {}

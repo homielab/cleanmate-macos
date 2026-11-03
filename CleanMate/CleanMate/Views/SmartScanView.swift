@@ -678,9 +678,7 @@ struct DoneScreen<Actions: View>: View {
             if report.upTo > 0 {
                 Text("\(report.upTo, format: .fileSize) of it came from caches that share files with your projects, so less space may be freed.")
             }
-            if report.skipped > 0 {
-                Text("Skipped (in use or not permitted): \(report.skipped)")
-            }
+            NotCleanedSummary(report: report)
             if !model.cleanedGroups.isEmpty {
                 cleanedGroups
             }

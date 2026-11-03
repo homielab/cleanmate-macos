@@ -98,6 +98,8 @@ final class LargeFilesModel: ObservableObject {
     @Published private(set) var duplicateIndex: [URL: Int] = [:]
     /// Fraction of bytes read while finding duplicates; nil when not running.
     @Published var duplicateProgress: Double?
+    /// Why the last duplicate search stopped before it finished (not a Stop): shown as a banner with "Try Again".
+    @Published private(set) var duplicateError: String?
     /// Hashes by (path, size, inode, modification date): a new scan only reads files that are new or changed.
     private var duplicateHashes: [DuplicateFinder.Key: Data] = [:]
     /// Where hashes persist across launches; nil = memory only. Never the real cache under a test host.
@@ -313,12 +315,14 @@ final class LargeFilesModel: ObservableObject {
         let urls = files.map(\.url)
         let (find, current, cacheURL) = (findDuplicateFiles, duplicateRun, hashCacheURL)
         duplicateProgress = 0
+        duplicateError = nil
         duplicateTask = Task {
             if !hashCacheLoaded, let cacheURL {
                 hashCacheLoaded = true
                 duplicateHashes.merge(await DuplicateFinder.HashCache.load(from: cacheURL)) { current, _ in current }
             }
             var result: DuplicateFinder.Result?
+            var failure: Error?
             do {
                 result = try await find(urls, duplicateHashes) { fraction in
                     Task { @MainActor in if current == self.duplicateRun, self.duplicateTask != nil { self.duplicateProgress = fraction } }
@@ -326,11 +330,14 @@ final class LargeFilesModel: ObservableObject {
             } catch let cancelled as DuplicateFinder.Cancelled { // keep hashes finished before the stop
                 duplicateHashes.merge(cancelled.hashes) { current, _ in current }
                 if let cacheURL { await DuplicateFinder.HashCache.save(duplicateHashes, to: cacheURL) }
-            } catch {}
+            } catch {
+                failure = error
+            }
             if let result, let cacheURL { await DuplicateFinder.HashCache.save(result.hashes, to: cacheURL) }
             guard current == duplicateRun else { return } // stopped, or a newer search owns the state now
             duplicateProgress = nil
             duplicateTask = nil
+            if let failure { duplicateError = failure.localizedDescription }
             guard let result else { return }
             duplicateHashes = result.hashes
             privateSizes = result.privateSizes
@@ -338,7 +345,14 @@ final class LargeFilesModel: ObservableObject {
         }
     }
 
+    /// "Try Again" of the duplicate search's error banner.
+    func retryDuplicates() {
+        duplicateError = nil
+        if duplicatesOnly { findDuplicates() }
+    }
+
     private func stopFindingDuplicates() {
+        duplicateError = nil
         duplicateRun += 1
         duplicateTask?.cancel()
         duplicateTask = nil

@@ -518,9 +518,11 @@ struct ActivitySettings: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(entry.item.hasPrefix("/") ? URL(fileURLWithPath: entry.item).lastPathComponent : entry.item)
                             .lineLimit(1).truncationMode(.middle)
-                        Text(entry.module).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        // A skipped or failed line says why after its module.
+                        Text(verbatim: [entry.module, entry.reason].compactMap { $0 }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                     }
-                    .help(entry.item)
+                    .help([entry.item, entry.reason].compactMap { $0 }.joined(separator: "\n"))
                 }
                 .width(min: 120)  // takes the rest
                 TableColumn("Size") { entry in
@@ -535,7 +537,8 @@ struct ActivitySettings: View {
                 TableColumn("Kind") { entry in
                     // Icon only to leave room for Item; the label is the tooltip and VoiceOver text.
                     let kind = Self.kindLabel(entry.kind, locale: locale)
-                    Label(kind.title, systemImage: kind.systemImage).help(kind.title)
+                    let help = [kind.title, entry.reason].compactMap { $0 }.joined(separator: ": ")
+                    Label(kind.title, systemImage: kind.systemImage).help(help)
                         .labelStyle(.iconOnly).foregroundStyle(.secondary).frame(maxWidth: .infinity)
                 }
                 .width(40)

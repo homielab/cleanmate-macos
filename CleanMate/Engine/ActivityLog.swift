@@ -1,7 +1,8 @@
 import Foundation
 
 /// Plain-text record of everything CleanMate removed: one tab-separated line per removed item
-/// (date, module, item, entries, size, deleted/trashed/restored, size in bytes) in ~/Library/Logs/CleanMate/activity.log.
+/// (date, module, item, entries, size, deleted/trashed/restored, size in bytes) in ~/Library/Logs/CleanMate/activity.log;
+/// skipped and failed lines add the reason in English.
 /// Maintenance tasks add a ran/failed line with size 0; only deleted/trashed/restored lines count in `freed`.
 /// Kept out of Smart Scan's "Old logs". Rotated to activity.1.log past `maxSize`.
 /// Module and Smart Scan item names are stored in English (= their String Catalog key) and translated
@@ -44,16 +45,20 @@ nonisolated enum ActivityLog {
 
     /// An item left in place because it changed since it was checked (a symlink or another item put there,
     /// `CleanReport.changed`): "skipped", size 0, so the user can see why it is still there.
-    static func recordSkipped(module: LocalizedStringResource, item: String,
+    /// `reason`: why, in English, as an eighth column (`Entry.reason`).
+    static func recordSkipped(module: LocalizedStringResource, item: String, reason: String? = nil,
                               home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
-        log(module: module, item: item, count: 1, size: 0, action: "skipped", home: home, date: date, rotateAt: maxSize)
+        log(module: module, item: item, count: 1, size: 0, action: "skipped", reason: reason, home: home, date: date,
+            rotateAt: maxSize)
     }
 
-    /// A move to the Trash that took something else than the item checked (swapped in during the move,
-    /// `CleanReport.failed`): "failed", size 0, so the user knows to look in the Trash.
-    static func recordFailed(module: LocalizedStringResource, item: String,
+    /// An item a clean, delete or uninstall left in place (`CleanReport.failures`), or a move to the Trash that took
+    /// something else than the item checked (`CleanReport.failed`): "failed", size 0, with `reason` in English as an
+    /// eighth column, so the user can see why it is still there.
+    static func recordFailed(module: LocalizedStringResource, item: String, reason: String? = nil,
                              home: URL = SafetyPolicy.current.homeURL, date: Date = .now) {
-        log(module: module, item: item, count: 1, size: 0, action: "failed", home: home, date: date, rotateAt: maxSize)
+        log(module: module, item: item, count: 1, size: 0, action: "failed", reason: reason, home: home, date: date,
+            rotateAt: maxSize)
     }
 
     /// A Maintenance task that was run: "ran" when every step succeeded, else "failed". Removes nothing, so size 0.
@@ -64,7 +69,7 @@ nonisolated enum ActivityLog {
     }
 
     private static func log(module: LocalizedStringResource, item: String, count: Int, size: Int64, action: String,
-                            home: URL, date: Date, rotateAt: Int) {
+                            reason: String? = nil, home: URL, date: Date, rotateAt: Int) {
         guard !writesRealLogInTests(home) else {
             // Loud in a test run: a test forgot to pass a throwaway home.
             assertionFailure("Test wrote to the real activity log: \(english(module)) \(item)")
@@ -73,7 +78,7 @@ nonisolated enum ActivityLog {
         let fields = [
             Date.ISO8601FormatStyle(timeZone: .current).format(date),
             english(module), item, String(count), size.formatted(.fileSize), action, String(size),
-        ]
+        ] + [reason].compactMap { $0 }
         append(fields.map { $0.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ") }
             .joined(separator: "\t") + "\n", to: url(home: home), rotateAt: rotateAt)
         NotificationCenter.default.post(name: didRecord, object: module.key)
@@ -132,8 +137,10 @@ nonisolated enum ActivityLog {
         var bytes: Int64?
         /// "deleted", "trashed", "restored" or "evicted" (an iCloud file's download removed); "ran" or "failed" for a
         /// Maintenance task; "skipped" for an item that changed since it was checked; "failed" also for a move to the
-        /// Trash that took something else.
+        /// Trash that took something else, and for an item a clean left in place.
         var kind = ""
+        /// Why it was skipped or failed, in `locale`'s language (lines of older versions have none).
+        var reason: String?
     }
 
     /// One log line for Settings › Activity: module and item translated to `locale`'s language when they are
@@ -143,13 +150,17 @@ nonisolated enum ActivityLog {
         var fields = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
         guard fields.count >= 6 else { return Entry(id: id, item: String(line)) }
         let moduleKey = fields[1]
-        if fields[2].components(separatedBy: separator).count > 2 { fields[2] = interpolated(fields[2], locale: locale) }
+        for index in [2, 7] where fields.count > index && fields[index].components(separatedBy: separator).count > 2 {
+            fields[index] = interpolated(fields[index], locale: locale)
+        }
+        if fields.count > 7, !fields[7].contains("%") { fields[7] = localized(fields[7], locale: locale) }
         // Paths aren't keys; "%" would be read as a format specifier.
         for index in 1...2 where !fields[index].hasPrefix("/") && !fields[index].contains("%") {
             fields[index] = localized(fields[index], locale: locale)
         }
         return Entry(id: id, date: try? Date(fields[0], strategy: .iso8601), dateText: fields[0], module: fields[1],
-                     moduleKey: moduleKey, item: fields[2], size: fields[4], bytes: fields.count > 6 ? Int64(fields[6]) : nil, kind: fields[5])
+                     moduleKey: moduleKey, item: fields[2], size: fields[4], bytes: fields.count > 6 ? Int64(fields[6]) : nil, kind: fields[5],
+                     reason: fields.count > 7 && !fields[7].isEmpty ? fields[7] : nil)
     }
 
     /// The log's text, oldest line first; empty when nothing was removed yet.

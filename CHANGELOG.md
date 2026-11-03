@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cleanmate similar [PATH…] [--json]` lists the same groups of similar photos from the command line, with the photo suggested to keep; move the ones you pick with `cleanmate trash` and put them back with `cleanmate restore`. The Agent Skill uses it too.
 - **Overview**: shows the last Smart Scan and what it found or freed, with **Scan Now**, and **Clean … Selected** while Smart Scan has results.
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
+- **Login Items**: after removing an agent, **Undo** (also ⌘Z) puts it back and loads it again, and **View Moved Items…** shows it.
 
 ### Changed
 - The menu bar item shows **Junk found: X (scanned …)**, everything the last Smart Scan found, and opens Smart Scan when clicked.
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Each release also carries `CleanMate.dmg` (+ `.sha256`), so the README download link always points to the latest version.
 - **Smart Scan › Developer**: Gradle caches are measured faster (their folders are read in parallel), with the same items and sizes.
 - **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
+- When something can't be cleaned, moved to the Trash, uninstalled or reset, the done screen says how many items stayed and **Show Details…** lists each one with the real reason (not permitted, in use, locked, no Trash on the drive, iCloud file not downloaded, or the tool's exit code and error) and what to do, such as granting Full Disk Access or quitting the app. Settings › Activity shows the reason too.
 
 ### Fixed
 - The menu bar and Overview line **Junk found: … (scanned …)**, dates in notifications and some Settings texts now use CleanMate's language (for example Vietnamese) and its date format even when macOS is set to another language.
@@ -44,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cleanmate space /` no longer counts the startup disk's data volume a second time inside /System: another volume mounted in a folder is listed as a mounted volume and left out of the total, as in Space Lens.
 - **Uninstaller**: an App Store app macOS won't let CleanMate move no longer brings up an unexplained password prompt; CleanMate says to remove it in Launchpad or drag it to the Trash in Finder, with **Reveal in Finder**.
 - **Space Lens**: a volume mounted inside a folder is no longer measured with it — /System no longer counts the whole data volume again, and network shares in your home folder are not walked.
+- **Space Lens** and **Overview** no longer show a folder macOS won't let CleanMate read as empty: it says **Not Readable** with a way to grant Full Disk Access, and a size that couldn't be measured says **Not measured**.
+- **Large & Old Files**: a duplicate search that fails now says so, with **Try Again**, instead of stopping silently; a reset in the **Uninstaller** that fails now always shows its result.
 
 ## [1.7] - 2026-11-02
 

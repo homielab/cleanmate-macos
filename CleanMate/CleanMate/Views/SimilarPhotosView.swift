@@ -59,12 +59,7 @@ struct SimilarPhotosView<Listing: View>: View {
             case .done(let report):
                 EmptyStateView(title: Text("Moved \(report.freed, format: .fileSize) to the Trash"), systemImage: "checkmark.circle") {
                     Text("Empty the Trash to free the space.")
-                    if report.skipped > 0 {
-                        Text("Skipped (in use or not permitted): \(report.skipped)")
-                    }
-                    if report.locked > 0 {
-                        Text("Locked in Finder (turn off Locked in Get Info): \(report.locked)")
-                    }
+                    NotCleanedSummary(report: report)
                     if let result = report.undo { UndoTrashResult(result: result) }
                 } actions: {
                     Button("Find Again") { model.findAgain() }.disabled(model.undoing)

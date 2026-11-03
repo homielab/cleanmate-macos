@@ -129,9 +129,32 @@ nonisolated enum LaunchAgents {
         return agents
     }
 
+    /// How one `launchctl` run went: nil `failure` = it succeeded. Tests return `true` or `false`.
+    struct RunResult: Sendable, ExpressibleByBooleanLiteral {
+        var failure: ShellCommand.Failure?
+        var succeeded: Bool { failure == nil }
+
+        init(failure: ShellCommand.Failure?) { self.failure = failure }
+        init(booleanLiteral succeeded: Bool) {
+            failure = succeeded ? nil : ShellCommand.Failure(tool: "launchctl", kind: .exited(1))
+        }
+    }
+
     /// Runs `launchctl` with the arguments; tests inject a recorder so the real one is never called.
-    typealias Runner = @Sendable ([String]) async -> Bool
-    static let launchctlRunner: Runner = { await ShellCommand(executable: launchctl, arguments: $0, timeout: .seconds(15)).run() }
+    typealias Runner = @Sendable ([String]) async -> RunResult
+    static let launchctlRunner: Runner = {
+        RunResult(failure: await ShellCommand(executable: launchctl, arguments: $0, timeout: .seconds(15)).attempt())
+    }
+
+    /// How an action on an agent went: why it failed, and what `remove` moved to the Trash (for "Undo").
+    struct Outcome: Sendable {
+        var failure: CleanFailure.Reason?
+        var trashed: TrashedItem?
+        var succeeded: Bool { failure == nil }
+
+        static let done = Outcome()
+        static func failed(_ reason: CleanFailure.Reason) -> Outcome { Outcome(failure: reason) }
+    }
 
     private static func service(_ label: String) -> String { "gui/\(getuid())/\(label)" }
 
@@ -150,21 +173,39 @@ nonisolated enum LaunchAgents {
         return shared ? nil : agent.label
     }
 
+    /// Why `agent` can't be acted on, before launchctl runs: not the user's own, or its plist changed (`ownedLabel`).
+    private static func refusal(_ agent: LaunchAgent, policy: SafetyPolicy) -> CleanFailure.Reason? {
+        guard policy.allowsLaunchAgent(agent.url, label: agent.label) else { return .refused }
+        return ownedLabel(agent) == nil ? .changed : nil
+    }
+
     /// Stops the agent and keeps it from starting at login (`bootout` + `disable`); undone by `enable`.
     @concurrent static func disable(_ agent: LaunchAgent, policy: SafetyPolicy = .current,
-                                    run: Runner = launchctlRunner) async -> Bool {
-        guard policy.allowsLaunchAgent(agent.url, label: agent.label), let label = ownedLabel(agent) else { return false }
-        _ = await run(["bootout", service(label)]) // fails when it isn't loaded, which is fine
-        return await run(["disable", service(label)])
+                                    run: Runner = launchctlRunner) async -> Outcome {
+        if let reason = refusal(agent, policy: policy) { return .failed(reason) }
+        _ = await run(["bootout", service(agent.label)]) // fails when it isn't loaded, which is fine
+        return await run(["disable", service(agent.label)]).failure.map { .failed(.command($0)) } ?? .done
     }
 
     /// Re-enables the agent and loads it again (`enable` + `bootstrap`).
     @concurrent static func enable(_ agent: LaunchAgent, policy: SafetyPolicy = .current,
-                                   run: Runner = launchctlRunner) async -> Bool {
-        guard policy.allowsLaunchAgent(agent.url, label: agent.label), let label = ownedLabel(agent),
-              await run(["enable", service(label)]) else { return false }
+                                   run: Runner = launchctlRunner) async -> Outcome {
+        if let reason = refusal(agent, policy: policy) { return .failed(reason) }
+        if let failure = await run(["enable", service(agent.label)]).failure { return .failed(.command(failure)) }
         _ = await run(["bootstrap", "gui/\(getuid())", agent.url.path]) // fails when already loaded
-        return true
+        return .done
+    }
+
+    /// "Undo" of `remove`: puts the plist back from the Trash (`TrashUndo.putBack`, never over another file) and loads
+    /// it again when it is the user's own agent with its own label. nil when put back, else why not.
+    @concurrent static func restore(_ trashed: TrashedItem, label: String, policy: SafetyPolicy = .current,
+                                    run: Runner = launchctlRunner) async -> TrashUndo.Outcome {
+        let outcome = TrashUndo.putBack(trashed, module: "Login Items", home: policy.homeURL)
+        guard outcome == .restored, policy.allowsLaunchAgent(trashed.original, label: label),
+              let dict = read(trashed.original), info(dict, fileName: trashed.original.lastPathComponent).label == label
+        else { return outcome }
+        _ = await run(["bootstrap", "gui/\(getuid())", trashed.original.path]) // fails when it was disabled, which is fine
+        return outcome
     }
 
     /// Moves the agent's plist to the Trash, then stops it (put it back and log in again to restore it). A plist whose
@@ -172,27 +213,24 @@ nonisolated enum LaunchAgents {
     /// The move is kept in `TrashRecords`, so `cleanmate restore` can put it back later. `trash`: tests use a fake Trash.
     @concurrent static func remove(_ agent: LaunchAgent, policy: SafetyPolicy = .current,
                                    trash: (URL) throws -> URL? = CleanReport.moveToTrash,
-                                   run: Runner = launchctlRunner) async -> Bool {
+                                   run: Runner = launchctlRunner) async -> Outcome {
         let size = (try? agent.url.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0
-        guard policy.allowsLaunchAgent(agent.url, label: agent.label) else { return false }
+        guard policy.allowsLaunchAgent(agent.url, label: agent.label) else { return .failed(.refused) }
         let label = ownedLabel(agent) // read before the plist is gone
-        // Only the plist checked moves (`SafeRemoval.trash`); one swapped in during the move is logged "failed".
+        // Only the plist checked moves (`SafeRemoval.trash`); every failure is logged "failed" with its reason.
         let inTrash: URL?
         do {
             inTrash = try SafeRemoval.trash(agent.url, allows: { policy.allowsLaunchAgent($0, label: agent.label) },
                                             move: trash)
         } catch {
-            if case SafeRemoval.Failure.movedOther = error {
-                ActivityLog.recordFailed(module: "Login Items", item: agent.url.path, home: policy.homeURL)
-            }
-            return false
+            let reason = CleanFailure.Reason.from(error, at: agent.url)
+            ActivityLog.recordFailed(module: "Login Items", item: agent.url.path, reason: reason.logText, home: policy.homeURL)
+            return .failed(reason)
         }
         ActivityLog.record(module: "Login Items", item: agent.url.path, size: Int64(size), mode: .trash, home: policy.homeURL)
-        if let inTrash {
-            TrashRecords.add([TrashedItem(original: agent.url, inTrash: inTrash, size: Int64(size))],
-                             module: "Login Items", home: policy.homeURL)
-        }
+        let trashed = inTrash.map { TrashedItem(original: agent.url, inTrash: $0, size: Int64(size)) }
+        if let trashed { TrashRecords.add([trashed], module: "Login Items", home: policy.homeURL) }
         if let label { _ = await run(["bootout", service(label)]) } // by label, so it works once the plist is gone
-        return true
+        return Outcome(trashed: trashed)
     }
 }

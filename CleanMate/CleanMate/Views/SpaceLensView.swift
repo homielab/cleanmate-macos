@@ -275,10 +275,14 @@ struct SpaceLensView: View {
                     Image(systemName: "lock").foregroundStyle(.secondary)
                         .accessibilityLabel("Not measured")
                         .help("Not measured: macOS asks before CleanMate can look inside without Full Disk Access.")
+                } else if item.isUnreadable {
+                    Text("Not Readable").foregroundStyle(.secondary).lineLimit(1)
+                        .help("macOS doesn’t let CleanMate read this folder. Grant Full Disk Access to measure it.")
                 } else if model.measuring {
                     ProgressView().controlSize(.small).accessibilityLabel("Measuring…")
                 } else {
-                    Text(verbatim: "—").foregroundStyle(.secondary)
+                    Text("Not measured").foregroundStyle(.secondary).lineLimit(1)
+                        .help("Its size couldn’t be measured. Open it, or click Rescan to try again.")
                 }
             }
             .width(min: 70, ideal: 90)
@@ -345,7 +349,15 @@ struct SpaceLensView: View {
         .exclusionNotice(excludedCount)
         .overlay {
             if model.items.isEmpty && !model.measuring {
-                EmptyStateView(title: Text("Empty or Not Readable"), systemImage: "folder")
+                if model.unreadable {
+                    EmptyStateView(title: Text("Not Readable"), systemImage: "lock.shield") {
+                        Text("macOS doesn’t let CleanMate read this folder. Grant Full Disk Access, then open it again.")
+                    } actions: {
+                        Button("Open Settings…") { FullDiskAccess.openSettings() }
+                    }
+                } else {
+                    EmptyStateView(title: Text("Empty Folder"), systemImage: "folder")
+                }
             } else if items.isEmpty && !model.items.isEmpty {
                 EmptyStateView(title: Text("No Matching Items"), systemImage: "magnifyingglass")
             }
@@ -387,8 +399,7 @@ struct SpaceLensView: View {
                         TrashReportButtons(report: report, showsMovedItems: false) { await model.undoTrash() }.buttonStyle(.link)
                     }
                     Group {
-                        if report.skipped > 0 { Text("Skipped (in use or not permitted): \(report.skipped)") }
-                        if report.locked > 0 { Text("Locked in Finder (turn off Locked in Get Info): \(report.locked)") }
+                        NotCleanedSummary(report: report)
                         if let result = report.undo { UndoTrashResult(result: result) }
                     }.foregroundStyle(.secondary)
                     if report.freed > 0 { ViewMovedItemsButton().buttonStyle(.link) }

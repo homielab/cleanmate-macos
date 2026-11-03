@@ -102,8 +102,15 @@ struct LaunchAgentsView: View {
         }
         .safeAreaInset(edge: .bottom) {
             HStack {
-                Text("Disabled agents stay off after you log in again; removed ones go to the Trash.")
-                    .foregroundStyle(.secondary)
+                if let removed = model.removed {
+                    Text("Moved “\(removed.label)” to the Trash.").lineLimit(1).truncationMode(.middle)
+                    Button("Undo") { Task { await model.undoRemove() } }
+                        .help("Put the agent’s file back where it was and load it again.")
+                    ViewMovedItemsButton()
+                } else {
+                    Text("Disabled agents stay off after you log in again; removed ones go to the Trash.")
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 if let agent = selected, agent.isUser { actions(agent) }
                 Button("Refresh") { Task { await model.load() } }
@@ -123,15 +130,48 @@ struct LaunchAgentsView: View {
         ) { agent in
             Button("Move to Trash", role: .destructive) { Task { await model.remove(agent) } }
         } message: { _ in
-            Text("The agent is stopped and its file is moved to the Trash. To restore it, put the file back and log in again.")
+            Text("The agent is stopped and its file is moved to the Trash. Undo puts it back and loads it again.")
         }
         .alert(
-            Text("Couldn’t change “\(model.failed?.label ?? "")”"),
-            isPresented: Binding(get: { model.failed != nil }, set: { if !$0 { model.failed = nil } })
-        ) {
-            Button("OK") {}
-        } message: {
-            Text("launchctl refused the change, or the agent’s file couldn’t be changed or moved to the Trash (it may be locked or not yours). Click Refresh to see its current state, or manage it in System Settings › General › Login Items & Extensions.")
+            problemTitle,
+            isPresented: Binding(get: { model.problem != nil }, set: { if !$0 { model.problem = nil } }),
+            presenting: model.problem
+        ) { problem in
+            if case .action(let reason) = problem.kind, reason.needsFullDiskAccess {
+                Button("Open Settings…") { FullDiskAccess.openSettings() }
+            }
+            Button("OK", role: .cancel) {}
+        } message: { problem in
+            Text(Self.message(problem.kind))
+        }
+        .trashUndo(model)
+    }
+
+    private var problemTitle: Text {
+        switch model.problem?.kind {
+        case .undo: Text("Couldn’t put back “\(model.problem?.label ?? "")”")
+        default: Text("Couldn’t change “\(model.problem?.label ?? "")”")
+        }
+    }
+
+    /// The reason, then what to do about it.
+    static func message(_ kind: LaunchAgentsModel.Problem.Kind) -> String {
+        switch kind {
+        case .action(let reason):
+            reason.explanation + " " + String(localized: "You can also manage it in System Settings › General › Login Items & Extensions.")
+        case .undo(let outcome):
+            String(localized: Self.undoReason(outcome)) + " "
+                + String(localized: "Look for it in the Trash, or in View Moved Items.")
+        }
+    }
+
+    static func undoReason(_ outcome: TrashUndo.Outcome) -> LocalizedStringResource {
+        switch outcome {
+        case .restored: "Put back."
+        case .notInTrash: "Its file is no longer in the Trash."
+        case .occupied: "Another file is already at its place: nothing was overwritten."
+        case .folderChanged: "Its folder was moved, removed or changed."
+        case .failed: "macOS couldn’t move it back from the Trash."
         }
     }
 

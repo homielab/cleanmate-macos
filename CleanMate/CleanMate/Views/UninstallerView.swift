@@ -10,6 +10,13 @@ struct UninstallerView: View {
     @State private var confirmingBatch = false
     @State private var resetting = false
     @State private var previewURL: URL?
+    /// "Show Details…" of the result alert: what was left in place and why.
+    @State private var failureDetails: FailureDetails?
+
+    struct FailureDetails: Identifiable {
+        let id = UUID()
+        let failures: [CleanFailure]
+    }
     @AppStorage(Preferences.uninstallerSort) private var sort = UninstallerModel.AppSort.name
     @AppStorage(Preferences.uninstallerUnused) private var unused = UninstallerModel.UnusedFilter.all
     @AppStorage(Preferences.uninstallerSource) private var source = UninstallerModel.SourceFilter.all
@@ -75,6 +82,7 @@ struct UninstallerView: View {
             case .notListed: Text("This app is not in the list. Only apps in Applications or ~/Applications can be uninstalled here; Apple’s apps and CleanMate are not listed.")
             }
         }
+        .sheet(item: $failureDetails) { CleanFailuresSheet(failures: $0.failures) }
         .alert(outcomeTitle, isPresented: Binding(get: { model.outcome != nil }, set: { if !$0 { model.outcome = nil } }),
                presenting: model.outcome) { outcome in
             switch outcome {
@@ -82,8 +90,10 @@ struct UninstallerView: View {
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
             case .removed(let report):
                 TrashReportButtons(report: report) { await model.undo(report) }
+                failureDetailsButton(report)
             case .batch(let result):
                 TrashReportButtons(report: result.report) { await model.undo(result.report) }
+                failureDetailsButton(result.report)
             default:
                 EmptyView()
             }
@@ -91,9 +101,8 @@ struct UninstallerView: View {
         } message: { outcome in
             switch outcome {
             case .removed(let report):
-                Text(verbatim: (Self.casksLeftLines(report) + [String(localized: "Empty the Trash to free the space."),
-                                report.skipped > 0 ? String(localized: "Skipped (in use or not permitted): \(report.skipped)") : nil,
-                                report.locked > 0 ? String(localized: "Locked in Finder (turn off Locked in Get Info): \(report.locked)") : nil])
+                Text(verbatim: (Self.casksLeftLines(report) + [report.freed > 0 ? String(localized: "Empty the Trash to free the space.") : nil,
+                                Self.notMovedLine(report)])
                     .compactMap { $0 }.joined(separator: " "))
             case .restored(let result):
                 if result.skipped > 0 {
@@ -146,9 +155,21 @@ struct UninstallerView: View {
         return ([result.removed.isEmpty ? nil : String(localized: "Uninstalled: \(result.removed.count)")] + skipped
                 + casksLeftLines(report)
                 + [result.removed.isEmpty ? nil : String(localized: "Empty the Trash to free the space."),
-                   report.skipped > 0 ? String(localized: "Skipped (in use or not permitted): \(report.skipped)") : nil,
-                   report.locked > 0 ? String(localized: "Locked in Finder (turn off Locked in Get Info): \(report.locked)") : nil])
+                   notMovedLine(report)])
             .compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// How many items stayed out of the Trash; the reasons are behind "Show Details…".
+    static func notMovedLine(_ report: CleanReport) -> String? {
+        guard report.notCleaned > 0 else { return nil }
+        return String(localized: "\(report.notCleaned) items couldn’t be moved to the Trash.")
+            + (report.failures.isEmpty ? "" : " " + String(localized: "Show Details to see why."))
+    }
+
+    @ViewBuilder private func failureDetailsButton(_ report: CleanReport) -> some View {
+        if !report.failures.isEmpty {
+            Button("Show Details…") { failureDetails = FailureDetails(failures: report.failures) }
+        }
     }
 
     /// One line per Homebrew cask whose app is in the Trash but whose record brew kept.

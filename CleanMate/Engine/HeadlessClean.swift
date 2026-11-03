@@ -169,7 +169,7 @@ nonisolated enum HeadlessClean {
                 freed = cleaned.freed
                 upTo = cleaned.upTo
                 result.skipped += kept(item, todo, cleaned, home: home)
-                // The app's lines (`SmartScanModel.clean`): one per item, and one per entry that changed since the scan.
+                // The app's lines (`SmartScanModel.clean`): one per item, and one per entry left in place, with why.
                 let module: LocalizedStringResource = target.isPrivacy ? "Privacy" : "Smart Scan"
                 let removed = Cleaner.removedCount(item, todo, cleaned)
                 if cleaned.freed > 0 || removed > 0 {
@@ -177,8 +177,7 @@ nonisolated enum HeadlessClean {
                                        size: cleaned.freed, mode: item.mode, home: home)
                 }
                 TrashRecords.add(cleaned.trashed, module: module, home: home) { _ in ActivityLog.english(item.title) }
-                for url in cleaned.changed { ActivityLog.recordSkipped(module: module, item: url.path, home: home) }
-                for url in cleaned.failed { ActivityLog.recordFailed(module: module, item: url.path, home: home) }
+                cleaned.logFailures(module: module, home: home)
             }
             result.freed = freed
             result.trashed = item.mode == .trash ? freed : 0
@@ -189,10 +188,16 @@ nonisolated enum HeadlessClean {
         return report
     }
 
-    /// What the cleaner kept of `scan`, with a reason: entries that changed since the scan, then entries still on
-    /// disk. The cleaner only counts the others (a tool's command failed, parts of an entry), so an item it kept
+    /// What the cleaner kept of `scan`, with a reason: each of its `failures`; a report without them (made by hand)
+    /// lists entries that changed since the scan, then entries still on disk. The cleaner only counts the others (a tool's command failed, parts of an entry), so an item it kept
     /// something of without a listed entry gets one line for its folder.
     static func kept(_ item: CleanerItem, _ scan: ItemScan, _ report: CleanReport, home: URL) -> [Skipped] {
+        if !report.failures.isEmpty {
+            return report.failures.map { failure in
+                Skipped(path: failure.url.map { HeadlessScan.displayPath($0, home: home) } ?? item.paths.first ?? item.id,
+                        reason: failure.reason == .changed ? changedReason : failure.reason.english)
+            }
+        }
         let changed = Set(report.changed.map(\.path))
         var kept = report.changed.map { Skipped(path: HeadlessScan.displayPath($0, home: home), reason: changedReason) }
         guard report.skipped > kept.count else { return kept }

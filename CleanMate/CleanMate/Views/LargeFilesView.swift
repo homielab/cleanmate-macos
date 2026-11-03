@@ -101,12 +101,7 @@ struct LargeFilesView: View {
             case .done(let report):
                 EmptyStateView(title: Text("Moved \(report.freed, format: .fileSize) to the Trash"), systemImage: "checkmark.circle") {
                     Text("Empty the Trash to free the space.")
-                    if report.skipped > 0 {
-                        Text("Skipped (in use or not permitted): \(report.skipped)")
-                    }
-                    if report.locked > 0 {
-                        Text("Locked in Finder (turn off Locked in Get Info): \(report.locked)")
-                    }
+                    NotCleanedSummary(report: report)
                     if let result = report.undo { UndoTrashResult(result: result) }
                 } actions: {
                     Button("Scan Again") { model.scan() }.disabled(model.undoing)
@@ -324,6 +319,13 @@ struct LargeFilesView: View {
                     ProgressView("Finding duplicates…", value: fraction).frame(maxWidth: 320)
                     Text("Only files of the same size are compared.").foregroundStyle(.secondary)
                     Button("Stop") { model.duplicatesOnly = false }
+                }
+            } else if model.duplicatesOnly, let error = model.duplicateError {
+                EmptyStateView(title: Text("Couldn’t Finish Finding Duplicates"), systemImage: "exclamationmark.triangle") {
+                    Text(verbatim: error)
+                } actions: {
+                    Button("Try Again") { model.retryDuplicates() }
+                    Button("Show All Files") { model.duplicatesOnly = false }
                 }
             } else if model.needsAccess {
                 EmptyStateView(title: Text("Full Disk Access Needed"), systemImage: "lock.shield") {

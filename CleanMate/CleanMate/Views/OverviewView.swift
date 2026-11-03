@@ -193,10 +193,23 @@ struct OverviewView: View {
                     Button("Open Settings…") { FullDiskAccess.openSettings() }
                 }
             }
+            if !model.unreadableFolders.isEmpty {
+                HStack {
+                    Image(systemName: "lock.shield").foregroundStyle(.orange)
+                    Text("Not readable: \(model.unreadableFolders.formatted(.list(type: .and).locale(locale))) — grant Full Disk Access.")
+                        .help("macOS doesn’t let CleanMate read these folders, so their size is not counted.")
+                    Spacer()
+                    Button("Open Settings…") { FullDiskAccess.openSettings() }
+                }
+            }
+            if !model.unmeasuredFolders.isEmpty {
+                Text("Not measured: \(model.unmeasuredFolders.formatted(.list(type: .and).locale(locale)))")
+                    .foregroundStyle(.secondary)
+            }
             if model.folders.isEmpty {
                 if model.measuring {
                     Text("Measuring…").foregroundStyle(.secondary)
-                } else if model.measured {
+                } else if model.measured && model.unreadableFolders.isEmpty && model.unmeasuredFolders.isEmpty {
                     Text("Your home folder is empty.").foregroundStyle(.secondary)
                 }
             }

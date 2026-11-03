@@ -662,13 +662,14 @@ nonisolated enum Uninstaller {
                 if appStore { throw .appStore }
                 guard policy.allowsApp(app), !isRunning(app) else { throw .notTrashed }
                 do { inTrash = try await SafeRemoval.trash(app, allows: policy.allowsApp, moveAsync: recycle) } catch {
-                    if case SafeRemoval.Failure.movedOther = error { failedMove(app, home: policy.homeURL) }
-                    throw (error as? CocoaError)?.code == .userCancelled ? .cancelled : .notTrashed
+                    if (error as? CocoaError)?.code == .userCancelled { throw .cancelled }
+                    failedMove(app, error, home: policy.homeURL)
+                    throw .notTrashed
                 }
             } catch SafeRemoval.Failure.locked {
                 throw .locked
             } catch {
-                if case SafeRemoval.Failure.movedOther = error { failedMove(app, home: policy.homeURL) }
+                failedMove(app, error, home: policy.homeURL)
                 throw .notTrashed
             }
             report.freed += size
@@ -688,8 +689,10 @@ nonisolated enum Uninstaller {
         return report
     }
 
-    private static func failedMove(_ app: URL, home: URL) {
-        ActivityLog.recordFailed(module: "Uninstaller", item: app.path, home: home)
+    /// The app stayed: logged "failed" with why (a swap during the move, no permission, in use).
+    private static func failedMove(_ app: URL, _ error: Error, home: URL) {
+        ActivityLog.recordFailed(module: "Uninstaller", item: app.path, reason: CleanFailure.Reason.from(error, at: app).logText,
+                                 home: home)
     }
 
     /// No write permission (Cocoa or POSIX EACCES/EPERM, also as the underlying error).

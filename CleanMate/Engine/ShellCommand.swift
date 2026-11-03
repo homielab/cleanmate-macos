@@ -29,12 +29,50 @@ nonisolated struct ShellCommand: Sendable {
 
     /// Runs the command; false when missing, failing or timed out (it is then terminated).
     @concurrent func run() async -> Bool {
-        await execute(capture: false).map { succeeded($0.status) } == true
+        await execute(capture: false).finished.map { succeeded($0.status) } == true
+    }
+
+    /// Why a run of `tool` didn't succeed, as shown to the user.
+    struct Failure: Error, Sendable, Equatable {
+        enum Kind: Sendable, Equatable {
+            /// Not installed, or not ready to run (`leadingArguments` nil: no local Docker socket).
+            case notInstalled, notReady
+            case timedOut, cancelled
+            /// Couldn't be started: the errno of posix_spawn.
+            case notStarted(Int32)
+            case exited(Int32)
+            /// Killed by this signal.
+            case killed(Int32)
+        }
+        /// The executable's name (`brew`, `docker`).
+        var tool: String
+        var kind: Kind
+        /// The last non-empty line the tool printed to standard error, if any.
+        var lastLine: String?
+    }
+
+    /// Runs the command like `run()`: nil when it succeeded, else why not, with the last line it printed to
+    /// standard error (its standard output is not kept).
+    @concurrent func attempt() async -> Failure? {
+        let tool = (executable as NSString).lastPathComponent
+        switch await execute(capture: true, errorsOnly: true) {
+        case .finished(let status, let errors):
+            guard !succeeded(status) else { return nil }
+            let last = errors.split(whereSeparator: \.isNewline).last { !$0.allSatisfy(\.isWhitespace) }
+                .map { String($0.trimmingCharacters(in: .whitespaces).prefix(300)) }
+            let kind: Failure.Kind = status & 0x7f == 0 ? .exited((status >> 8) & 0xff) : .killed(status & 0x7f)
+            return Failure(tool: tool, kind: kind, lastLine: last)
+        case .missing: return Failure(tool: tool, kind: .notInstalled)
+        case .notReady: return Failure(tool: tool, kind: .notReady)
+        case .timedOut: return Failure(tool: tool, kind: .timedOut)
+        case .cancelled: return Failure(tool: tool, kind: .cancelled)
+        case .notStarted(let code): return Failure(tool: tool, kind: .notStarted(code))
+        }
     }
 
     /// Standard output of a successful run; nil when missing, failing or timed out.
     @concurrent func output() async -> String? {
-        guard let result = await execute(capture: true), succeeded(result.status) else { return nil }
+        guard let result = await execute(capture: true).finished, succeeded(result.status) else { return nil }
         return result.output
     }
 
@@ -46,13 +84,13 @@ nonisolated struct ShellCommand: Sendable {
 
     /// Exit result and everything the tool printed; nil when missing, timed out or cancelled. `requiresSuccess` is not used.
     @concurrent func outcome() async -> Outcome? {
-        await execute(capture: true, includeErrors: true).map { Outcome(succeeded: $0.status == 0, output: $0.output) }
+        await execute(capture: true, includeErrors: true).finished.map { Outcome(succeeded: $0.status == 0, output: $0.output) }
     }
 
     /// Like `outcome()`, and hands what the tool prints to `onOutput` while it runs: whole lines, at most every
     /// `outputInterval` (the rest when it exits), so a long tool (brew) shows its progress live.
     @concurrent func outcome(onOutput: @escaping @Sendable (String) async -> Void) async -> Outcome? {
-        await execute(capture: true, includeErrors: true, onOutput: onOutput)
+        await execute(capture: true, includeErrors: true, onOutput: onOutput).finished
             .map { Outcome(succeeded: $0.status == 0, output: $0.output) }
     }
 
@@ -66,17 +104,29 @@ nonisolated struct ShellCommand: Sendable {
     /// pipe open forever.
     static let drainGrace: Duration = .milliseconds(300)
 
-    /// Wait status and captured output ("" without `capture`); nil when missing, timed out or cancelled.
-    private func execute(capture: Bool, includeErrors: Bool = false,
-                         onOutput: (@Sendable (String) async -> Void)? = nil) async -> (status: Int32, output: String)? {
-        guard let path = resolvedPath, let leading = leadingArguments() else { return nil }
+    /// How a run ended: its wait status and captured output ("" without `capture`), or why it didn't finish.
+    private enum Run {
+        case finished(status: Int32, output: String)
+        case missing, notReady, timedOut, cancelled
+        case notStarted(Int32)
+
+        var finished: (status: Int32, output: String)? {
+            if case .finished(let status, let output) = self { (status, output) } else { nil }
+        }
+    }
+
+    /// `errorsOnly`: captures standard error alone (standard output goes to /dev/null).
+    private func execute(capture: Bool, includeErrors: Bool = false, errorsOnly: Bool = false,
+                         onOutput: (@Sendable (String) async -> Void)? = nil) async -> Run {
+        guard let path = resolvedPath else { return .missing }
+        guard let leading = leadingArguments() else { return .notReady }
         var environment = ProcessInfo.processInfo.environment.merging(self.environment) { $1 }
         // Script tools (`#!/usr/bin/env node`, brew) need their siblings on PATH.
         environment["PATH"] = ([(path as NSString).deletingLastPathComponent] + Self.searchPaths
             + [environment["PATH"] ?? ""]).joined(separator: ":")
 
         var fds: [Int32] = [-1, -1]
-        if capture { guard pipe(&fds) == 0 else { return nil } }
+        if capture { guard pipe(&fds) == 0 else { return .notStarted(errno) } }
         defer { for fd in fds where fd >= 0 { close(fd) } }
 
         // posix_spawn, not Process: the tool gets its own process group (POSIX_SPAWN_SETPGROUP) so a timeout or
@@ -85,9 +135,9 @@ nonisolated struct ShellCommand: Sendable {
         posix_spawn_file_actions_init(&actions)
         defer { posix_spawn_file_actions_destroy(&actions) }
         posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-        if capture { posix_spawn_file_actions_adddup2(&actions, fds[1], 1) }
+        if capture && !errorsOnly { posix_spawn_file_actions_adddup2(&actions, fds[1], 1) }
         else { posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0) }
-        if includeErrors { posix_spawn_file_actions_adddup2(&actions, fds[1], 2) }
+        if includeErrors || errorsOnly { posix_spawn_file_actions_adddup2(&actions, fds[1], 2) }
         else { posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0) }
         var attributes: posix_spawnattr_t?
         posix_spawnattr_init(&attributes)
@@ -106,7 +156,8 @@ nonisolated struct ShellCommand: Sendable {
         let envp = environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
         defer { (argv + envp).forEach { free($0) } }
         var pid: pid_t = 0
-        guard posix_spawn(&pid, path, &actions, &attributes, argv, envp) == 0 else { return nil }
+        let spawned = posix_spawn(&pid, path, &actions, &attributes, argv, envp)
+        guard spawned == 0 else { return .notStarted(spawned) }
 
         let reader = fds[0]
         if capture {
@@ -139,13 +190,14 @@ nonisolated struct ShellCommand: Sendable {
             }
             // A cancelled scan stops waiting for slow tools (docker, xcrun) right away.
             if ContinuousClock.now >= deadline || Task.isCancelled {
+                let cancelled = Task.isCancelled
                 await Self.stop(group: pid, reaped: exitedAt != nil)
-                return nil
+                return cancelled ? .cancelled : .timedOut
             }
             nap = min(nap * 2, .milliseconds(50))  // capped: long tools (brew, docker) poll thousands of times
             try? await Task.sleep(for: min(nap, exitedAt == nil ? .milliseconds(50) : .milliseconds(20)))
         }
-        return (status, capture ? String(decoding: data, as: UTF8.self) : "")
+        return .finished(status: status, output: capture ? String(decoding: data, as: UTF8.self) : "")
     }
 
     /// How long a timed-out or cancelled tool group gets after SIGTERM to stop cleanly before SIGKILL.

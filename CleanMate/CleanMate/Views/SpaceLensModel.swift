@@ -39,6 +39,8 @@ final class SpaceLensModel: ObservableObject {
     weak var undoManager: UndoManager?
     /// The current listing left out folders macOS protects (no Full Disk Access): the view shows a note.
     @Published private(set) var skippedProtected = false
+    /// The folder shown can't be read (macOS refused): its empty list is not an empty folder.
+    @Published private(set) var unreadable = false
     /// Injectable for tests.
     var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
     /// "Undo"; tests pass their own so the real Trash is never touched.
@@ -292,6 +294,7 @@ final class SpaceLensModel: ObservableObject {
         self.skipping = skipping
         skippedProtected = ProtectedFolders.skips(skipping, inside: folder)
         items = []
+        unreadable = false
         measuring = true
         let listing = listings[folder.path]
         let measure = self.measure
@@ -314,14 +317,18 @@ final class SpaceLensModel: ObservableObject {
                 listed[index].isProtected = skipping.contains(listed[index].url.standardizedFileURL.path)
                 let path = listed[index].url.path
                 listed[index].size = listed[index].isMountPoint ? nil : listing?[path] ?? sizes[path]
+                if listed[index].size == nil, !listed[index].isProtected, !listed[index].isMountPoint {
+                    listed[index].isUnreadable = SpaceLens.isUnreadable(listed[index].url)
+                }
             }
             items = listed
+            if listed.isEmpty { unreadable = SpaceLens.isUnreadable(folder) }
             // Revealed item not listed (e.g. gone since): the folder stays open with nothing selected, silently.
             if let revealed, !listed.contains(where: { $0.url.standardizedFileURL == revealed.standardizedFileURL }) { self.revealed = nil }
             // firstIndex(where:) per result was O(n²) URL compares: 1.2 s for a folder of 3k subfolders.
             let indexByURL = Dictionary(listed.indices.map { (listed[$0].url, $0) }) { first, _ in first }
             await withTaskGroup(of: (URL, Int64, [String: Int64])?.self) { group in
-                for item in listed where item.size == nil && !item.isProtected && !item.isMountPoint {
+                for item in listed where item.size == nil && !item.isProtected && !item.isMountPoint && !item.isUnreadable {
                     group.addTask {
                         guard let result = try? await measure(item.url, links, fenced)
                         else { return nil }

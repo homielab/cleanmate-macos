@@ -24,6 +24,8 @@ nonisolated struct SpaceItem: Identifiable, Hashable, Sendable {
     var isMountPoint = false
     /// Why an item outside the home folder can't be moved to the Trash; nil inside home and on external drives.
     var viewOnly: SpaceLens.ViewOnly?
+    /// A folder macOS doesn't let CleanMate read (no Full Disk Access, another user's): left unmeasured.
+    var isUnreadable = false
 
     var id: URL { url }
     var name: String { url.lastPathComponent }
@@ -119,6 +121,14 @@ nonisolated enum SpaceLens {
             item.isMountPoint = isFolder && (mounts.contains(url.path) || device.map { $0 != info.st_dev } == true)
             return item
         }
+    }
+
+    /// Whether macOS refuses to list `folder` (EPERM / EACCES): no Full Disk Access, another user's folder. Never asked
+    /// of a `ProtectedFolders` folder, which would make macOS ask for access.
+    static func isUnreadable(_ folder: URL) -> Bool {
+        guard let stream = opendir(folder.path) else { return errno == EPERM || errno == EACCES }
+        closedir(stream)
+        return false
     }
 
     /// Why an item outside the home folder stays view-only, for the lock shown next to it.

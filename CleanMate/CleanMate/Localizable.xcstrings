@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@" : {
+      "shouldTranslate" : false
+    },
     "%@ came from the App Store: remove it in Launchpad or drag it to the Trash in Finder." : {
       "localizations" : {
         "vi" : {
@@ -177,6 +180,62 @@
         }
       }
     },
+    "%lld items couldn’t be cleaned" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item couldn’t be cleaned"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items couldn’t be cleaned"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không dọn được %lld mục"
+          }
+        }
+      }
+    },
+    "%lld items couldn’t be moved to the Trash." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item couldn’t be moved to the Trash."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items couldn’t be moved to the Trash."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không chuyển được %lld mục vào Thùng rác."
+          }
+        }
+      }
+    },
     "%lld of %lld photos" : {
       "localizations" : {
         "vi" : {
@@ -193,6 +252,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld ảnh tương tự"
+          }
+        }
+      }
+    },
+    "a Homebrew command is running" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "một lệnh Homebrew đang chạy"
           }
         }
       }
@@ -253,6 +322,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ở đó đã có mục cùng tên. Không có gì bị thay thế."
+          }
+        }
+      }
+    },
+    "Another file is already at its place: nothing was overwritten." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã có một tệp khác ở chỗ cũ của nó: không ghi đè gì cả."
           }
         }
       }
@@ -407,6 +486,46 @@
         }
       }
     },
+    "Changed since the scan" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã thay đổi từ lúc quét"
+          }
+        }
+      }
+    },
+    "Check Settings › Exclusions." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem Cài đặt › Loại trừ."
+          }
+        }
+      }
+    },
+    "Check the Trash: the item there is not the one that was checked." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem Thùng rác: mục ở đó không phải mục đã được kiểm tra."
+          }
+        }
+      }
+    },
+    "Cleaning step" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bước dọn"
+          }
+        }
+      }
+    },
     "CleanMate asks the app to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved. You can put the items back from the Trash until it is emptied." : {
       "localizations" : {
         "vi" : {
@@ -423,6 +542,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate vẫn chạy trên thanh menu sau khi đóng cửa sổ. Không dọn gì khi bạn không bấm."
+          }
+        }
+      }
+    },
+    "CleanMate left these in place. Each reason says what to do; then clean again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate để nguyên các mục này. Mỗi lý do nói cách xử lý; sau đó dọn lại."
           }
         }
       }
@@ -487,6 +616,26 @@
         }
       }
     },
+    "Couldn’t Finish Finding Duplicates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không tìm xong tệp trùng lặp"
+          }
+        }
+      }
+    },
+    "Couldn’t put back “%@”" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không khôi phục được “%@”"
+          }
+        }
+      }
+    },
     "Couldn’t put it back. Try again, or drag it out of the Trash in Finder." : {
       "localizations" : {
         "vi" : {
@@ -513,6 +662,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Số ngày"
+          }
+        }
+      }
+    },
+    "Delete it in Finder instead." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy xoá nó trong Finder."
           }
         }
       }
@@ -567,6 +726,16 @@
         }
       }
     },
+    "Download it in Finder first, or remove it there." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tải nó về trong Finder trước, hoặc xoá nó ở đó."
+          }
+        }
+      }
+    },
     "Download removed (still in iCloud)" : {
       "localizations" : {
         "vi" : {
@@ -613,6 +782,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mỗi gợi ý mở đúng nơi bạn chọn thứ cần xoá. Không có gì bị dọn từ đây."
+          }
+        }
+      }
+    },
+    "Empty Folder" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục trống"
           }
         }
       }
@@ -797,6 +976,16 @@
         }
       }
     },
+    "Grant CleanMate Full Disk Access in System Settings, then try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cấp cho CleanMate Truy cập toàn bộ ổ đĩa trong Cài đặt hệ thống, rồi thử lại."
+          }
+        }
+      }
+    },
     "Holds your home folder — open it to pick items to move to the Trash." : {
       "localizations" : {
         "vi" : {
@@ -873,6 +1062,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Image, container đã dừng, volume và build cache không còn dùng. CleanMate không khởi động Docker để đo."
+          }
+        }
+      }
+    },
+    "In iCloud, not downloaded to this Mac" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trong iCloud, chưa tải về máy Mac này"
           }
         }
       }
@@ -1927,12 +2126,32 @@
         }
       }
     },
+    "In use by an app" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang được một ứng dụng dùng"
+          }
+        }
+      }
+    },
     "Incoming connections to apps on this Mac are not filtered. Turn the firewall on in Network settings." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Kết nối đến các ứng dụng trên máy Mac này không được lọc. Bật tường lửa trong phần Mạng."
+          }
+        }
+      }
+    },
+    "Install it again, or scan again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài lại nó, hoặc quét lại."
           }
         }
       }
@@ -2025,6 +2244,16 @@
         }
       }
     },
+    "It stays while this is true; try again later." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mục này được giữ khi điều đó còn đúng; hãy thử lại sau."
+          }
+        }
+      }
+    },
     "Item" : {
       "localizations" : {
         "vi" : {
@@ -2035,12 +2264,42 @@
         }
       }
     },
+    "Items Not Cleaned" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các mục không dọn được"
+          }
+        }
+      }
+    },
+    "Its file is no longer in the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp của nó không còn trong Thùng rác."
+          }
+        }
+      }
+    },
     "Its folder is now a link to another place, so it was not put back. Drag it out of the Trash in Finder instead." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thư mục cũ giờ là liên kết tới nơi khác nên mục không được khôi phục. Hãy kéo nó ra khỏi Thùng rác trong Finder."
+          }
+        }
+      }
+    },
+    "Its folder was moved, removed or changed." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục của nó đã bị chuyển, xoá hoặc thay đổi."
           }
         }
       }
@@ -2061,6 +2320,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cài đặt, bộ nhớ đệm và dữ liệu đã lưu của ứng dụng được chuyển vào Thùng rác để nó chạy lại như mới cài. Bản thân ứng dụng vẫn được giữ. Bạn có thể lấy lại bằng Hoàn tác hoặc từ Thùng rác."
+          }
+        }
+      }
+    },
+    "Its size couldn’t be measured. Open it, or click Rescan to try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đo được dung lượng. Mở nó, hoặc bấm Quét lại để thử lại."
           }
         }
       }
@@ -2091,6 +2360,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Giữ lại (chưa tải lên xong hoặc đã thay đổi): %lld"
+          }
+        }
+      }
+    },
+    "Kept by CleanMate’s safety rules or your exclusions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được giữ theo quy tắc an toàn của CleanMate hoặc mục loại trừ của bạn"
+          }
+        }
+      }
+    },
+    "Kept: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được giữ: %@"
           }
         }
       }
@@ -2135,12 +2424,72 @@
         }
       }
     },
+    "Locked in Finder" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bị khoá trong Finder"
+          }
+        }
+      }
+    },
+    "Look for it in the Trash, or in View Moved Items." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm nó trong Thùng rác, hoặc bấm Xem mục đã chuyển…"
+          }
+        }
+      }
+    },
     "Looking for space you can free…" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đang tìm chỗ có thể giải phóng…"
+          }
+        }
+      }
+    },
+    "macOS couldn’t move it back from the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không chuyển được nó ra khỏi Thùng rác."
+          }
+        }
+      }
+    },
+    "macOS doesn’t let CleanMate read these folders, so their size is not counted." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không cho CleanMate đọc các thư mục này, nên dung lượng của chúng không được tính."
+          }
+        }
+      }
+    },
+    "macOS doesn’t let CleanMate read this folder. Grant Full Disk Access to measure it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không cho CleanMate đọc thư mục này. Cấp Truy cập toàn bộ ổ đĩa để đo nó."
+          }
+        }
+      }
+    },
+    "macOS doesn’t let CleanMate read this folder. Grant Full Disk Access, then open it again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không cho CleanMate đọc thư mục này. Cấp Truy cập toàn bộ ổ đĩa, rồi mở lại."
           }
         }
       }
@@ -2185,6 +2534,16 @@
         }
       }
     },
+    "Moved “%@” to the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chuyển “%@” vào Thùng rác."
+          }
+        }
+      }
+    },
     "No longer in the Trash." : {
       "localizations" : {
         "vi" : {
@@ -2215,12 +2574,62 @@
         }
       }
     },
+    "Not measured: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa đo: %@"
+          }
+        }
+      }
+    },
+    "Not permitted: macOS blocked access" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không được phép: macOS chặn truy cập"
+          }
+        }
+      }
+    },
+    "Not Readable" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đọc được"
+          }
+        }
+      }
+    },
+    "Not readable: %@ — grant Full Disk Access." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đọc được: %@ — cấp Truy cập toàn bộ ổ đĩa."
+          }
+        }
+      }
+    },
     "Not Used for More Than" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không dùng quá"
+          }
+        }
+      }
+    },
+    "Nothing can be removed from this drive." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không xoá được gì khỏi ổ này."
           }
         }
       }
@@ -2365,12 +2774,32 @@
         }
       }
     },
+    "Put back." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã khôi phục."
+          }
+        }
+      }
+    },
     "Put every item in the list back where it was." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đưa mọi mục trong danh sách về chỗ cũ."
+          }
+        }
+      }
+    },
+    "Put the agent’s file back where it was and load it again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt tệp của agent về chỗ cũ và nạp lại nó."
           }
         }
       }
@@ -2401,6 +2830,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thoát rồi gỡ…"
+          }
+        }
+      }
+    },
+    "Quit the app using it, then try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thoát ứng dụng đang dùng nó, rồi thử lại."
+          }
+        }
+      }
+    },
+    "Replaced since it was checked" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã bị thay từ lúc được kiểm tra"
           }
         }
       }
@@ -3291,6 +3740,16 @@
         }
       }
     },
+    "Scan again, then try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét lại, rồi thử lại."
+          }
+        }
+      }
+    },
     "Scan Now" : {
       "localizations" : {
         "vi" : {
@@ -3335,6 +3794,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm trong kết quả"
+          }
+        }
+      }
+    },
+    "See each item left in place, why, and what to do about it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem từng mục được để nguyên, lý do và cách xử lý."
           }
         }
       }
@@ -3407,12 +3876,42 @@
         }
       }
     },
+    "Show All Files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện mọi tệp"
+          }
+        }
+      }
+    },
     "Show apps not used for a while (apps with no last-opened date are left out), or from one source" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hiện app lâu không dùng (app không có ngày mở được bỏ qua), hoặc từ một nguồn"
+          }
+        }
+      }
+    },
+    "Show Details to see why." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm Xem chi tiết để biết lý do."
+          }
+        }
+      }
+    },
+    "Show Details…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem chi tiết…"
           }
         }
       }
@@ -3537,6 +4036,16 @@
         }
       }
     },
+    "Something else went to the Trash in its place" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một thứ khác đã vào Thùng rác thay cho nó"
+          }
+        }
+      }
+    },
     "Sort groups by the space their extra photos take, their newest photo, or how many photos they have" : {
       "localizations" : {
         "vi" : {
@@ -3591,6 +4100,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ổn định trong %lld ngày qua."
+          }
+        }
+      }
+    },
+    "Start it, then try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở nó lên, rồi thử lại."
           }
         }
       }
@@ -3743,12 +4262,32 @@
         }
       }
     },
+    "The agent is stopped and its file is moved to the Trash. Undo puts it back and loads it again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent bị dừng và tệp của nó được chuyển vào Thùng rác. Hoàn tác sẽ đặt tệp về chỗ cũ và nạp lại."
+          }
+        }
+      }
+    },
     "The details are too long for the link. Paste them into “System details” on the GitHub page." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thông tin quá dài để đưa vào liên kết. Hãy dán vào ô “System details” trên trang GitHub."
+          }
+        }
+      }
+    },
+    "The drive is read-only" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ đĩa chỉ đọc"
           }
         }
       }
@@ -3769,6 +4308,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhận diện mã độc macOS dùng để kiểm tra ứng dụng, tự động cập nhật."
+          }
+        }
+      }
+    },
+    "The password prompt was cancelled" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã huỷ hộp nhập mật khẩu"
+          }
+        }
+      }
+    },
+    "This drive has no Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ổ này không có Thùng rác"
           }
         }
       }
@@ -3799,6 +4358,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Các toolchain khác bản mặc định và override của rustup, cài lại bằng rustup toolchain install"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thử lại"
+          }
+        }
+      }
+    },
+    "Try again in a moment; if it keeps failing, run the tool in Terminal to see why." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thử lại sau giây lát; nếu vẫn lỗi, chạy công cụ đó trong Terminal để xem lý do."
+          }
+        }
+      }
+    },
+    "Try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy thử lại."
+          }
+        }
+      }
+    },
+    "Turn off Locked in Finder › Get Info, then try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tắt Khoá trong Finder › Lấy thông tin, rồi thử lại."
           }
         }
       }
@@ -4019,6 +4618,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chào mừng bạn đến với CleanMate"
+          }
+        }
+      }
+    },
+    "You can also manage it in System Settings › General › Login Items & Extensions." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn cũng có thể quản lý nó trong Cài đặt hệ thống › Cài đặt chung › Mục đăng nhập & Tiện ích mở rộng."
           }
         }
       }
@@ -5580,16 +6189,6 @@
         }
       }
     },
-    "Empty or Not Readable" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trống hoặc không đọc được"
-          }
-        }
-      }
-    },
     "Empty the Trash to free the space." : {
       "localizations" : {
         "vi" : {
@@ -6026,16 +6625,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dùng lần cuối"
-          }
-        }
-      }
-    },
-    "launchctl refused the change, or the agent’s file couldn’t be changed or moved to the Trash (it may be locked or not yours). Click Refresh to see its current state, or manage it in System Settings › General › Login Items & Extensions." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "launchctl từ chối thay đổi, hoặc không thể sửa hay chuyển tệp của agent vào Thùng rác (tệp có thể bị khoá hoặc không thuộc về bạn). Bấm Làm mới để xem trạng thái hiện tại, hoặc quản lý trong Cài đặt hệ thống › Cài đặt chung › Mục đăng nhập & Tiện ích mở rộng."
           }
         }
       }
@@ -7582,16 +8171,6 @@
         }
       }
     },
-    "Skipped (in use or not permitted): %lld" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã bỏ qua (đang dùng hoặc không được phép): %lld"
-          }
-        }
-      }
-    },
     "Skips caches of apps that are open" : {
       "localizations" : {
         "vi" : {
@@ -7728,16 +8307,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Văn bản lưu từ biểu mẫu web; mật khẩu, địa chỉ và thẻ vẫn được giữ"
-          }
-        }
-      }
-    },
-    "The agent is stopped and its file is moved to the Trash. To restore it, put the file back and log in again." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent bị dừng và tệp của nó được chuyển vào Thùng rác. Để khôi phục, hãy đưa tệp trở lại rồi đăng nhập lại."
           }
         }
       }
@@ -8435,16 +9004,6 @@
         }
       }
     },
-    "Locked in Finder (turn off Locked in Get Info): %lld" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bị khoá trong Finder (tắt Khoá trong Lấy thông tin): %lld"
-          }
-        }
-      }
-    },
     "It is locked in Finder. Select it, choose File > Get Info, turn off Locked, then try again. Nothing was moved." : {
       "localizations" : {
         "vi" : {
@@ -8767,6 +9326,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld snapshot"
+          }
+        }
+      }
+    },
+    "“%@” couldn’t start: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” không khởi chạy được: %2$@"
+          }
+        }
+      }
+    },
+    "“%@” exited with code %lld" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” thoát với mã %2$lld"
+          }
+        }
+      }
+    },
+    "“%@” exited with code %lld: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” thoát với mã %2$lld: %3$@"
           }
         }
       }
@@ -10667,6 +11256,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ đang mở. CleanMate yêu cầu nó thoát và chờ tối đa 10 giây; nếu nó không thoát, không có gì bị di chuyển."
+          }
+        }
+      }
+    },
+    "“%@” is not installed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” chưa được cài"
+          }
+        }
+      }
+    },
+    "“%@” is not running" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” không chạy"
+          }
+        }
+      }
+    },
+    "“%@” took too long and was stopped" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” chạy quá lâu nên đã bị dừng"
+          }
+        }
+      }
+    },
+    "“%@” was cancelled" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” đã bị huỷ"
+          }
+        }
+      }
+    },
+    "“%@” was stopped by signal %lld" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@” bị dừng bởi tín hiệu %2$lld"
           }
         }
       }

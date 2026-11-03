@@ -602,6 +602,11 @@ final class UninstallerModel: ObservableObject {
                 case .brewBusy: outcome = .appBrewBusy(app)
                 case .appStore: outcome = .appStore(app)
                 }
+            } else {
+                // A reset (or leftovers) that threw: every ticked item stayed, said in the same result as a partial one.
+                var kept = CleanReport()
+                for entry in data { kept.skip(entry.url, Self.reason(error)) }
+                outcome = .removed(kept)
             }
             Attention.finished()
             return
@@ -619,6 +624,16 @@ final class UninstallerModel: ObservableObject {
             if selection == removing { selection = nil }
         } else if selection == removing {
             await loadEntries() // leftovers, or the reset app's data
+        }
+    }
+
+    /// Why an item stayed when the move threw `error` (it names no file).
+    nonisolated static func reason(_ error: Uninstaller.AppTrashError) -> CleanFailure.Reason {
+        switch error {
+        case .locked: .locked
+        case .brewBusy: .kept(String(localized: "a Homebrew command is running"))
+        case .cancelled: .other(String(localized: "The password prompt was cancelled"))
+        case .notTrashed, .appStore: .notPermitted
         }
     }
 

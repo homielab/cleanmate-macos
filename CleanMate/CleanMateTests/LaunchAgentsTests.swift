@@ -90,9 +90,9 @@ struct LaunchAgentsTests {
         let agent = LaunchAgent(
             url: URL(fileURLWithPath: "/Library/LaunchDaemons/com.foo.d.plist"), label: "com.foo.d", scope: .systemDaemon,
             program: nil, programMissing: false, owner: nil, state: .unknown)
-        #expect(await !LaunchAgents.disable(agent, policy: policy))
-        #expect(await !LaunchAgents.enable(agent, policy: policy))
-        #expect(await !LaunchAgents.remove(agent, policy: policy))
+        #expect(await LaunchAgents.disable(agent, policy: policy).failure == .refused)
+        #expect(await LaunchAgents.enable(agent, policy: policy).failure == .refused)
+        #expect(await LaunchAgents.remove(agent, policy: policy).failure == .refused)
     }
 
     actor Calls {
@@ -115,8 +115,8 @@ struct LaunchAgentsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let agent = try plist("helper.plist", label: "com.foo.helper")
         let calls = Calls()
-        #expect(await LaunchAgents.disable(agent, policy: policy) { await calls.add($0); return true })
-        #expect(await LaunchAgents.enable(agent, policy: policy) { await calls.add($0); return true })
+        #expect(await LaunchAgents.disable(agent, policy: policy) { await calls.add($0); return true }.succeeded)
+        #expect(await LaunchAgents.enable(agent, policy: policy) { await calls.add($0); return true }.succeeded)
         let service = "gui/\(getuid())/com.foo.helper"
         #expect(await calls.all == [["bootout", service], ["disable", service], ["enable", service],
                                     ["bootstrap", "gui/\(getuid())", agent.url.path]])
@@ -135,10 +135,10 @@ struct LaunchAgentsTests {
         try Data("x".utf8).write(to: unreadable.url)
         let calls = Calls()
         for agent in [copy, changed, unreadable] {
-            #expect(await !LaunchAgents.disable(agent, policy: policy) { await calls.add($0); return true })
-            #expect(await !LaunchAgents.enable(agent, policy: policy) { await calls.add($0); return true })
+            #expect(await !LaunchAgents.disable(agent, policy: policy) { await calls.add($0); return true }.succeeded)
+            #expect(await !LaunchAgents.enable(agent, policy: policy) { await calls.add($0); return true }.succeeded)
         }
-        #expect(await LaunchAgents.remove(copy, policy: policy, run: { await calls.add($0); return true }))
+        #expect(await LaunchAgents.remove(copy, policy: policy, run: { await calls.add($0); return true }).succeeded)
         #expect(!FileManager.default.fileExists(atPath: copy.url.path))
         #expect(await calls.all.isEmpty)
     }
@@ -147,7 +147,7 @@ struct LaunchAgentsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let agent = try plist("com.foo.solo.plist", label: "com.foo.solo")
         let calls = Calls()
-        #expect(await LaunchAgents.remove(agent, policy: policy, run: { await calls.add($0); return false }))
+        #expect(await LaunchAgents.remove(agent, policy: policy, run: { await calls.add($0); return false }).succeeded)
         #expect(!FileManager.default.fileExists(atPath: agent.url.path))
         #expect(await calls.all == [["bootout", "gui/\(getuid())/com.foo.solo"]])
     }
@@ -164,7 +164,7 @@ struct LaunchAgentsTests {
             return target
         }
         let policy = policy
-        #expect(await LaunchAgents.remove(agent, policy: policy, trash: fakeTrash) { _ in true })
+        #expect(await LaunchAgents.remove(agent, policy: policy, trash: fakeTrash) { _ in true }.succeeded)
         #expect(!FileManager.default.fileExists(atPath: agent.url.path))
         var sources = HeadlessScan.Sources()
         sources.policy = { policy }
