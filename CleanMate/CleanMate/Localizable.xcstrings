@@ -11457,6 +11457,166 @@
           }
         }
       }
+    },
+    "Slack (App Store)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slack (App Store)"
+          }
+        }
+      }
+    },
+    "Caches and logs only; messages, files and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm và nhật ký; giữ nguyên tin nhắn, tệp và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; messages and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên tin nhắn và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; messages, attachments and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên tin nhắn, tệp đính kèm và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; pages, offline pages and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên trang, trang ngoại tuyến và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; your files and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên tệp của bạn và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches and logs only; collections, history and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm và nhật ký; giữ nguyên collection, lịch sử và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; your vaults and settings are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên vault và cài đặt"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts, graphics caches and logs of the Slack app; Slack makes them again when it opens. Messages and files stay in your Slack workspace, and your sign-in is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch, bộ nhớ đệm đồ hoạ và nhật ký của app Slack; Slack tạo lại khi mở. Tin nhắn và tệp vẫn ở workspace Slack của bạn, đăng nhập được giữ nguyên"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts, graphics caches and logs of the Slack app from the App Store, inside its container; Slack makes them again when it opens. Messages and files stay in your Slack workspace, and your sign-in is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch, bộ nhớ đệm đồ hoạ và nhật ký của app Slack bản App Store, trong container của nó; Slack tạo lại khi mở. Tin nhắn và tệp vẫn ở workspace Slack của bạn, đăng nhập được giữ nguyên"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Discord app; Discord makes them again when it opens. Messages stay on Discord, and your sign-in and the app's modules are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch và bộ nhớ đệm đồ hoạ của app Discord; Discord tạo lại khi mở. Tin nhắn vẫn ở Discord, đăng nhập và các module của app được giữ nguyên"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Signal app; Signal makes them again when it opens. Your messages and attachments (the sql and attachments.noindex folders) and the link to your phone are never touched" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch và bộ nhớ đệm đồ hoạ của app Signal; Signal tạo lại khi mở. Tin nhắn, tệp đính kèm (thư mục sql và attachments.noindex) và liên kết với điện thoại không bao giờ bị đụng tới"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Notion app; Notion makes them again when it opens. Your pages, the pages kept for offline use and your sign-in are never touched" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch và bộ nhớ đệm đồ hoạ của app Notion; Notion tạo lại khi mở. Trang của bạn, các trang lưu để dùng ngoại tuyến và đăng nhập không bao giờ bị đụng tới"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Figma app; Figma downloads or makes them again. Your files are saved in your Figma account, and your sign-in stays" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch và bộ nhớ đệm đồ hoạ của app Figma; Figma tải hoặc tạo lại. Tệp của bạn được lưu trong tài khoản Figma, đăng nhập được giữ nguyên"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts, graphics caches and logs of the Postman app; Postman makes them again when it opens. Your collections, environments, history and sign-in are never touched" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch, bộ nhớ đệm đồ hoạ và nhật ký của app Postman; Postman tạo lại khi mở. Collection, environment, lịch sử và đăng nhập không bao giờ bị đụng tới"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Obsidian app; Obsidian makes them again when it opens. Your vaults are your own folders and are never touched, nor the list of vaults and settings" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã đã biên dịch và bộ nhớ đệm đồ hoạ của app Obsidian; Obsidian tạo lại khi mở. Vault là thư mục riêng của bạn và không bao giờ bị đụng tới, danh sách vault và cài đặt cũng vậy"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

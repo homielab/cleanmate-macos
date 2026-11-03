@@ -232,10 +232,7 @@ extension CleanerGroup {
             vscode("Code") + ["~/Library/Caches/com.microsoft.VSCode"]),
         // Per-project state of VS Code and its forks for project folders since deleted (`EditorWorkspaces`).
         EditorWorkspaces.item(),
-        app("slack", "Slack", bundle: ["com.tinyspeck.slackmacgap"],
-            chromium("~/Library/Application Support/Slack") + ["~/Library/Caches/com.tinyspeck.slackmacgap"]),
-        app("discord", "Discord", bundle: ["com.hnc.Discord"],
-            chromium("~/Library/Application Support/discord") + ["~/Library/Caches/com.hnc.Discord"]),
+        // Slack, Discord, Notion, Figma, Obsidian, Postman, Signal are in `ChatAppCaches`.
         // New Teams (com.microsoft.teams2) is `ChatAppCaches.teams`, with Full Disk Access.
         app("teams", "Microsoft Teams (classic)", bundle: ["com.microsoft.teams"],
             chromium("~/Library/Application Support/Microsoft/Teams") + ["~/Library/Caches/com.microsoft.teams"]),
@@ -247,16 +244,6 @@ extension CleanerGroup {
             "~/Library/Application Support/Telegram Desktop/tdata/user_data*/media_cache",
             "~/Library/Caches/com.tdesktop.Telegram",
         ]),
-        app("notion", "Notion", bundle: ["notion.id"],
-            chromium("~/Library/Application Support/Notion") + ["~/Library/Caches/notion.id"]),
-        app("figma", "Figma", bundle: ["com.figma.Desktop"],
-            chromium("~/Library/Application Support/Figma") + chromium("~/Library/Application Support/Figma/DesktopProfile/*")
-                + ["~/Library/Caches/com.figma.Desktop"]),
-        app("obsidian", "Obsidian", bundle: ["md.obsidian"], chromium("~/Library/Application Support/obsidian")),
-        app("postman", "Postman", bundle: ["com.postmanlabs.mac"],
-            chromium("~/Library/Application Support/Postman") + ["~/Library/Caches/com.postmanlabs.mac"]),
-        app("signal", "Signal", bundle: ["org.whispersystems.signal-desktop"],
-            chromium("~/Library/Application Support/Signal")),
         // Media cache Premiere Pro, After Effects, Media Encoder and Audition share: conformed audio, peak files and
         // the cache database, often tens of GB, rebuilt from the source media when a project opens. Only these three
         // folders at the default location (a folder chosen in Premiere's Preferences › Media Cache is not scanned),
