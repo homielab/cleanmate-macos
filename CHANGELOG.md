@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Moved to the Trash**: see everything CleanMate moved to the Trash from any module, also after quitting, and put items back one by one or all at once, filtered by source or search; open it with **View Moved Items…** after a move to the Trash or in Settings › Activity.
 - **Uninstaller**: each app shows its source (App Store, Homebrew, Setapp or Downloaded) and the **Show** menu filters the list by source; an open app has **Quit and Uninstall…**, which quits it and uninstalls it in one step.
 - CleanMate opens on the module you used last, with its window at the same place and size; a notification or the menu bar's **Scan Now** still opens Smart Scan.
 - **Similar Photos**, **Login Items** and **Maintenance** have a search field, and ⌘F goes to the search field in every list; ⌘A / ⇧⌘A tick or untick what **Large & Old Files**, **Similar Photos** and **Uninstaller** show.

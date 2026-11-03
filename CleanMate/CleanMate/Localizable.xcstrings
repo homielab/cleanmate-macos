@@ -171,6 +171,16 @@
         }
       }
     },
+    "An item with the same name is already there. Nothing was replaced." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ở đó đã có mục cùng tên. Không có gì bị thay thế."
+          }
+        }
+      }
+    },
     "Another user's folder — view only." : {
       "localizations" : {
         "vi" : {
@@ -321,6 +331,16 @@
         }
       }
     },
+    "Couldn’t put it back. Try again, or drag it out of the Trash in Finder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không khôi phục được. Hãy thử lại hoặc kéo nó ra khỏi Thùng rác trong Finder."
+          }
+        }
+      }
+    },
     "Custom…" : {
       "localizations" : {
         "vi" : {
@@ -371,6 +391,16 @@
         }
       }
     },
+    "Done" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xong"
+          }
+        }
+      }
+    },
     "Download history (Gatekeeper)" : {
       "localizations" : {
         "vi" : {
@@ -411,6 +441,16 @@
         }
       }
     },
+    "Each item returns to where it was. Nothing already there is replaced." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mỗi mục trở về chỗ cũ. Không thay thế mục nào đang có ở đó."
+          }
+        }
+      }
+    },
     "Erasing cookies signs you out of websites." : {
       "localizations" : {
         "vi" : {
@@ -431,6 +471,16 @@
         }
       }
     },
+    "Everything CleanMate moved to the Trash that is still there. Put an item back to return it to where it was." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ CleanMate đã chuyển vào Thùng rác và vẫn còn ở đó. Khôi phục một mục để đưa nó về chỗ cũ."
+          }
+        }
+      }
+    },
     "Extra copies: %@" : {
       "localizations" : {
         "vi" : {
@@ -447,6 +497,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp trong iCloud Drive không bao giờ vào Thùng rác. Hãy bỏ bản tải về để giải phóng chỗ."
+          }
+        }
+      }
+    },
+    "Files, apps and folders that CleanMate moves to the Trash are listed here until the Trash is emptied, so you can put them back. Caches and other items deleted permanently are not." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp, ứng dụng và thư mục CleanMate chuyển vào Thùng rác được liệt kê ở đây cho tới khi dọn sạch Thùng rác, để bạn khôi phục được. Bộ nhớ đệm và các mục bị xoá vĩnh viễn thì không có ở đây."
           }
         }
       }
@@ -487,6 +547,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Giải phóng chỗ: tệp vẫn ở trong iCloud Drive và sẽ tải về lại khi bạn mở."
+          }
+        }
+      }
+    },
+    "from %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "từ %@"
           }
         }
       }
@@ -1611,6 +1681,16 @@
         }
       }
     },
+    "In the Trash: %lld (%@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trong Thùng rác: %lld (%@)"
+          }
+        }
+      }
+    },
     "In total" : {
       "localizations" : {
         "vi" : {
@@ -1739,6 +1819,26 @@
         }
       }
     },
+    "Its folder is now a link to another place, so it was not put back. Drag it out of the Trash in Finder instead." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục cũ giờ là liên kết tới nơi khác nên mục không được khôi phục. Hãy kéo nó ra khỏi Thùng rác trong Finder."
+          }
+        }
+      }
+    },
+    "Its folder was moved, renamed or removed, or is now on another disk." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục cũ đã bị chuyển, đổi tên, xoá hoặc giờ nằm trên ổ khác."
+          }
+        }
+      }
+    },
     "Its settings, caches and saved data go to the Trash, so it starts as if newly installed. The app itself stays installed. You can put them back with Undo or from the Trash." : {
       "localizations" : {
         "vi" : {
@@ -1829,6 +1929,26 @@
         }
       }
     },
+    "Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "No longer in the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không còn trong Thùng rác."
+          }
+        }
+      }
+    },
     "Not from the App Store, Homebrew or Setapp" : {
       "localizations" : {
         "vi" : {
@@ -1845,6 +1965,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không dùng quá"
+          }
+        }
+      }
+    },
+    "Nothing from CleanMate in the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thùng rác không có mục nào từ CleanMate"
           }
         }
       }
@@ -1905,6 +2035,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hệ thống được SIP (Bảo vệ toàn vẹn hệ thống) bảo vệ — chỉ xem."
+          }
+        }
+      }
+    },
+    "Put Back" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khôi phục"
+          }
+        }
+      }
+    },
+    "Put Back %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khôi phục %@"
+          }
+        }
+      }
+    },
+    "Put Back All Shown…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khôi phục mọi mục đang hiện…"
+          }
+        }
+      }
+    },
+    "Put back everything shown (%lld)?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khôi phục mọi mục đang hiện (%lld)?"
+          }
+        }
+      }
+    },
+    "Put every item in the list back where it was." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đưa mọi mục trong danh sách về chỗ cũ."
           }
         }
       }
@@ -2883,6 +3063,16 @@
         }
       }
     },
+    "See everything CleanMate moved to the Trash and put items back, also after CleanMate was quit." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem mọi thứ CleanMate đã chuyển vào Thùng rác và khôi phục chúng, kể cả sau khi đã thoát CleanMate."
+          }
+        }
+      }
+    },
     "Select All but Suggested" : {
       "localizations" : {
         "vi" : {
@@ -2977,6 +3167,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hiện tệp ẩn (⇧⌘.): khi tắt, mục ẩn không hiện trong danh sách nhưng vẫn được tính vào tổng."
+          }
+        }
+      }
+    },
+    "Show it in the Trash in Finder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện mục này trong Thùng rác bằng Finder."
           }
         }
       }
@@ -3483,6 +3683,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xem trong Space Lens"
+          }
+        }
+      }
+    },
+    "View Moved Items…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem mục đã chuyển…"
           }
         }
       }

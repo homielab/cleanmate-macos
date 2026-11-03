@@ -276,35 +276,13 @@ nonisolated enum HeadlessTrash {
                 }
                 let record = records[index]
                 item.path = record.original
-                let original = URL(fileURLWithPath: record.original)
-                guard SafeRemoval.FileID(URL(fileURLWithPath: record.trashed)) == record.id else {
-                    // Emptied, put back in Finder, or something else at that place in the Trash now.
-                    item.reason = "Not in the Trash any more"
-                    records.remove(at: index)
-                    continue
-                }
-                var info = stat()
-                if lstat(original.deletingLastPathComponent().path, &info) == 0, info.st_mode & S_IFMT == S_IFLNK {
-                    item.reason = "Its folder is a symlink now: nothing was moved"
-                    continue
-                }
-                let module = LocalizedStringResource(String.LocalizationValue(record.moduleName))
-                switch TrashUndo.putBack(record.item, module: module, home: home,
-                                         logName: { record.logItem ?? $0.path }) {
-                case .restored:
+                let outcome = TrashRecords.putBack(record, home: home)
+                item.reason = outcome.reason
+                if outcome == .restored {
                     item.skipped = false
                     report.count += 1
-                    records.remove(at: index)
-                case .notInTrash:
-                    item.reason = "Not in the Trash any more"
-                    records.remove(at: index)
-                case .occupied:
-                    item.reason = "Something is already at its place: nothing was overwritten"
-                case .folderChanged:
-                    item.reason = "Its folder was moved, removed or changed: nothing was moved"
-                case .failed:
-                    item.reason = "Could not put it back"
                 }
+                if outcome.dropsRecord { records.remove(at: index) }
             }
         }
         return report

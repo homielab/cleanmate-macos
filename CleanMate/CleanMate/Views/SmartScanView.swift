@@ -93,6 +93,7 @@ struct SmartScanView: View {
                         Button("Undo") { Task { await model.undoTrash() } }
                             .help("Put the items just moved to the Trash back where they were.")
                     }
+                    if model.cleanedGroups.contains(where: { $0.trashed > 0 }) { ViewMovedItemsButton() }
                 }
                 .transition(.opacity)
             }

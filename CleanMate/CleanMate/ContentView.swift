@@ -66,6 +66,8 @@ final class ModuleRouter: ObservableObject {
     @Published var scanRequested = false
     /// Help › Getting Started…: ContentView opens the welcome guide, also on first appearance.
     @Published var welcomeRequested = false
+    /// "View Moved Items…": ContentView opens Moved to the Trash, also on first appearance.
+    @Published var trashedItemsRequested = false
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
     var openMainWindow: OpenWindowAction?
 
@@ -87,6 +89,12 @@ final class ModuleRouter: ObservableObject {
     /// Opens the welcome guide on the main window (reopened if closed); settings are not changed by opening it.
     func showWelcome() {
         welcomeRequested = true
+        show(nil)
+    }
+
+    /// Opens Moved to the Trash on the main window (reopened if closed), from a module, an alert or Settings.
+    func showTrashedItems() {
+        trashedItemsRequested = true
         show(nil)
     }
 
@@ -116,6 +124,7 @@ struct ContentView: View {
     @StateObject private var loginItems = LaunchAgentsModel()
     @StateObject private var maintenance = MaintenanceModel()
     @State private var showsWelcome = false
+    @State private var showsTrashedItems = false
     @Environment(\.openWindow) private var openWindow
     /// The app's own window: opens on the module shown last and keeps its frame. Off in the benchmark's window and in
     /// the test host, so tests never read or write the user's settings.
@@ -197,12 +206,24 @@ struct ContentView: View {
             // A confirmation already open keeps the window: no sheet over a sheet.
             if ModuleRouter.mainWindow?.attachedSheet == nil { showsWelcome = true } else { NSSound.beep() }
         }
+        .onAppearAndChange(of: router.trashedItemsRequested) { _ in
+            guard router.trashedItemsRequested else { return }
+            router.trashedItemsRequested = false
+            Task {
+                // Asked from an alert's button: the alert is still closing. Another confirmation open keeps the window.
+                for _ in 0..<10 where ModuleRouter.mainWindow?.attachedSheet != nil {
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                if ModuleRouter.mainWindow?.attachedSheet == nil { showsTrashedItems = true } else { NSSound.beep() }
+            }
+        }
         .onAppear {
             if WelcomeModel.showsAtLaunch() { showsWelcome = true }
             AppUpdater.shared.start()  // after the window: see `start`
             router.openMainWindow = openWindow
         }
         .sheet(isPresented: $showsWelcome) { WelcomeView { selection = .overview } }
+        .sheet(isPresented: $showsTrashedItems) { TrashedItemsView() }
         .onChange(of: selection) { if remembers { Self.remember($0) } }
         .background { if remembers { WindowFrameKeeper() } }
     }

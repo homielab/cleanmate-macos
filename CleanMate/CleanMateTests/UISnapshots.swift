@@ -683,4 +683,49 @@ struct UISnapshots {
         try (old + text).write(to: url, atomically: true, encoding: .utf8)
         try await snapshot("settings-activity", size: CGSize(width: 520, height: 590)) { ActivitySettings(home: home, now: Self.today) }
     }
+
+    /// Moved to the Trash, from sample records in a temporary home and Trash (never this Mac's); one item can't go back
+    /// (something now at its old place), so its reason shows.
+    @Test func trashedItems() async throws {
+        let home = FileManager.default.temporaryDirectory.appending(path: "CleanMateSnapshotsHome-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: home) }
+        let fm = FileManager.default
+        let trash = home.appending(path: ".Trash")
+        try fm.createDirectory(at: trash, withIntermediateDirectories: true)
+        let day: Double = 86_400
+        let samples: [(String, Int64, String, Double)] = [
+            ("Movies/Trip 2019.mov", 4_300_000_000, "Large & Old Files", 2),
+            ("Pictures/IMG_2041.heic", 3_100_000, "Similar Photos", 1.5),
+            ("Applications/Sample.app", 512_000_000, "Uninstaller", 1),
+            ("Downloads/Installer.dmg", 820_000_000, "Space Lens", 0.5),
+            ("Documents/old-notes.zip", 48_000_000, "Command Line", 0.2),
+        ]
+        var occupied: TrashRecords.Record?
+        for (path, size, module, ago) in samples {
+            let original = home.appending(path: path)
+            try fm.createDirectory(at: original.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let inTrash = trash.appending(path: original.lastPathComponent)
+            if path.hasSuffix(".app") { try fm.createDirectory(at: inTrash, withIntermediateDirectories: true) }
+            else { try Data().write(to: inTrash) }
+            let id = try #require(SafeRemoval.FileID(inTrash))
+            let record = TrashRecords.Record(TrashedItem(original: original, inTrash: inTrash, size: size), id: id,
+                                             date: Self.today - ago * day, module: module)
+            TrashRecords.update(home: home) { $0.append(record) }
+            if module == "Space Lens" { occupied = record }
+        }
+        // Something new at the Space Lens item's old place: put back is refused, with the reason under its row.
+        let refused = try #require(occupied)
+        try Data().write(to: URL(fileURLWithPath: refused.original))
+        try await snapshot("trashed-items", size: CGSize(width: 680, height: 520)) {
+            let model = TrashedItemsModel(home: home)
+            Task {
+                await model.load()
+                if let row = model.rows.first(where: { $0.id == refused.trashed }) { await model.restore([row]) }
+            }
+            return TrashedItemsView(model: model)
+        }
+        try await snapshot("trashed-items-empty", size: CGSize(width: 680, height: 520)) {
+            TrashedItemsView(model: TrashedItemsModel(home: home.appending(path: "none")))
+        }
+    }
 }

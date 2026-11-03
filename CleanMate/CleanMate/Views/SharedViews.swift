@@ -9,10 +9,12 @@ struct OpenTrashButton: View {
     }
 }
 
-/// "Open Trash" (once something went to the Trash) and "Undo" after a module's move to the Trash.
+/// "Open Trash" (once something went to the Trash), "Undo" and "View Moved Items…" after a module's move to the Trash.
 /// Undo puts back what that move moved; hidden once it ran (`report.undo`) or when nothing can be put back.
 struct TrashReportButtons: View {
     let report: CleanReport
+    /// false: the caller shows "View Moved Items…" elsewhere (a narrow bar).
+    var showsMovedItems = true
     let undo: () async -> Void
 
     var body: some View {
@@ -21,6 +23,7 @@ struct TrashReportButtons: View {
             Button("Undo") { Task { await undo() } }
                 .help("Put the items just moved to the Trash back where they were.")
         }
+        if showsMovedItems && report.freed > 0 { ViewMovedItemsButton() }
     }
 }
 

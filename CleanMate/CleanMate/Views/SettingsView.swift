@@ -496,6 +496,7 @@ struct ActivitySettings: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 Spacer()
+                ViewMovedItemsButton()
                 Button("Reveal in Finder") {
                     let url = ActivityLog.url(home: home)
                     if FileManager.default.fileExists(atPath: url.path) {

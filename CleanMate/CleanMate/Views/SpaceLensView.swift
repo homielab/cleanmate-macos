@@ -384,13 +384,14 @@ struct SpaceLensView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text("Moved \(report.freed, format: .fileSize) to the Trash").foregroundStyle(.secondary)
-                        TrashReportButtons(report: report) { await model.undoTrash() }.buttonStyle(.link)
+                        TrashReportButtons(report: report, showsMovedItems: false) { await model.undoTrash() }.buttonStyle(.link)
                     }
                     Group {
                         if report.skipped > 0 { Text("Skipped (in use or not permitted): \(report.skipped)") }
                         if report.locked > 0 { Text("Locked in Finder (turn off Locked in Get Info): \(report.locked)") }
                         if let result = report.undo { UndoTrashResult(result: result) }
                     }.foregroundStyle(.secondary)
+                    if report.freed > 0 { ViewMovedItemsButton().buttonStyle(.link) }
                 }
             }
             Spacer()
