@@ -224,7 +224,7 @@ extension CleanerGroup {
     }
 
     /// Containers whose `Data/Library/Caches` an app item lists, kept out of "Sandboxed app caches".
-    nonisolated static let ownedContainers: Set = [CloudSyncCaches.oneDriveContainer]
+    nonisolated static let ownedContainers = Set([CloudSyncCaches.oneDriveContainer]).union(ChatAppCaches.containers)
 
     /// Not caches though under ~/Library/Caches: Poetry's default virtualenvs (`{cache-dir}/virtualenvs`), one
     /// per project; removing them breaks `poetry run` until `poetry install`. The rest of `pypoetry` is still listed.

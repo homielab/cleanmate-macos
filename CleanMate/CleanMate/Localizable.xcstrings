@@ -281,6 +281,46 @@
         }
       }
     },
+    "Caches and logs only; chats, files and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm và nhật ký; giữ nguyên trò chuyện, tệp và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; chats, photos, files and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên trò chuyện, ảnh, tệp và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; messages, photos, files and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên tin nhắn, ảnh, tệp và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches only; your designs and sign-in are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ bộ nhớ đệm; giữ nguyên thiết kế và đăng nhập"
+          }
+        }
+      }
+    },
     "CleanMate asks the app to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved. You can put the items back from the Trash until it is emptied." : {
       "localizations" : {
         "vi" : {
@@ -497,6 +537,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp trong iCloud Drive không bao giờ vào Thùng rác. Hãy bỏ bản tải về để giải phóng chỗ."
+          }
+        }
+      }
+    },
+    "Files WhatsApp keeps in its Caches folder to open faster; it makes them again. Chats, photos and files are in another folder and are never touched" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp WhatsApp giữ trong thư mục Caches để mở nhanh hơn; app tạo lại. Trò chuyện, ảnh và tệp nằm ở thư mục khác và không bao giờ bị đụng tới"
           }
         }
       }
@@ -3693,6 +3743,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xem mục đã chuyển…"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Canva app; Canva downloads or makes them again. Your designs are saved in your Canva account, and your sign-in stays" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã script đã biên dịch và bộ nhớ đệm đồ hoạ của app Canva; Canva tải hoặc tạo lại. Thiết kế của bạn lưu trong tài khoản Canva, đăng nhập được giữ"
+          }
+        }
+      }
+    },
+    "Web caches, compiled scripts and graphics caches of the Zalo app; Zalo makes them again when it opens. Your messages, the photos and files you received (ZaloData/media) and your sign-in are never touched" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, mã script đã biên dịch và bộ nhớ đệm đồ hoạ của app Zalo; Zalo tạo lại khi mở. Tin nhắn, ảnh và tệp bạn nhận (ZaloData/media) và đăng nhập không bao giờ bị đụng tới"
+          }
+        }
+      }
+    },
+    "Web caches, graphics caches and logs of the new Microsoft Teams, inside its container; Teams makes them again and downloads what it needs. Chats and files stay in Microsoft 365, and your sign-in is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm web, bộ nhớ đệm đồ hoạ và nhật ký của Microsoft Teams mới, trong container của app; Teams tạo lại và tải lại thứ cần. Trò chuyện và tệp nằm trên Microsoft 365, đăng nhập được giữ"
           }
         }
       }

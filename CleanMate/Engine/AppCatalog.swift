@@ -236,8 +236,7 @@ extension CleanerGroup {
             chromium("~/Library/Application Support/Slack") + ["~/Library/Caches/com.tinyspeck.slackmacgap"]),
         app("discord", "Discord", bundle: ["com.hnc.Discord"],
             chromium("~/Library/Application Support/discord") + ["~/Library/Caches/com.hnc.Discord"]),
-        // New Teams (com.microsoft.teams2): its container's Caches go with "Sandboxed app caches";
-        // its Group Containers caches go with "App group caches".
+        // New Teams (com.microsoft.teams2) is `ChatAppCaches.teams`, with Full Disk Access.
         app("teams", "Microsoft Teams (classic)", bundle: ["com.microsoft.teams"],
             chromium("~/Library/Application Support/Microsoft/Teams") + ["~/Library/Caches/com.microsoft.teams"]),
         app("zoom", "Zoom", bundle: ["us.zoom.xos"], ["~/Library/Caches/us.zoom.xos"]),
@@ -277,8 +276,12 @@ extension CleanerGroup {
         CloudSyncCaches.dropbox(hasFullDiskAccess: { hasFullDiskAccess }),
         // Media caches outside ~/Library/Caches (`MediaAppCaches`): unticked, deleted, skipped while the app runs.
         MediaAppCaches.spotify,
-    ] + GameLauncherCaches.all // Steam, Epic, Battle.net, GOG Galaxy, Minecraft, Prism: ticked, emptied, skipped while the launcher runs.
-    + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive, MediaAppCaches.telegram] + MediaAppCaches.podcasts : []))
+    ]
+    // Chat and design apps (`ChatAppCaches`): ticked, deleted, skipped while the app runs.
+    + ChatAppCaches.all
+    + GameLauncherCaches.all // Steam, Epic, Battle.net, GOG Galaxy, Minecraft, Prism: ticked, emptied, skipped while the launcher runs.
+    + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive, MediaAppCaches.telegram] + MediaAppCaches.podcasts
+        + ChatAppCaches.fullDiskAccess : []))
     }
 
     /// Adobe apps that read and write the media cache. Bundle ids and executables carry the version
@@ -306,12 +309,19 @@ extension CleanerGroup {
 
     /// Chromium/Electron cache folders, in the data folder itself, its profiles (Default, Profile 1…) and partitions.
     /// Never Cookies, Local Storage, IndexedDB, History or Preferences.
-    nonisolated private static func chromium(_ root: String) -> [String] {
-        let folders = ["Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache", "GraphiteDawnCache",
-                       "GrShaderCache", "ShaderCache", "GPUPersistentCache", "Service Worker/CacheStorage",
-                       "Service Worker/ScriptCache"]
-        return [root, root + "/*", root + "/Partitions/*"].flatMap { base in folders.map { base + "/" + $0 } }
+    nonisolated static func chromium(_ root: String) -> [String] {
+        [root, root + "/*", root + "/Partitions/*"].flatMap { base in chromiumCaches.map { base + "/" + $0 } }
     }
+
+    /// An Electron app's data folder without profiles: only its own Chromium caches and its partitions', never a
+    /// folder of the app's one level down (Zalo keeps chat media in folders named `Cache` there).
+    nonisolated static func electron(_ root: String) -> [String] {
+        [root, root + "/Partitions/*"].flatMap { base in chromiumCaches.map { base + "/" + $0 } }
+    }
+
+    nonisolated static let chromiumCaches = ["Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache",
+                                             "GraphiteDawnCache", "GrShaderCache", "ShaderCache", "GPUPersistentCache",
+                                             "Service Worker/CacheStorage", "Service Worker/ScriptCache"]
 
     /// VS Code and its forks: Chromium caches plus compiled code and downloaded extension packages.
     nonisolated private static func vscode(_ name: String) -> [String] {
