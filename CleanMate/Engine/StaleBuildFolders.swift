@@ -39,6 +39,7 @@ nonisolated enum StaleBuildFolders {
                     paths: StaleProjects.folders, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
                     skipsOpenFiles: true,
                     skipsEntry: StaleProjects.skipsEntry(running: running, now: now) { lastWorkedOn($0, home: home) },
+                    skipNote: StaleProjects.skipNote,
                     entryLabel: { url in (label(url, home: home), lastWorkedOn(url, home: home)) },
                     selectableEntries: true,
                     findEntries: { roots, policy in

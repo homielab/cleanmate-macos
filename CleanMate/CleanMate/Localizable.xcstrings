@@ -8876,6 +8876,626 @@
           }
         }
       }
+    },
+    "Why is this safe?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vì sao an toàn?"
+          }
+        }
+      }
+    },
+    "What it is" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đây là gì"
+          }
+        }
+      }
+    },
+    "Where it is" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nằm ở đâu"
+          }
+        }
+      }
+    },
+    "After cleaning" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sau khi dọn"
+          }
+        }
+      }
+    },
+    "and %lld more" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "và %lld mục khác"
+          }
+        }
+      }
+    },
+    "The Trash folder of each external drive" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục Thùng rác trên từng ổ ngoài"
+          }
+        }
+      }
+    },
+    "Searched for inside these folders" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm bên trong các thư mục này"
+          }
+        }
+      }
+    },
+    "Also where the tool's own settings put it" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cả nơi cài đặt riêng của công cụ chỉ tới"
+          }
+        }
+      }
+    },
+    "Found by asking %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm bằng cách hỏi %@"
+          }
+        }
+      }
+    },
+    "Deleted for good: emptying a Trash can't be undone" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá hẳn: dọn sạch Thùng rác thì không hoàn tác được"
+          }
+        }
+      }
+    },
+    "Each ticked entry is removed with the tool's own command" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mỗi mục được chọn được gỡ bằng lệnh riêng của công cụ"
+          }
+        }
+      }
+    },
+    "CleanMate runs the tool's own clean command: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate chạy lệnh dọn riêng của công cụ: %@"
+          }
+        }
+      }
+    },
+    "Without the tool installed, the files are deleted instead" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nếu chưa cài công cụ, các tệp được xoá thẳng"
+          }
+        }
+      }
+    },
+    "Only these records are erased, for good; the database and its other data stay" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ xoá hẳn các bản ghi này; cơ sở dữ liệu và dữ liệu khác trong đó được giữ"
+          }
+        }
+      }
+    },
+    "Moved to the Trash: you can put it back until you empty the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác: bạn lấy lại được cho đến khi dọn sạch Thùng rác"
+          }
+        }
+      }
+    },
+    "Deleted, not moved to the Trash. The app or tool creates it again when it needs it" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá thẳng, không qua Thùng rác. App hoặc công cụ tự tạo lại khi cần"
+          }
+        }
+      }
+    },
+    "Not ticked by default: it is cleaned only if you tick it" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mặc định không chọn: chỉ dọn khi bạn tự chọn"
+          }
+        }
+      }
+    },
+    "While %@ is open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khi %@ đang mở"
+          }
+        }
+      }
+    },
+    "While %@ runs" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khi %@ đang chạy"
+          }
+        }
+      }
+    },
+    "Files a program has open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp đang được một chương trình mở"
+          }
+        }
+      }
+    },
+    "Some folders inside are always kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một số thư mục bên trong luôn được giữ"
+          }
+        }
+      }
+    },
+    "Folders in Exclusions and folders macOS protects are never touched" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không bao giờ đụng tới thư mục trong Loại trừ và thư mục macOS bảo vệ"
+          }
+        }
+      }
+    },
+    "Deleted, not moved to the Trash. Apps write new logs as they run" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá thẳng, không qua Thùng rác. App ghi log mới khi chạy"
+          }
+        }
+      }
+    },
+    "Deleted for good: it can't be brought back" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá hẳn: không lấy lại được"
+          }
+        }
+      }
+    },
+    "The list of an app that is open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Danh sách của app đang mở"
+          }
+        }
+      }
+    },
+    "The cache of an app that is open, and caches that hold iCloud or sync state" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache của app đang mở, và cache giữ trạng thái iCloud hoặc đồng bộ"
+          }
+        }
+      }
+    },
+    "Apple's apps and apps that are open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App của Apple và app đang mở"
+          }
+        }
+      }
+    },
+    "Apple's groups and groups an open app may use" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhóm của Apple và nhóm mà một app đang mở có thể dùng"
+          }
+        }
+      }
+    },
+    "The folder of an app that is open" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư mục của app đang mở"
+          }
+        }
+      }
+    },
+    "Files apps keep in ~/Library/Caches to open faster; each app makes them again when it needs them" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp các app lưu trong ~/Library/Caches để mở nhanh hơn; mỗi app tự tạo lại khi cần"
+          }
+        }
+      }
+    },
+    "Caches of App Store and other sandboxed apps, inside each app's container; the app makes them again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache của app App Store và các app sandbox khác, trong container của từng app; app tự tạo lại"
+          }
+        }
+      }
+    },
+    "Caches apps of one developer share in an app group container; the apps make them again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache mà các app của cùng một nhà phát triển dùng chung trong container nhóm; các app tự tạo lại"
+          }
+        }
+      }
+    },
+    "Files apps leave in your temporary folder while they work" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp các app để lại trong thư mục tạm khi làm việc"
+          }
+        }
+      }
+    },
+    "Logs apps wrote in ~/Library/Logs, used only to look into past problems" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log các app ghi trong ~/Library/Logs, chỉ dùng để tìm hiểu sự cố đã qua"
+          }
+        }
+      }
+    },
+    "Reports macOS wrote when an app crashed; only needed to report that crash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Báo cáo macOS ghi khi một app bị lỗi thoát; chỉ cần để báo lỗi lần đó"
+          }
+        }
+      }
+    },
+    "Package sources Swift Package Manager downloaded; downloaded again by the next build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mã nguồn package Swift Package Manager đã tải; tải lại ở lần build sau"
+          }
+        }
+      }
+    },
+    "Pods CocoaPods downloaded; downloaded again by the next pod install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pod CocoaPods đã tải; tải lại ở lần pod install sau"
+          }
+        }
+      }
+    },
+    "Packages npm downloaded; downloaded again by the next npm install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package npm đã tải; tải lại ở lần npm install sau"
+          }
+        }
+      }
+    },
+    "Packages Yarn downloaded; downloaded again by the next yarn install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package Yarn đã tải; tải lại ở lần yarn install sau"
+          }
+        }
+      }
+    },
+    "Packages pip downloaded and built; downloaded again by the next pip install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package pip đã tải và build; tải lại ở lần pip install sau"
+          }
+        }
+      }
+    },
+    "Compiled Go packages, made again by the next go build" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package Go đã biên dịch, tạo lại ở lần go build sau"
+          }
+        }
+      }
+    },
+    "PHP packages Composer downloaded; downloaded again by the next composer install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Package PHP Composer đã tải; tải lại ở lần composer install sau"
+          }
+        }
+      }
+    },
+    "Skipped when" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ qua khi"
+          }
+        }
+      }
+    },
+    "Anything changed in the last day" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ thay đổi trong ngày qua"
+          }
+        }
+      }
+    },
+    "Anything changed in the last %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ thay đổi trong %lld ngày qua"
+          }
+        }
+      }
+    },
+    "Anything changed in the last hour" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ thay đổi trong giờ qua"
+          }
+        }
+      }
+    },
+    "Anything changed in the last %lld hours" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ thay đổi trong %lld giờ qua"
+          }
+        }
+      }
+    },
+    "A project a build or package tool is running in, and a project worked on in the last %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dự án mà công cụ build hoặc trình quản lý gói đang chạy trong đó, và dự án có thao tác trong %lld ngày qua"
+          }
+        }
+      }
+    },
+    "A project Terraform or OpenTofu is running in, and a project worked on in the last %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dự án mà Terraform hoặc OpenTofu đang chạy trong đó, và dự án có thao tác trong %lld ngày qua"
+          }
+        }
+      }
+    },
+    "Data of a project that still exists, a remote or virtual workspace, and a project on a drive or in a folder CleanMate can't check" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dữ liệu của dự án vẫn còn, không gian làm việc từ xa hoặc ảo, và dự án trên ổ đĩa hoặc trong thư mục mà CleanMate không kiểm tra được"
+          }
+        }
+      }
+    },
+    "Anything that is not a real folder, such as device_set.plist or a symlink" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ không phải thư mục thật, như device_set.plist hoặc symlink"
+          }
+        }
+      }
+    },
+    "An app that is open, Apple's apps, apps another item already cleans, and CleanMate while it updates itself" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App đang mở, app của Apple, app đã có mục dọn riêng, và CleanMate khi đang tự cập nhật"
+          }
+        }
+      }
+    },
+    "Anything that is not an unfinished download, and one touched in the last %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ không phải bản tải dang dở, và bản tải có thao tác trong %lld ngày qua"
+          }
+        }
+      }
+    },
+    "Files that are not screenshots, hidden files, and any touched in the last %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp không phải ảnh chụp màn hình, tệp ẩn, và tệp có thao tác trong %lld ngày qua"
+          }
+        }
+      }
+    },
+    "History files, while any of them is open, even by a macOS service" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các tệp lịch sử, khi một trong số đó đang mở, kể cả bởi dịch vụ của macOS"
+          }
+        }
+      }
+    },
+    "Hidden names such as .DS_Store" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tên ẩn như .DS_Store"
+          }
+        }
+      }
+    },
+    "Hidden names, files and symlinks: only real model folders are listed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tên ẩn, tệp và symlink: chỉ liệt kê thư mục mô hình thật"
+          }
+        }
+      }
+    },
+    "Files that are not installers (folders, symlinks, zips without an app) and downloads still in progress" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp không phải bộ cài (thư mục, symlink, zip không chứa app) và bản tải đang dở"
+          }
+        }
+      }
+    },
+    "Anything touched in the last %lld days, hidden files, downloads in progress, installers and the screenshots folder" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ có thao tác trong %lld ngày qua, tệp ẩn, bản tải đang dở, bộ cài và thư mục ảnh chụp màn hình"
+          }
+        }
+      }
+    },
+    "Anything that is not a git clone of a spec repo; the CDN copy (trunk) stays" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ không phải bản git clone của kho spec; bản CDN (trunk) được giữ lại"
+          }
+        }
+      }
+    },
+    "The newest version of each IDE and folders that are not IDE versions" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phiên bản mới nhất của mỗi IDE và thư mục không phải phiên bản IDE"
+          }
+        }
+      }
+    },
+    "Anything that is not a registry host folder, so a mis-set cache folder lists nothing else" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ không phải thư mục host registry, nên thư mục cache đặt nhầm không liệt kê gì khác"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

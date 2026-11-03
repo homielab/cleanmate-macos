@@ -124,7 +124,8 @@ extension CleanerGroup {
                     note: "Downloaded again with ollama pull; a model made with ollama create must be made again",
                     paths: [OllamaModels.manifestFolders], selectedByDefault: false, shellFolders: OllamaModels.shellFolders,
                     showsWhenEmpty: false, runningAppBundleIDs: ["com.electron.ollama"], runningProcessNames: ["ollama"],
-                    skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } }, entryLabel: OllamaModels.label(of:),
+                    skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } }, skipNote: "Hidden names such as .DS_Store",
+                    entryLabel: OllamaModels.label(of:),
                     selectableEntries: true, entryFiles: OllamaModels.blobs(of:)),
         // Interrupted `ollama pull`s: one unticked row, deleted (regenerable); never a finished blob or a manifest.
         // Skipped while Ollama runs: a pull in progress writes to them.
@@ -145,7 +146,8 @@ extension CleanerGroup {
                     configFolders: ConfigFolders(read: LMStudioModels.configuredFolders(home:), subpaths: ["*"]),
                     showsWhenEmpty: false, runningAppBundleIDs: LMStudioModels.bundleIDs,
                     runningProcessNames: LMStudioModels.processNames, skipsOpenFiles: true,
-                    skipsEntry: { LMStudioModels.skips }, entryLabel: LMStudioModels.label(of:), selectableEntries: true),
+                    skipsEntry: { LMStudioModels.skips },
+                    skipNote: "Hidden names, files and symlinks: only real model folders are listed", entryLabel: LMStudioModels.label(of:), selectableEntries: true),
         // Models PyTorch Hub, Whisper, sentence-transformers and Keras downloaded (`AIModelCaches`): GBs each, unticked,
         // one entry per model file or folder, deleted (downloaded again on the next load). A model a program has open is
         // kept; Python runs for many other things, so no process name locks the item.

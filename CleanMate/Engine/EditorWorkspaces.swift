@@ -35,6 +35,7 @@ nonisolated enum EditorWorkspaces {
                         let skipped = ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess())
                         return { !isOrphaned($0, skipped: skipped, volumesFolder: volumesFolder) }
                     },
+                    skipNote: "Data of a project that still exists, a remote or virtual workspace, and a project on a drive or in a folder CleanMate can't check",
                     entryLabel: label(of:), selectableEntries: true)
     }
 

@@ -231,6 +231,8 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// Per-entry skip, checked at scan and again right before removal (e.g. the container of a running app).
     /// Makes the check: called once per scan (one snapshot, e.g. of running apps) and anew for each entry removed.
     var skipsEntry: (@Sendable () -> @Sendable (URL) -> Bool)? = nil
+    /// A "Skipped when" line for what `skipsEntry` checks (running apps, entries kept by name).
+    var skipNote: LocalizedStringResource? = nil
     /// Names a top-level entry in the expanded path list (an iPhone backup's device and date); read once at scan.
     var entryLabel: EntryLabel? = nil
     typealias EntryLabel = @Sendable (URL) -> (title: String, date: Date?)?
@@ -283,6 +285,10 @@ nonisolated struct CleanerItem: Identifiable, Sendable {
     /// again right before removal, where each one is checked (locked; with `skipsOpenFiles`, holding an open file) and
     /// removed on its own.
     var entryParts: (@Sendable (SafetyPolicy, URL) -> [URL])? = nil
+    /// "Why is this safe?": what the item is, in a sentence or two. Falls back to `note` (`ItemExplanation`).
+    var about: LocalizedStringResource? = nil
+    /// Replaces the "After cleaning" text derived from `mode` and `command` (data that is never recreated).
+    var afterClean: LocalizedStringResource? = nil
 }
 
 nonisolated struct CleanerGroup: Identifiable, Sendable {

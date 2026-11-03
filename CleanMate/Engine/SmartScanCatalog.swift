@@ -42,7 +42,9 @@ extension CleanerGroup {
                             let apps = runningApps()
                             let names = Set(runningAppNames().filter(AppMatcher.isDistinctive).map { $0.lowercased() })
                             return { skipsUserCache($0, runningApps: apps, runningAppNames: names) }
-                        }),
+                        },
+                        skipNote: "The cache of an app that is open, and caches that hold iCloud or sync state",
+                        about: "Files apps keep in ~/Library/Caches to open faster; each app makes them again when it needs them"),
         ] + (hasFullDiskAccess ? [
             // Only `Data/Library/Caches` of each container; never Apple's containers nor a running app's
             // (its helpers `<id>.*` included).
@@ -50,7 +52,9 @@ extension CleanerGroup {
                         excluded: keptCaches, showsWhenEmpty: false, skipsEntry: {
                             let apps = runningApps()
                             return { skipsSandboxCache($0, runningApps: apps) }
-                        }),
+                        },
+                        skipNote: "Apple's apps and apps that are open",
+                        about: "Caches of App Store and other sandboxed apps, inside each app's container; the app makes them again"),
             // Only `Library/Caches` of each app group container; never Apple's nor one a running app may use (same
             // signing team, or same vendor when the team is unknown).
             CleanerItem(id: "group-caches", title: "App group caches", paths: ["~/Library/Group Containers/*/Library/Caches"],
@@ -58,7 +62,9 @@ extension CleanerGroup {
                             let apps = runningApps()
                             let teams = runningAppTeams()
                             return { skipsGroupCache($0, runningApps: apps, runningAppTeams: teams) }
-                        }),
+                        },
+                        skipNote: "Apple's groups and groups an open app may use",
+                        about: "Caches apps of one developer share in an app group container; the apps make them again"),
             // Deliberate exception to "never Apple's containers": only Mail's copies of opened attachments
             // (the originals stay in the messages). Moved to the Trash, unticked, old ones only, never while Mail runs.
             // Needs Full Disk Access like the container itself; the legacy path is listed under the same rule.
@@ -74,7 +80,7 @@ extension CleanerGroup {
                         note: "Backups made by Finder. Moved to the Trash", paths: [MobileBackups.folder],
                         minAge: 3600, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
                         runningProcessNames: MobileBackups.processNames,
-                        skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } },
+                        skipsEntry: { { $0.lastPathComponent.hasPrefix(".") } }, skipNote: "Hidden names such as .DS_Store",
                         entryLabel: MobileBackups.label(of:), selectableEntries: true),
             // Installers left in Downloads (`OldInstallers`): user files, so unticked, one checkbox each, to the Trash.
             // Only with Full Disk Access: reading ~/Downloads without it makes macOS ask (`ProtectedFolders`).
@@ -83,7 +89,9 @@ extension CleanerGroup {
                         note: "Disk images, packages and zipped apps in Downloads older than \(ages.installers) days. Moved to the Trash",
                         paths: [OldInstallers.folder], minAge: Double(ages.installers) * 86_400,
                         included: OldInstallers.patterns, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
-                        skipsOpenFiles: true, skipsEntry: { OldInstallers.skips }, selectableEntries: true),
+                        skipsOpenFiles: true, skipsEntry: { OldInstallers.skips },
+                        skipNote: "Files that are not installers (folders, symlinks, zips without an app) and downloads still in progress",
+                        selectableEntries: true),
             // Everything else at the top level of Downloads (`OldDownloads`) that was neither modified, added nor
             // opened for the downloads age, folders by everything inside them: user files, so unticked, one checkbox
             // each, to the Trash, never open, still downloading or an installer (listed just above).
@@ -94,6 +102,7 @@ extension CleanerGroup {
                         skipsEntry: { [days = ages.downloads] in
                             OldDownloads.skips(olderThan: days, screenshotFolder: screenshotFolder)
                         },
+                        skipNote: "Anything touched in the last \(ages.downloads) days, hidden files, downloads in progress, installers and the screenshots folder",
                         entryLabel: OldDownloads.label(of:), selectableEntries: true,
                         allowsEntry: { $0.allowsOldDownload($1) }),
             // Screenshots and screen recordings where macOS saves them (`OldScreenshots`), untouched for the downloads
@@ -121,8 +130,12 @@ extension CleanerGroup {
             // "CleanMate": our own activity log (`ActivityLog`) is never cleaned.
             CleanerItem(id: "old-logs", title: "Old logs", note: "Not modified for \(ages.logs) days",
                         paths: ["~/Library/Logs"], minAge: Double(ages.logs) * 86_400,
-                        excluded: ["DiagnosticReports", "CleanMate", "JetBrains"]), // JetBrains: "Old IDE versions"
-            CleanerItem(id: "crash-reports", title: "Crash reports", paths: ["~/Library/Logs/DiagnosticReports"]),
+                        excluded: ["DiagnosticReports", "CleanMate", "JetBrains"],
+                        about: "Logs apps wrote in ~/Library/Logs, used only to look into past problems",
+                        afterClean: "Deleted, not moved to the Trash. Apps write new logs as they run"), // JetBrains: "Old IDE versions"
+            CleanerItem(id: "crash-reports", title: "Crash reports", paths: ["~/Library/Logs/DiagnosticReports"],
+                        about: "Reports macOS wrote when an app crashed; only needed to report that crash",
+                        afterClean: "Deleted, not moved to the Trash. Apps write new logs as they run"),
             // A running app's own folder in $TMPDIR (bundle id or `<id>.*`, e.g. helpers unpacked at launch) is kept.
             // An entry that is, or holds, a file any process has open is kept too, whatever its mtime.
             CleanerItem(id: "temp-files", title: "Old temporary files", note: "Not modified for \(ages.temp) days",
@@ -132,7 +145,9 @@ extension CleanerGroup {
                                 let name = url.lastPathComponent.lowercased() // once per entry, not per app
                                 return apps.contains { AppMatcher.belongs(name, to: $0) }
                             }
-                        }),
+                        },
+                        skipNote: "The folder of an app that is open",
+                        about: "Files apps leave in your temporary folder while they work"),
         ]),
         developer,
         aiTools(sessionDays: ages.sessions),
@@ -140,7 +155,8 @@ extension CleanerGroup {
         CleanerGroup(id: "trash", title: "Trash", systemImage: "trash", items: [
             // Unticked by default: emptying the Trash cannot be undone.
             CleanerItem(id: "empty-trash", title: "Empty Trash", note: "Permanently deletes everything in the Trash",
-                        paths: ["~/.Trash"], selectedByDefault: false),
+                        paths: ["~/.Trash"], selectedByDefault: false,
+                        afterClean: "Deleted for good: emptying a Trash can't be undone"),
         ] + (hasFullDiskAccess ? [
             // What was deleted from an external drive stays in that drive's Trash (`ExternalTrash`): one entry per
             // drive, unticked like the Trash above. Only with Full Disk Access: reading a drive without it makes macOS ask.

@@ -90,6 +90,7 @@ nonisolated enum AbandonedDownloads {
                     note: "Unfinished downloads (.crdownload, .part, .download, .aria2, .!qB) in Downloads not modified or opened for 7 days. Moved to the Trash",
                     paths: [folder], minAge: Double(days) * 86_400, mode: .trash, selectedByDefault: false,
                     showsWhenEmpty: false, skipsOpenFiles: true, skipsEntry: { skips() },
+                    skipNote: "Anything that is not an unfinished download, and one touched in the last \(days) days",
                     entryLabel: label(of:), selectableEntries: true, entryFiles: files(of:),
                     allowsEntry: { allows($1, policy: $0) })
     }

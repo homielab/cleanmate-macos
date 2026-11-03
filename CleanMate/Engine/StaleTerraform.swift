@@ -32,6 +32,7 @@ nonisolated enum StaleTerraform {
                                 || lastWorkedOn(url, home: home).map { $0 >= cutoff } ?? true
                         }
                     },
+                    skipNote: "A project Terraform or OpenTofu is running in, and a project worked on in the last \(StaleProjects.days) days",
                     entryLabel: { url in (label(url, home: home), lastWorkedOn(url, home: home)) },
                     selectableEntries: true,
                     findEntries: { roots, policy in

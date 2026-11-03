@@ -25,6 +25,7 @@ nonisolated enum StaleNodeModules {
                     paths: StaleProjects.folders, mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
                     skipsOpenFiles: true,
                     skipsEntry: StaleProjects.skipsEntry(running: running, now: now) { lastWorkedOn($0, home: home) },
+                    skipNote: StaleProjects.skipNote,
                     entryLabel: { url in
                         (url.deletingLastPathComponent().lastPathComponent, lastWorkedOn(url, home: home))
                     },

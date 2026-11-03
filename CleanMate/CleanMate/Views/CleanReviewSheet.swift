@@ -145,6 +145,7 @@ struct CleanReviewSheet: View {
             }
             .accessibilityHidden(true) // read by the checkbox
             Spacer()
+            ItemExplanationButton(item: row.item)
             SmartScanView.totalText(row.total)
                 .sizeColumnStyle(emphasized: row.isOn)
                 .fontWeight(row.isOn ? .semibold : .regular)

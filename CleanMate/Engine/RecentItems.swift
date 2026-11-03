@@ -28,8 +28,10 @@ nonisolated enum RecentItems {
                         let apps = Set(runningApps().map { $0.lowercased() })
                         return { skips($0, runningApps: apps) }
                     },
+                    skipNote: "The list of an app that is open",
                     entryLabel: { label(of: $0, appURL: appURL) }, selectableEntries: true,
-                    allowsEntry: { policy, url in isRecentList(url) && policy.allows(url) })
+                    allowsEntry: { policy, url in isRecentList(url) && policy.allows(url) },
+                    afterClean: CleanerGroup.historyGone)
     }
 
     /// Whether `url` is a recent items list: a regular `*.sfl<N>` file directly in the shared file list folder whose

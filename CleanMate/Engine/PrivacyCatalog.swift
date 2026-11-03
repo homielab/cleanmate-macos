@@ -50,13 +50,13 @@ extension CleanerGroup {
                         note: terminalSavedStateNote,
                         paths: ["~/Library/Saved Application State/com.apple.Terminal.savedState"],
                         selectedByDefault: false, showsWhenEmpty: false,
-                        runningAppBundleIDs: ["com.apple.Terminal"], skipsOpenFiles: true),
+                        runningAppBundleIDs: ["com.apple.Terminal"], skipsOpenFiles: true, afterClean: historyGone),
             CleanerItem(id: "iterm2-saved-state", title: "iTerm2 saved state",
                         note: terminalSavedStateNote,
                         paths: ["~/Library/Application Support/iTerm2/SavedState",
                                 "~/Library/Saved Application State/com.googlecode.iterm2.savedState"],
                         selectedByDefault: false, showsWhenEmpty: false,
-                        runningAppBundleIDs: ["com.googlecode.iterm2"], skipsOpenFiles: true),
+                        runningAppBundleIDs: ["com.googlecode.iterm2"], skipsOpenFiles: true, afterClean: historyGone),
         ]),
     ] }
 
@@ -69,6 +69,9 @@ extension CleanerGroup {
         paths: ["~/Library/Preferences"], included: [quarantineEvents],
         database: DatabaseErase(count: "SELECT count(*) FROM LSQuarantineEvent;", tables: ["LSQuarantineEvent"]),
         selectedByDefault: false, showsWhenEmpty: false, skipsOpenFiles: true)
+    /// Privacy traces are not caches: nothing makes them again.
+    nonisolated static let historyGone: LocalizedStringResource = "Deleted for good: it can't be brought back"
+
     nonisolated static let quarantineEvents = "com.apple.LaunchServices.QuarantineEventsV2"
 
     /// History.db, -wal and -shm go together or not at all: a macOS service (history sync) may keep the
@@ -80,6 +83,7 @@ extension CleanerGroup {
                          ["~/Library/Safari"], ["History.db", "History.db-*", "RecentlyClosedTabs.plist"],
                          bundle: "com.apple.Safari")
         item.skipsEntry = { { historyInUse($0) } }
+        item.skipNote = "History files, while any of them is open, even by a macOS service"
         return item
     }()
 
@@ -164,6 +168,7 @@ extension CleanerGroup {
                                           _ paths: [String], _ included: [String], bundle: String? = nil, bundles: [String] = [],
                                           database: DatabaseErase? = nil) -> CleanerItem {
         CleanerItem(id: id, title: title, note: note, paths: paths, included: included, database: database,
-                    selectedByDefault: false, showsWhenEmpty: false, runningAppBundleIDs: bundles + (bundle.map { [$0] } ?? []))
+                    selectedByDefault: false, showsWhenEmpty: false, runningAppBundleIDs: bundles + (bundle.map { [$0] } ?? []),
+                    afterClean: database == nil ? historyGone : nil)
     }
 }

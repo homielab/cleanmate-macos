@@ -73,6 +73,7 @@ nonisolated enum OldScreenshots {
                            note: "Screenshots and screen recordings not modified or opened for \(days) days. Moved to the Trash",
                            paths: [folder], minAge: Double(days) * 86_400, mode: .trash, selectedByDefault: false,
                            showsWhenEmpty: false, skipsOpenFiles: true, skipsEntry: { skips(olderThan: days) },
+                           skipNote: "Files that are not screenshots, hidden files, and any touched in the last \(days) days",
                            entryLabel: OldDownloads.label(of:), selectableEntries: true,
                            allowsEntry: { allows($1, policy: $0) })
     }

@@ -58,14 +58,15 @@ extension CleanerGroup {
         // dyld shared caches of the simulator runtimes, rebuilt by the next simulator boot (takes a few minutes once).
         dev("simulator-caches", "Simulator caches", note: "Rebuilt when a simulator starts; that first start is slower",
             ["~/Library/Developer/CoreSimulator/Caches"], apps: ["com.apple.dt.Xcode", "com.apple.iphonesimulator"]),
-        dev("swiftpm-cache", "Swift Package Manager cache", ["~/Library/Caches/org.swift.swiftpm"]),
-        dev("cocoapods-cache", "CocoaPods cache", ["~/Library/Caches/CocoaPods"]),
+        dev("swiftpm-cache", "Swift Package Manager cache", about: "Package sources Swift Package Manager downloaded; downloaded again by the next build", ["~/Library/Caches/org.swift.swiftpm"]),
+        dev("cocoapods-cache", "CocoaPods cache", about: "Pods CocoaPods downloaded; downloaded again by the next pod install", ["~/Library/Caches/CocoaPods"]),
         // Git clones of spec repos (`master` from CocoaPods before 1.8, ~1–3 GB). The `trunk` CDN repo is no git clone
         // and is not listed. Unticked: a Podfile still naming the git source clones it again on the next `pod install`.
         dev("cocoapods-spec-repos", "CocoaPods spec repo clones",
             note: "Git copies of pod spec repos; CocoaPods uses its CDN, a Podfile naming the repo clones it again",
             ["~/.cocoapods/repos"], selected: false, processes: ["pod"],
-            skipsEntry: { { !DeveloperTools.isGitSpecRepo($0) } }, selectableEntries: true),
+            skipsEntry: { { !DeveloperTools.isGitSpecRepo($0) } },
+            skipNote: "Anything that is not a git clone of a spec repo; the CDN copy (trunk) stays", selectableEntries: true),
         // Documentation Xcode downloads and indexes; it fetches it again when the docs are opened.
         dev("xcode-documentation-cache", "Xcode documentation cache", note: "Downloaded again when Xcode shows documentation",
             ["~/Library/Developer/Xcode/DocumentationCache"], selected: false, apps: ["com.apple.dt.Xcode"]),
@@ -75,7 +76,7 @@ extension CleanerGroup {
              "~/Library/Developer/Xcode/tvOS Device Logs"], selected: false, apps: ["com.apple.dt.Xcode"]),
 
         // Package managers
-        dev("npm-cache", "npm cache", ["~/.npm/_cacache"],
+        dev("npm-cache", "npm cache", about: "Packages npm downloaded; downloaded again by the next npm install", ["~/.npm/_cacache"],
             command: ShellCommand(executable: "npm", arguments: ["cache", "clean", "--force"]),
             locate: lookup("npm", ["config", "get", "cache"], subpath: "_cacache")),
         // Packages `npx` fetched to run once; a running npx (e.g. an MCP server started with npx) still uses its folder.
@@ -84,7 +85,7 @@ extension CleanerGroup {
         // Only the downloaded Node tarballs; ~/.nvm/versions (the installed Node versions) is never touched.
         dev("nvm-cache", "nvm download cache", note: "Downloaded Node.js archives, downloaded again by nvm install",
             ["~/.nvm/.cache"], shell: ["NVM_DIR": [".cache"]]),
-        dev("yarn-cache", "Yarn cache", ["~/Library/Caches/Yarn"], processes: ["yarn"]),
+        dev("yarn-cache", "Yarn cache", about: "Packages Yarn downloaded; downloaded again by the next yarn install", ["~/Library/Caches/Yarn"], processes: ["yarn"]),
         // Unticked: Yarn 2+ (Berry) keeps packages in this global cache by default, and Plug'n'Play projects
         // read their zips straight from it, so they stop running until `yarn install` downloads them again.
         dev("yarn-berry-cache", "Yarn Berry cache", note: "Projects using Yarn Plug'n'Play need yarn install again",
@@ -114,7 +115,7 @@ extension CleanerGroup {
         // Terraform and OpenTofu providers and modules of the same stale projects, found by the same walk: unticked,
         // one entry per folder, to the Trash. Never `.terraform`'s state, environment, nor the project's files.
         StaleTerraform.item(),
-        dev("pip-cache", "pip cache", ["~/Library/Caches/pip"], processes: ["pip", "pip3"]),
+        dev("pip-cache", "pip cache", about: "Packages pip downloaded and built; downloaded again by the next pip install", ["~/Library/Caches/pip"], processes: ["pip", "pip3"]),
         // Only Poetry's download caches; `virtualenvs` (one per project) is never listed.
         dev("poetry-cache", "Poetry cache", note: "Downloaded packages, downloaded again by poetry install",
             ["~/Library/Caches/pypoetry/cache", "~/Library/Caches/pypoetry/artifacts"],
@@ -146,7 +147,7 @@ extension CleanerGroup {
         dev("uv-cache", "uv cache", note: clonedNote, ["~/.cache/uv"],
             command: ShellCommand(executable: "uv", arguments: ["cache", "clean"], timeout: .seconds(120)),
             locate: lookup("uv", ["cache", "dir"]), upperBound: true),
-        dev("go-build-cache", "Go build cache", ["~/Library/Caches/go-build"],
+        dev("go-build-cache", "Go build cache", about: "Compiled Go packages, made again by the next go build", ["~/Library/Caches/go-build"],
             command: ShellCommand(executable: "go", arguments: ["clean", "-cache"]),
             locate: lookup("go", ["env", "GOCACHE"])),
         // Module files are read-only, so `go clean` is the reliable way to remove them.
@@ -247,7 +248,8 @@ extension CleanerGroup {
                             "~/Library/Application Support/Google", "~/Library/Caches/Google"],
                     mode: .trash, selectedByDefault: false, showsWhenEmpty: false,
                     runningAppBundleIDs: ["com.jetbrains.*", "com.google.android.studio*"],
-                    skipsEntry: { { !DeveloperTools.isStaleIDEFolder($0) } }, selectableEntries: true),
+                    skipsEntry: { { !DeveloperTools.isStaleIDEFolder($0) } },
+                    skipNote: "The newest version of each IDE and folders that are not IDE versions", selectableEntries: true),
         dev("maven-repository", "Maven repository",
             note: "May hold artifacts installed locally with mvn install, which cannot be downloaded again",
             ["~/.m2/repository"], selected: false),
@@ -264,7 +266,7 @@ extension CleanerGroup {
             note: "Formulae installed as dependencies that nothing needs any more (brew autoremove)", [],
             command: ShellCommand(executable: "brew", arguments: ["autoremove"], timeout: .seconds(300)),
             probe: DeveloperTools.brewAutoremoveProbe(), selected: false, processes: ["brew"]),
-        dev("composer-cache", "Composer cache", ["~/Library/Caches/composer", "~/.composer/cache", "~/.cache/composer"]),
+        dev("composer-cache", "Composer cache", about: "PHP packages Composer downloaded; downloaded again by the next composer install", ["~/Library/Caches/composer", "~/.composer/cache", "~/.cache/composer"]),
         // Haskell, Scala and OCaml package caches, each skipped while its tools run, deleted (downloaded again).
         // Only these folders: never the compilers and tools they install (`~/.stack/programs`, `~/.ghcup/ghc|bin`,
         // `~/.cabal/bin`, `~/.cabal/config`), Ivy's locally published artifacts (`~/.ivy2/local`) nor opam switches.
@@ -324,6 +326,7 @@ extension CleanerGroup {
             shell: ["TF_PLUGIN_CACHE_DIR": [""]], selected: false,
             processes: ["terraform", "tofu", "terraform-provider-*"], openFiles: true,
             skipsEntry: { { !StaleTerraform.isPluginHost($0) } },
+            skipNote: "Anything that is not a registry host folder, so a mis-set cache folder lists nothing else",
             config: ConfigFolders(read: StaleTerraform.configuredPluginCaches(home:))),
         // Only minikube's downloads (ISO, preload images, kic base image, kubectl/kubeadm binaries); never `machines`,
         // `profiles`, certificates or config. Skipped while minikube or a VM driver it starts runs.
@@ -411,12 +414,13 @@ extension CleanerGroup {
     }
 
     nonisolated private static func dev(
-        _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource? = nil, _ paths: [String],
+        _ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource? = nil,
+        about: LocalizedStringResource? = nil, _ paths: [String],
         minAge: TimeInterval? = nil, excluded: Set<String> = [], included: [String]? = nil, mode: RemovalMode = .delete,
         command: ShellCommand? = nil,
         probe: SizeProbe? = nil, locate: PathLookup? = nil, shell: [String: [String]] = [:], selected: Bool = true, apps: [String] = [],
         processes: [String] = [], upperBound: Bool = false, openFiles: Bool = false,
-        skipsEntry: (@Sendable () -> @Sendable (URL) -> Bool)? = nil,
+        skipsEntry: (@Sendable () -> @Sendable (URL) -> Bool)? = nil, skipNote: LocalizedStringResource? = nil,
         entryLabel: CleanerItem.EntryLabel? = nil, selectableEntries: Bool = false, config: ConfigFolders? = nil
     ) -> CleanerItem {
         CleanerItem(id: id, title: title, note: note, paths: paths, minAge: minAge, excluded: excluded, included: included,
@@ -426,7 +430,7 @@ extension CleanerGroup {
                     sizeIsUpperBound: upperBound,
                     showsWhenEmpty: false,
                     runningAppBundleIDs: apps, runningProcessNames: processes, skipsOpenFiles: openFiles,
-                    skipsEntry: skipsEntry, entryLabel: entryLabel, selectableEntries: selectableEntries)
+                    skipsEntry: skipsEntry, skipNote: skipNote, entryLabel: entryLabel, selectableEntries: selectableEntries, about: about)
     }
 
     /// Gradle's caches, one entry per folder in `caches` (a Gradle version's, `modules-2`, `jars-9`…): ~500 k files

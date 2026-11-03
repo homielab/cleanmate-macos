@@ -350,6 +350,9 @@ nonisolated enum StaleProjects {
         return folders.contains { $0 == path || $0.hasPrefix(path + "/") }
     }
 
+    /// "Skipped when" line of the items using `skipsEntry`.
+    static let skipNote: LocalizedStringResource = "A project a build or package tool is running in, and a project worked on in the last \(days) days"
+
     /// The Smart Scan item's per-entry skip: a project a tool runs in (`running`, read once per scan) or one worked on
     /// within `days` before `now`.
     static func skipsEntry(running: @escaping @Sendable () -> [String], now: @escaping @Sendable () -> Date,

@@ -44,6 +44,7 @@ nonisolated enum SparkleDownloads {
                         let apps = runningApps(), updating = isUpdating()
                         return { skips($0, runningApps: apps, isUpdating: updating) }
                     },
+                    skipNote: "An app that is open, Apple's apps, apps another item already cleans, and CleanMate while it updates itself",
                     entryLabel: { label(of: $0, appURL: appURL) },
                     findEntries: { roots, _ in roots.flatMap(find) },
                     // An app's cache folder left empty goes too (`rmdir` only).

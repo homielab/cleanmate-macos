@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan** and **Privacy**: every item has a **Why is this safe?** button that explains what it is, where it is, what cleaning does to it (made again, moved to the Trash or deleted for good) and when it is skipped, in English and Vietnamese.
 - **Smart Scan** and **Privacy**: **Clean…** / **Erase…** first opens a review of everything ticked, by group, with each item's size and whether it goes to the Trash or is deleted permanently, the total of each, and what will be skipped; untick anything there before cleaning.
 - **Smart Scan** and **Privacy**: search the results with ⌘F by item name or file path; ⌘A / ⇧⌘A tick or untick the whole group of the selected row.
 - **Large & Old Files › Similar Photos**: groups photos that look alike (bursts, edits, resized or recompressed copies), compared on this Mac with Vision; each group suggests the photo to keep, nothing is ticked for you, and moved photos can be put back with `cleanmate restore`. Photos libraries and apps are never read. Stop ends the search at once, even while photos are being analyzed.

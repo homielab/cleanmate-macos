@@ -559,6 +559,7 @@ struct CleanerItemRow: View {
                     .padding(.leading, 52) // under the title, past the checkbox and icon
                 }
                 Spacer()
+                ItemExplanationButton(item: item)
                 if let size = Self.sizeText(item: item, scan: scan, selectedSize: selectedSize, locale: locale) {
                     Text(verbatim: size)
                         .sizeColumnStyle(emphasized: ticked)

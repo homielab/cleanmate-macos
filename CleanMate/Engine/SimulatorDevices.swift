@@ -48,7 +48,8 @@ nonisolated enum SimulatorDevices {
                     note: "Copies of simulators Xcode makes to run tests in parallel, made again by the next parallel test run",
                     paths: [clonesFolder], selectedByDefault: false, showsWhenEmpty: false,
                     runningAppBundleIDs: bundleIDs, runningProcessNames: processNames, skipsOpenFiles: true,
-                    skipsEntry: { { !isFolder($0) } }, entryLabel: cloneLabel(of:), selectableEntries: true)
+                    skipsEntry: { { !isFolder($0) } }, skipNote: "Anything that is not a real folder, such as device_set.plist or a symlink",
+                    entryLabel: cloneLabel(of:), selectableEntries: true)
     }
 
     /// `device.plist` of a device folder; nil when missing or unreadable.
