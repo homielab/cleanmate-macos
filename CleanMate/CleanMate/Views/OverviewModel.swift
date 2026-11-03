@@ -3,8 +3,8 @@ import Foundation
 
 /// Overview: drives and their free space, free space over the last 30 days, what CleanMate freed, space outside
 /// the user's folders, the largest folders in the home folder and whether macOS's protections are on.
-/// Read-only. Drives and freed space are read at once; folder sizes, local snapshots and protections are read in the
-/// background.
+/// Read-only. Drives, freed space and the last Smart Scan are read at once; folder sizes, local snapshots and protections
+/// are read in the background. The folder sizes of the last launch (`HomeFolderSizes`) show until the new measure ends.
 final class OverviewModel: ObservableObject {
     nonisolated struct Disk: Identifiable, Equatable, Sendable {
         let url: URL
@@ -53,9 +53,18 @@ final class OverviewModel: ObservableObject {
     @Published private(set) var snapshots: LocalSnapshots?
     /// The home folder's size from the last measure: its folders plus the files directly in it.
     @Published private(set) var homeSize: Int64?
+    /// When the folder sizes shown were measured, while they still come from the saved file of an earlier launch;
+    /// nil once this launch's measure replaced them.
+    @Published private(set) var savedSizesDate: Date?
+    /// The last finished Smart Scan, as in the menu bar item; nil before the first one.
+    @Published private(set) var lastScan: LastScan?
 
     /// Injectable for tests: the folder measured and the activity log read.
     var home = SafetyPolicy.current.homeURL
+    /// Where folder sizes are saved between launches; nil keeps nothing (the default under tests, which pass their own).
+    var sizesFile: URL? = OverviewModel.isTesting ? nil : HomeFolderSizes.defaultURL
+    /// Tests and snapshots pass their own: under tests the app's real preferences are not read.
+    var readLastScan: () -> LastScan? = { OverviewModel.isTesting ? nil : LastScan.read() }
     var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
     /// The end of "Last 30 days" and of the free-space chart; snapshots pin it.
     var now: () -> Date = { .now }
@@ -70,12 +79,13 @@ final class OverviewModel: ObservableObject {
     }
     /// Tests pass their own; running under tests without one reads nothing (all unknown), so no command runs.
     var readSecurity: @Sendable () async -> SecurityStatus = {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? await SecurityStatus.read() : SecurityStatus()
+        OverviewModel.isTesting ? SecurityStatus() : await SecurityStatus.read()
     }
     /// Like `readSecurity`: under tests without one, no command runs.
     var readSnapshots: @Sendable () async -> LocalSnapshots = {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? await LocalSnapshots.read() : .unreadable
+        OverviewModel.isTesting ? .unreadable : await LocalSnapshots.read()
     }
+    nonisolated static var isTesting: Bool { ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil }
     /// Space Lens takes the sizes measured here, so opening a folder from the list is instant.
     weak var spaceLens: SpaceLensModel?
 
@@ -122,6 +132,19 @@ final class OverviewModel: ObservableObject {
         disks = readDisks()
         cleanups = ActivityLog.cleanups(now: now(), home: home, calendar: calendar)
         history = diskHistory.recent(now: now(), calendar: calendar)
+        lastScan = readLastScan()
+    }
+
+    /// Before the first measure of a launch: the sizes saved by the last one, so the list shows at once.
+    private func showSavedSizes(home: URL) {
+        guard !measured, folders.isEmpty, let sizesFile, let saved = HomeFolderSizes.read(from: sizesFile, home: home)
+        else { return }
+        folders = saved.folders.map {
+            SpaceItem(url: home.appending(path: $0.name, directoryHint: .isDirectory), isFolder: true, size: $0.size)
+        }
+        homeSize = saved.homeSize
+        skippedProtected = saved.skippedProtected
+        savedSizesDate = saved.date
     }
 
     /// Runs alongside the folder measure; ⌘. does not stop it (each command times out within seconds).
@@ -166,6 +189,8 @@ final class OverviewModel: ObservableObject {
         let skipping = ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess())
         let measure = measure
         let epoch = spaceLens?.cacheEpoch
+        let sizesFile = sizesFile
+        showSavedSizes(home: home)
         measuring = true
         task = Task {
             // One per listing, as in Space Lens: sibling folders don't count a shared hard link twice.
@@ -197,6 +222,13 @@ final class OverviewModel: ObservableObject {
             homeSize = sized.reduce(looseFiles) { $0 + max($1.sortSize, 0) }
             measured = true
             measuring = false
+            savedSizesDate = nil
+            if let sizesFile {
+                let saved = HomeFolderSizes(home: home.path, date: now(),
+                                            folders: folders.map { .init(name: $0.name, size: $0.sortSize) },
+                                            homeSize: homeSize ?? 0, skippedProtected: skippedProtected)
+                saved.write(to: sizesFile)
+            }
             if let epoch {
                 let listing = Dictionary(sized.map { ($0.url.path, $0.sortSize) }) { $1 }
                 spaceLens?.remember(listing: listing, folders: nested, of: home, skipping: skipping, epoch: epoch)

@@ -5,9 +5,13 @@ import SwiftUI
 /// folders in the home folder and whether macOS's protections are on. Nothing here removes files or changes a setting.
 struct OverviewView: View {
     @ObservedObject var model: OverviewModel
+    /// What Smart Scan's ticked results would free; nil when it has no results to clean.
+    var cleanable: Int64?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Form {
+            smartScanSection
             Section("Drives") {
                 let animates = !model.introduced.contains(.drives)
                 ForEach(model.disks) { disk in
@@ -22,12 +26,42 @@ struct OverviewView: View {
             securitySection
         }
         .formStyle(.grouped)
+        // The new measure replacing the saved sizes: rows move and their sizes roll; none with Reduce Motion.
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: model.folders)
         .navigationTitle(Text(Module.overview.title))
         .task { model.startIfNeeded() }
         .toolbar {
             ToolbarItem {
                 Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
             }
+        }
+    }
+
+    /// The last Smart Scan (the menu bar item's line) and the way to scan, or to clean what the scan found.
+    private var smartScanSection: some View {
+        Section {
+            HStack(spacing: 12) {
+                Image(systemName: Module.smartScan.systemImage).font(.title2).foregroundStyle(.tint)
+                    .frame(width: 28).accessibilityHidden(true)
+                if let last = model.lastScan {
+                    Text(verbatim: SmartScanView.lastScanLine(last))
+                } else {
+                    Text("Scan your Mac to see how much space you can free up.").foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                if let cleanable, cleanable > 0 {
+                    Button("Scan Now") { ModuleRouter.shared.scanNow() }
+                    Button("Clean \(cleanable, format: .fileSize) Selected") { ModuleRouter.shared.show(.smartScan) }
+                        .buttonStyle(.borderedProminent)
+                        .help("Review and clean the items Smart Scan found")
+                } else {
+                    Button("Scan Now") { ModuleRouter.shared.scanNow() }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text(Module.smartScan.title)
         }
     }
 
@@ -138,6 +172,11 @@ struct OverviewView: View {
             HStack {
                 Text("Largest folders in your home")
                 Spacer()
+                // Sizes from the last launch while this one measures: dimmed, with when they were measured.
+                if let date = model.savedSizesDate {
+                    Text("Measured \(date, format: Date.FormatStyle(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
                 if model.measuring { ProgressView().controlSize(.small) }
             }
         } footer: {
@@ -363,6 +402,7 @@ private struct FolderRow: View {
                 Text(verbatim: FileManager.default.displayName(atPath: item.url.path))
                 Spacer()
                 Text(item.sortSize, format: .fileSize).sizeColumnStyle(emphasized: false)
+                    .contentTransition(.numericText())
                 SizeBar(size: item.sortSize, largest: largest)
                 Image(systemName: "chevron.right").foregroundStyle(.tertiary).imageScale(.small)
             }

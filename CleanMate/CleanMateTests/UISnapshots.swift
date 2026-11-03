@@ -571,6 +571,8 @@ struct UISnapshots {
         let snapshots = LocalSnapshots(count: 4, oldest: Self.today.addingTimeInterval(-86_400),
                                        newest: Self.today.addingTimeInterval(-3_600))
         model.readSnapshots = { snapshots }
+        let lastScan = LastScan(date: Self.today.addingTimeInterval(-2 * 86_400), size: 1_400_000_000, cleaned: 1_250_000_000)
+        model.readLastScan = { lastScan }
         model.introduced = Set(OverviewModel.Intro.allCases) // still, final values: no count-up or growing bars
         model.refresh()
         while model.measuring || model.security == nil || model.snapshots == nil {

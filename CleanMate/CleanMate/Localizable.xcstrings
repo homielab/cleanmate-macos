@@ -1539,6 +1539,36 @@
         }
       }
     },
+    "Clean %@ Selected" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn %@ đã chọn"
+          }
+        }
+      }
+    },
+    "Measured %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đo lúc %@"
+          }
+        }
+      }
+    },
+    "Review and clean the items Smart Scan found" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xem lại và dọn các mục Smart Scan đã tìm thấy"
+          }
+        }
+      }
+    },
     "Last scan %@: %@ to clean" : {
       "localizations" : {
         "vi" : {

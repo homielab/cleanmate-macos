@@ -136,7 +136,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
             switch selection ?? .overview {
-            case .overview: OverviewView(model: overview)
+            case .overview: OverviewView(model: overview, cleanable: hasResults(smartScan) ? smartScan.selectedSize : nil)
             case .smartScan: SmartScanView(model: smartScan, module: .smartScan)
             case .privacy: SmartScanView(model: privacy, module: .privacy)
             case .largeFiles: LargeFilesView(model: largeFiles)

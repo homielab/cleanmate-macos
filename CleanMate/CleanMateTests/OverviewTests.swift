@@ -159,6 +159,99 @@ struct OverviewTests {
         model.cancel()
         #expect(!model.measuring)
     }
+
+    /// Saved sizes come back as written, only for the same home; a missing, damaged or older-format file reads as nil.
+    @Test func savedFolderSizesRoundTrip() throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appending(path: "Application Support/CleanMate/home-folders.json")
+        #expect(HomeFolderSizes.read(from: file, home: home) == nil)
+        let sizes = HomeFolderSizes(home: home.standardizedFileURL.path, date: Self.now,
+                                    folders: [.init(name: "Library", size: 9_000), .init(name: ".cache", size: 4_000)],
+                                    homeSize: 13_500, skippedProtected: true)
+        sizes.write(to: file) // creates the folder
+        #expect(HomeFolderSizes.read(from: file, home: home) == sizes)
+        #expect(HomeFolderSizes.read(from: file, home: root.appending(path: "other")) == nil)
+
+        try Data("{\"version\":1,\"home\":".utf8).write(to: file)
+        #expect(HomeFolderSizes.read(from: file, home: home) == nil)
+        var older = sizes
+        older.version = HomeFolderSizes.currentVersion + 1
+        older.write(to: file)
+        #expect(HomeFolderSizes.read(from: file, home: home) == nil)
+    }
+
+    /// The sizes saved by the last launch show at once, marked with when they were measured; the new measure then
+    /// replaces them and is saved for the next launch.
+    @MainActor @Test func savedSizesShowBeforeTheMeasureEnds() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try file("Big/data.bin", bytes: 10)
+        try file("Small/data.bin", bytes: 10)
+        let sizesFile = root.appending(path: "home-folders.json")
+        let measuredAt = Self.now.addingTimeInterval(-86_400)
+        HomeFolderSizes(home: home.standardizedFileURL.path, date: measuredAt,
+                        folders: [.init(name: "Small", size: 7_000), .init(name: "Big", size: 5_000)],
+                        homeSize: 12_000, skippedProtected: false).write(to: sizesFile)
+
+        let gate = Gate()
+        let model = OverviewModel(center: NotificationCenter())
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        model.readDisks = { [] }
+        model.now = { Self.now }
+        model.sizesFile = sizesFile
+        model.measure = { url, _, _ in
+            while !gate.isOpen { try await Task.sleep(for: .milliseconds(5)) }
+            return (url.lastPathComponent == "Big" ? 80_000 : 3_000, [:])
+        }
+        model.startIfNeeded()
+        #expect(model.measuring && !model.measured)
+        #expect(model.folders.map(\.name) == ["Small", "Big"] && model.folders.map(\.size) == [7_000, 5_000])
+        #expect(model.folders.first?.url.standardizedFileURL.path == home.appending(path: "Small").standardizedFileURL.path)
+        #expect(model.homeSize == 12_000 && model.savedSizesDate == measuredAt)
+
+        gate.open()
+        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.folders.map(\.name) == ["Big", "Small"] && model.folders.map(\.size) == [80_000, 3_000])
+        #expect(model.savedSizesDate == nil)
+        let saved = try #require(HomeFolderSizes.read(from: sizesFile, home: home))
+        #expect(saved.date == Self.now && saved.folders.map(\.size) == [80_000, 3_000] && saved.homeSize == 83_000)
+    }
+
+    /// A damaged file: nothing shows until the measure ends, as without one, and the file is written again.
+    @MainActor @Test func damagedSavedSizesMeasureAsBefore() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        try file("Big/data.bin", bytes: 10)
+        let sizesFile = root.appending(path: "home-folders.json")
+        try Data("not json".utf8).write(to: sizesFile)
+        let model = OverviewModel(center: NotificationCenter())
+        model.home = home
+        model.hasFullDiskAccess = { true }
+        model.readDisks = { [] }
+        model.sizesFile = sizesFile
+        model.measure = { _, _, _ in (4_000, [:]) }
+        model.startIfNeeded()
+        #expect(model.folders.isEmpty && model.savedSizesDate == nil)
+        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(model.folders.map(\.size) == [4_000])
+        #expect(HomeFolderSizes.read(from: sizesFile, home: home)?.folders.map(\.name) == ["Big"])
+    }
+
+    /// The last Smart Scan is read with the drives each time the Overview shows; none under tests by default.
+    @MainActor @Test func lastScanIsReadWhenShown() {
+        let model = OverviewModel(center: NotificationCenter())
+        #expect(model.readLastScan() == nil && model.sizesFile == nil)
+        var last: LastScan?
+        model.home = home
+        model.readDisks = { [] }
+        model.measure = { _, _, _ in (0, [:]) }
+        model.readLastScan = { last }
+        model.startIfNeeded()
+        model.cancel()
+        #expect(model.lastScan == nil)
+        last = LastScan(date: Self.now, size: 5_000, cleaned: 4_000)
+        model.startIfNeeded()
+        #expect(model.lastScan == last)
+    }
 }
 
 private final class Counter: @unchecked Sendable {
@@ -166,4 +259,11 @@ private final class Counter: @unchecked Sendable {
     private var count = 0
     var value: Int { lock.withLock { count } }
     func add() { lock.withLock { count += 1 } }
+}
+
+private final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var opened = false
+    var isOpen: Bool { lock.withLock { opened } }
+    func open() { lock.withLock { opened = true } }
 }
