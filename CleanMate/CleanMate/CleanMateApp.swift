@@ -62,13 +62,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         completionHandler(notification.request.identifier == LowDiskWarning.requestID ? [.list] : [])
     }
 
-    /// A click on the reminder or the low-disk warning opens Smart Scan; it does not start a scan.
+    /// A click on the reminder or the low-disk warning opens Smart Scan; it does not start a scan. A click on "Freed …"
+    /// opens the module that cleaned, on its report.
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
-        let isReminder = [ScanReminder.requestID, LowDiskWarning.requestID].contains(response.notification.request.identifier)
+        let id = response.notification.request.identifier
+        let isReminder = [ScanReminder.requestID, LowDiskWarning.requestID].contains(id)
         completionHandler()
-        guard isReminder else { return }
-        Task { @MainActor in ModuleRouter.shared.show(.smartScan) }
+        Task { @MainActor in
+            guard let module = isReminder ? .smartScan : CleanFinishedNotice.module(forRequestID: id) else { return }
+            ModuleRouter.shared.show(module)
+        }
     }
 
     /// Registered by ContentView (`isChanging`): a clean, move to the Trash, put back or launchctl change is running.
@@ -173,7 +177,8 @@ private struct MenuBarContent: View {
               systemImage: volume.level == .normal ? "internaldrive" : "exclamationmark.triangle.fill")
             .foregroundStyle(volume.level == .critical ? Color.red : volume.level == .low ? Color.orange : Color.primary)
         if let last = LastScan.read() {
-            Text(SmartScanView.lastScanLine(last))
+            // Opens Smart Scan on its results (or its start screen after a relaunch); it does not scan again.
+            Button(SmartScanView.lastScanLine(last)) { ModuleRouter.shared.show(.smartScan, openWindow: openWindow) }
         }
         if let freed = SmartScanView.freedLine(FreedCache.shared.bytes()) {
             Text(freed)

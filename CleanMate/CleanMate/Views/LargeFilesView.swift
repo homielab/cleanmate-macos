@@ -308,6 +308,11 @@ struct LargeFilesView: View {
             previewURL = previewURL == nil ? files.first { selection.contains($0.url) }?.url : nil
             return true
         }
+        .onSelectAllKeys { on in
+            model.setCheckedByKey(on)
+            return true
+        }
+        .onFindKey { focusToolbarSearch(in: $0) }
         .quickLookPreview($previewURL, in: files.map(\.url))
         .exclusionNotice(excludedCount)
         .overlay(alignment: .bottom) {
@@ -387,7 +392,7 @@ struct LargeFilesView: View {
                 Text("Selected: \(model.checkedFiles.count) files, \(model.checkedSize, format: .fileSize)")
                     .monospacedDigit()
                 Spacer()
-                // ⌘A stays the Table's own row selection (Quick Look, Reveal); ticking for the Trash is this button only.
+                // ⌘A / ⇧⌘A in the table do what this button does (`setCheckedByKey`); rows highlight with click and Shift-click.
                 if model.duplicatesOnly {
                     // Never "Select All" here: it would tick every copy, the one to keep too.
                     let anyOn = !model.checkedFiles.isEmpty

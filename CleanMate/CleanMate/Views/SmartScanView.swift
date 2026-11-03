@@ -25,16 +25,16 @@ struct SmartScanView: View {
         bytes > 0 ? String(localized: "Freed \(bytes, format: .fileSize) in the last 30 days") : nil
     }
 
-    /// Menu bar item: the last finished Smart Scan and what it found, or what cleaning it freed.
+    /// Menu bar item: the junk the last finished Smart Scan found, what cleaning it freed, and when it ran.
     nonisolated static func lastScanLine(_ last: LastScan, locale: Locale = .current) -> String {
         let date = last.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale))
         let size = { (bytes: Int64) in bytes.formatted(.fileSize.locale(locale)) }
         var resource: LocalizedStringResource = if let cleaned = last.cleaned {
-            "Last scan \(date): cleaned \(size(cleaned))"
-        } else if last.size > 0 {
-            "Last scan \(date): \(size(last.size)) to clean"
+            "Junk found: \(size(last.junk)), cleaned \(size(cleaned)) (scanned \(date))"
+        } else if last.junk > 0 {
+            "Junk found: \(size(last.junk)) (scanned \(date))"
         } else {
-            "Last scan \(date): nothing to clean"
+            "No junk found (scanned \(date))"
         }
         resource.locale = locale
         return String(localized: resource)

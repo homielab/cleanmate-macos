@@ -58,15 +58,19 @@ struct LaunchAgentsView: View {
                     Text(agent.program ?? "—").lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary).help(agent.program ?? "")
                 }
             } rows: {
-                // No section headers over the "No Launch Agents Found" overlay.
-                if !model.agents.isEmpty {
+                // No section headers over the "No Launch Agents Found" overlay; with a search, only sections with matches.
+                let user = model.agents(.user), system = model.agents(.systemAgent) + model.agents(.systemDaemon)
+                let searching = !model.search.trimmingCharacters(in: .whitespaces).isEmpty
+                if !model.agents.isEmpty && !(searching && user.isEmpty) {
                     Section {
-                        ForEach(model.agents(.user)) { TableRow($0) }
+                        ForEach(user) { TableRow($0) }
                     } header: {
                         Text("Your Launch Agents")
                     }
+                }
+                if !model.agents.isEmpty && !(searching && system.isEmpty) {
                     Section {
-                        ForEach(model.agents(.systemAgent) + model.agents(.systemDaemon)) { TableRow($0) }
+                        ForEach(system) { TableRow($0) }
                     } header: {
                         Text("System Agents & Daemons — require administrator, manage in System Settings")
                     }
@@ -90,8 +94,11 @@ struct LaunchAgentsView: View {
                             Text("Nothing in ~/Library/LaunchAgents or in /Library starts at login.")
                         }
                     }
+                } else if !LaunchAgent.Scope.allCases.contains(where: { !model.agents($0).isEmpty }) {
+                    EmptyStateView(title: Text("No Matching Launch Agents"), systemImage: "magnifyingglass")
                 }
             }
+            .onFindKey { focusToolbarSearch(in: $0) }
         }
         .safeAreaInset(edge: .bottom) {
             HStack {
@@ -106,6 +113,7 @@ struct LaunchAgentsView: View {
             .background(.bar)
         }
         .navigationTitle(Text(Module.loginItems.title))
+        .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Launch Agents"))
         .task { await model.loadIfNeeded() }
         .focusedSceneValue(\.confirming, removing != nil)
         .confirmationDialog(

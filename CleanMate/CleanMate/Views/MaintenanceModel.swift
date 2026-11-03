@@ -60,8 +60,33 @@ final class MaintenanceModel: ObservableObject {
 
     var now: () -> Date = { .now }
 
-    /// The tasks shown: Homebrew's only when it is installed.
-    var tasks: [MaintenanceTask] { MaintenanceTask.allCases.filter { $0 != .homebrew || brewInstalled } }
+    /// The search field's text: filters the tasks and the snapshots section by their title and description.
+    @Published var search = ""
+
+    /// The tasks shown: Homebrew's only when it is installed, and only those matching `search`.
+    var tasks: [MaintenanceTask] {
+        MaintenanceTask.allCases.filter { ($0 != .homebrew || brewInstalled) && Self.matches($0, search) }
+    }
+
+    /// The local snapshots section is shown: no search, or one that matches its title or description.
+    var showsSnapshots: Bool { Self.matches(search, Self.snapshotsTitle, Self.snapshotsSummary) }
+
+    /// Title and description of the local snapshots section, shared with the view.
+    static let snapshotsTitle: LocalizedStringResource = "Time Machine local snapshots"
+    static let snapshotsSummary: LocalizedStringResource = "Copies of your disk that Time Machine keeps on this Mac between backups. macOS deletes them by itself when it needs the space; deleting them now frees it at once. Backups on your Time Machine disk are not touched. Each deletion is recorded in Settings › Activity."
+
+    /// `task` matches `search` (empty matches all): in its title or description, in the app's language or in English.
+    nonisolated static func matches(_ task: MaintenanceTask, _ search: String) -> Bool {
+        matches(search, task.title, task.summary)
+    }
+
+    nonisolated private static func matches(_ search: String, _ texts: LocalizedStringResource...) -> Bool {
+        let search = search.trimmingCharacters(in: .whitespaces)
+        guard !search.isEmpty else { return true }
+        return texts.contains { text in
+            String(localized: text).localizedStandardContains(search) || text.key.localizedStandardContains(search)
+        }
+    }
 
     /// The task now running; Run is disabled for every task until it ends.
     var running: MaintenanceTask? { results.first { $0.value.status == .running }?.key }

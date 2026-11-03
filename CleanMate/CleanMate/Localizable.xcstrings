@@ -1779,36 +1779,6 @@
         }
       }
     },
-    "Last scan %@: %@ to clean" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lần quét gần nhất %1$@: có thể dọn %2$@"
-          }
-        }
-      }
-    },
-    "Last scan %@: cleaned %@" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lần quét gần nhất %1$@: đã dọn %2$@"
-          }
-        }
-      }
-    },
-    "Last scan %@: nothing to clean" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lần quét gần nhất %@: không có gì để dọn"
-          }
-        }
-      }
-    },
     "Last used %@" : {
       "localizations" : {
         "vi" : {
@@ -9783,6 +9753,136 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mọi thứ không phải thư mục host registry, nên thư mục cache đặt nhầm không liệt kê gì khác"
+          }
+        }
+      }
+    },
+    "Junk found: %@, cleaned %@ (scanned %@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác tìm thấy: %1$@, đã dọn %2$@ (quét lúc %3$@)"
+          }
+        }
+      }
+    },
+    "Junk found: %@ (scanned %@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác tìm thấy: %1$@ (quét lúc %2$@)"
+          }
+        }
+      }
+    },
+    "No junk found (scanned %@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không tìm thấy rác (quét lúc %@)"
+          }
+        }
+      }
+    },
+    "Cleaning finished" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dọn xong"
+          }
+        }
+      }
+    },
+    "Smart Scan has finished cleaning." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét thông minh đã dọn xong."
+          }
+        }
+      }
+    },
+    "Privacy items erased" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã xoá các mục quyền riêng tư"
+          }
+        }
+      }
+    },
+    "Privacy has finished erasing." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quyền riêng tư đã xoá xong."
+          }
+        }
+      }
+    },
+    "Search Photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm ảnh"
+          }
+        }
+      }
+    },
+    "No Matching Photos" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có ảnh khớp"
+          }
+        }
+      }
+    },
+    "Search Launch Agents" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm launch agent"
+          }
+        }
+      }
+    },
+    "No Matching Launch Agents" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có launch agent khớp"
+          }
+        }
+      }
+    },
+    "Search Maintenance" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm trong Bảo trì"
+          }
+        }
+      }
+    },
+    "No Matching Tasks" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có tác vụ khớp"
           }
         }
       }

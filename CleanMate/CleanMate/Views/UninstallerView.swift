@@ -23,6 +23,7 @@ struct UninstallerView: View {
         .trashUndo(model)
         .onAppearAndChange(of: unused) { model.unused = $0 }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Apps"))
+        .onFindKey { focusToolbarSearch(in: $0) }
         .toolbar {
             Menu("Sort By", systemImage: "arrow.up.arrow.down") {
                 Picker("Sort By", selection: $sort) {
@@ -207,6 +208,10 @@ struct UninstallerView: View {
             } header: {
                 appsHeader
             }
+        }
+        .onSelectAllKeys { on in
+            model.tickListed(on)
+            return true
         }
         .overlay { if model.loadingApps { ProgressView().accessibilityLabel("Loading…") } }
     }
@@ -525,7 +530,7 @@ struct UninstallerView: View {
                 checked(item.url).wrappedValue.toggle()
             }
         }
-        .spaceToggles(model)
+        .listKeys(model)
         .overlay {
             if model.extensionItems == nil {
                 ProgressView().accessibilityLabel("Loading…")
@@ -579,7 +584,7 @@ struct UninstallerView: View {
                 .tag(entry.url)
             }
         }
-        .spaceToggles(model)
+        .listKeys(model)
         .overlay {
             if model.loadingEntries {
                 ProgressView().accessibilityLabel("Loading…")
@@ -680,10 +685,15 @@ struct UninstallerView: View {
 }
 
 private extension View {
-    func spaceToggles(_ model: UninstallerModel) -> some View {
+    /// Space ticks or unticks the highlighted rows, ⌘A / ⇧⌘A every row.
+    func listKeys(_ model: UninstallerModel) -> some View {
         onSpaceKey {
             guard !model.highlighted.isEmpty else { return false }
             model.toggle(urls: model.highlighted)
+            return true
+        }
+        .onSelectAllKeys { on in
+            model.setAllChecked(on)
             return true
         }
     }

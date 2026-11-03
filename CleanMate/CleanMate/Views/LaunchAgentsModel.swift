@@ -21,7 +21,20 @@ final class LaunchAgentsModel: ObservableObject {
         await $0($1, .current)
     }
 
-    func agents(_ scope: LaunchAgent.Scope) -> [LaunchAgent] { agents.filter { $0.scope == scope } }
+    /// Toolbar search: label, app or program; "" = no search.
+    @Published var search = ""
+
+    /// The agents of `scope` the search finds (all without a search).
+    func agents(_ scope: LaunchAgent.Scope) -> [LaunchAgent] {
+        agents.filter { $0.scope == scope && Self.matches($0, search) }
+    }
+
+    nonisolated static func matches(_ agent: LaunchAgent, _ search: String) -> Bool {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return true }
+        let app = agent.owner.map { FileManager.default.displayName(atPath: $0.path) }
+        return [agent.label, app, agent.program].contains { $0?.localizedStandardContains(query) == true }
+    }
 
     func loadIfNeeded() async {
         if !started { await load() }

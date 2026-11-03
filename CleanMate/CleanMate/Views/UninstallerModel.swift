@@ -276,6 +276,15 @@ final class UninstallerModel: ObservableObject {
         if app != nil { trashApp = on }
     }
 
+    /// ⌘A / ⇧⌘A on the selected app's files, the leftovers or the extensions: ticks or unticks every row with a working
+    /// checkbox, the app itself too.
+    func setAllChecked(_ on: Bool) {
+        guard !working else { return }
+        let rows = selection == .extensions ? tickableExtensions.map(\.url) : entries.map(\.url)
+        if on { checked.formUnion(rows) } else { checked.subtract(rows) }
+        if selectedApp != nil { trashApp = on }
+    }
+
     /// Extensions whose checkbox works: trashable, and not a pane while System Settings is open.
     private var tickableExtensions: [ExtensionItem] { (extensionItems ?? []).filter { $0.trashable && !isInUse($0) } }
 

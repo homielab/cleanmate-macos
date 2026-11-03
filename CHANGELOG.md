@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CleanMate opens on the module you used last, with its window at the same place and size; a notification or the menu bar's **Scan Now** still opens Smart Scan.
+- **Similar Photos**, **Login Items** and **Maintenance** have a search field, and ⌘F goes to the search field in every list; ⌘A / ⇧⌘A tick or untick what **Large & Old Files**, **Similar Photos** and **Uninstaller** show.
+- A **Freed 1.2 GB** notification when a Smart Scan clean or a Privacy erase finishes while CleanMate is in the background (only if notifications are already allowed; it never asks).
 - **Space Lens**: **Startup Disk** in the Location menu shows the top level of the disk (Applications, Library, System, Users…) with sizes; folders outside your home folder open with the breadcrumb from the disk, and view-only items show a lock saying why (protected by SIP, system library, another user's folder, apps). **View in Space Lens** on the Overview's **System and apps** opens it.
 - **Space Lens**: **Show Hidden Files** (⇧⌘.) hides dotfiles from the list while still counting them in the total.
 - **Large & Old Files**: the Kind filter has nine kinds with icons — videos, audio, images, documents, code & projects (also unknown files inside a project folder or Git repository), archives, disk images, installers and other — so far fewer files land in **Other**; `cleanmate large --json` reports the same kinds.
@@ -22,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
 
 ### Changed
+- The menu bar item shows **Junk found: X (scanned …)**, everything the last Smart Scan found, and opens Smart Scan when clicked.
 - **Large & Old Files › Similar Photos** and `cleanmate similar` use about a third less memory on large libraries (20,000 photos: 490 MB → 320 MB at peak), with the same groups.
 - **Overview** opens at once: the largest folders in your home show the sizes of the last measure, with when they were measured, while they are measured again in the background.
 - Each release also carries `CleanMate.dmg` (+ `.sha256`), so the README download link always points to the latest version.

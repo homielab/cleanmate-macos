@@ -78,7 +78,7 @@ struct SimilarPhotosView<Listing: View>: View {
     }
 
     private var results: some View {
-        let groups = model.sortedGroups
+        let groups = model.shownGroups
         let largest = groups.lazy.flatMap(\.photos).map(\.size).max() ?? 0
         let urls = groups.flatMap { $0.photos.map(\.url) }
         return List(selection: $highlighted) {
@@ -103,7 +103,18 @@ struct SimilarPhotosView<Listing: View>: View {
             previewURL = previewURL == nil ? urls.first(where: highlighted.contains) : nil
             return true
         }
+        .onSelectAllKeys { on in
+            if on { model.checkAllButSuggested() } else { model.uncheckAll() }
+            return true
+        }
+        .onFindKey { focusToolbarSearch(in: $0) }
         .quickLookPreview($previewURL, in: urls)
+        .overlay {
+            if groups.isEmpty {
+                EmptyStateView(title: Text("No Matching Photos"), systemImage: "magnifyingglass")
+            }
+        }
+        .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Photos"))
         .toolbar {
             Picker("Sort By", selection: $model.order) {
                 Text("Space to Free").tag(SimilarPhotos.GroupOrder.space)
@@ -118,7 +129,7 @@ struct SimilarPhotosView<Listing: View>: View {
                     .monospacedDigit()
                 Spacer()
                 // Never "Select All": it would tick the photo to keep too.
-                let anyOn = !model.checked.isEmpty
+                let anyOn = !model.checkedPhotos.isEmpty
                 Button(anyOn ? "Deselect All" : "Select All but Suggested") {
                     if anyOn { model.uncheckAll() } else { model.checkAllButSuggested() }
                 }

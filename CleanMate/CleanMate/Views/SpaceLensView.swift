@@ -49,6 +49,7 @@ struct SpaceLensView: View {
             selection = model.pruned(selection)
         }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Items"))
+        .onFindKey { focusToolbarSearch(in: $0) }
         .task(id: selection) {
             allowed.formIntersection(selection) // until checked, nothing newly picked is movable
             let checked = await SpaceLens.allowed(selection)

@@ -20,10 +20,17 @@ struct MaintenanceView: View {
                 Text("These tasks need no administrator password and remove none of your files. Each run is recorded in Settings › Activity.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            LocalSnapshotsSection(model: model)
+            if model.showsSnapshots { LocalSnapshotsSection(model: model) }
         }
         .formStyle(.grouped)
+        .overlay {
+            if model.tasks.isEmpty && !model.showsSnapshots {
+                EmptyStateView(title: Text("No Matching Tasks"), systemImage: "magnifyingglass")
+            }
+        }
+        .onFindKey { focusToolbarSearch(in: $0) }
         .navigationTitle(Text(Module.maintenance.title))
+        .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Maintenance"))
         .task { await model.loadSnapshots() }
         .task { await model.watchBrew() }
         .focusedSceneValue(\.confirming, confirming != nil || model.pendingDeletion != nil)
@@ -158,7 +165,7 @@ private struct LocalSnapshotsSection: View {
                 }
             }
         } footer: {
-            Text("Copies of your disk that Time Machine keeps on this Mac between backups. macOS deletes them by itself when it needs the space; deleting them now frees it at once. Backups on your Time Machine disk are not touched. Each deletion is recorded in Settings › Activity.")
+            Text(MaintenanceModel.snapshotsSummary)
                 .font(.caption).foregroundStyle(.secondary)
         }
         .confirmationDialog(
@@ -190,7 +197,7 @@ private struct LocalSnapshotsSection: View {
                     .frame(width: 28)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Time Machine local snapshots").font(.headline)
+                    Text(MaintenanceModel.snapshotsTitle).font(.headline)
                     count.foregroundStyle(.secondary)
                     MaintenanceStatus(status: model.snapshotResult?.status).font(.callout).padding(.top, 2)
                 }

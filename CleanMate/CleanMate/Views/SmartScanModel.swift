@@ -104,7 +104,8 @@ final class SmartScanModel: ObservableObject {
     /// Overview chart, moves the scan reminder and checks for the low-disk warning.
     var scanFinished: (SmartScanModel) -> Void = { _ in }
     /// Called when a clean finishes; the real Smart Scan adds what it freed to the menu bar item's last scan, records
-    /// the free space for the Overview chart and checks for the low-disk warning.
+    /// the free space for the Overview chart and checks for the low-disk warning. The real Smart Scan and Privacy say
+    /// what was freed in a notification when CleanMate is in the background.
     var cleanFinished: (CleanReport) -> Void = { _ in }
 
     /// `catalog` defaults to the module's own (Privacy or Smart Scan).
@@ -112,18 +113,22 @@ final class SmartScanModel: ObservableObject {
         self.module = module
         self.catalog = catalog ?? (module == .privacy ? { CleanerGroup.privacy } : { CleanerGroup.smartScan })
         let realSmartScan = catalog == nil && module == .smartScan
+        if catalog == nil {
+            cleanFinished = { report in Task { await CleanFinishedNotifier.shared.post(report, module: module) } }
+        }
         if realSmartScan {
             disabledGroups = { Preferences.disabledGroups() }
             scanFinished = { model in
-                LastScan(date: .now, size: model.selectedSize).save()
+                LastScan(date: .now, size: model.selectedSize, found: model.foundSize).save()
                 DiskHistory.shared.recordNow()
                 Task { await ScanReminderScheduler.shared.postpone() }
                 Task { await LowDiskWarningChecker.shared.check() }
             }
-            cleanFinished = {
-                LastScan.recordClean(freed: $0.freed)
+            cleanFinished = { report in
+                LastScan.recordClean(freed: report.freed)
                 DiskHistory.shared.recordNow()
                 Task { await LowDiskWarningChecker.shared.check() }
+                Task { await CleanFinishedNotifier.shared.post(report, module: module) }
             }
         }
         groups = []
@@ -514,6 +519,9 @@ final class SmartScanModel: ObservableObject {
         }.map(\.element)
         return CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage, items: items)
     }
+
+    /// Everything the scan found in the groups that are on, ticked or not: the menu bar item's "Junk found".
+    var foundSize: Int64 { items.reduce(0) { $0 + (scans[$1.id]?.size ?? 0) } }
 
     /// Bytes the selected items will free for sure; items whose size is only a maximum are in `selectedUpToSize`.
     var selectedSize: Int64 { selectedSize(upperBound: false) }

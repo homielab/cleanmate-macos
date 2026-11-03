@@ -117,14 +117,33 @@ struct ContentView: View {
     @StateObject private var maintenance = MaintenanceModel()
     @State private var showsWelcome = false
     @Environment(\.openWindow) private var openWindow
+    /// The app's own window: opens on the module shown last and keeps its frame. Off in the benchmark's window and in
+    /// the test host, so tests never read or write the user's settings.
+    private let remembers: Bool
 
-    init() {}
+    /// Opens on the module shown last (Overview the first time); the menu bar, a notification or the welcome guide
+    /// still pick their own module once the window is up.
+    init() {
+        remembers = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+        _selection = State(initialValue: remembers ? Self.lastModule() : .overview)
+    }
 
     /// The scan benchmark's window: its own Smart Scan / Large & Old Files models, opened on `selection`.
     init(smartScan: SmartScanModel? = nil, largeFiles: LargeFilesModel? = nil, selection: Module) {
         if let smartScan { _smartScan = StateObject(wrappedValue: smartScan) }
         if let largeFiles { _largeFiles = StateObject(wrappedValue: largeFiles) }
         _selection = State(initialValue: selection)
+        remembers = false
+    }
+
+    /// The module saved by `remember`; Overview when none or one this version no longer has.
+    static func lastModule(defaults: UserDefaults = .standard) -> Module {
+        defaults.string(forKey: Preferences.lastModule).flatMap(Module.init(rawValue:)) ?? .overview
+    }
+
+    static func remember(_ module: Module?, defaults: UserDefaults = .standard) {
+        guard let module else { return }
+        defaults.set(module.rawValue, forKey: Preferences.lastModule)
     }
 
     var body: some View {
@@ -184,6 +203,8 @@ struct ContentView: View {
             router.openMainWindow = openWindow
         }
         .sheet(isPresented: $showsWelcome) { WelcomeView { selection = .overview } }
+        .onChange(of: selection) { if remembers { Self.remember($0) } }
+        .background { if remembers { WindowFrameKeeper() } }
     }
 
     private func badgeText(_ module: Module) -> Text? {

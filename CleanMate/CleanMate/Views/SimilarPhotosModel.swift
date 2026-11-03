@@ -12,6 +12,8 @@ final class SimilarPhotosModel: ObservableObject {
     @Published var order = SimilarPhotos.GroupOrder.space
     /// Ticked for the Trash. Never pre-filled.
     @Published var checked: Set<URL> = []
+    /// Toolbar search: photo name or location; "" = no search.
+    @Published var search = ""
     /// Image files checked so far while listing.
     @Published private(set) var listed = 0
     /// Photos analyzed (or answered from the cache) and their total while analyzing.
@@ -151,19 +153,34 @@ final class SimilarPhotosModel: ObservableObject {
     /// `groups` in the chosen `order`, as listed.
     var sortedGroups: [SimilarPhotos.Group] { order.sorted(groups) }
 
-    var checkedPhotos: [SimilarPhotos.Photo] { groups.flatMap(\.photos).filter { checked.contains($0.url) } }
-    var checkedSize: Int64 { checkedPhotos.reduce(0) { $0 + $1.size } }
-
-    /// Ticks every photo but the suggested one of each group.
-    func checkAllButSuggested() {
-        checked = Set(groups.flatMap { $0.photos.dropFirst().map(\.url) })
+    /// `sortedGroups` with a photo whose name or location matches the search, each whole: the suggested photo stays
+    /// in view next to the ones found.
+    var shownGroups: [SimilarPhotos.Group] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return sortedGroups }
+        return sortedGroups.filter { group in
+            group.photos.contains { $0.name.localizedStandardContains(query) || $0.location.localizedStandardContains(query) }
+        }
     }
 
-    func uncheckAll() { checked = [] }
+    /// Ticked photos of the shown groups: what Move to Trash takes. A tick in a group the search hides stays, unused.
+    var checkedPhotos: [SimilarPhotos.Photo] { shownGroups.flatMap(\.photos).filter { checked.contains($0.url) } }
+    var checkedSize: Int64 { checkedPhotos.reduce(0) { $0 + $1.size } }
 
-    /// Names of the groups whose every photo is ticked (their suggested photo's): the confirmation warns.
+    /// Select All but Suggested and ⌘A: ticks every photo but the suggested one of each shown group.
+    func checkAllButSuggested() {
+        for group in shownGroups {
+            checked.formUnion(group.photos.map(\.url))
+            checked.remove(group.suggested.url)
+        }
+    }
+
+    /// Deselect All and ⇧⌘A: unticks the shown groups.
+    func uncheckAll() { checked.subtract(shownGroups.flatMap { $0.photos.map(\.url) }) }
+
+    /// Names of the shown groups whose every photo is ticked (their suggested photo's): the confirmation warns.
     var groupsLosingEveryPhoto: [String] {
-        groups.filter { $0.photos.allSatisfy { checked.contains($0.url) } }.map(\.suggested.name)
+        shownGroups.filter { $0.photos.allSatisfy { checked.contains($0.url) } }.map(\.suggested.name)
     }
 
     /// Only from results: not twice.

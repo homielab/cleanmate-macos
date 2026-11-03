@@ -49,6 +49,10 @@ nonisolated enum Preferences {
     static let lowDiskWarned = "lowDiskWarned"
     /// Settings tab shown when the window opens.
     static let settingsTab = "settingsTab"
+    /// String (`Module` raw value): the module shown last; the main window opens on it again.
+    static let lastModule = "lastModule"
+    /// String (`NSStringFromRect`): the main window's last frame, put back when the window opens again.
+    static let mainWindowFrame = "mainWindowFrame"
 
     /// [String: [String: Any]]: probe command → last output with its fingerprint and date (`SizeProbe.output`).
     static let probeOutputs = "probeOutputs"
@@ -135,23 +139,37 @@ nonisolated enum Preferences {
     }
 }
 
-/// The last finished Smart Scan, for the menu bar item: when, what its ticked items would free, and, once cleaned,
-/// what the clean freed (the same bytes the activity log records).
+/// The last finished Smart Scan, for the menu bar item: when, what it found, what its ticked items would free, and,
+/// once cleaned, what the clean freed (the same bytes the activity log records).
 nonisolated struct LastScan: Equatable, Sendable {
     var date: Date
     var size: Int64
     var cleaned: Int64?
+    /// Everything the scan found, ticked or not; nil in records saved before it was kept (`junk` falls back to `size`).
+    var found: Int64?
+
+    init(date: Date, size: Int64, cleaned: Int64? = nil, found: Int64? = nil) {
+        self.date = date
+        self.size = size
+        self.cleaned = cleaned
+        self.found = found
+    }
+
+    /// The junk the scan found, for the menu bar item.
+    var junk: Int64 { found ?? size }
 
     static func read(defaults: UserDefaults = .standard) -> LastScan? {
         let stored: [String: Any] = Preferences.dictionary(Preferences.lastSmartScan, defaults: defaults)
         guard let seconds = stored["date"] as? Double, let size = (stored["size"] as? NSNumber)?.int64Value else { return nil }
         return LastScan(date: Date(timeIntervalSince1970: seconds), size: size,
-                        cleaned: (stored["cleaned"] as? NSNumber)?.int64Value)
+                        cleaned: (stored["cleaned"] as? NSNumber)?.int64Value,
+                        found: (stored["found"] as? NSNumber)?.int64Value)
     }
 
     func save(defaults: UserDefaults = .standard) {
         var stored: [String: Any] = ["date": date.timeIntervalSince1970, "size": NSNumber(value: size)]
         if let cleaned { stored["cleaned"] = NSNumber(value: cleaned) }
+        if let found { stored["found"] = NSNumber(value: found) }
         defaults.set(stored, forKey: Preferences.lastSmartScan)
     }
 

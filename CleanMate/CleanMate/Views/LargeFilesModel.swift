@@ -372,6 +372,12 @@ final class LargeFilesModel: ObservableObject {
         if on { checked.formUnion(urls) } else { checked.subtract(urls) }
     }
 
+    /// ⌘A / ⇧⌘A, like the bottom bar's button: Select All (with Duplicates Only, Select Extra Copies: never every copy)
+    /// or Deselect All, on the shown files.
+    func setCheckedByKey(_ on: Bool) {
+        if !on { setVisibleChecked(false) } else if duplicatesOnly { checkExtraCopies() } else { setVisibleChecked(true) }
+    }
+
     /// The copy each duplicate group keeps: oldest modification date (the original), tie → shortest path.
     /// Counted over the whole group, so a copy hidden by search/kind/age can be the kept one.
     var keptCopies: Set<URL> { Set(keptCopyByGroup.compactMap(\.self)) }
