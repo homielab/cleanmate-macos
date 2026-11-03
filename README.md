@@ -8,7 +8,7 @@ their leftovers — and shows what fills your disk. Everything is previewed firs
 confirm. It runs entirely on your Mac: no account, no telemetry; its only network connection is the update
 check, which you can turn off.
 
-[**Website**](https://cleanmate.homielab.com) · [**Download CleanMate-1.7.dmg**](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate-1.7.dmg) · [All releases][releases] · [Ubuntu version](https://github.com/homielab/cleanmate-linux)
+[**Website**](https://cleanmate.homielab.com) · [**Download CleanMate.dmg**](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate.dmg) · [All releases][releases] · [Ubuntu version](https://github.com/homielab/cleanmate-linux)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/1-smart-scan-dark.png">
@@ -17,8 +17,8 @@ check, which you can turn off.
 
 ## Install
 
-1. Download [CleanMate-1.7.dmg](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate-1.7.dmg)
-   (verify the [`.sha256` checksum](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate-1.7.dmg.sha256)) —
+1. Download [CleanMate.dmg](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate.dmg)
+   (verify the [`.sha256` checksum](https://github.com/homielab/cleanmate-macos/releases/latest/download/CleanMate.dmg.sha256), `shasum -a 256 -c CleanMate.dmg.sha256`) —
    signed with a Developer ID and notarized by Apple. Open the disk image and drag **CleanMate** to **Applications**.
    Requires **macOS 13** or later. Later versions install from the app: **CleanMate › Check for Updates…**
    (offered at the second launch; off until then — Settings › General › Updates).

@@ -24,7 +24,8 @@ usage() {
   cat <<EOF
 Usage: scripts/release.sh [--skip-notarize] [--profile NAME] [--help]
 
-Builds build/release/CleanMate-<version>.dmg (+ .sha256) from the current checkout,
+Builds build/release/CleanMate-<version>.dmg (+ .sha256) from the current checkout, a copy named
+CleanMate.dmg (+ .sha256) for the fixed releases/latest/download/CleanMate.dmg link,
 build/release/CleanMate-<version>-notes.md with the "## [<version>]" section of CHANGELOG.md, and
 build/release/appcast.xml: the Sparkle update feed with one item for this version, its download
 signed with the EdDSA key, and the same release notes.
@@ -55,7 +56,7 @@ One-time setup:
 This script does not tag, push or upload. Publish afterwards, e.g.:
   git tag v<version> && git push origin main v<version>
   gh release create v<version> build/release/CleanMate-<version>.dmg build/release/CleanMate-<version>.dmg.sha256 \\
-      build/release/appcast.xml --title "CleanMate <version>" --notes-file build/release/CleanMate-<version>-notes.md
+      build/release/CleanMate.dmg build/release/CleanMate.dmg.sha256 build/release/appcast.xml --title "CleanMate <version>" --notes-file build/release/CleanMate-<version>-notes.md
 The app reads its feed from $REPO_URL/releases/latest/download/appcast.xml,
 so the new release must be the latest one (gh's default) and carry appcast.xml.
 EOF
@@ -207,6 +208,10 @@ if [[ $SKIP_NOTARIZE -eq 0 ]]; then
 fi
 
 (cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
+# Same dmg under a fixed name, so releases/latest/download/CleanMate.dmg always works.
+LATEST_DMG="$OUT/$APP_NAME.dmg"
+cp "$DMG" "$LATEST_DMG"
+(cd "$OUT" && shasum -a 256 "$(basename "$LATEST_DMG")" > "$(basename "$LATEST_DMG").sha256")
 
 echo "==> Appcast"
 # Signed last: stapling changes the dmg. sign_update prints: sparkle:edSignature="..." length="..."
@@ -249,8 +254,8 @@ sed -E -e "s/^  version \".*\"/  version \"$VERSION\"/" -e "s/^  sha256 \".*\"/ 
   && mv "$CASK.tmp" "$CASK"
 echo "==> Cask updated: $CASK (version $VERSION)"
 
-echo "==> Done: $DMG"
-cat "$DMG.sha256"
+echo "==> Done: $DMG (+ $LATEST_DMG)"
+cat "$DMG.sha256" "$LATEST_DMG.sha256"
 echo "Release notes: $NOTES_FILE"
 echo "Appcast: $APPCAST"
 [[ -n "$SIGN_KEY" ]] || echo "(appcast.xml has no EdDSA signature: do not publish it)"
