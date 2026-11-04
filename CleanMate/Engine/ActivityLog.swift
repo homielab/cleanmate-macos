@@ -191,13 +191,36 @@ nonisolated enum ActivityLog {
     /// too). Only lines with the raw byte column (written by current versions) count: the formatted size column depends
     /// on the locale it was written in.
     /// `trashed` is still in the Trash; `since` is the oldest counted line.
+    /// With no `cutoff` (lifetime), lines rotated away for good still count (`archived`), so the total never drops.
     static func freed(after cutoff: Date = .distantPast, home: URL = SafetyPolicy.current.homeURL)
         -> (deleted: Int64, trashed: Int64, since: Date?) {
+        var result = totals(of: readAll(home: home), after: cutoff)
+        if cutoff == .distantPast {
+            let kept = archived(url: url(home: home))
+            result.deleted += kept.deleted
+            result.trashed += kept.trashed
+        }
+        return result
+    }
+
+    /// Lifetime bytes of the lines dropped when activity.1.log was rotated away, in activity.archived.
+    static func archived(url: URL) -> (deleted: Int64, trashed: Int64) {
+        guard let text = try? String(contentsOf: archiveURL(url), encoding: .utf8) else { return (0, 0) }
+        let numbers = text.split(whereSeparator: \.isWhitespace).compactMap { Int64($0) }
+        guard numbers.count == 2 else { return (0, 0) }
+        return (max(0, numbers[0]), max(0, numbers[1]))
+    }
+
+    private static func archiveURL(_ log: URL) -> URL {
+        log.deletingPathExtension().appendingPathExtension("archived")
+    }
+
+    private static func totals(of text: String, after cutoff: Date) -> (deleted: Int64, trashed: Int64, since: Date?) {
         var result: (deleted: Int64, trashed: Int64, since: Date?) = (0, 0, nil)
         // Trashed bytes counted so far per module + item: a "restored" line takes back only what its own "trashed"
         // line added in this window, never bytes trashed by something else.
         var counted: [String: Int64] = [:]
-        for line in readAll(home: home).split(separator: "\n") {
+        for line in text.split(separator: "\n") {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard fields.count == 7, let bytes = Int64(fields[6]), bytes >= 0,
                   let date = try? Date(String(fields[0]), strategy: .iso8601), date >= cutoff else { continue }
@@ -248,6 +271,7 @@ nonisolated enum ActivityLog {
         var result = Cleanups()
         let cutoff = now.addingTimeInterval(-30 * 86_400)
         var lines: [(date: Date, bytes: Int64)] = []
+        result.total = archived(url: url(home: home)).deleted // rotated away for good: the total never drops
         for line in readAll(home: home).split(separator: "\n") {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard fields.count == 7, fields[5] == "deleted" || fields[5] == "evicted", let bytes = Int64(fields[6]), bytes >= 0,
@@ -289,6 +313,14 @@ nonisolated enum ActivityLog {
         try? manager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let size = (try? manager.attributesOfItem(atPath: url.path))?[.size] as? Int, size > rotateAt {
             let old = url.deletingPathExtension().appendingPathExtension("1.log")
+            // The lines dropped with activity.1.log still count in the lifetime totals.
+            if let dropped = try? String(contentsOf: old, encoding: .utf8) {
+                var kept = archived(url: url)
+                let freed = totals(of: dropped, after: .distantPast)
+                kept.deleted += freed.deleted
+                kept.trashed += freed.trashed
+                try? "\(kept.deleted)\t\(kept.trashed)\n".write(to: archiveURL(url), atomically: true, encoding: .utf8)
+            }
             try? manager.removeItem(at: old)
             try? manager.moveItem(at: url, to: old)
         }

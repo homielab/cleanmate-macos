@@ -8,6 +8,8 @@ struct SimilarPhotosView<Listing: View>: View {
     @ObservedObject var model: SimilarPhotosModel
     /// Where the photos were looked for, e.g. "~/Pictures"; nil = the home folder.
     let scopeName: String?
+    /// Folders macOS protects (Desktop, Documents, Pictures…) are left out: no Full Disk Access.
+    var skipsProtected = false
     @Binding var confirming: Bool
     /// The Duplicates menu, kept in the toolbar so the user can go back to the file list.
     @ViewBuilder let listingMenu: () -> Listing
@@ -21,6 +23,7 @@ struct SimilarPhotosView<Listing: View>: View {
             case .idle:
                 EmptyStateView(title: Text("Similar Photos"), systemImage: "photo.on.rectangle.angled") {
                     Text("Find photos that look alike — bursts, edits, resized copies — and keep one. Photos are compared on this Mac; nothing is uploaded.")
+                    photosLibraryNote
                 } actions: {
                     Button("Find Similar Photos") { model.findAgain() }.buttonStyle(.borderedProminent)
                 }
@@ -51,6 +54,7 @@ struct SimilarPhotosView<Listing: View>: View {
                             Text("No two photos in your home folder look alike.")
                         }
                         if model.truncated { IncompleteResultsNote() }
+                        photosLibraryNote
                     } actions: {
                         Button("Find Again") { model.findAgain() }
                     }
@@ -70,8 +74,25 @@ struct SimilarPhotosView<Listing: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if skipsProtected && showsAccessNote { ProtectedFoldersNote() }
+        }
         .toolbar { listingMenu() }
         .trashUndo(model)
+    }
+
+    /// The Photos app's library is a package Similar Photos does not open; say so where nothing was found.
+    private var photosLibraryNote: some View {
+        Text("Photos in the Photos app's library are not checked.").foregroundStyle(.secondary)
+    }
+
+    /// The waiting and empty screens explain what was left out.
+    private var showsAccessNote: Bool {
+        switch model.phase {
+        case .idle: true
+        case .results: model.groups.isEmpty
+        default: false
+        }
     }
 
     private var results: some View {

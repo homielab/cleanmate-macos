@@ -130,6 +130,12 @@ final class WelcomeModel: ObservableObject {
         self.step = step
     }
 
+    /// Skip: past the introduction, straight to the preferences (Open at login, menu bar), never past them.
+    func skip() {
+        forward = true
+        step = .options
+    }
+
     func back() {
         guard let step = Step(rawValue: step.rawValue - 1) else { return }
         forward = false
@@ -144,7 +150,7 @@ final class WelcomeModel: ObservableObject {
 }
 
 struct WelcomeView: View {
-    static let size = CGSize(width: 580, height: 520)
+    static let size = CGSize(width: 580, height: 620)
     static let barHeight: CGFloat = 52
     /// Room for a page above the button bar and its divider.
     static var pageHeight: CGFloat { size.height - barHeight - 1 }
@@ -194,7 +200,7 @@ struct WelcomeView: View {
     private var buttons: some View {
         HStack {
             if model.step != .options {
-                Button("Skip") { close() }
+                Button("Skip") { move(model.skip) }
                     .keyboardShortcut(.cancelAction)
             }
             Spacer()
@@ -243,10 +249,10 @@ private struct StepDots: View {
     }
 }
 
-/// Step 1: what CleanMate does and how it removes things.
+/// Step 1: what CleanMate does (every module) and how it removes things.
 struct WelcomeAboutPage: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Welcome to CleanMate").font(.title).bold()
             WelcomeRow(systemImage: Module.smartScan.systemImage, title: Text(Module.smartScan.title),
                        text: Text("System junk, developer leftovers, AI tool data and app caches in one scan."))
@@ -256,6 +262,12 @@ struct WelcomeAboutPage: View {
                        text: Text("Removes apps together with the files they leave behind."))
             WelcomeRow(systemImage: Module.spaceLens.systemImage, title: Text(Module.spaceLens.title),
                        text: Text("Shows what takes up space on your disk, folder by folder."))
+            WelcomeRow(systemImage: Module.largeFiles.systemImage, title: Text(Module.largeFiles.title),
+                       text: Text("Big files you forgot, duplicates and photos that look alike."))
+            WelcomeRow(systemImage: Module.loginItems.systemImage, title: Text(Module.loginItems.title),
+                       text: Text("Apps and helpers that start with your Mac, to turn off or remove."))
+            WelcomeRow(systemImage: Module.maintenance.systemImage, title: Text(Module.maintenance.title),
+                       text: Text("Common fixes for Open With menus, previews, icons and fonts, plus Homebrew and local snapshots."))
             Divider()
             WelcomeRow(systemImage: "checkmark.shield", title: Text("Nothing goes without your OK"),
                        text: Text("You see everything first, and nothing is removed until you confirm. Caches and junk that rebuild themselves are deleted; your own files and apps go to the Trash, and Undo puts them back."))

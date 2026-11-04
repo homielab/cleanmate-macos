@@ -184,6 +184,14 @@ nonisolated struct LastScan: Equatable, Sendable {
         defaults.set(stored, forKey: Preferences.lastSmartScan)
     }
 
+    /// The user changed the ticks on the last scan's results: what they would free now, so the menu bar and the
+    /// Overview say the same "selected" figure as the sidebar badge. A record already cleaned is left as it is.
+    static func recordSelection(_ size: Int64, defaults: UserDefaults = .standard) {
+        guard var last = read(defaults: defaults), last.cleaned == nil, last.size != size else { return }
+        last.size = size
+        last.save(defaults: defaults)
+    }
+
     /// A clean of the last scan's results: keeps its date, adds what was freed and takes what each group freed
     /// (`freedByGroup`, group id → bytes) off that group.
     static func recordClean(freed: Int64, freedByGroup: [String: Int64] = [:], defaults: UserDefaults = .standard) {

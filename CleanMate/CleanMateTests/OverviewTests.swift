@@ -357,18 +357,18 @@ struct OverviewTests {
         #expect(found.map(\.target.module) == [.smartScan, .smartScan, .uninstaller])
         #expect(protectedReads.value == 0)
 
-        // The Uninstaller opens on apps unused for 3 months, from every source, largest first.
-        let suite = TestDefaults.suite("CleanMateOverviewTests")
-        defer { TestDefaults.remove(suite) }
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defaults.set(UninstallerModel.UnusedFilter.all.rawValue, forKey: Preferences.uninstallerUnused)
-        defaults.set(UninstallerModel.SourceFilter.appStore.rawValue, forKey: Preferences.uninstallerSource)
-        ModuleRouter.setFilters(for: .smartScanGroup("trash"), defaults: defaults) // Smart Scan: no filter to set
-        #expect(defaults.string(forKey: Preferences.uninstallerUnused) == UninstallerModel.UnusedFilter.all.rawValue)
-        ModuleRouter.setFilters(for: .uninstallerUnused, defaults: defaults)
-        #expect(defaults.string(forKey: Preferences.uninstallerUnused) == UninstallerModel.UnusedFilter.months3.rawValue)
-        #expect(defaults.string(forKey: Preferences.uninstallerSource) == UninstallerModel.SourceFilter.all.rawValue)
-        #expect(defaults.string(forKey: Preferences.uninstallerSort) == UninstallerModel.AppSort.size.rawValue)
+        // The Uninstaller opens on apps unused for 3 months, from every source, largest first, for this session only.
+        let keys = [Preferences.uninstallerUnused, Preferences.uninstallerSource, Preferences.uninstallerSort]
+        let saved = keys.map { UserDefaults.standard.string(forKey: $0) }
+        let uninstaller = UninstallerModel()
+        uninstaller.applyFilters(unused: .all, source: .appStore)
+        uninstaller.showUnusedSuggestion()
+        uninstaller.applyFilters(unused: .all, source: .appStore) // the view reapplies the saved filters
+        #expect(uninstaller.unused == .months3 && uninstaller.source == .all && uninstaller.sort(.name) == .size)
+        #expect(keys.map { UserDefaults.standard.string(forKey: $0) } == saved)
+        uninstaller.suggestedFilter = false
+        uninstaller.applyFilters(unused: .all, source: .appStore)
+        #expect(uninstaller.unused == .all && uninstaller.source == .appStore && uninstaller.sort(.name) == .name)
         #expect(Suggestion.Target.maintenanceSnapshots.module == .maintenance)
     }
 
@@ -494,19 +494,62 @@ struct OverviewTests {
         #expect(model.foundByGroup().isEmpty)
 
         model.reveal(group: "g2")
-        #expect(model.revealedGroup == "g2" && model.search.isEmpty && model.collapsedGroups.isEmpty)
+        #expect(model.revealedGroup == nil && model.search.isEmpty && model.collapsedGroups.isEmpty) // after the scan
         for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(5)) }
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(model.revealedGroup == "g2")
         #expect(model.foundByGroup(leavingOut: ["s390.live"]) == ["g1": 100, "g2": 30])
 
-        model.reveal(group: "g1") // results shown: no new scan
+        model.reveal(group: "g1", measuredAt: .now.addingTimeInterval(-60)) // results newer than the suggestion
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(model.revealedGroup == "g1")
 
         model.cleanItem = { item, scan, _ in CleanReport(freed: item.id == "s390.b" ? 0 : scan.size) }
         model.selected = ["s390.a", "s390.b", "s390.live"]
         await model.clean()
         #expect(model.freedByGroup() == ["g1": 107])
         #expect(model.freedByGroup(leavingOut: ["s390.live"]) == ["g1": 100])
+    }
+
+    /// A suggestion measured after the results shown scans again, then opens its group; a group turned off in
+    /// Settings is not scanned: the model asks, and turning it on scans and opens it.
+    @MainActor @Test func suggestionRescansOldResultsAndAsksForAGroupTurnedOff() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let a = CleanerItem(id: "s409.a", title: "A", paths: ["/nonexistent"])
+        let b = CleanerItem(id: "s409.b", title: "B", paths: ["/nonexistent"])
+        let model = SmartScanModel.isolated(module: .smartScan) {
+            [CleanerGroup(id: "g1", title: "G1", systemImage: "x", items: [a]),
+             CleanerGroup(id: "g2", title: "G2", systemImage: "x", items: [b])]
+        }
+        var off: Set<String> = ["g2"]
+        model.disabledGroups = { off }
+        model.enableGroup = { off.remove($0) }
+        model.processNames = { [] }
+        model.appBundleIDs = { [] }
+        model.logHome = home
+        let scans = Counter()
+        model.scanItem = { _, _ in scans.add(); return ItemScan(measuredSize: 10) }
+        let waitForReveal = {
+            for _ in 0..<3000 where model.revealedGroup == nil { try await Task.sleep(for: .milliseconds(5)) }
+        }
+
+        model.startScan()
+        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(5)) }
+        #expect(scans.value == 1)
+        let first = try #require(model.resultsDate)
+
+        model.reveal(group: "g1", measuredAt: first.addingTimeInterval(30)) // the suggestion is newer
+        #expect(model.revealedGroup == nil)
+        try await waitForReveal()
+        #expect(scans.value == 2 && model.revealedGroup == "g1")
+
+        model.revealedGroup = nil
+        model.reveal(group: "g2")
+        #expect(model.offGroupAsked == "g2" && model.revealedGroup == nil && scans.value == 2)
+        model.turnOnAskedGroup()
+        #expect(off.isEmpty && model.offGroupAsked == nil)
+        try await waitForReveal()
+        #expect(model.revealedGroup == "g2" && scans.value == 4) // both groups scanned again
     }
 }
 

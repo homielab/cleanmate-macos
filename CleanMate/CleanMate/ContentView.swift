@@ -70,6 +70,8 @@ final class ModuleRouter: ObservableObject {
     @Published var trashedItemsRequested = false
     /// Overview › Suggestions: ContentView opens the module on what the suggestion is about.
     @Published var suggestion: Suggestion.Target?
+    /// When the suggestion being opened was measured (`Suggestion.measuredAt`).
+    var suggestionMeasuredAt: Date?
     /// Shortcuts' Clean Selected Junk: ContentView opens Smart Scan's review, also on first appearance.
     @Published var cleanReviewRequested = false
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
@@ -112,20 +114,11 @@ final class ModuleRouter: ObservableObject {
 
     /// Overview › Suggestions: the module where the user decides, showing what the suggestion is about. Nothing is
     /// ticked or cleaned. A confirmation open on the window keeps it.
-    func open(_ target: Suggestion.Target, defaults: UserDefaults = .standard) {
+    func open(_ target: Suggestion.Target, measuredAt: Date? = nil) {
         guard Self.mainWindow?.attachedSheet == nil else { NSSound.beep(); return }
-        Self.setFilters(for: target, defaults: defaults)
+        suggestionMeasuredAt = measuredAt
         suggestion = target
         show(target.module)
-    }
-
-    /// The list filters a suggestion opens with, saved where the module's view reads them: the Uninstaller shows apps
-    /// not used for 3 months from every source, largest first.
-    static func setFilters(for target: Suggestion.Target, defaults: UserDefaults = .standard) {
-        guard target == .uninstallerUnused else { return }
-        defaults.set(UninstallerModel.UnusedFilter.months3.rawValue, forKey: Preferences.uninstallerUnused)
-        defaults.set(UninstallerModel.SourceFilter.all.rawValue, forKey: Preferences.uninstallerSource)
-        defaults.set(UninstallerModel.AppSort.size.rawValue, forKey: Preferences.uninstallerSort)
     }
 
     /// Brings the main window front (reopened if closed) on `module`, nil = the module already shown.
@@ -248,8 +241,8 @@ struct ContentView: View {
             guard let target = router.suggestion else { return }
             router.suggestion = nil
             switch target {
-            case .smartScanGroup(let group): smartScan.reveal(group: group)
-            case .uninstallerUnused: uninstaller.search = "" // the filters are set by `open`
+            case .smartScanGroup(let group): smartScan.reveal(group: group, measuredAt: router.suggestionMeasuredAt)
+            case .uninstallerUnused: uninstaller.showUnusedSuggestion()
             case .maintenanceSnapshots: maintenance.revealSnapshots()
             }
         }

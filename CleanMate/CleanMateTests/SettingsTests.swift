@@ -146,6 +146,23 @@ struct SettingsTests {
         #expect(FileManager.default.fileExists(atPath: rotated.path))
     }
 
+    /// Lines dropped when activity.1.log is rotated away still count in the lifetime totals: they never go down.
+    @Test func lifetimeFreedNeverDropsWhenTheLogRotates() {
+        defer { try? FileManager.default.removeItem(at: root) }
+        var before: Int64 = 0
+        for index in 0..<120 {
+            ActivityLog.record(module: "Smart Scan", item: "item-\(index)", size: 1_000, mode: .delete, home: home,
+                               rotateAt: 1_500)
+            let total = ActivityLog.freed(home: home).deleted
+            #expect(total >= before)
+            before = total
+        }
+        #expect(before == 120_000)
+        #expect(ActivityLog.cleanups(home: home).total == 120_000)
+        #expect(ActivityLog.archived(url: ActivityLog.url(home: home)).deleted > 0)
+        #expect(ActivityLog.freed(after: .now.addingTimeInterval(-3600), home: home).deleted < 120_000) // window: files only
+    }
+
     /// Concurrent records crossing the rotation threshold. ~60 lines of ~70 bytes against a 2500-byte
     /// threshold rotate exactly once, so nothing is dropped: every line is in exactly one of the two files.
     @Test func activityLogKeepsEveryLineWhenRecordsRotateConcurrently() {

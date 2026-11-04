@@ -12143,6 +12143,126 @@
           }
         }
       }
+    },
+    "Apps not used for 3 months, largest first" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng không dùng 3 tháng, lớn nhất trước"
+          }
+        }
+      }
+    },
+    "Clear Filter" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ lọc"
+          }
+        }
+      }
+    },
+    "%@ is turned off in Settings › Scan Groups, so it is not scanned." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ đang tắt trong Cài đặt › Nhóm quét nên không được quét."
+          }
+        }
+      }
+    },
+    "Turn On and Scan" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật và quét"
+          }
+        }
+      }
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đóng"
+          }
+        }
+      }
+    },
+    "Desktop, Documents, Downloads and other protected folders are not scanned — grant Full Disk Access to scan them." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa quét Desktop, Documents, Downloads và các thư mục được bảo vệ khác — cấp Full Disk Access để quét."
+          }
+        }
+      }
+    },
+    "Grant Full Disk Access to also check Downloads and external drives." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cấp Full Disk Access để kiểm thêm Downloads và ổ ngoài."
+          }
+        }
+      }
+    },
+    "Photos in the Photos app's library are not checked." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư viện của ứng dụng Ảnh không được quét."
+          }
+        }
+      }
+    },
+    "Junk found: %@ · selected %@ (scanned %@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác tìm thấy: %1$@ · đã chọn %2$@ (quét lúc %3$@)"
+          }
+        }
+      }
+    },
+    "Big files you forgot, duplicates and photos that look alike." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp lớn bị quên, tệp trùng và ảnh giống nhau."
+          }
+        }
+      }
+    },
+    "Apps and helpers that start with your Mac, to turn off or remove." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng và trình trợ giúp chạy cùng máy Mac, để tắt hoặc gỡ."
+          }
+        }
+      }
+    },
+    "Common fixes for Open With menus, previews, icons and fonts, plus Homebrew and local snapshots." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa nhanh menu Mở bằng, xem trước, biểu tượng và phông chữ, cùng Homebrew và bản chụp cục bộ."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

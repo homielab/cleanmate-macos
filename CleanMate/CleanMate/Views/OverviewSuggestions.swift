@@ -30,6 +30,8 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
     let id: String
     let kind: Kind
     let systemImage: String
+    /// When `size` was measured (the last Smart Scan's date for junk); Smart Scan rescans results older than this.
+    var measuredAt: Date?
     /// Bytes to win; nil when unknown (local snapshots need admin rights to measure).
     var size: Int64?
     /// Apps, files or snapshots; nil for a size alone.
@@ -135,6 +137,7 @@ nonisolated enum OverviewSuggestions {
             found.append(Suggestion(id: "snapshots", kind: .snapshots, systemImage: "clock.arrow.circlepath",
                                     count: snapshots.count, target: .maintenanceSnapshots))
         }
+        for index in found.indices where found[index].measuredAt == nil { found[index].measuredAt = now }
         return ranked(found)
     }
 
@@ -144,8 +147,10 @@ nonisolated enum OverviewSuggestions {
         let catalog = CleanerGroup.smartScan(ages: .default)
         return groups.compactMap { id, size in
             guard !skippedGroups.contains(id), let group = catalog.first(where: { $0.id == id }) else { return nil }
-            return Suggestion(id: "junk-" + id, kind: .junk(title: group.title),
-                              systemImage: group.systemImage, size: size, target: .smartScanGroup(id))
+            var suggestion = Suggestion(id: "junk-" + id, kind: .junk(title: group.title),
+                                        systemImage: group.systemImage, size: size, target: .smartScanGroup(id))
+            suggestion.measuredAt = lastScan.date
+            return suggestion
         }
     }
 

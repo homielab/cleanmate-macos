@@ -26,13 +26,16 @@ struct SmartScanView: View {
         bytes > 0 ? String(localized: "Freed \(bytes, format: .fileSize) in the last 30 days") : nil
     }
 
-    /// Menu bar item and Overview: the junk the last finished Smart Scan found, what cleaning it freed, and when it ran,
+    /// Menu bar item and Overview: the junk the last finished Smart Scan found, the part ticked (the sidebar badge's
+    /// figure) when that is less, what cleaning it freed, and when it ran,
     /// in `locale`'s language and date format (the view's `\.locale`: CleanMate's language).
     nonisolated static func lastScanLine(_ last: LastScan, locale: Locale = AppLanguage.locale()) -> String {
         let date = last.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale))
         let size = { (bytes: Int64) in bytes.formatted(.fileSize.locale(locale)) }
         var resource: LocalizedStringResource = if let cleaned = last.cleaned {
             "Junk found: \(size(last.junk)), cleaned \(size(cleaned)) (scanned \(date))"
+        } else if last.junk > 0 && last.size != last.junk {
+            "Junk found: \(size(last.junk)) · selected \(size(last.size)) (scanned \(date))"
         } else if last.junk > 0 {
             "Junk found: \(size(last.junk)) (scanned \(date))"
         } else {
@@ -109,6 +112,16 @@ struct SmartScanView: View {
             }
         }
         .animation(.default, value: phaseStep)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                if let group = model.offGroupAsked {
+                    offGroupNote(group)
+                }
+                if module == .smartScan && !access.granted {
+                    fullDiskAccessNote
+                }
+            }
+        }
         .navigationTitle(Text(module.title))
         .trashUndo(model)
         .onAppear {
@@ -133,6 +146,34 @@ struct SmartScanView: View {
             Spacer()
             Button("Open Settings…") { FullDiskAccess.openSettings() }
         }
+    }
+
+    /// Overview › Suggestions led to a group turned off in Settings: say so instead of showing nothing.
+    private func offGroupNote(_ id: String) -> some View {
+        let title = CleanerGroup.smartScan.first { $0.id == id }?.title
+        return HStack {
+            Image(systemName: "eye.slash").foregroundStyle(.secondary)
+            Text("\(title.map { Text($0) } ?? Text(verbatim: id)) is turned off in Settings › Scan Groups, so it is not scanned.")
+            Spacer()
+            Button("Turn On and Scan") { model.turnOnAskedGroup() }
+            Button("Dismiss") { model.offGroupAsked = nil }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    /// Without Full Disk Access, Smart Scan leaves out what macOS protects: say what and how to get it.
+    private var fullDiskAccessNote: some View {
+        HStack {
+            Image(systemName: "lock.shield").foregroundStyle(.orange)
+            Text("Desktop, Documents, Downloads and other protected folders are not scanned — grant Full Disk Access to scan them.")
+            Spacer()
+            Button("Open Settings…") { FullDiskAccess.openSettings() }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     private var results: some View {

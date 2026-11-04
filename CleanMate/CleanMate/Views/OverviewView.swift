@@ -5,6 +5,7 @@ import SwiftUI
 /// folders in the home folder and whether macOS's protections are on. Nothing here removes files or changes a setting.
 struct OverviewView: View {
     @ObservedObject var model: OverviewModel
+    @ObservedObject private var access = FullDiskAccessStatus.shared
     /// What Smart Scan's ticked results would free; nil when it has no results to clean.
     var cleanable: Int64?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -83,6 +84,15 @@ struct OverviewView: View {
                 }
             } else {
                 Text("Looking for space you can free…").foregroundStyle(.secondary)
+            }
+            if !access.granted {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.shield").foregroundStyle(.orange).frame(width: 20)
+                        .accessibilityHidden(true)
+                    Text("Grant Full Disk Access to also check Downloads and external drives.").foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Open Settings…") { FullDiskAccess.openSettings() }.controlSize(.small)
+                }
             }
         } header: {
             HStack {
@@ -359,7 +369,7 @@ private struct SuggestionRow: View {
                 note.font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
-                Button { ModuleRouter.shared.open(suggestion.target) } label: {
+                Button { ModuleRouter.shared.open(suggestion.target, measuredAt: suggestion.measuredAt) } label: {
                     Text("Open \(Text(suggestion.target.module.title))")
                 }
                 .controlSize(.small)

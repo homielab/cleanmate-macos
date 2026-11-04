@@ -210,6 +210,10 @@ final class LargeFilesModel: ObservableObject {
     /// Saves exclusions ("Never Clean This"); tests inject a throwaway defaults domain.
     var exclude: ([URL]) -> [URL] = { Preferences.exclude($0) }
     var hasFullDiskAccess: () -> Bool = { FullDiskAccess.isGranted }
+    /// Folders macOS protects are left out without Full Disk Access (Similar Photos says so).
+    var skipsProtectedFolders: Bool {
+        !ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess()).isEmpty
+    }
     /// Injected by tests (e.g. a slow scan); args: root, minimum size, skipped folders, progress.
     var scanFiles: @Sendable (URL, Int64, Set<String>, @escaping @Sendable (Int) -> Void) async throws -> [LargeFile] = {
         try await LargeFileScanner.scan(root: $0, minSize: $1, skipping: $2, progress: $3)
@@ -230,6 +234,8 @@ final class LargeFilesModel: ObservableObject {
     /// The last move to the Trash, shown above the list (what went, what didn't, "Undo") until the next scan or
     /// until dismissed. Set by `trash()` (tests and snapshots set it directly).
     @Published var lastTrash: CleanReport?
+    /// Space the last move frees once the Trash is emptied: an APFS clone counts only its own blocks (`freedSize`).
+    private(set) var lastTrashFreed: Int64 = 0
     /// Stop was clicked while moving to the Trash: the move ends after the file under way.
     @Published private(set) var stoppingTrash = false
     /// The move to the Trash under way, for Stop.
@@ -624,6 +630,7 @@ final class LargeFilesModel: ObservableObject {
         stoppingTrash = false
         let gone = Set(report.trashed.map(\.original))
         trashedRows = selection.filter { gone.contains($0.url) }
+        lastTrashFreed = trashedRows.reduce(0) { $0 + freedSize(of: $1) }
         dropTrashed(Array(gone))
         // The files a Stop left (the last ones the engine would have moved) keep their tick.
         let left = Set(selection.filter(\.trashable).suffix(report.stopped).map(\.url))

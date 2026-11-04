@@ -49,6 +49,27 @@ final class UninstallerModel: ObservableObject {
     @Published var unused = UnusedFilter.all { didSet { if unused != oldValue { showUndated = false; deselectUnlistedApp() } } }
     /// Set by the view from `@AppStorage`; an app it hides is deselected like the search does.
     @Published var source = SourceFilter.all { didSet { if source != oldValue { deselectUnlistedApp() } } }
+    /// Overview › Suggestions opened the list on apps not used for 3 months, from every source, largest first: for this
+    /// session only, the saved filters (`Preferences.uninstaller*`) stay as they are. "Clear Filter" or a pick in the
+    /// Show or Sort By menu ends it.
+    @Published var suggestedFilter = false
+
+    /// Shows the apps the "not used for 3 months" suggestion is about, without saving any filter.
+    func showUnusedSuggestion() {
+        search = ""
+        suggestedFilter = true
+        unused = .months3
+        source = .all
+    }
+
+    /// The list's filters and order: the suggestion's while `suggestedFilter`, else the saved ones.
+    func applyFilters(unused saved: UnusedFilter, source savedSource: SourceFilter) {
+        unused = suggestedFilter ? .months3 : saved
+        source = suggestedFilter ? .all : savedSource
+    }
+
+    func sort(_ saved: AppSort) -> AppSort { suggestedFilter ? .size : saved }
+
     /// A new selection drops the old one's rows at once (and any load still finishing for it): Uninstall must never
     /// send one app with another's ticked data before `loadEntries` runs.
     @Published var selection: Selection? {

@@ -51,6 +51,14 @@ final class WelcomeTests {
         #expect(!WelcomeModel.showsAtLaunch(defaults: defaults, environment: [:]))
     }
 
+    /// Skip leaves the introduction for the preferences page (Open at login, menu bar), not the whole guide.
+    @Test func skipGoesToThePreferences() {
+        let model = model()
+        model.skip()
+        #expect(model.step == .options)
+        #expect(WelcomeModel.showsAtLaunch(defaults: defaults, environment: [:]))
+    }
+
     @Test func closingTheGuideKeepsItFromShowingAgain() {
         let model = model()
         model.next()

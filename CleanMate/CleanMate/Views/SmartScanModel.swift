@@ -13,13 +13,25 @@ final class SmartScanModel: ObservableObject {
         didSet { if case .results = phase { groups = groups.map { Self.sortedBySize($0, scans: scans) } } }
     }
     @Published var scans: [String: ItemScan] = [:]
-    @Published var selected: Set<String> = []
+    @Published var selected: Set<String> = [] {
+        didSet { if selected != oldValue, case .results = phase { selectionChanged(self) } }
+    }
+    /// After the user ticks or unticks results (the real Smart Scan saves the selected size for the menu bar).
+    var selectionChanged: (SmartScanModel) -> Void = { _ in }
     /// Entries left out of a ticked item with `selectableEntries`: item id → entry URLs. Per session, never remembered.
     @Published var excludedEntries: [String: Set<URL>] = [:]
     /// Ids of result groups the user folded away; per session, kept across rescans since group ids are stable.
     @Published var collapsedGroups: Set<String> = []
     /// Group Overview › Suggestions asked for: the results scroll to it once, then clear it.
     @Published var revealedGroup: String?
+    /// Overview › Suggestions asked for a group turned off in Settings: the view says so and offers to turn it on.
+    @Published var offGroupAsked: String?
+    /// A suggestion's group waiting for the scan it started: shown (`revealedGroup`) once the results are in.
+    private var pendingReveal: String?
+    /// When the results shown were scanned; nil without results.
+    private(set) var resultsDate: Date?
+    /// Turns a group on in Settings (the real Smart Scan writes `Preferences.disabledScanGroups`).
+    var enableGroup: (String) -> Void = { _ in }
     /// Shortcuts' Clean Selected Junk asked for the review: the view opens it once there are results (`takeReviewRequest`).
     @Published var reviewRequested = false
     /// Item ids of the result rows highlighted with the keyboard/mouse (List selection), not the ticks.
@@ -124,6 +136,11 @@ final class SmartScanModel: ObservableObject {
         }
         if realSmartScan {
             disabledGroups = { Preferences.disabledGroups() }
+            selectionChanged = { model in LastScan.recordSelection(model.selectedSize) }
+            enableGroup = { id in
+                let off = Preferences.disabledGroups().subtracting([id])
+                UserDefaults.standard.set(off.sorted().joined(separator: "\n"), forKey: Preferences.disabledScanGroups)
+            }
             scanFinished = { model in
                 LastScan(date: .now, size: model.selectedSize, found: model.foundSize,
                          groups: model.foundByGroup(leavingOut: OverviewSuggestions.liveItems)).save()
@@ -689,24 +706,59 @@ final class SmartScanModel: ObservableObject {
         scanningSince = [:]
         scanningNow = ScanningLine()
         if Task.isCancelled, let beforeScan {
+            pendingReveal = nil
             (phase, groups, scans, selected, excludedEntries, blocked) = beforeScan
             return
         }
         phase = .results
+        resultsDate = .now
+        if let pendingReveal {
+            revealedGroup = pendingReveal
+            self.pendingReveal = nil
+        }
         Attention.finished()
         scanFinished(self)
     }
 
     /// Overview › Suggestions: shows `group` unfolded, scanning first when there are no results to show it in
     /// (a scan or a clean under way is left to finish). Nothing is ticked or cleaned.
-    func reveal(group: String) {
+    /// `measuredAt`: when the suggestion measured what it shows; results older than that are scanned again first.
+    /// A group turned off in Settings is not scanned: `offGroupAsked` lets the view say so.
+    func reveal(group: String, measuredAt: Date? = nil) {
         search = ""
-        collapsedGroups.remove(group)
-        revealedGroup = group
-        switch phase {
-        case .idle, .done: if !undoing { startScan() }
-        case .scanning, .results, .cleaning: break
+        offGroupAsked = nil
+        guard !disabledGroups().contains(group) else {
+            offGroupAsked = group
+            return
         }
+        collapsedGroups.remove(group)
+        switch phase {
+        case .idle, .done:
+            if undoing { revealedGroup = group } else { pendingReveal = group; startScan() }
+        case .scanning:
+            pendingReveal = group
+        case .results:
+            // A second of slack: the Overview's record of a scan is saved just after its results.
+            if let measuredAt, let resultsDate, resultsDate < measuredAt.addingTimeInterval(-1), !undoing {
+                pendingReveal = group
+                startScan()
+            } else {
+                revealedGroup = group
+            }
+        case .cleaning:
+            revealedGroup = group
+        }
+    }
+
+    /// The group `offGroupAsked` named, turned on in Settings, then scanned and shown.
+    func turnOnAskedGroup() {
+        guard let group = offGroupAsked else { return }
+        enableGroup(group)
+        refreshDisabled()
+        offGroupAsked = nil
+        pendingReveal = group
+        collapsedGroups.remove(group)
+        startScan()
     }
 
     /// Stop (or ⌘.) while cleaning: the item under way finishes, the ones after it are not touched, and the done

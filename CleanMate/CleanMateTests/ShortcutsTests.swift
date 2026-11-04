@@ -69,7 +69,7 @@ struct ShortcutsTests {
         #expect(ShortcutsSummary.spaceText(volume, last: nil, locale: Self.en) == "120 GB free of 500 GB\nSmart Scan has not run yet.")
         let last = LastScan(date: Date(timeIntervalSince1970: 1_800_000_000), size: 1_000_000, found: 3_000_000)
         let space = ShortcutsSummary.spaceText(volume, last: last, locale: Self.vi)
-        #expect(space.hasPrefix("Còn trống 120 GB / 500 GB\nRác tìm thấy: 3 MB (quét lúc "), "\(space)")
+        #expect(space.hasPrefix("Còn trống 120 GB / 500 GB\nRác tìm thấy: 3 MB · đã chọn 1 MB (quét lúc "), "\(space)")
     }
 
     @Test func choicesMatchTheAppAndTheCommandLine() {

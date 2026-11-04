@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Stop** while a Smart Scan or Privacy clean runs (the rest is left as it is and the done screen says how many items weren’t cleaned), on a running Maintenance task, and while the Uninstaller waits for an app to quit; ⌘. does the same.
 ### Changed
+- Without Full Disk Access, Smart Scan, Similar Photos and Suggestions say what they skip and how to fix it, instead of "nothing found".
+- The menu bar and Overview show "found X · selected Y", the same number as the sidebar, and lifetime "freed" never goes down.
+- Suggestions rescan old results, offer to turn a disabled group back on, and their Uninstaller filter lasts only this visit.
+- The welcome guide introduces every module, and **Skip** still lets you set Open at login and the menu bar.
 - The menu bar item shows **Junk found: X (scanned …)**, everything the last Smart Scan found, and opens Smart Scan when clicked.
 - **Large & Old Files › Similar Photos** and `cleanmate similar` use about a third less memory on large libraries (20,000 photos: 490 MB → 320 MB at peak), with the same groups.
 - **Overview** opens at once: the largest folders in your home show the sizes of the last measure, with when they were measured, while they are measured again in the background.

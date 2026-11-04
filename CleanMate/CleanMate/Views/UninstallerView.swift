@@ -23,6 +23,14 @@ struct UninstallerView: View {
     @AppStorage(Preferences.uninstallerUnused) private var unused = UninstallerModel.UnusedFilter.all
     @AppStorage(Preferences.uninstallerSource) private var source = UninstallerModel.SourceFilter.all
 
+    /// A menu pick ends the suggestion's filter and is saved; the menus show what the list shows.
+    private func picked<Value>(_ saved: Binding<Value>, shown: @escaping () -> Value) -> Binding<Value> {
+        Binding(get: shown) {
+            model.suggestedFilter = false
+            saved.wrappedValue = $0
+        }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             appList.frame(width: 280)
@@ -31,13 +39,14 @@ struct UninstallerView: View {
         }
         .navigationTitle(Text(Module.uninstaller.title))
         .trashUndo(model)
-        .onAppearAndChange(of: unused) { model.unused = $0 }
-        .onAppearAndChange(of: source) { model.source = $0 }
+        .onAppearAndChange(of: unused) { model.applyFilters(unused: $0, source: source) }
+        .onAppearAndChange(of: source) { model.applyFilters(unused: unused, source: $0) }
+        .onAppearAndChange(of: model.suggestedFilter) { _ in model.applyFilters(unused: unused, source: source) }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Apps"))
         .onFindKey { focusToolbarSearch(in: $0) }
         .toolbar {
             Menu("Sort By", systemImage: "arrow.up.arrow.down") {
-                Picker("Sort By", selection: $sort) {
+                Picker("Sort By", selection: picked($sort) { model.sort(sort) }) {
                     Text("Name").tag(UninstallerModel.AppSort.name)
                     Text("Size").tag(UninstallerModel.AppSort.size)
                     Text("Last Used").tag(UninstallerModel.AppSort.lastUsed)
@@ -45,16 +54,16 @@ struct UninstallerView: View {
                 .pickerStyle(.inline)
             }
             .help("Sort By")
-            Menu("Show", systemImage: unused == .all && source == .all ? "line.3.horizontal.decrease.circle"
+            Menu("Show", systemImage: model.unused == .all && model.source == .all ? "line.3.horizontal.decrease.circle"
                                                                         : "line.3.horizontal.decrease.circle.fill") {
-                Picker("Show", selection: $unused) {
+                Picker("Show", selection: picked($unused) { model.unused }) {
                     Text("All Apps").tag(UninstallerModel.UnusedFilter.all)
                     Text("Not Used for 3 Months").tag(UninstallerModel.UnusedFilter.months3)
                     Text("Not Used for 6 Months").tag(UninstallerModel.UnusedFilter.months6)
                     Text("Not Used for a Year").tag(UninstallerModel.UnusedFilter.year1)
                 }
                 .pickerStyle(.inline)
-                Picker("Source", selection: $source) {
+                Picker("Source", selection: picked($source) { model.source }) {
                     Text("All Sources").tag(UninstallerModel.SourceFilter.all)
                     Text("App Store").tag(UninstallerModel.SourceFilter.appStore)
                     Text("Homebrew").tag(UninstallerModel.SourceFilter.homebrew)
@@ -193,6 +202,13 @@ struct UninstallerView: View {
 
     private var appList: some View {
         List(selection: $model.selection) {
+            if model.suggestedFilter {
+                HStack {
+                    Text("Apps not used for 3 months, largest first").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear Filter") { model.suggestedFilter = false }.controlSize(.small)
+                }
+            }
             Section {
                 Label("Leftovers of Removed Apps", systemImage: "questionmark.folder").tag(UninstallerModel.Selection.leftovers)
                 Label("Unknown Hidden Config", systemImage: "exclamationmark.triangle")
@@ -203,7 +219,7 @@ struct UninstallerView: View {
                     .tag(UninstallerModel.Selection.extensions)
             }
             Section {
-                ForEach(UninstallerModel.sorted(model.filteredApps, by: sort, sizes: model.totalSizes)) { app in
+                ForEach(UninstallerModel.sorted(model.filteredApps, by: model.sort(sort), sizes: model.totalSizes)) { app in
                     HStack {
                         Toggle(isOn: ticked(app.url)) { EmptyView() }
                             .toggleStyle(SelectionCheckboxStyle())

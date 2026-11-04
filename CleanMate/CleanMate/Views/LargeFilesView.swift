@@ -92,7 +92,8 @@ struct LargeFilesView: View {
                 TrashProgress(stopping: model.stoppingTrash) { model.stopTrash() }
             case .results:
                 if model.similarPhotosShown, !model.needsAccess {
-                    SimilarPhotosView(model: model.similarPhotos, scopeName: model.scopeName, confirming: $confirmingPhotos) {
+                    SimilarPhotosView(model: model.similarPhotos, scopeName: model.scopeName,
+                                      skipsProtected: model.skipsProtectedFolders, confirming: $confirmingPhotos) {
                         listingMenu
                     }
                 } else {
@@ -368,7 +369,7 @@ struct LargeFilesView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 if let report = model.lastTrash {
-                    MovedToTrashNote(report: report, undoing: model.undoing) { await model.undoTrash() } dismiss: {
+                    MovedToTrashNote(report: report, freed: model.lastTrashFreed, undoing: model.undoing) { await model.undoTrash() } dismiss: {
                         model.dismissTrashReport()
                     }
                 }
@@ -516,6 +517,8 @@ struct LargeFilesView: View {
 /// After Move to Trash, above the list: what went (and what didn't), Undo, Open Trash, View Moved Items.
 private struct MovedToTrashNote: View {
     let report: CleanReport
+    /// What the move frees (APFS clones count only their own blocks); `report.freed` is the files' sizes.
+    let freed: Int64
     let undoing: Bool
     let undo: () async -> Void
     let dismiss: () -> Void
@@ -524,7 +527,7 @@ private struct MovedToTrashNote: View {
         HStack(alignment: .firstTextBaseline) {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Moved \(report.freed, format: .fileSize) to the Trash")
+                Text("Moved \(freed, format: .fileSize) to the Trash")
                     .help(Text("Empty the Trash to free the space."))
                 StoppedTrashSummary(report: report)
                 NotCleanedSummary(report: report)
@@ -542,7 +545,7 @@ private struct MovedToTrashNote: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.bar)
-        .onAppear { announceForAccessibility(String(localized: "Moved \(report.freed.formatted(.byteCount(style: .file))) to the Trash")) }
+        .onAppear { announceForAccessibility(String(localized: "Moved \(freed.formatted(.byteCount(style: .file))) to the Trash")) }
     }
 }
 
