@@ -233,17 +233,41 @@ nonisolated extension CommandLineTool {
             }
         }
         var moved: CleanReport?
+        var failure: Failure?
         if !dryRun && !picked.isEmpty {
-            moved = try? await Uninstaller.trash(app: nil, data: picked, policy: sources.policy(), launchctl: sources.launchctl,
-                                                 moveToTrash: sources.trash)
+            do {
+                moved = try await Uninstaller.trash(app: nil, data: picked, policy: sources.policy(),
+                                                    launchctl: sources.launchctl, moveToTrash: sources.trash)
+            } catch {
+                moved = CleanReport()
+                failure = Failure(code: error == .cancelled ? "cancelled" : "failed",
+                                  message: leftoversFailure(error))
+            }
         } else if !dryRun {
             moved = CleanReport()
         }
         var report = HeadlessApps.report(app: nil, data: picked, summary: nil, notTaken: [], moved: moved, started: started,
                                          sources: sources)
+        if failure == nil, !picked.isEmpty, let moved, moved.trashed.isEmpty, moved.notCleaned > 0 {
+            let reasons = Set(report.items.compactMap(\.reason)).sorted().joined(separator: "; ")
+            failure = Failure(code: "failed", message: "none of the leftovers could be moved to the Trash (\(reasons))")
+        }
         report.items += refused
+        report.error = failure
+        if let failure { output.err("cleanmate uninstall: \(failure.message). Nothing was moved.\n") }
         return emit(report, json: json, output: output) { uninstallText(report, home: home, color: output.color) }
-            ?? Exit.ok.rawValue
+            ?? (failure == nil ? Exit.ok : Exit.failure).rawValue
+    }
+
+    /// Why `Uninstaller.trash` refused the leftovers, as the app tells it.
+    static func leftoversFailure(_ error: Uninstaller.AppTrashError) -> String {
+        switch error {
+        case .locked: "an item is locked in Finder: select it, choose File > Get Info, turn off Locked, then try again"
+        case .brewBusy: "a brew command is running now: wait until it finishes, then try again"
+        case .appStore: "macOS only lets you remove App Store items yourself: drag them to the Trash in Finder"
+        case .cancelled: "the move was cancelled"
+        case .notTrashed: "the leftovers couldn’t be moved to the Trash: they may belong to the system or another user"
+        }
     }
 
     /// The question asked on a terminal before `uninstall APP` moves anything.

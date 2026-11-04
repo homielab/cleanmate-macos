@@ -86,6 +86,9 @@ CleanMate moved").
 Exit codes: 0 OK (also when something was skipped), 1 error, 2 bad arguments (stderr says why), 3 no Full Disk Access
 with `--require-fda`, 4 a command that changes something (`clean`, `trash`, `uninstall APP`, `privacy --erase`,
 `login-items remove`) without `--yes` and without a terminal, 5 `uninstall`: the app is open.
+On failure stderr says why and `--json` prints `"error": {"code", "message"}`: `fullDiskAccess` (exit 3: ask the
+user to grant it), `path` (2), `permission`, `cancelled`, `failed` (1). All output is in English, whatever the app's
+language.
 
 ## What takes space
 

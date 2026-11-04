@@ -222,6 +222,21 @@ struct CommandLineModulesTests {
         #expect(TrashRecords.inTrash(home: apps.home).map(\.moduleName) == ["Uninstaller"])
     }
 
+    /// The Trash refuses every leftover: the reason on stderr, exit 1, `error` in the JSON, nothing moved.
+    @Test func failedLeftoversExitWithTheReason() async throws {
+        let apps = try Apps()
+        var sources = apps.sources()
+        sources.trash = { _ in throw CocoaError(.fileWriteNoPermission) }
+        let (code, printed) = await Self.run(["uninstall", "--leftovers", "--yes", "--json", "~/Library/Caches/org.oldvendor.gone"],
+                                             sources)
+        #expect(code == 1, "\(printed.stderr)")
+        #expect(printed.stderr.hasPrefix("cleanmate uninstall: none of the leftovers could be moved"))
+        let report = try Self.decode(HeadlessApps.UninstallReport.self, printed)
+        #expect(report.count == 0 && report.error?.code == "failed")
+        #expect(apps.exists("Library/Caches/org.oldvendor.gone"))
+        #expect(CommandLineTool.leftoversFailure(.locked).contains("Locked"))
+    }
+
     // MARK: - privacy
 
     /// A browser whose app runs (its cookies are skipped) and one that doesn't.

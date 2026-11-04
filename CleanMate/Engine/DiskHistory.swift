@@ -55,7 +55,8 @@ nonisolated final class DiskHistory: @unchecked Sendable {
     }
 
     /// Adds `point`, replacing a reading from the same day, and saves (under the lock, so two records keep both).
-    func record(_ point: Point, calendar: Calendar = .current) {
+    /// A save that fails is logged in the activity log of `home` (Settings › Activity) with the path and errno.
+    func record(_ point: Point, calendar: Calendar = .current, home: URL = SafetyPolicy.current.homeURL) {
         state.withLock { points in
             let updated = Self.adding(point, to: points ?? load(), calendar: calendar)
             points = updated
@@ -63,8 +64,18 @@ nonisolated final class DiskHistory: @unchecked Sendable {
             do {
                 try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try Self.text(updated).write(to: file, atomically: true, encoding: .utf8)
-            } catch {}
+            } catch {
+                ActivityLog.recordFailed(module: "Overview", item: file.path, reason: Self.reason(error), home: home)
+            }
         }
+    }
+
+    /// "Couldn’t save the disk space history: <description> (errno N)".
+    static func reason(_ error: any Error) -> String {
+        let nsError = error as NSError
+        let posix = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0.code : nil }
+            ?? (nsError.domain == NSPOSIXErrorDomain ? nsError.code : nil)
+        return "Couldn’t save the disk space history: \(nsError.localizedDescription)" + (posix.map { " (errno \($0))" } ?? "")
     }
 
     private func load() -> [Point] {
@@ -75,7 +86,7 @@ nonisolated final class DiskHistory: @unchecked Sendable {
     func recordNow(home: URL = SafetyPolicy.current.homeURL, now: Date = .now) {
         let volume = DiskVolume.read(home)
         guard volume.total > 0 else { return }
-        record(Point(date: now, available: volume.available, total: volume.total))
+        record(Point(date: now, available: volume.available, total: volume.total), home: home)
     }
 
     /// The readings from the last `days` days (today included) of `now`.

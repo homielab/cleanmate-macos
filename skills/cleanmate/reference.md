@@ -25,6 +25,10 @@
 | `cleanmate login-items restore --json LABEL` | puts it back from the Trash and loads it again |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
+On failure (`space`, `large`, `dupes`, `similar`, `uninstall --leftovers`) `--json` prints
+`{"version": …, "error": {"code": "fullDiskAccess", "message": "…"}}` (in `uninstall` the report gets `error`).
+Codes and exit codes: `fullDiskAccess` 3, `path` 2, `permission` / `cancelled` / `failed` 1. Output is always English.
+
 Options for `scan` and `clean`:
 
 - `--only ID,ID`: these items (ids from `cleanmate list`). In `clean`, the items are cleaned even if unticked. The only

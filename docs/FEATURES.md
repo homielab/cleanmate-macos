@@ -267,7 +267,12 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
   removed, one by one, except locked rows: the rows you tick in the app are not seen by the command, so to keep some,
   clean them in Smart Scan instead.
 - Text output has colours only on a terminal and never when `NO_COLOR` is set; `--json` prints one JSON object.
-  Names and descriptions are always in English.
+  Names, descriptions and messages are always in English, whatever the app's language, so scripts and AI agents can
+  read them.
+- A failed command says why on stderr (`cleanmate large: …`: no Full Disk Access with how to grant it, no permission
+  for a folder with its path, cancelled) and, with `--json`, prints `{"error": {"code", "message"}}`; codes
+  `fullDiskAccess` (exit 3), `path` (2), `permission`, `cancelled`, `failed` (1). `uninstall --leftovers` that moves
+  nothing because the Trash refused every item exits 1 with the reason and `error` in its JSON.
 - Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments or a PATH that does not
   exist, is not a folder or can't be read, `3` no Full Disk Access with `--require-fda`, or a `space` / `large` PATH in a
   folder macOS protects without it, `4` `clean`, `trash`, `uninstall APP`, `uninstall --leftovers PATH…`,

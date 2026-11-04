@@ -851,6 +851,41 @@ extension CommandLineToolTests {
         #expect(dupesHelp.stdout.contains("dupes           Duplicate files"))
     }
 
+    /// A folder it can't read: every search command says why on stderr, exits 2, and `--json` carries `error`.
+    @Test func unreadableFolderTellsWhy() async throws {
+        let fixture = try FilesFixture()
+        let locked = fixture.home.appending(path: "Media")
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: locked.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
+        for command in [["large", "--in"], ["dupes", "--in"], ["similar"]] {
+            let (code, printed) = await Self.run(command + [locked.path], fixture.sources(fullDiskAccess: true))
+            #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.contains("can't read"), "\(command)")
+            let (jsonCode, json) = await Self.run(command + [locked.path, "--json"], fixture.sources(fullDiskAccess: true))
+            let report = try JSONDecoder().decode(CommandLineTool.FailureReport.self, from: Data(json.stdout.utf8))
+            #expect(jsonCode == 2 && report.error.code == "path" && report.error.message.contains("can't read"), "\(command)")
+        }
+    }
+
+    /// Errors thrown during a search map to the exit code table and a reason.
+    @Test func searchFailuresMapToExitCodes() {
+        let home = URL(fileURLWithPath: "/Users/someone")
+        let folder = home.appending(path: "Media")
+        let denied = CocoaError(.fileReadNoPermission, userInfo: [NSFilePathErrorKey: folder.path,
+                                                                  NSUnderlyingErrorKey: POSIXError(.EACCES) as NSError])
+        let noAccess = CommandLineTool.searchFailure(denied, root: home, hasFullDiskAccess: false, home: home)
+        #expect(noAccess.exit == .noFullDiskAccess && noAccess.failure.code == "fullDiskAccess")
+        #expect(noAccess.failure.message.contains("~/Media") && noAccess.failure.message.contains("Full Disk Access"))
+        let permission = CommandLineTool.searchFailure(denied, root: home, hasFullDiskAccess: true, home: home)
+        #expect(permission.exit == .failure && permission.failure.code == "permission")
+        let cancelled = CommandLineTool.searchFailure(CancellationError(), root: home, hasFullDiskAccess: true, home: home)
+        #expect(cancelled.exit == .failure && cancelled.failure.code == "cancelled")
+        let outside = CommandLineTool.searchFailure(LargeFileScanner.OutsideHomeError(), root: folder, hasFullDiskAccess: true,
+                                                    home: home)
+        #expect(outside.exit == .usage && outside.failure.code == "path")
+        let other = CommandLineTool.searchFailure(POSIXError(.EIO), root: folder, hasFullDiskAccess: true, home: home)
+        #expect(other.exit == .failure && other.failure.code == "failed" && other.failure.message.contains("~/Media"))
+    }
+
     @Test func similarArgumentsAndExitCodes() async throws {
         let fixture = try FilesFixture()
         let home = fixture.home.path

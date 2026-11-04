@@ -91,4 +91,22 @@ struct DiskHistoryTests {
         model.cancel()
         #expect(model.history.map(\.available) == [2, 3])
     }
+
+    /// A history file it can't write: the reading stays in memory and the failure goes to the activity log.
+    @Test func failedSaveIsLogged() throws {
+        let root = TestTemp.url("CleanMateDiskHistory")
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: root.appending(path: "ro").path)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let readOnly = root.appending(path: "ro")
+        try FileManager.default.createDirectory(at: readOnly, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: readOnly.path)
+        let home = root.appending(path: "home")
+        let history = DiskHistory(file: readOnly.appending(path: "history.tsv"))
+        history.record(Self.point(daysAgo: 0, free: Self.gb), calendar: Self.calendar, home: home)
+        #expect(history.points.count == 1)
+        let log = ActivityLog.read(home: home)
+        #expect(log.contains("history.tsv") && log.contains("errno 13"), "\(log)")
+    }
 }

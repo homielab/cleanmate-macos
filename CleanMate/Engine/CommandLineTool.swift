@@ -228,8 +228,10 @@ nonisolated enum CommandLineTool {
              login-items could not remove or restore the item)
           2  Invalid arguments (also a PATH that is missing, not a folder or can't be read; no app, Privacy
              item or login item by that name)
-          3  No Full Disk Access with --require-fda, or space, large, dupes or similar asked for a folder macOS
-             protects
+          3  No Full Disk Access with --require-fda, or space, large, dupes or similar asked for (or could not
+             read) a folder macOS protects
+          With --json a failure also prints {"error": {"code", "message"}}: fullDiskAccess, path, permission,
+          cancelled or failed.
           4  clean, trash, uninstall, privacy --erase or login-items remove without --yes and without a
              terminal: nothing was deleted or moved
           5  uninstall: the app is open (add --quit) or did not quit: nothing was moved
@@ -276,7 +278,7 @@ nonisolated enum CommandLineTool {
                                sources: sources, output: output)
         case .space(let options, let json):
             let folder: URL
-            do { folder = try HeadlessFiles.spaceFolder(options, sources: sources) } catch { return pathError(error, output) }
+            do { folder = try HeadlessFiles.spaceFolder(options, sources: sources) } catch { return pathError(error, json: json, sources: sources, output) }
             let showsProgress = output.progress && !json
             if showsProgress { output.err("Measuring…") }
             let report = await HeadlessFiles.space(folder, limit: options.limit, sources: sources)
@@ -286,29 +288,29 @@ nonisolated enum CommandLineTool {
             output.out(text)
         case .large(let options, let json):
             let root: URL
-            do { root = try HeadlessFiles.largeFolder(options, sources: sources) } catch { return pathError(error, output) }
+            do { root = try HeadlessFiles.largeFolder(options, sources: sources) } catch { return pathError(error, json: json, sources: sources, output) }
             let showsProgress = output.progress && !json
             if showsProgress { output.err("Searching…") }
-            let found = try? await HeadlessFiles.large(root, options: options, sources: sources)
-            if showsProgress { output.err("\r\u{1B}[K") }
-            guard let report = found else {
-                output.err("cleanmate: could not search \(options.root ?? "~")\n")
-                return Exit.failure.rawValue
+            let report: HeadlessFiles.LargeReport
+            do { report = try await HeadlessFiles.large(root, options: options, sources: sources) } catch {
+                if showsProgress { output.err("\r\u{1B}[K") }
+                return searchFailed("large", error, root: root, json: json, sources: sources, output: output)
             }
+            if showsProgress { output.err("\r\u{1B}[K") }
             guard let text = json ? encode(report) : largeText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
         case .dupes(let options, let json):
             let root: URL
-            do { root = try HeadlessFiles.dupesFolder(options, sources: sources) } catch { return pathError(error, output) }
+            do { root = try HeadlessFiles.dupesFolder(options, sources: sources) } catch { return pathError(error, json: json, sources: sources, output) }
             let showsProgress = output.progress && !json
             if showsProgress { output.err("Searching…") }
-            let found = try? await HeadlessFiles.dupes(root, options: options, sources: sources)
-            if showsProgress { output.err("\r\u{1B}[K") }
-            guard let report = found else {
-                output.err("cleanmate: could not search \(options.root ?? "~")\n")
-                return Exit.failure.rawValue
+            let report: HeadlessFiles.DupesReport
+            do { report = try await HeadlessFiles.dupes(root, options: options, sources: sources) } catch {
+                if showsProgress { output.err("\r\u{1B}[K") }
+                return searchFailed("dupes", error, root: root, json: json, sources: sources, output: output)
             }
+            if showsProgress { output.err("\r\u{1B}[K") }
             guard let text = json ? encode(report) : dupesText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
@@ -360,13 +362,72 @@ nonisolated enum CommandLineTool {
         return result
     }
 
-    private static func pathError(_ error: HeadlessFiles.PathError, _ output: Output) -> Int32 {
+    /// Why a command failed, in `--json` output: `{"error": {"code", "message"}}`. Codes: `fullDiskAccess` (exit 3),
+    /// `path` (exit 2), `permission`, `cancelled`, `failed` (exit 1).
+    struct Failure: Codable, Equatable, Sendable {
+        var code: String
+        var message: String
+    }
+
+    struct FailureReport: Codable, Equatable, Sendable {
+        var version: String
+        var error: Failure
+    }
+
+    private static func pathError(_ error: HeadlessFiles.PathError, json: Bool = false, sources: HeadlessScan.Sources,
+                                  _ output: Output) -> Int32 {
+        if json, let text = encode(FailureReport(version: sources.version(),
+                                                 error: Failure(code: error.needsFullDiskAccess ? "fullDiskAccess" : "path",
+                                                                message: error.message))) {
+            output.out(text)
+        }
         if error.needsFullDiskAccess {
             output.err("cleanmate: \(error.message)\n")
             return Exit.noFullDiskAccess.rawValue
         }
         output.err("cleanmate: \(error.message)\nRun `cleanmate --help` for usage.\n")
         return Exit.usage.rawValue
+    }
+
+    /// What a failed search of `space`, `large`, `dupes` or `similar` tells, and its exit code: no Full Disk Access
+    /// (3), a folder outside the places it may search (2), a folder it may not read, cancelled, or another error (1).
+    static func searchFailure(_ error: any Error, root: URL?, hasFullDiskAccess: Bool,
+                              home: URL) -> (failure: Failure, exit: Exit) {
+        let nsError = error as NSError
+        let path = (nsError.userInfo[NSFilePathErrorKey] as? String) ?? (nsError.userInfo[NSURLErrorKey] as? URL)?.path
+            ?? root?.path
+        let shown = path.map { HeadlessScan.displayPath(URL(fileURLWithPath: $0), home: home) } ?? "the folder"
+        if error is CancellationError || error is SimilarPhotos.Cancelled || error is DuplicateFinder.Cancelled
+            || (error as? CocoaError)?.code == .userCancelled {
+            return (Failure(code: "cancelled", message: "the search was cancelled"), .failure)
+        }
+        if error is LargeFileScanner.OutsideHomeError {
+            return (Failure(code: "path", message: "\(shown) can't be searched: only your home folder (not ~/Library or "
+                            + "a hidden folder) or an external drive"), .usage)
+        }
+        let posix = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError).flatMap { $0.domain == NSPOSIXErrorDomain ? $0.code : nil }
+            ?? (nsError.domain == NSPOSIXErrorDomain ? nsError.code : nil)
+        let denied = posix == Int(EPERM) || posix == Int(EACCES)
+            || [CocoaError.fileReadNoPermission, .fileWriteNoPermission].contains((error as? CocoaError)?.code)
+        if denied && !hasFullDiskAccess {
+            return (Failure(code: "fullDiskAccess", message: "macOS didn’t let it read \(shown): reading it needs Full Disk "
+                            + "Access. Grant it to the app that runs cleanmate in System Settings › Privacy & Security › "
+                            + "Full Disk Access, then reopen that app"), .noFullDiskAccess)
+        }
+        if denied {
+            return (Failure(code: "permission", message: "no permission to read \(shown): check its owner and permissions in "
+                            + "Finder (File › Get Info)"), .failure)
+        }
+        return (Failure(code: "failed", message: "could not search \(shown): \(nsError.localizedDescription)"), .failure)
+    }
+
+    private static func searchFailed(_ command: String, _ error: any Error, root: URL?, json: Bool,
+                                     sources: HeadlessScan.Sources, output: Output) -> Int32 {
+        let (failure, exit) = searchFailure(error, root: root, hasFullDiskAccess: sources.hasFullDiskAccess(),
+                                            home: sources.policy().homeURL)
+        if json, let text = encode(FailureReport(version: sources.version(), error: failure)) { output.out(text) }
+        output.err("cleanmate \(command): \(failure.message).\n")
+        return exit.rawValue
     }
 
     static func noFullDiskAccess(_ output: Output) -> Int32 {
@@ -407,7 +468,7 @@ nonisolated enum CommandLineTool {
     private static func similar(_ options: HeadlessFiles.SimilarOptions, json: Bool, sources: HeadlessScan.Sources,
                                 output: Output) async -> Int32 {
         let roots: [URL]
-        do { roots = try HeadlessFiles.similarFolders(options, sources: sources) } catch { return pathError(error, output) }
+        do { roots = try HeadlessFiles.similarFolders(options, sources: sources) } catch { return pathError(error, json: json, sources: sources, output) }
         let showsProgress = output.progress && !json
         if showsProgress { output.err("Searching…") }
         // At most ~10 progress lines a second.
@@ -420,13 +481,16 @@ nonisolated enum CommandLineTool {
             }
             if due { output.err("\r\u{1B}[KComparing photos… \(done)/\(total)") }
         }
-        let found = try? await HeadlessFiles.similar(roots, options: options, sources: sources,
+        let report: HeadlessFiles.SimilarReport
+        do {
+            report = try await HeadlessFiles.similar(roots, options: options, sources: sources,
                                                      progress: showsProgress ? progress : nil)
-        if showsProgress { output.err("\r\u{1B}[K") }
-        guard let report = found else {
-            output.err("cleanmate: could not search \(options.roots.isEmpty ? "~" : options.roots.joined(separator: ", "))\n")
-            return Exit.failure.rawValue
+        } catch {
+            if showsProgress { output.err("\r\u{1B}[K") }
+            return searchFailed("similar", error, root: roots.count == 1 ? roots[0] : nil, json: json, sources: sources,
+                                output: output)
         }
+        if showsProgress { output.err("\r\u{1B}[K") }
         guard let text = json ? encode(report) : similarText(report, home: sources.policy().homeURL, color: output.color)
         else { return Exit.failure.rawValue }
         output.out(text)

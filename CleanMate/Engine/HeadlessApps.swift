@@ -112,8 +112,10 @@ nonisolated enum HeadlessApps {
         var casksLeft: [String]
         /// The activity log (`~/…`); null in a dry run, which writes nothing.
         var log: String?
+        /// Why nothing was moved, when the command failed (exit code 1); left out otherwise.
+        var error: CommandLineTool.Failure? = nil
 
-        enum CodingKeys: String, CodingKey { case version, dryRun, durationMs, app, count, size, items, notRemoved, casksLeft, log }
+        enum CodingKeys: String, CodingKey { case version, dryRun, durationMs, app, count, size, items, notRemoved, casksLeft, log, error }
 
         func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
@@ -127,6 +129,7 @@ nonisolated enum HeadlessApps {
             try container.encode(notRemoved, forKey: .notRemoved)
             try container.encode(casksLeft, forKey: .casksLeft)
             try container.encode(log, forKey: .log)
+            try container.encodeIfPresent(error, forKey: .error)
         }
     }
 
