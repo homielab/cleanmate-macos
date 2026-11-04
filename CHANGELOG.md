@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Smart Scan** is much faster after the first scan, about 10 seconds down to 5 on a developer Mac.
 
 ### Fixed
-- Moving items to the Trash is safer: nothing else gets moved if a file changes at the last moment.
+- Moving items to the Trash is safer.
 
 ## [1.5] - 2026-11-01
 
@@ -98,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The first **Smart Scan** is about twice as fast with many JavaScript projects.
 
 ### Fixed
-- Cleaning is safer: an item swapped for a link after the scan is never touched.
+- Cleaning is safer.
 - Fixed a few small display bugs, including animations ignoring **Reduce motion**.
 
 ## [1.4] - 2026-10-31
