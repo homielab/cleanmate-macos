@@ -59,183 +59,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.7] - 2026-11-02
 
 ### Added
-- **Smart Scan › Applications**: caches and logs of **Steam**, **Epic Games Launcher**, **Battle.net** and **GOG Galaxy** (web caches, library artwork, update manifests, logs, crash dumps, shader caches), 0.5–3 GB with Steam. Ticked and deleted, since the launcher downloads them again; skipped while the launcher runs. Games, downloads in progress, saves, settings and sign-ins are never touched.
-- **Smart Scan › Applications**: logs, crash reports and web caches of **Minecraft** and **Prism Launcher** (including each Prism instance's logs and crash reports). Ticked and deleted; skipped while the launcher runs. Worlds, mods, resource packs, screenshots, settings and accounts are never touched.
-- **Large & Old Files › Remove Download**: with Full Disk Access, downloaded iCloud Drive files are listed with an **iCloud** label; for a file whose every change is in iCloud, Remove Download frees its space on this Mac and keeps it in iCloud Drive (it downloads again when opened). Files not uploaded yet, syncing or in conflict are locked. `cleanmate large --json` adds an `icloud` field.
-- `cleanmate restore --list` now lists launch agents removed in **Login Items**, and `cleanmate restore` puts them back.
-
-### Changed
-- `cleanmate restore --list --json`: `version` is the app's version string, as in every other command (was the number `1`). Older records that didn't keep what moved them show `unknown` instead of `Command Line`.
+- **Smart Scan** cleans caches and logs of Steam, Epic Games Launcher, Battle.net and GOG Galaxy; games and saves are never touched.
+- **Smart Scan** also cleans Minecraft and Prism Launcher logs and caches; worlds and mods stay.
+- **Large & Old Files**: **Remove Download** frees the space of iCloud Drive files on this Mac and keeps them in iCloud.
 
 ## [1.6] - 2026-11-02
 
 ### Added
-- **Command line**: `cleanmate restore --list` shows what CleanMate moved to the Trash and is still there, newest first, with the date, size, old place and the module that moved it (Smart Scan, Large & Old Files, Space Lens, the Uninstaller or the command line); `--limit N` and `--json`. `cleanmate restore` now also puts back what the app moved, even after CleanMate quit, with the same never-overwrite checks. The Agent Skill uses it when you ask to get something back.
-- **Command line**: `cleanmate trash PATH…` moves exactly the files and folders you name to the Trash, with the safety rules of Space Lens (only in your home folder; never `~/Library`, hidden files like `~/.ssh`, packages, excluded paths or symlinks; each refused path is reported with the reason), and `cleanmate restore TRASHED…` puts them back at their old place, never over a file that is there now. It asks `Proceed? [y/N]` on a terminal and needs `--yes` elsewhere (exit code 4 without it); both write the activity log and take `--json`. The Agent Skill uses it after `space`, `large` or `dupes`, only for the paths you confirm.
-- **Smart Scan › Developer Junk**: **Stale build folders** now also finds the build folders of Gradle and Android (`build`, `.gradle`, `app/build`), Maven, SwiftPM, Flutter, Next.js, Nuxt, SvelteKit, Angular, Turborepo, Haskell, Elixir and Zig projects untouched for 90 days, each only next to the file that makes it, so an abandoned Android or Next.js project's gigabytes show up. Unticked and moved to the Trash, so Undo puts them back.
-- **Command line**: `cleanmate dupes` finds duplicate files like the Duplicates Only filter of Large & Old Files, in your home folder or `--in PATH`, with `--min-size`, `--limit` and `--json`: groups by space wasted, each copy with its date and what removing it frees (hard links and APFS clones free nothing). Read-only; the Agent Skill uses it when you ask about duplicates and sends you to the app to remove copies.
-- **Smart Scan › Developer Junk**: **Old Vagrant boxes**, the box versions `vagrant box update` leaves behind (0.5–2 GB each), one row per box and version. The newest version of each box and every version a Vagrant machine uses are kept. Unticked and deleted, since `vagrant box add` downloads them again; skipped while `vagrant` runs.
-- **Smart Scan › Developer Junk**: Haskell, Scala and OCaml package caches: **Cabal packages**, **Stack package cache**, **GHCup downloads**, **Coursier cache**, **Ivy cache**, **sbt launcher cache** and **opam download cache**, each skipped while its tools run. Installed compilers, tools, locally published Ivy artifacts and opam switches are never touched.
-- **Smart Scan › Developer Junk**: infrastructure tool caches. **Stale Terraform providers** lists `.terraform/providers` and `.terraform/modules` of Terraform and OpenTofu projects untouched for 90 days, one row each, unticked, moved to the Trash; state files are never touched. Also the **Terraform plugin cache** and **minikube cache** (unticked; clusters and certificates kept) and the **Helm cache** (ticked), each skipped while its tool runs.
-- **Command line**: the app now includes `cleanmate` (`CleanMate.app/Contents/Helpers/cleanmate`) for scripts and AI agents. `cleanmate list` shows every Smart Scan item and `cleanmate scan` measures them like Smart Scan, with the same safety rules, exclusions and locks for running apps, as text or `--json`; `--only`, `--group` and `--privacy` narrow the scan. Both are read-only, and the command never connects to the network. Installed with Homebrew, `cleanmate` is on your PATH; otherwise link it as shown in the README. Release builds sign it with the same Developer ID and notarize it with the app.
-- **Command line**: `cleanmate clean` cleans from scripts and AI agents like Clean in Smart Scan: the items named with `--only`, or those ticked by default (in the `--group`s named), with the app's safety rules, exclusions and running-app locks. Junk is deleted, items the app moves to the Trash go to the Trash, and the activity log counts it. It asks `Proceed? [y/N]` on a terminal and needs `--yes` anywhere else (exit code 4 without it, nothing deleted); `--dry-run` previews; `--json` reports what was freed, moved to the Trash and kept, with the reason. Deleted junk can't be put back; what went to the Trash can, with `cleanmate restore`. Docker volumes and stopped containers, which may hold databases or other data, are cleaned only when named with `--only`, even if you ticked them in the app; `list` and `scan` mark them `dataLoss`.
-- **Command line**: `cleanmate space [PATH]` shows what fills a folder (your home folder by default), like Space Lens: its folders and files by size, hard links counted once. `cleanmate large` lists large files like Large & Old Files, with `--min-size`, `--older-than DAYS` and `--in PATH`. Both take `--limit` and `--json`, only read, and without Full Disk Access skip the folders macOS protects (listed as skipped) instead of asking for access. The Agent Skill uses them when you ask what takes up space, and sends you to the app to remove anything.
-- **AI agents**: an Agent Skill (`skills/cleanmate/`, install with `bunx skills add homielab/cleanmate-macos`) lets Claude Code, Codex, Cursor and other agents scan with `cleanmate scan --json`, show you the result and clean only the items you confirm, never Privacy items or unticked ones unless you ask, and Docker volumes or stopped containers only when you name them after seeing the list.
-- **Smart Scan › Developer Junk**: **Docker: unused images** can now be cleaned one by one, like untagged build images. Each tagged image no container uses (stopped ones included) is its own row with its name and tag, size and date; an image with two tags shows two rows. Nothing is ticked, and Clean removes only the ones you ticked with `docker rmi <name:tag>`, so other tags of the same image stay; skipped while `docker build` or `docker compose` runs.
-- **Smart Scan › Developer Junk**: **Docker: unused volumes** and **Docker: stopped containers** can now be cleaned one by one, so you can keep a database volume and drop the rest without a terminal. Each volume no container uses is its own row with its name and size; each stopped container shows its name, image, when it stopped and its size. Nothing is ticked, and Clean removes only the ones you ticked with `docker volume rm` / `docker rm`, never forced; a volume a stopped container still uses is locked until you remove that container. Skipped while `docker build` or `docker compose` runs. From the command line, `--only docker-volumes` removes every unused volume listed.
-- **Smart Scan › Developer Junk**: **Old runtime versions (asdf)** and **(mise)**, the Node, Python, Ruby, Java and other versions these managers keep after upgrades (0.1–1 GB each), one row per tool and version. The newest of each tool and every version pinned globally or by a project in your project folders are kept. Unticked and deleted, since `asdf install` / `mise install` installs them again; skipped while `asdf` or `mise` runs, and a version a program runs from is locked.
-- **Smart Scan › Developer Junk**: **Old Xcode versions**, the Xcode apps left in Applications after an upgrade or a beta (15–30 GB each), one row per version with its build, such as "Xcode 15.4 (15F31d)". The version `xcode-select` uses and the newest release are always kept. Unticked and moved to the Trash so Undo puts them back; a version owned by root is a locked row (delete it with Finder), and one Xcode, `xcodebuild` or Simulator runs from is locked.
-- **Smart Scan › Developer Junk**: **Old Unity Editor versions**, the editors Unity Hub keeps side by side (5–15 GB each), one row per version with its size, such as "Unity 2022.3.10f1". The newest version and every version a project uses (its `ProjectVersion.txt`, in your project folders or Unity Hub's project list) are always kept. Unticked and moved to the Trash so Undo puts them back; a version owned by root is a locked row (delete it with Finder), and one whose Unity runs is locked. Also **Unity caches**: the package cache and downloaded Asset Store packages, one row each, unticked; never your licenses.
+- A `cleanmate` command line tool for scripts: scan, clean, and find big files, duplicates and what fills a folder.
+- AI agents like Claude Code, Codex and Cursor can scan and clean with CleanMate, only touching what you confirm.
+- See what CleanMate moved to the Trash and put it back, even after quitting the app.
+- **Developer Junk** can clean Docker images, volumes and stopped containers one by one, so you can keep a database volume.
+- **Developer Junk** finds old versions you no longer use: Xcode (15–30 GB each), Unity Editor, asdf and mise runtimes, Vagrant boxes.
+- **Developer Junk** also finds more build folders (Android, Flutter, Next.js and others) and Terraform, Haskell and Scala caches.
 
 ### Changed
-- **Smart Scan** is faster after the first scan: the size of each folder in Gradle's caches (often 500,000 files, the slowest item) is kept between scans and measured again only when something up to two levels inside it changed. On a developer Mac, a repeat Smart Scan went from 9.6 to 5.0 seconds, and Gradle caches from 4.4 to 0.9 seconds.
+- **Smart Scan** is much faster after the first scan, about 10 seconds down to 5 on a developer Mac.
 
 ### Fixed
-- **Tests**: the test suite no longer depends on the items you ticked in the app on the same Mac, and no longer leaves empty settings files (`CleanMate*-<id>.plist`) in `~/Library/Preferences` after each run.
-- **Large & Old Files**, **Space Lens**, **Uninstaller**, **Login Items** and Smart Scan items moved to the Trash: CleanMate now holds each item open from its safety check to the move and moves it by its real location, so an item or folder swapped for a symlink (or another item) in between is never moved; it is left alone and logged as skipped. If something else is swapped in during the move itself, it is not counted as freed, has no Undo and is logged as failed.
+- Moving items to the Trash is safer: nothing else gets moved if a file changes at the last moment.
 
 ## [1.5] - 2026-11-01
 
 ### Added
-- **Privacy › System**: **Download history (Gatekeeper)** erases the name and web address macOS keeps of every file you downloaded (it never deletes them itself); the downloaded files are kept. **Recent items** now lists each app's Open Recent list on its own row with the app's name, skips apps that are open, and never touches the Finder sidebar lists. Both unticked.
-- **Smart Scan › Developer Junk**: **Old Android SDK components**, the NDK, build tools, SDK platform and CMake versions Android Studio leaves behind after updates (often 5–15 GB), one row per version. The newest of each kind and any version a project in your project folders pins (`ndkVersion`, `buildToolsVersion`, `compileSdk`, `ndk.dir`) are kept. Unticked and deleted, since the SDK Manager downloads them again; skipped while Android Studio, Gradle or the emulator runs.
-- **Welcome guide** on first launch, in three steps: what CleanMate does and how it removes things safely, **Full Disk Access** with a button to System Settings and a status that updates when you come back, then language, scan reminder and automatic update checks. Skip it at any step; **Help › Getting Started…** opens it again. It replaces the one-time Full Disk Access sheet.
-- **Help** menu: **Report a Bug…** shows your CleanMate and macOS versions, Mac chip, Full Disk Access, app language and last 5 activity log lines (no file paths or user name), then opens a new GitHub issue with them filled in; nothing is sent from CleanMate. Also **Suggest a Feature…**, **CleanMate on GitHub** and **Share CleanMate**, which copies the website link.
-- **Privacy › System**: **Terminal saved state** and **iTerm2 saved state**, which keep previous session window text and scrollback on disk. Unticked and permanently deleted; skipped while Terminal or iTerm2 is running, and iTerm2 is hidden when not installed or empty. Profiles and preferences are kept untouched.
-- **Smart Scan › Developer Junk**: **Test device clones**, the copies of simulators Xcode makes in `~/Library/Developer/XCTestDevices` to run tests in parallel (often 5–20 GB), one row per clone. Unticked and deleted; Xcode makes them again on the next parallel test run.
-- **Smart Scan › System Junk**: **macOS installers** lists the `Install macOS` apps left in Applications after an upgrade or after making a USB installer (12–15 GB each), one by one with their macOS version (such as "macOS Sonoma 14.6" for Big Sur and later; older installers from `InstallInfo.plist`). None are ticked, they go to the Trash so Undo can put them back; installers owned by root or in a folder you can't write to are listed as locked rows with the reason "Administrator privileges required — delete with Finder" without prompting for a password; skipped while an installer runs.
-- **Smart Scan › Developer Junk**: **Old versions of code editor extensions**, the versions VS Code, VS Code Insiders, VSCodium, Cursor and Windsurf leave behind when an extension updates (often 0.5–3 GB in all), one row per extension. Unticked and deleted; the version in use is never listed, and the item is skipped while one of these editors runs.
-- **Smart Scan › Apps**: **Apple Podcasts: downloaded episodes** and **Apple Podcasts cache** (artwork and audio cached while streaming), with Full Disk Access. Episodes often take several GB; Podcasts downloads one again when you play it. Both are unticked and skipped while Podcasts runs; your subscriptions and library are never touched.
-- **Maintenance**: **Update and Clean Homebrew** runs `brew update`, `brew upgrade --formula` and `brew cleanup --prune=all` with brew's output shown live, then says how many formulae were upgraded and how much space was freed. Formulae only (casks are left alone), no password; shown only when Homebrew is installed and locked while another `brew` command runs.
-- **Uninstaller**: **Reset…** next to **Uninstall…** moves an app's own data (caches, preferences, Application Support, containers, saved state, logs, web data) to the Trash and keeps the app, so it starts fresh without reinstalling. The sheet lists each item with its size, all ticked; open apps can't be reset, and Undo (⌘Z) puts everything back.
-- **Maintenance**: **Reset Font Cache** (text in the wrong font or shown as boxes) and **Clear Icon Cache** (wrong or blank icons in the Dock and Finder; restarts the Dock after asking). Neither needs an administrator password.
-- **Smart Scan › Developer Junk**: **CocoaPods spec repo clones** (git copies like `~/.cocoapods/repos/master`, often 1–3 GB, unused since CocoaPods switched to its CDN; `trunk` is never listed), **Xcode documentation cache** and **Xcode device logs** (iOS, watchOS and tvOS). All unticked and deleted; skipped while `pod` or Xcode runs.
-- **Smart Scan › Apps**: **Telegram media cache** (photos, videos and files from chats, with Full Disk Access) and **Spotify stream cache**, often several GB outside the usual cache folder. Both are unticked, deleted and skipped while the app runs; Telegram's chats, keys and sign-in are never touched.
-- **Smart Scan › Developer Junk**: caches of Deno, Zig, Bazel, ccache, sccache, NuGet, Poetry, pre-commit and `pipx run`, each its own unticked item, skipped while the tool runs. Only the caches are listed (also where your shell profile moves them); installed packages, virtualenvs, pipx apps and Bazel's project outputs are never touched.
-- **Smart Scan › Apps**: **Zoom: downloaded updates** (old installers in Zoom's AutoUpdater folder), **Microsoft AutoUpdate cache**, and **Downloaded app updates**, the updates apps using Sparkle leave in their cache folder, one row per app. All three are ticked and deleted; an open app keeps its files, and so does CleanMate's own update while it is being downloaded or installed. **User caches** no longer counts these Sparkle folders.
-- **Uninstaller**: tick several apps (or all apps listed, for example after **Not Used for a Year**) and uninstall them with one confirmation. Each goes to the Trash with the data that surely belongs to it; possibly related items and config are kept, open apps are skipped and an app that can't be moved doesn't stop the others. One Undo puts everything back.
-- **Uninstaller**: apps installed with `brew install --cask` show **Homebrew cask (<token>)**. Uninstalling one still moves the app to the Trash, then runs `brew uninstall --cask <token>` so Homebrew forgets it and `brew upgrade` doesn't install it again (never `--zap`: the app's data is handled as usual). If brew fails or isn't there, the app stays in the Trash and the result says which command to run in Terminal; while a `brew` command runs, cask apps are left in place.
-- **Maintenance**: **Time Machine local snapshots** lists the snapshots Time Machine keeps on this Mac, with **Delete…** for one and **Delete All…**; both ask first, because a deleted snapshot can't be brought back (backups on your Time Machine disk are not affected). No administrator password is needed, and each deletion is recorded in **Settings › Activity**. The Overview's snapshot row now has **Delete…**, which opens Maintenance.
+- A **Welcome guide** on first launch explains what CleanMate does, helps you give Full Disk Access and sets the main options.
+- **Uninstaller**: **Reset…** an app to a fresh start, uninstall several apps at once, and remove Homebrew cask apps cleanly.
+- **Help › Report a Bug…** fills in your system details and opens a GitHub issue; nothing is sent until you submit.
+- **Maintenance**: update and clean Homebrew, reset the font cache, clear the icon cache and delete Time Machine local snapshots.
+- **Privacy** clears download history, each app's recent items, and Terminal and iTerm2 saved state.
+- **Smart Scan** finds old macOS installers (12–15 GB each) and downloaded Apple Podcasts episodes.
+- **Smart Scan** cleans more app leftovers: Telegram and Spotify caches, Zoom and Microsoft updates, and downloaded app updates.
+- **Developer Junk** finds old Android SDK components, old code editor extensions, Xcode test device clones and more caches.
 
 ### Changed
-- **Smart Scan** and **Privacy**: the scan progress bar now counts finished items instead of guessing from the last scan's times, so it no longer stalls near the end or jumps, and **Scanning:** names the items still running (with their time once past 10 seconds), so a slow one such as Docker is easy to spot.
-- **Smart Scan › Developer Junk**: **Simulator data** now lists each available simulator on its own row with its OS, size and last use, and erases only the ones you tick (`simctl erase`), instead of erasing every simulator at once. The simulators stay, empty as new; a running one is locked, and the item is skipped while Xcode, Simulator or `xcodebuild` runs.
-- **Overview**: **Freed by CleanMate** is now three cards (last 30 days, in total, last cleanup) above a bar chart of what was freed each day over the last 30 days; hover a bar for its date and size. The first time the Overview shows, the numbers count up and the drive bars, free-space chart and bars grow into place, once, within a second; with **Reduce motion** on they only fade in. After **Refresh**, changed figures roll to their new value.
-- **Smart Scan** and **Privacy**: the result after cleaning now counts the freed space up, lists each group with a size bar, and shows the disk's used space moving from before to after; screens fade into each other instead of jumping. It plays once per cleanup, within a second, and only fades with **Reduce motion** on.
-- **Smart Scan**: the first scan on a Mac with many JavaScript projects is about twice as fast: measuring what stale `node_modules` and build folders really free now reads each folder in one go (35 projects, 21 GB: 13 s → 6 s). Sizes are unchanged.
-- **Smart Scan** and **Uninstaller**: app group containers (`<TEAMID>.<group>`) are matched by the team that signed the app instead of the vendor name. Smart Scan keeps an app group's caches while any app of that team runs, and stops keeping them just because an app of another team with a similar name runs; the Uninstaller lists such a container with the app it belongs to.
+- The **Smart Scan** progress bar is accurate and names the slow items still running.
+- **Simulator data** lists each simulator, so you erase only the ones you pick.
+- **Overview** shows what CleanMate freed in three cards with a daily chart, and results after cleaning animate smoothly.
+- The first **Smart Scan** is about twice as fast with many JavaScript projects.
 
 ### Fixed
-- **Smart Scan** and **Privacy**: cleaning now checks each item and removes it inside the same open folder, so a folder swapped for a symlink (or another item put in its place) after the scan can never make CleanMate delete or trash something elsewhere. Such an item is left alone and listed in **Settings › Activity** as **Skipped: changed since the scan**; deleting a folder never follows a symlink inside it nor enters another volume mounted there.
-- **Animations**: turning on **Reduce motion** in System Settings while a screen is open is now respected immediately: in-flight animations finish at once at their final state, and subsequent displays show still content that only fades in.
-- **Uninstaller** and **Large & Old Files**: the checkboxes of app data, Extensions and file rows no longer show a stray name (and size) next to the box; VoiceOver still reads them.
+- Cleaning is safer: an item swapped for a link after the scan is never touched.
+- Fixed a few small display bugs, including animations ignoring **Reduce motion**.
 
 ## [1.4] - 2026-10-31
 
 ### Added
-- **Maintenance** (⌘8): a new module with three fixes that need no administrator password, each with a **Run** button, its result and the tools' output: **Rebuild Launch Services** removes duplicate and outdated apps from **Open With** menus, **Reset Quick Look** fixes blank or wrong previews and clears the thumbnail cache, and **Restart Finder and Dock** (asks first) fixes a Finder or Dock that hangs. Each run is recorded in **Settings › Activity**.
-- **Smart Scan**: **Abandoned downloads** lists unfinished downloads left in Downloads for 7 days without being touched — Chrome, Edge and Brave `.crdownload`, Firefox `.part`, Safari `.download`, aria2 `.aria2` and qBittorrent `.!qB` — often several GB, one by one with the file of the real name Firefox and aria2 keep next to them; none are ticked, they go to the Trash so Undo can put them back, and a download still in progress is kept (needs Full Disk Access). Old installers and Old downloads now also leave aria2 and qBittorrent downloads alone.
-- **AI tools**: **PyTorch, Whisper and Keras models** lists each model PyTorch Hub, Whisper, sentence-transformers and Keras downloaded (a Whisper model alone can be 3 GB), with its library, date and size, also in folders moved with `TORCH_HOME`, `XDG_CACHE_HOME`, `SENTENCE_TRANSFORMERS_HOME` or `KERAS_HOME`; none are ticked, they are deleted (the library downloads them again when needed), and a model a program has open is kept.
-- **Developer Junk**: **Old Python versions (pyenv)**, **Old Ruby versions (rbenv)**, **Old Rust toolchains (rustup)** and **Old Go SDKs (golang.org/dl)** list each installed version other than the one in use (pyenv's and rbenv's global version, rustup's default toolchain and overrides, the Go SDK your `go` runs), 0.3–2 GB each; none are ticked, they are deleted (the tool installs them again), and a version a program is running from is shown locked with the reason.
-- **Apps**: **Final Cut Pro and iMovie render files** lists the render files of each Final Cut Pro and iMovie library in Movies, Desktop and Documents (often many GB per library), one row per library; none are ticked, they are deleted (the app renders them again, so the first open is slower), the row is locked while Final Cut Pro or iMovie runs, and your media and projects are never touched (needs Full Disk Access).
-- **Apps**: **Google Drive cache**, **Dropbox cache** and **OneDrive cache & logs** list what these apps keep locally besides your synced files (Google Drive's content cache, only parts unchanged for 7 days, and Dropbox's `.dropbox.cache`, often 5–30 GB Finder doesn't show); none are ticked, they are deleted (the apps download again what they need), and each is locked while its app runs. Your synced files are never touched.
-- **Smart Scan**: **Old screenshots** lists screenshots and screen recordings you haven't modified or opened for 90 days (the downloads age in Settings) in the folder macOS saves them to, Desktop by default, one by one; none are ticked, they go to the Trash so Undo can put them back (needs Full Disk Access).
-- **Developer Junk**: **Old Node.js versions (nvm)** and **Old Flutter SDKs (fvm)** list each installed version other than nvm's default or fvm's global one (100–200 MB per Node version, 1–2 GB per Flutter SDK); none are ticked, they are deleted (`nvm install` / `fvm install` installs them again), and a version a program is running from is shown locked with the reason.
-- **Low disk warning**: CleanMate posts a notification when the startup disk has less than 10% free (5–20% or Off in **Settings › General**), checked when it opens, after Smart Scan scans or cleans, and every hour while it runs (also with its window closed); at most one a day, and clicking it opens Smart Scan. Local only, no network.
-- **Developer Junk**: **Android system images without a device** lists each emulator system image no virtual device uses (often 1–8 GB each, left behind when a device is deleted); none are ticked, they are deleted (Android Studio's SDK Manager downloads them again) along with their API and tag folders once empty, nothing is listed when a device can't be read, and the row is locked while Android Studio, the emulator, sdkmanager or avdmanager runs.
-- **Overview**: **Space outside your folders** explains space no folder shows: how many Time Machine local snapshots the Mac keeps and from when (macOS deletes them when it needs the space; the row says how to delete them now), purgeable space macOS frees on demand, and how much macOS, apps and other users take outside your home folder. Read-only, no password.
-- **Apps**: **Adobe media cache** lists the media cache Premiere Pro, After Effects, Media Encoder and Audition keep in `~/Library/Application Support/Adobe/Common` (often tens of GB); it isn't ticked, because Premiere rebuilds it when a project is opened (that first open is slower), and it is locked while one of these apps runs. A cache folder moved in Premiere's settings is not scanned.
-- **Overview**: **System protection** shows whether Gatekeeper, the firewall, System Integrity Protection and FileVault are on, and which XProtect version is installed and when; when one is off, a sentence says what that means and a button opens the right System Settings pane. Read-only: CleanMate changes none of these settings and needs no password.
-- **Smart Scan**: **Old downloads** lists the files and folders in Downloads you haven't modified, added or opened for 90 days (a folder only when nothing inside was touched either), one by one with the date it was last touched; none are ticked, they go to the Trash so Undo can put them back, and installers stay under **Old installers** (needs Full Disk Access). Set the age in **Settings › General** (7 to 365 days).
-- **Developer Junk**: **conda package archives** (downloaded `.tar.bz2`/`.conda` files and the index cache in conda's `pkgs` folders) and the **Dart and Flutter pub cache** (`~/.pub-cache` downloads) are listed; neither is ticked, and both are locked while conda/mamba or dart/flutter runs.
-- **Overview**: **Free space over time** charts the startup disk's free space over the last 30 days, recorded once a day when CleanMate starts and after Smart Scan scans or cleans; hover a day to see its free space, and a sentence says whether the disk is filling up (and when it would be full at that rate), freeing up or stable.
-- **Apps**: **Code editors: data of deleted projects** lists what VS Code, Cursor, Windsurf and VSCodium keep for project folders you have since deleted, one by one with the project name, editor and size; none are ticked, they go to the Trash so Undo can put them back, and the row is locked while one of these editors runs.
-- **Overview**: CleanMate now opens on an overview of free space on each drive (orange past 90 % used), what it freed in the last 30 days and in total, and the 12 largest folders in your home; click a folder to open it in Space Lens. ⌘1 shows it, the other modules moved to ⌘2–⌘7.
-- **Developer Junk › Firebase CLI**: emulators and debug logs moved with `FIREBASE_EMULATORS_PATH` or `FIREBASE_DEBUG_PATH` in your shell profile are listed too.
-- **Settings › General**: set how long installers stay in Downloads before **Old installers** lists them (default 30 days, was the 7-day log age).
-- **Developer Junk**: **Stale build folders** lists Cargo `target`, Python `.venv`/`venv` and CocoaPods `Pods` folders of projects nobody changed for 90 days, one by one with the project's path; none are ticked, and they go to the Trash so Undo can put them back.
-- **AI tools**: **LM Studio models** lists each downloaded LM Studio model with its size and date; tick the ones to delete (none are ticked by default, and the row is locked while LM Studio runs).
-- **Settings › General › Language**: choose Same as your Mac, English or Tiếng Việt for CleanMate only, with a Restart button.
-- Homebrew cask definition (`packaging/Casks/cleanmate.rb`); the release script keeps its version and checksum current.
-- **Uninstaller**: an app's `~/.local/state/<name>` is listed with its other config, and **Leftovers of Removed Apps** also shows
-  `~/.config`, `~/.local/share` and `~/.local/state` folders that no installed app or command-line tool is named after (never ticked).
-- **Developer Junk**: Docker untagged build images are listed one by one and can be cleaned individually.
-- **Large & Old Files**: the Scope menu lists mounted external drives, and **Choose Folder…** accepts folders on them; files found there go to that drive's Trash and can be put back with Undo.
-- **Developer Junk**: Docker build cache records not in use are listed one by one; tick the ones to clean (none are ticked by default).
-- **Developer Junk**: **Unused Homebrew dependencies** lists the formulae `brew autoremove` would remove, each with its size, and removes them with that command (not ticked by default).
-- **Smart Scan**: **Trash on external drives** lists the Trash of each mounted external drive by name and size, so you can empty it from the same place as your own Trash (needs Full Disk Access; none are ticked by default).
-- **Menu bar item**: shows free space out of the disk's size, the last Smart Scan with what it found or what cleaning it freed, and a **Scan Now** button that opens Smart Scan and starts a scan (replaces Open Smart Scan).
-- **Smart Scan**: **Old installers** lists disk images, packages and zipped apps in Downloads older than the old-logs age, one by one; none are ticked, and they go to the Trash (needs Full Disk Access).
-- **Developer Junk**: **Stale node_modules** lists the `node_modules` of each JavaScript project in your usual project folders that nobody changed for 90 days, one by one; none are ticked, and they go to the Trash so Undo can put them back.
-- **Smart Scan**: **Undo** (and ⌘Z) after a clean puts back what it moved to the Trash.
-- **Space Lens**: on a writable external drive, files and folders can be moved to that drive's Trash and put back with Undo; a folder opened on a drive shows the path from the drive. Read-only, network and Time Machine drives stay view-only.
-- **Settings › General › Remind me to scan**: an optional weekly or monthly notification (off by default) when CleanMate has gone unused that long; clicking it opens Smart Scan. It is local and uses no network.
+- CleanMate opens on a new **Overview** with free space per drive, a 30-day chart, what it freed and your largest folders.
+- **Overview** also shows whether Gatekeeper, the firewall and FileVault are on, and what takes space outside your folders.
+- **Maintenance** fixes **Open With** menus, blank previews and a stuck Finder or Dock with one click.
+- **Smart Scan** lists old downloads, old screenshots, unfinished downloads and old installers; nothing is ticked and you can Undo.
+- A notification when your disk is almost full, and an optional reminder to scan.
+- **Undo** (⌘Z) after a **Smart Scan** clean puts back what went to the Trash.
+- The menu bar item shows free space and your last scan, with a **Scan Now** button.
+- **Large & Old Files** and **Space Lens** work on external drives, with Undo; **Smart Scan** can empty their Trash.
+- **Settings › General › Language**: English or Tiếng Việt, whatever your Mac uses.
+- **Apps**: cleans Adobe media cache, Final Cut Pro and iMovie render files, and Google Drive, Dropbox and OneDrive caches.
+- **AI tools** lists downloaded PyTorch, Whisper, Keras and LM Studio models one by one.
+- **Developer Junk** finds old Node, Python, Ruby, Rust and Go versions, stale project build folders and Android emulator images.
+- **Developer Junk** can clean Docker images and build cache one by one, and unused Homebrew dependencies.
 
 ### Changed
-- **Large & Old Files**: **Duplicates Only** now lists APFS clones (Finder's Duplicate, `cp -c`) with their copies, labelled with what moving them really frees (often nothing, since clones share their data), counts only that in the selected size, and **Select Extra Copies** no longer ticks them; before, clones were hidden, and a clone changed in place was counted at its full size.
-- **Smart Scan**: the list of files other apps have open is read once per scan and once per clean, shared by every item that skips open files, instead of once per folder of each item (17 items: 31 reads → 1, scan CPU time 4.8 s → 4.4 s); open files are still never listed or removed.
-- **Smart Scan**: stale `node_modules` and build folders remember their sizes between scans and are found in one parallel walk, so a machine full of old projects no longer slows every scan (33 projects, 21 GB: 2.9 s on the first scan, 0.06 s on the next).
-- Developer junk: the Firebase emulators row is locked while an emulator is running, so its files are never removed from under it.
-- **Uninstaller**: folders your shell profile adds to `PATH` (for example `~/.cargo/bin`, nvm or pnpm) count as installed command-line tools, so their config in `~/.config` is no longer listed as a leftover of a removed app.
-- **Developer Junk**: rustup downloads are no longer hidden while `cargo` or `rustc` builds; only a running `rustup` skips them.
-- Now runs on macOS 13 or later (was macOS 27). On macOS 13, **Space Lens** shows its contents as a stacked bar
-  instead of a donut chart.
-- **Smart Scan** and **Privacy**: larger checkboxes; a click anywhere on a row ticks it, and ticked rows are tinted.
-- **Large Files** and **Uninstaller**: the same larger checkboxes and tinted ticked rows; in Uninstaller a click anywhere on a row ticks it.
-  Each group header has a checkbox (all, none or some ticked) instead of Select All / Deselect All, and locked rows
-  show a lock with a larger reason text.
-- **Smart Scan** finishes sooner and uses less CPU while it scans; **Large Files** redraws its scan progress at most
-  10 times a second.
+- CleanMate now runs on macOS 13 or later.
+- Checkboxes are larger and a click anywhere on a row ticks it.
+- **Smart Scan** is faster, especially with many old projects.
+- **Large & Old Files** shows what moving duplicate clones really frees.
 
 ### Fixed
-- **Developer Junk**: **Stale node_modules** and the virtual environments in **Stale build folders** now show what moving them really frees. Files pnpm, Bun and uv share with their store or cache (hard links, APFS clones) no longer count, so a project that showed several GB may now show a few hundred MB, and **Freed** after cleaning matches. The first scan of large projects takes longer once; sizes are then remembered.
-- **AI tools › Ollama models**: a layer several ticked models share now counts once in the selected size and in the space freed, which were smaller than what the clean really freed; hover a model's size to see what it shares and with which models.
-- **Uninstaller**: apps macOS has no last-opened date for are no longer treated as never used: they show an estimate from their settings and cache files, or **Unknown**, and the "Not used for" filter leaves unknown ones out unless you choose **Show**.
-- **Uninstaller**: Leftovers of Removed Apps no longer lists a config folder of an installed Homebrew formula or cask as orphaned.
-- **Smart Scan** and **Privacy**: "Freed" is now the size of what was removed or moved to the Trash, never the noisy
-  change in free disk space (it could show less than was removed). The part moved to the Trash is shown apart, and the
-  free space before and after is shown for reference.
+- Sizes now match what cleaning really frees, including `node_modules`, Ollama models and the space shown as freed.
+- Fixed a few **Uninstaller** mistakes with unused apps and leftovers.
 
 ## [1.3] - 2026-10-24
 
 ### Added
-- **Smart Scan**: Firebase CLI debug logs (`~/.cache/firebase/firebase-debug.log`, which `firebase mcp` lets grow
-  without limit; kept while still open) and its downloaded emulators (unticked).
-- **Smart Scan**: ZCode caches and logs (daily app logs in `~/.zcode/v2/logs` can reach several GB), skipped
-  while ZCode runs.
-- **Smart Scan**: Kilo Code CLI and MiMoCode caches and logs (models list, downloaded tools), skipped while
-  the CLI runs; their sessions and settings are kept.
-- **Smart Scan**: ZCode's remote server files (Linux server, Node.js and tools it installs on SSH machines,
-  downloaded again on the next connection), unticked and skipped while ZCode runs.
+- **Smart Scan** cleans more AI and developer tool caches and logs: Firebase, ZCode, Kilo Code and MiMoCode.
 
 ## [1.2] - 2026-10-24
 
 ### Added
-- **Uninstaller**: an app's data in `~/.local/share/<name>` (`~/.local/share/zed`) is listed with its config, not
-  ticked, under the same rules as `~/.config/<name>`.
-- **Smart Scan**: incomplete Ollama downloads (`-partial` files an interrupted `ollama pull` leaves in the models
-  folder) — one unticked row, skipped while Ollama runs.
-
-### Fixed
-- **Large & Old Files**: the progress estimate kept a count for every folder ever scanned, without limit; it now
-  keeps at most 20 folders inside your home folder and drops older entries from elsewhere on the next scan.
+- **Uninstaller** finds more app data, and **Smart Scan** finds unfinished Ollama downloads.
 
 ## [1.1] - 2026-10-24
 
 ### Added
-- **Updates**: CleanMate › Check for Updates… installs new versions from GitHub Releases (signed, verified with
-  Sparkle). On the second launch you are asked whether to check automatically; Settings › General › Updates changes
-  it. This update check is CleanMate's only network connection and sends no data about you or your Mac.
-- **Uninstaller**: an app's config outside ~/Library (`~/.config/zed`, `~/.cursor`…) and folders that only start like
-  its name (`BraveSoftware` for Brave Browser, marked "Possibly related") are listed with its data, not ticked.
-- **Smart Scan**: Orca and OrbStack caches and logs, and downloaded Ollama models — unticked, each model chosen on
-  its own and removed with only the files no other model uses.
-- **Smart Scan**: Windsurf code search indexes, browser caches and downloaded browsers (unticked), opencode and
-  Cline caches and logs, and old Cursor agent chats stored outside ~/Library.
+- **Check for Updates…** installs new versions of CleanMate; it is the app's only network connection and sends no data about you.
+- **Smart Scan** cleans caches of Orca, OrbStack, Windsurf, Cline and opencode, and downloaded Ollama models.
+- **Uninstaller** also lists an app's config outside Library, not ticked.
 
 ### Fixed
-- **Uninstaller**: finds data in folders named after the app's bundle name or executable or spelled without spaces
-  (`Code` for Visual Studio Code, `DiskDrill`, `beekeeper-studio`), and of apps with a three-letter name such as Arc.
+- **Uninstaller** finds data of more apps, including ones with short or unusual names.
 
 ## [1.0] - 2026-10-24
 
@@ -243,17 +154,14 @@ First public release: a native macOS cleaner that frees disk space and removes p
 showing everything first and removing only what you confirm.
 
 ### Added
-- **Smart Scan**: system junk, developer junk (Xcode, simulators, package caches, Docker, Homebrew…), AI tool data
-  and app caches in one scan.
-- **Privacy**: browsing history, download history, cookies and autofill per browser, plus recent items, QuickLook
-  thumbnails and shell history; nothing is ticked by default.
-- **Large & Old Files**: big or unused files in your home folder or a folder you pick, including duplicates.
-- **Uninstaller**: remove apps with their data, reset an app, find leftovers, unknown hidden config and extensions.
-- **Space Lens**: browse any folder sorted by size, with a donut chart of its contents.
-- **Login Items**: disable, enable or remove your launch agents.
-- Undo (⌘Z) for what a module just moved to the Trash, and an activity log of every removal with the space freed.
-- Optional menu bar item showing free space and the space freed in the last 30 days.
+- **Smart Scan**: system junk, developer junk, AI tool data and app caches in one scan.
+- **Privacy**: browsing history, cookies and autofill per browser, plus recent items and shell history; nothing is ticked.
+- **Large & Old Files**: find big or unused files and duplicates.
+- **Uninstaller**: remove apps with their data, reset an app and find leftovers.
+- **Space Lens**: browse any folder by size.
+- **Login Items**: turn launch agents off, on or remove them.
+- **Undo** (⌘Z) for what was just moved to the Trash, and an activity log of every removal.
+- An optional menu bar item showing free space.
 - English and Vietnamese.
-- Safety rules checked again right before every removal: running apps and open files are skipped, keys, documents
-  and passwords are never touched, user files and apps go to the Trash. No account, no network, no telemetry.
-- Open source under the MIT License; you can support development on Ko-fi.
+- Running apps and open files are skipped, and your documents and passwords are never touched. No account, no network, no telemetry.
+- Open source under the MIT License.
