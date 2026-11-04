@@ -1,9 +1,10 @@
 import Foundation
 
 /// The `cleanmate` command line tool inside CleanMate.app: `list`, a read-only `scan` and `clean`, the read-only
-/// `space`, `large`, `dupes` and `similar` (what takes the disk space), and `trash` / `restore` for exactly the paths
-/// named, as text or JSON. Stdin only for the confirmation of `clean` and `trash` on a terminal; no network; colours only on a
-/// terminal without `NO_COLOR`.
+/// `space`, `large`, `dupes` and `similar` (what takes the disk space), `trash` / `restore` for exactly the paths
+/// named, and the Uninstaller, Privacy and Login Items modules (`uninstall`, `privacy`, `login-items`, in
+/// `CommandLineModules.swift`), as text or JSON. Stdin only for the confirmation of a command that removes or moves
+/// something, on a terminal; no network; colours only on a terminal without `NO_COLOR`.
 nonisolated enum CommandLineTool {
     enum Exit: Int32 {
         case ok = 0
@@ -12,6 +13,8 @@ nonisolated enum CommandLineTool {
         case noFullDiskAccess = 3
         /// `clean` or `trash` without `--yes` and without a terminal to confirm on: nothing was deleted or moved.
         case notConfirmed = 4
+        /// `uninstall` of an app that is open (without `--quit`, or it did not quit): nothing was moved.
+        case appRunning = 5
     }
 
     /// Where the tool writes; tests collect the text.
@@ -50,6 +53,14 @@ nonisolated enum CommandLineTool {
         case trash(paths: [String], json: Bool, yes: Bool)
         case restore(paths: [String], json: Bool)
         case restoreList(limit: Int, json: Bool)
+        case uninstallList(leftoversOnly: Bool, json: Bool)
+        case uninstall(HeadlessApps.Options, json: Bool)
+        case removeLeftovers(paths: [String], dryRun: Bool, yes: Bool, json: Bool)
+        case privacy(json: Bool)
+        case privacyErase(ids: [String], dryRun: Bool, yes: Bool, json: Bool)
+        case loginItems(json: Bool)
+        case loginItemRemove(label: String, yes: Bool, json: Bool)
+        case loginItemRestore(label: String, json: Bool)
     }
 
     struct UsageError: Error, Equatable { let message: String }
@@ -66,16 +77,26 @@ nonisolated enum CommandLineTool {
           cleanmate trash [--yes] [--json] [--] PATH…
           cleanmate restore [--json] [--] TRASHED…
           cleanmate restore --list [--limit N] [--json]
+          cleanmate uninstall [--leftovers] [--json]
+          cleanmate uninstall APP [--leftovers-only] [--quit] [--dry-run] [--yes] [--json]
+          cleanmate uninstall --leftovers [--dry-run] [--yes] [--json] [--] PATH…
+          cleanmate privacy [--json]
+          cleanmate privacy --erase [ID…] [--dry-run] [--yes] [--json]
+          cleanmate login-items [--json]
+          cleanmate login-items remove LABEL [--yes] [--json]
+          cleanmate login-items restore LABEL [--json]
           cleanmate --version
           cleanmate --help
 
         """
 
     static let help = """
-        cleanmate: CleanMate's Smart Scan, Space Lens and Large & Old Files on the command line, for scripts
-        and AI agents. list, scan, space, large, dupes and similar are read-only. clean removes what scan finds with the
-        app's safety rules; trash moves exactly the files and folders you name to the Trash, and restore puts
-        them back. Both write the app's activity log. It never connects to the network.
+        cleanmate: CleanMate's Smart Scan, Space Lens, Large & Old Files, Uninstaller, Privacy and Login Items on
+        the command line, for scripts and AI agents. list, scan, space, large, dupes and similar are read-only, and
+        so are uninstall, privacy and login-items without an app, --erase or an action. clean removes what scan finds
+        with the app's safety rules; trash moves exactly the files and folders you name to the Trash, and restore puts
+        them back. All of them write the app's activity log. It never connects to the network and never asks for a
+        password.
 
         \(usage)
         Commands:
@@ -126,6 +147,33 @@ nonisolated enum CommandLineTool {
                           folder was moved, removed or replaced by a symlink. Deleted junk can't be put back.
                           With --list it only lists those items still in the Trash, newest first: when,
                           size, where each came from and its path in the Trash.
+          uninstall       Without APP: the apps the Uninstaller lists (not Apple's), with bundle id, source
+                          (App Store, Homebrew, Setapp or Downloaded), size of the app and of its data, last
+                          used and whether it is open; then the leftovers of apps already removed.
+                          --leftovers lists only those. Read-only.
+                          With APP (name, bundle id or path of the .app): moves the app and its own data in
+                          ~/Library to the Trash like the app's Uninstall, stops its launch agents and clears
+                          a Homebrew cask's record. Folders that only look like its name and config folders
+                          in ~ are listed, never taken. --leftovers-only keeps the app and moves only its
+                          data, like the app's Reset. An open app is never touched (exit code 5): quit it,
+                          or add --quit to ask it to quit first. An App Store app macOS only lets you remove
+                          yourself, or an app owned by another user, is left with the reason: no password
+                          prompt. --leftovers PATH… moves leftovers of removed apps, only paths that
+                          `cleanmate uninstall --leftovers` lists. On a terminal it asks first; anywhere else
+                          it needs --yes. Everything goes to the Trash: `cleanmate restore` puts it back.
+          privacy         The Privacy items: browsing history, cookies and form data per browser, recent
+                          items and shell history, with their size. An item whose browser is running is
+                          skipped, with the reason. Read-only.
+                          --erase erases the items named by id (default: those ticked in the app), with the
+                          app's safety rules, skipping a browser that runs. Erased traces are deleted and
+                          can't be put back; erasing cookies signs you out of websites. On a terminal it asks
+                          first; anywhere else it needs --yes.
+          login-items     Your login items and launch agents (~/Library/LaunchAgents) and the system's
+                          (/Library/LaunchAgents and LaunchDaemons): label, state, the program each runs.
+                          remove LABEL moves one of yours to the Trash and stops it, like the app's Login
+                          Items (the system's need an administrator: only listed). On a terminal it asks
+                          first; anywhere else it needs --yes. restore LABEL puts it back from the Trash and
+                          loads it again.
 
         Options:
           --json          Print one JSON object instead of text.
@@ -133,8 +181,16 @@ nonisolated enum CommandLineTool {
           --group GROUPS  Only these groups, comma-separated: system, user, dev, ai, apps, privacy.
                           A group turned off in Settings is scanned when named here.
           --privacy       Include the Privacy items (browser history, cookies, recent items).
-          --dry-run       clean: report what would be cleaned; delete nothing, log nothing.
-          --yes, -y       clean, trash: don't ask. Required when not run in a terminal (scripts, AI agents).
+          --dry-run       clean, uninstall, privacy --erase: report what would be removed; change nothing,
+                          log nothing.
+          --yes, -y       clean, trash, uninstall APP or --leftovers, privacy --erase, login-items remove:
+                          don't ask. Required when not run in a terminal (scripts, AI agents).
+          --leftovers     uninstall: list the leftovers of removed apps only, or move the PATHs named.
+          --leftovers-only
+                          uninstall APP: move only the app's data to the Trash; the app stays.
+          --quit          uninstall APP: ask the open app to quit (it may ask to save first) and wait up to
+                          10 seconds; still open → nothing moved, exit code 5.
+          --erase         privacy: erase the items named by id, or those ticked in the app.
           --require-fda   Exit with code 3 instead of scanning when Full Disk Access is missing.
           --limit N       space, large: list the N biggest (default 20 for space, 50 for large);
                           dupes: the N groups wasting the most space (default 20);
@@ -148,7 +204,7 @@ nonisolated enum CommandLineTool {
                           large: only files not opened or changed for DAYS days.
           --in PATH       large, dupes: search this folder (in your home folder or on an external drive) instead.
                           similar: the same as naming PATH.
-          --              trash, restore: every argument after it is a path, even one starting with -.
+          --              trash, restore, uninstall: every argument after it is a path, even one starting with -.
           -h, --help      Show this help.
           --version       Show the version.
 
@@ -160,19 +216,23 @@ nonisolated enum CommandLineTool {
           Settings › Privacy & Security › Full Disk Access, turn on that app, then quit and reopen it.
 
         Undo:
-          Deleted junk can't be put back: the apps that use it rebuild it. Check first with
-          `cleanmate clean --dry-run`. What CleanMate moved to the Trash (trash, clean, and the app's
-          Smart Scan, Large & Old Files, Space Lens and Uninstaller) is listed by
-          `cleanmate restore --list`, and `cleanmate restore TRASHED…` puts it back, until the Trash
-          is emptied.
+          Deleted junk and erased Privacy traces can't be put back. Check first with
+          `cleanmate clean --dry-run`. What CleanMate moved to the Trash (trash, clean, uninstall,
+          login-items remove, and the app's Smart Scan, Large & Old Files, Space Lens, Uninstaller and
+          Login Items) is listed by `cleanmate restore --list`, and `cleanmate restore TRASHED…` puts it
+          back, until the Trash is emptied. `cleanmate login-items restore LABEL` also loads the item again.
 
         Exit codes:
           0  OK (also when some items or files were skipped)
-          1  Error
-          2  Invalid arguments (also a PATH that is missing, not a folder or can't be read)
+          1  Error (also: uninstall left the app, as App Store, locked, owned by another user or brew busy;
+             login-items could not remove or restore the item)
+          2  Invalid arguments (also a PATH that is missing, not a folder or can't be read; no app, Privacy
+             item or login item by that name)
           3  No Full Disk Access with --require-fda, or space, large, dupes or similar asked for a folder macOS
              protects
-          4  clean or trash without --yes and without a terminal: nothing was deleted or moved
+          4  clean, trash, uninstall, privacy --erase or login-items remove without --yes and without a
+             terminal: nothing was deleted or moved
+          5  uninstall: the app is open (add --quit) or did not quit: nothing was moved
 
         """
 
@@ -266,6 +326,22 @@ nonisolated enum CommandLineTool {
             guard let text = json ? encode(report) : restoreListText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
+        case .uninstallList(let leftoversOnly, let json):
+            return await uninstallList(leftoversOnly: leftoversOnly, json: json, sources: sources, output: output)
+        case .uninstall(let options, let json):
+            return await uninstall(options, json: json, sources: sources, output: output)
+        case .removeLeftovers(let paths, let dryRun, let yes, let json):
+            return await removeLeftovers(paths, dryRun: dryRun, yes: yes, json: json, sources: sources, output: output)
+        case .privacy(let json):
+            return await privacy(json: json, sources: sources, output: output)
+        case .privacyErase(let ids, let dryRun, let yes, let json):
+            return await privacyErase(ids: ids, dryRun: dryRun, yes: yes, json: json, sources: sources, output: output)
+        case .loginItems(let json):
+            return await loginItems(json: json, sources: sources, output: output)
+        case .loginItemRemove(let label, let yes, let json):
+            return await loginItemRemove(label: label, yes: yes, json: json, sources: sources, output: output)
+        case .loginItemRestore(let label, let json):
+            return await loginItemRestore(label: label, json: json, sources: sources, output: output)
         }
         return Exit.ok.rawValue
     }
@@ -293,7 +369,7 @@ nonisolated enum CommandLineTool {
         return Exit.usage.rawValue
     }
 
-    private static func noFullDiskAccess(_ output: Output) -> Int32 {
+    static func noFullDiskAccess(_ output: Output) -> Int32 {
         output.err("cleanmate: no Full Disk Access. Grant it to the app that runs cleanmate in System Settings › "
                    + "Privacy & Security › Full Disk Access, then reopen that app.\n")
         return Exit.noFullDiskAccess.rawValue
@@ -537,13 +613,16 @@ nonisolated enum CommandLineTool {
                                                            : "restore needs the TRASHED path of each item, as trash or restore --list printed it")
             }
             return first == "trash" ? .trash(paths: paths, json: json, yes: yes) : .restore(paths: paths, json: json)
+        case "uninstall": return try parseUninstall(rest)
+        case "privacy": return try parsePrivacy(rest)
+        case "login-items": return try parseLoginItems(rest)
         default:
             throw UsageError(message: first.hasPrefix("-") ? "unknown option `\(first)`" : "unknown command `\(first)`")
         }
     }
 
     /// `--only=a,b` → ("--only", "a,b").
-    private static func split(_ argument: String) -> (String, String?) {
+    static func split(_ argument: String) -> (String, String?) {
         guard argument.hasPrefix("--"), let equals = argument.firstIndex(of: "=") else { return (argument, nil) }
         return (String(argument[..<equals]), String(argument[argument.index(after: equals)...]))
     }
@@ -568,7 +647,7 @@ nonisolated enum CommandLineTool {
     static let groupTitles = ["system": "System Junk", "user": "Trash", "dev": "Developer Junk", "ai": "AI Tools",
                               "apps": "Applications", "privacy": "Privacy"]
 
-    private struct Style {
+    struct Style {
         let color: Bool
         func bold(_ text: String) -> String { color ? "\u{1B}[1m\(text)\u{1B}[0m" : text }
         func dim(_ text: String) -> String { color ? "\u{1B}[2m\(text)\u{1B}[0m" : text }
@@ -582,7 +661,7 @@ nonisolated enum CommandLineTool {
         return formatter.string(fromByteCount: bytes)
     }
 
-    private static func padded(_ text: String, _ width: Int) -> String {
+    static func padded(_ text: String, _ width: Int) -> String {
         text.count >= width ? text : text + String(repeating: " ", count: width - text.count)
     }
 
@@ -678,11 +757,11 @@ nonisolated enum CommandLineTool {
     }
 
     /// `~/…` for a path in the home folder, else the full path.
-    private static func shown(_ path: String, home: URL) -> String {
+    static func shown(_ path: String, home: URL) -> String {
         HeadlessScan.displayPath(URL(fileURLWithPath: path), home: home)
     }
 
-    private static func rightAligned(_ text: String, _ width: Int) -> String {
+    static func rightAligned(_ text: String, _ width: Int) -> String {
         String(repeating: " ", count: max(0, width - text.count)) + text
     }
 

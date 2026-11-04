@@ -272,11 +272,12 @@ nonisolated enum AppMatcher {
 }
 
 nonisolated enum Uninstaller {
-    /// Apps that may be uninstalled (`SafetyPolicy.allowsApp`), sorted by name.
-    @concurrent static func installedApps(policy: SafetyPolicy = .current) async -> [InstalledApp] {
+    /// Apps that may be uninstalled (`SafetyPolicy.allowsApp`), sorted by name. `folders`: the policy's
+    /// `applicationFolders`, or some of them (tests list only the fake home's).
+    @concurrent static func installedApps(policy: SafetyPolicy = .current, folders: [URL]? = nil) async -> [InstalledApp] {
         var apps: [InstalledApp] = []
         let casks = HomebrewCasks.installed()
-        for folder in policy.applicationFolders {
+        for folder in folders ?? policy.applicationFolders {
             for url in appURLs(in: folder) where policy.allowsApp(url) {
                 guard let bundle = Bundle(url: url), let id = bundle.bundleIdentifier else { continue }
                 let info = bundle.infoDictionary

@@ -1,6 +1,6 @@
 ---
 name: cleanmate
-description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space, which files are large or duplicated or which photos look alike, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS. Scans first, shows what it found by group, and cleans or moves to the Trash only what the user confirms.
+description: Free up disk space on this Mac with CleanMate (`cleanmate`). Use when the user asks to free up disk space, says the disk is full, asks what takes up space, which files are large or duplicated or which photos look alike, or wants to clean caches, logs, the Trash, developer junk (Xcode, simulators, node_modules, Docker) or AI model files on macOS, or to uninstall an app, remove its leftovers, erase browsing traces or remove a login item. Scans first, shows what it found by group, and cleans or moves to the Trash only what the user confirms.
 ---
 
 # CleanMate for macOS
@@ -84,7 +84,8 @@ Deleted junk can't be put back. Items `clean` moved to the Trash can, with `rest
 CleanMate moved").
 
 Exit codes: 0 OK (also when something was skipped), 1 error, 2 bad arguments (stderr says why), 3 no Full Disk Access
-with `--require-fda`, 4 `clean` or `trash` without `--yes` and without a terminal.
+with `--require-fda`, 4 a command that changes something (`clean`, `trash`, `uninstall APP`, `privacy --erase`,
+`login-items remove`) without `--yes` and without a terminal, 5 `uninstall`: the app is open.
 
 ## What takes space
 
@@ -179,8 +180,65 @@ An empty list means nothing CleanMate moved is still in the Trash. Junk Smart Sc
 junk) is never listed: it can't come back, and the apps rebuild it. Items the user moved to the Trash themselves are
 put back in Finder (Put Back).
 
-## Beyond Smart Scan
+## Uninstall an app
 
-Uninstalling apps, login items and maintenance tasks are in the app: `open -a CleanMate`. Point the user there.
+1. Run `cleanmate uninstall --json`: each app with `name`, `bundleId`, `source` (`appStore`, `homebrew`, `setapp`,
+   `downloaded`), `size` (the app), `dataSize` (its data in `~/Library`), `lastUsed` and `running`; then `leftovers`,
+   data of apps already removed. Read-only.
+2. Show the app the user named, its size and data size. Before moving anything, show what goes with
+   `cleanmate uninstall --dry-run --json APP` (`items`: the app and each data folder, `notRemoved`: folders that only
+   look like its name, never taken).
+3. After the user confirmed, run it with `--yes`. APP is the `bundleId` (safest), the name or the `.app` path.
+
+```bash
+cleanmate uninstall --json                                   # apps and leftovers, read-only
+cleanmate uninstall --dry-run --json com.example.App         # what would go
+cleanmate uninstall --yes --json com.example.App             # app + its data to the Trash
+cleanmate uninstall --leftovers-only --yes --json com.example.App   # keep the app, reset its data
+cleanmate uninstall --leftovers --yes --json /Users/me/Library/Caches/com.old.Tool   # a leftover listed above
+```
+
+- An open app is never touched: exit code 5. Ask the user to quit it, or with their OK add `--quit` (the app may ask
+  to save first). Never kill it yourself.
+- An App Store app macOS only lets the user remove, or an app owned by another user, is left with exit code 1 and the
+  reason: tell the user to remove it in Finder or Launchpad. `cleanmate` never asks for a password; never use `sudo`.
+- Everything goes to the Trash: each `trashed` path works with `cleanmate restore --json TRASHED…`.
+- `--leftovers PATH…` takes only paths `cleanmate uninstall --leftovers --json` lists; anything else is `skipped`.
+
+## Erase privacy traces
+
+Only when the user asks to erase browsing history, cookies, recent items or shell history (rule 6).
+
+1. Run `cleanmate privacy --json`: items with `id`, `browser`, `name`, `size`, `records`, `signsOut` and `skipped`
+   with a `reason` (`"Safari is running"`).
+2. Show them; say that items with `"signsOut": true` (cookies) sign the user out of websites. Say a `skipped` item
+   needs its browser quit first.
+3. After the user confirmed, erase only the ids they picked:
+
+```bash
+cleanmate privacy --json
+cleanmate privacy --erase --yes --json safari-history chrome-history
+```
+
+Erased traces are deleted, not moved to the Trash: they can't be put back. The result is the `clean` report: report
+`freed` and every `locked` item with its `reason`.
+
+## Login items
+
+```bash
+cleanmate login-items --json                                  # label, scope, state, program, removable
+cleanmate login-items remove --yes --json com.example.agent   # to the Trash, stopped
+cleanmate login-items restore --json com.example.agent        # put back and loaded again
+```
+
+Only items with `"removable": true` (the user's own, in `~/Library/LaunchAgents`) can be removed; the system's
+(`system-agent`, `system-daemon`) need an administrator: point the user to System Settings › General › Login Items.
+An item with `"programMissing": true` belongs to an app that was removed: a good one to suggest. Remove only the
+labels the user confirmed.
+
+## When not to use it
+
+Maintenance tasks (flush DNS, reindex Spotlight) and anything needing an administrator are in the app:
+`open -a CleanMate`. Never use `rm`, `sudo`, `launchctl` or `osascript` instead of `cleanmate`.
 
 More: [reference.md](reference.md).

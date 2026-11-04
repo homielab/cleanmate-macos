@@ -222,8 +222,9 @@ CleanMate.app includes `cleanmate`, a command with no window for scripts and AI 
 uses the same items, safety rules, **Settings › Exclusions** and **Scan Groups** as Smart Scan, and reads your ticks.
 `list`, `scan`, `space`, `large`, `dupes` and `similar` are read-only. `clean` removes what Smart Scan would, through the app's own
 cleaning code, and writes the app's activity log. `trash` moves the files and folders you name to the Trash and
-`restore` puts them back. The command changes no setting, reads stdin only to ask before a clean or a move on a
-terminal, and never connects to the network.
+`restore` puts them back. `uninstall`, `privacy` and `login-items` do what the Uninstaller, Privacy and Login Items do,
+with the same rules. The command changes no setting, reads stdin only to ask before a change on a terminal, never asks
+for a password, and never connects to the network.
 
 The command is in the app bundle. Installed with Homebrew (`brew install --cask`), it is already on your PATH: the
 cask links it into Homebrew's `bin`, and `brew uninstall` removes the link. Otherwise link it into a folder on your
@@ -245,6 +246,13 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 | `cleanmate large [--min-size SIZE] [--older-than DAYS] [--in PATH] [--limit N] [--json]` | Large files, like Large & Old Files: biggest first, with kind, last change, last use, whether other hard links exist and the iCloud Drive state, then the count and total found. |
 | `cleanmate trash [--yes] [--json] [--] PATH…` | Moves exactly those files and folders to the Trash, with the safety rules of Space Lens; per path where it went in the Trash, or why it was skipped, then the total. |
 | `cleanmate restore [--json] [--] TRASHED…` | Puts back items `trash` moved, named by their place in the Trash, at their old place; never overwrites. |
+| `cleanmate uninstall [--leftovers] [--json]` | The apps the Uninstaller lists (not Apple's): name, bundle id, source (App Store, Homebrew, Setapp, Downloaded), size of the app and of its data, last used, open or not; then the leftovers of apps already removed (`--leftovers`: only those). |
+| `cleanmate uninstall APP [--leftovers-only] [--quit] [--dry-run] [--yes] [--json]` | Moves the app (name, bundle id or `.app` path) and its data in ~/Library to the Trash like **Uninstall**, stops its launch agents and clears a Homebrew cask's record; `--leftovers-only` keeps the app, like **Reset**. Per item where it went in the Trash, or why it was skipped. |
+| `cleanmate uninstall --leftovers [--dry-run] [--yes] [--json] [--] PATH…` | Moves the leftovers named, only paths `uninstall --leftovers` lists, to the Trash. |
+| `cleanmate privacy [--json]` | The Privacy items per browser (history, cookies, form data), recent items and shell history, with their size; an item whose browser runs is marked skipped, with the reason. |
+| `cleanmate privacy --erase [ID…] [--dry-run] [--yes] [--json]` | Erases the items named (default: those ticked in the app) like **Privacy › Erase**, skipping a running browser; warns that erasing cookies signs you out. |
+| `cleanmate login-items [--json]` | Login items and launch agents (yours, then /Library's): label, state, program, the app it belongs to, whether it can be removed. |
+| `cleanmate login-items remove LABEL [--yes] [--json]`, `restore LABEL [--json]` | Moves one of your own to the Trash and stops it, like **Login Items › Remove**; `restore` puts it back and loads it again. |
 | `cleanmate --version`, `cleanmate --help` | The app's version; usage, options, Undo, Full Disk Access and exit codes. |
 
 - `--only` scans only the named items (ids from `cleanmate list`); `--group` only the named groups: `system`, `user`
@@ -262,8 +270,14 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
   Names and descriptions are always in English.
 - Exit codes: `0` OK (also when items or files were skipped), `1` error, `2` invalid arguments or a PATH that does not
   exist, is not a folder or can't be read, `3` no Full Disk Access with `--require-fda`, or a `space` / `large` PATH in a
-  folder macOS protects without it, `4` `clean` or `trash` without `--yes` and without a terminal (nothing was
-  deleted or moved).
+  folder macOS protects without it, `4` `clean`, `trash`, `uninstall APP`, `uninstall --leftovers PATH…`,
+  `privacy --erase` or `login-items remove` without `--yes` and without a terminal (nothing was deleted or moved),
+  `5` `uninstall`: the app is open, or did not quit with `--quit` (nothing was moved). `2` also: no app, Privacy item
+  or login item by that name; `1` also: an App Store app macOS only lets you remove yourself, or a login item that
+  could not be removed or put back.
+- `uninstall` never touches an open app and never asks for a password: an App Store app macOS protects, or an app
+  owned by another user, is left with the reason. Everything it moves goes to the Trash and `cleanmate restore` puts
+  it back. `privacy --erase` deletes, like the app: erased traces can't be put back.
 
 `cleanmate list --json`:
 

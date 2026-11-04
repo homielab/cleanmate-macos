@@ -104,18 +104,25 @@ nonisolated enum LaunchAgents {
         return nil
     }
 
-    /// Every non-Apple plist of the three folders; state only for agents in the user's GUI domain.
-    @concurrent static func scan(appForID: @Sendable (String) -> URL?, policy: SafetyPolicy = .current) async -> [LaunchAgent] {
-        let list = parseList(await ShellCommand(executable: launchctl, arguments: ["list"], timeout: .seconds(10)).output() ?? "")
-        let disabled = parseDisabled(await ShellCommand(
-            executable: launchctl, arguments: ["print-disabled", "gui/\(getuid())"], timeout: .seconds(10)).output() ?? "")
+    /// What a read-only `launchctl` run (`list`, `print-disabled`) printed; nil when it failed. Tests pass a fake.
+    typealias Reader = @Sendable ([String]) async -> String?
+    static let launchctlReader: Reader = {
+        await ShellCommand(executable: launchctl, arguments: $0, timeout: .seconds(10)).output()
+    }
+
+    /// Every non-Apple plist of the folders of `scopes`; state only for agents in the user's GUI domain.
+    @concurrent static func scan(appForID: @Sendable (String) -> URL?, policy: SafetyPolicy = .current,
+                                 scopes: [LaunchAgent.Scope] = LaunchAgent.Scope.allCases,
+                                 read: Reader = launchctlReader) async -> [LaunchAgent] {
+        let list = parseList(await read(["list"]) ?? "")
+        let disabled = parseDisabled(await read(["print-disabled", "gui/\(getuid())"]) ?? "")
         var agents: [LaunchAgent] = []
-        for scope in LaunchAgent.Scope.allCases {
+        for scope in scopes {
             let folder = folder(scope, policy: policy)
             let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
             for name in names.sorted() where name.hasSuffix(".plist") && !name.hasPrefix(".") && !SafetyPolicy.isApple(name) {
                 let url = folder.appending(path: name)
-                let dict = read(url) ?? [:]
+                let dict = Self.read(url) ?? [:]
                 let (label, program) = info(dict, fileName: name)
                 guard !SafetyPolicy.isApple(label) else { continue }
                 let state = scope == .systemDaemon

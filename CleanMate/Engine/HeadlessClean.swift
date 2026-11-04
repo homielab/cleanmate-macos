@@ -56,8 +56,10 @@ nonisolated enum HeadlessClean {
         var items: [Item]
         /// The activity log (`~/…`); null in a dry run, which writes nothing.
         var log: String?
+        /// Milliseconds the scan and the clean took: only `cleanmate privacy --erase` sets it (written only when set).
+        var durationMs: Int?
 
-        enum CodingKeys: String, CodingKey { case version, dryRun, freed, upTo, inTrash, items, log }
+        enum CodingKeys: String, CodingKey { case version, dryRun, freed, upTo, inTrash, items, log, durationMs }
 
         func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
@@ -68,6 +70,7 @@ nonisolated enum HeadlessClean {
             try container.encode(inTrash, forKey: .inTrash)
             try container.encode(items, forKey: .items)
             try container.encode(log, forKey: .log)
+            try container.encodeIfPresent(durationMs, forKey: .durationMs)
         }
     }
 

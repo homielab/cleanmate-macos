@@ -78,7 +78,8 @@ struct AgentSkillTests {
                      "clean --yes", "Contents/Helpers/cleanmate", "~/Library/Logs/CleanMate/activity.log",
                      "cleanmate space --json", "cleanmate large --json", "cleanmate dupes --json", "cleanmate similar --json", "Never delete or move these files yourself",
                      "cleanmate trash --yes", "only with the exact paths they confirmed", "cleanmate restore",
-                     "cleanmate restore --list --json"] {
+                     "cleanmate restore --list --json", "cleanmate uninstall --json", "cleanmate privacy --json",
+                     "cleanmate login-items --json", "never asks for a password", "Never kill it yourself"] {
             #expect(skill.contains(rule), "\(rule)")
         }
     }
@@ -86,7 +87,7 @@ struct AgentSkillTests {
     @Test func jsonSamplesDecodeAsReports() throws {
         let text = try Self.text("reference.md")
         let blocks = text.components(separatedBy: "```json\n").dropFirst().map { $0.components(separatedBy: "```").first ?? "" }
-        try #require(blocks.count == 9)
+        try #require(blocks.count == 12)
         let scan = try JSONDecoder().decode(HeadlessScan.Report.self, from: Data(blocks[0].utf8))
         #expect(scan.items.contains { $0.locked })
         let clean = try JSONDecoder().decode(HeadlessClean.Report.self, from: Data(blocks[1].utf8))
@@ -114,5 +115,17 @@ struct AgentSkillTests {
         let list = try JSONDecoder().decode(HeadlessTrash.ListReport.self, from: Data(blocks[8].utf8))
         #expect(list.version == trash.version && list.count == list.items.count && list.items.first?.trashed == moved.first?.trashed)
         #expect(list.items.allSatisfy { $0.date != nil } && list.items.map(\.date) == list.items.map(\.date).sorted(by: { ($0 ?? "") > ($1 ?? "") }))
+        let apps = try JSONDecoder().decode(HeadlessApps.ListReport.self, from: Data(blocks[9].utf8))
+        #expect(apps.apps.contains { $0.running } && apps.apps.contains { $0.lastUsed == nil })
+        #expect(apps.leftoversSize == apps.leftovers.reduce(0) { $0 + $1.size })
+        let sources = Set(InstalledApp.Source.allCases.map(\.rawValue))
+        #expect(apps.apps.allSatisfy { sources.contains($0.source) })
+        let privacy = try JSONDecoder().decode(HeadlessPrivacy.Report.self, from: Data(blocks[10].utf8))
+        #expect(privacy.items.contains { $0.skipped && $0.reason != nil } && privacy.items.contains { $0.signsOut })
+        #expect(privacy.total == privacy.items.filter { $0.selectedByDefault && !$0.skipped }.reduce(0) { $0 + $1.size })
+        #expect(privacy.items.allSatisfy { $0.signsOut == HeadlessPrivacy.signsOut($0.id) })
+        let login = try JSONDecoder().decode(HeadlessLoginItems.ListReport.self, from: Data(blocks[11].utf8))
+        #expect(login.count == login.items.count && login.items.contains { $0.removable } && login.items.contains { !$0.removable })
+        for json in [blocks[9], blocks[10], blocks[11]] { #expect(json.contains("\"durationMs\"")) }
     }
 }

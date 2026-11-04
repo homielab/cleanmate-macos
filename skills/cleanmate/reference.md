@@ -15,6 +15,14 @@
 | `cleanmate trash --yes --json PATH…` | moves exactly those files and folders to the Trash, after the user confirmed them |
 | `cleanmate restore --list --json` | what CleanMate (the app and `cleanmate`) moved to the Trash and is still there, newest first; read-only |
 | `cleanmate restore --json TRASHED…` | puts items CleanMate moved back at their old place, never overwriting |
+| `cleanmate uninstall --json` | apps like the Uninstaller (source, sizes, last used, open or not), then leftovers of removed apps; read-only |
+| `cleanmate uninstall --yes --json APP` | moves the app and its data to the Trash (`--leftovers-only`: only its data; `--dry-run`: nothing) |
+| `cleanmate uninstall --leftovers --yes --json PATH…` | moves leftovers that `uninstall --leftovers` listed to the Trash |
+| `cleanmate privacy --json` | Privacy items per browser with size; items of a running browser are `skipped`; read-only |
+| `cleanmate privacy --erase --yes --json ID…` | erases those Privacy items (default: the ones ticked in the app); can't be undone |
+| `cleanmate login-items --json` | login items and launch agents: label, scope, state, program, `removable` |
+| `cleanmate login-items remove --yes --json LABEL` | moves one of the user's own to the Trash and stops it |
+| `cleanmate login-items restore --json LABEL` | puts it back from the Trash and loads it again |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
 Options for `scan` and `clean`:
@@ -364,10 +372,73 @@ Newest first, at most 200 (`--limit N`). `date` is when it was moved, `source` w
 `date` may be `null`), `size` its bytes then. Items no longer in the Trash
 are not listed. Each `trashed` is an argument for `restore`. `version` is the app's version, like every other command's.
 
+## `uninstall --json` (shortened)
+
+```json
+{
+  "apps" : [
+    { "bundleId" : "com.example.Editor", "dataSize" : 412000000, "lastUsed" : "2026-06-14T10:02:11Z", "lastUsedIsEstimate" : false, "name" : "Editor", "path" : "/Applications/Editor.app", "running" : false, "size" : 389000000, "source" : "homebrew", "version" : "3.2" },
+    { "bundleId" : "com.example.Notes", "dataSize" : 1200000, "lastUsed" : null, "lastUsedIsEstimate" : false, "name" : "Notes Pro", "path" : "/Applications/Notes Pro.app", "running" : true, "size" : 52000000, "source" : "appStore", "version" : "1.4" }
+  ],
+  "durationMs" : 2140,
+  "fullDiskAccess" : true,
+  "leftovers" : [
+    { "kind" : "data", "path" : "~/Library/Application Support/com.old.Tool", "size" : 230000000 },
+    { "kind" : "config", "path" : "~/.config/oldtool", "size" : 12000 }
+  ],
+  "leftoversSize" : 230012000,
+  "version" : "1.5"
+}
+```
+
+`size` is the app bundle, `dataSize` its data in `~/Library`; `lastUsed` is `null` when macOS doesn't know, and
+`lastUsedIsEstimate` means it comes from the app's files, not Spotlight. `running` apps can't be uninstalled until they
+quit. `uninstall --yes --json APP` prints `app`, `items` (`path`, `size`, `kind` `app` or `data`, `trashed`, `skipped`,
+`reason`), `count` and `size` of what moved, `notRemoved` (folders that only look like the app's, never taken),
+`casksLeft` and `log`. Exit code 5: the app is open, nothing moved.
+
+## `privacy --json` (shortened)
+
+```json
+{
+  "durationMs" : 380,
+  "fullDiskAccess" : true,
+  "items" : [
+    { "browser" : "Safari", "entries" : [ ], "id" : "safari-history", "name" : "Browsing history", "reason" : "Safari is running", "records" : 5321, "selectedByDefault" : true, "signsOut" : false, "size" : 18000000, "skipped" : true },
+    { "browser" : "Google Chrome", "entries" : [ ], "id" : "chrome-cookies", "name" : "Cookies", "reason" : null, "selectedByDefault" : false, "signsOut" : true, "size" : 4100000, "skipped" : false }
+  ],
+  "total" : 0,
+  "version" : "1.5"
+}
+```
+
+`total` counts the items ticked by default that are not `skipped`. `privacy --erase` prints the `clean` report with
+`durationMs`; an item of a running browser is `locked` with its `reason`, and erasing cookies writes the app's
+warning to stderr.
+
+## `login-items --json` (shortened)
+
+```json
+{
+  "count" : 2,
+  "durationMs" : 95,
+  "items" : [
+    { "label" : "com.old.Tool.helper", "owner" : null, "path" : "~/Library/LaunchAgents/com.old.Tool.helper.plist", "pid" : null, "program" : "/Applications/Old Tool.app/Contents/MacOS/helper", "programMissing" : true, "removable" : true, "scope" : "user", "state" : "not-loaded" },
+    { "label" : "com.example.daemon", "owner" : "/Applications/Example.app", "path" : "/Library/LaunchDaemons/com.example.daemon.plist", "pid" : null, "program" : "/Library/PrivilegedHelperTools/com.example.daemon", "programMissing" : false, "removable" : false, "scope" : "system-daemon", "state" : "unknown" }
+  ],
+  "version" : "1.5"
+}
+```
+
+`state` is `running` (with `pid`), `loaded`, `not-loaded`, `disabled` or `unknown`. `remove` and `restore` print
+`action`, `label`, `path`, `trashed`, `skipped`, `reason` and `log`; `restore` with nothing in the Trash for that label
+exits with code 1.
+
 ## Safety
 
 `cleanmate` cleans only the locations of CleanMate's catalog, with the app's safety rules and the user's exclusions
 (Settings › Exclusions). It never runs as root, never touches system files macOS protects, and never connects to the
 network. Every clean is written to the activity log. `space`, `large`, `dupes` and `similar` only read. `trash` only moves to the
 Trash, never deletes, and only the paths named that pass the same rules as Space Lens in the app; `trash` and `restore`
-are written to the activity log too.
+are written to the activity log too. `uninstall` and `login-items remove` move to the Trash with the app's rules and
+never ask for a password; `privacy --erase` deletes, like the app's Privacy.

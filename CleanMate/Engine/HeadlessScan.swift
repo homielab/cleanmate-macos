@@ -174,6 +174,22 @@ nonisolated enum HeadlessScan {
         }
         /// Makes a photo's feature print for `cleanmate similar` (Vision); tests may pass a fake.
         var makePrint: SimilarPhotos.PrintMaker = SimilarPhotos.featurePrint
+        /// The apps the Uninstaller lists, for `cleanmate uninstall`; tests list a fake Applications folder.
+        var installedApps: @Sendable (SafetyPolicy) async -> [InstalledApp] = { await Uninstaller.installedApps(policy: $0) }
+        /// LaunchServices knows an app with this bundle id: data named after it is not a leftover.
+        var isRegistered: @Sendable (String) -> Bool = { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil }
+        /// Asks every running copy of the app with this bundle id to quit (never forced), for `uninstall --quit`.
+        var quitApp: @Sendable (String) -> Void = { id in
+            NSRunningApplication.runningApplications(withBundleIdentifier: id).forEach { $0.terminate() }
+        }
+        /// How long `uninstall --quit` waits for the app to quit, as the app's "Quit and Uninstall" does.
+        var quitTimeout: Duration = .seconds(10)
+        /// The login items and launch agents, for `cleanmate login-items`; tests read a fake home only.
+        var loginItems: @Sendable (SafetyPolicy) async -> [LaunchAgent] = { policy in
+            await LaunchAgents.scan(appForID: { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }, policy: policy)
+        }
+        /// Runs `launchctl` for `login-items` and the launch agents `uninstall` stops; tests record the calls.
+        var launchctl: LaunchAgents.Runner = LaunchAgents.launchctlRunner
     }
 
     /// The app's version (`appBundle`).

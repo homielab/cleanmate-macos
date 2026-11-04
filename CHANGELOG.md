@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Large & Old Files › Similar Photos**: groups photos that look alike (bursts, edits, resized or recompressed copies), compared on this Mac with Vision; each group suggests the photo to keep, nothing is ticked for you, and moved photos can be put back with `cleanmate restore`. Photos libraries and apps are never read. Stop ends the search at once, even while photos are being analyzed.
 - `cleanmate similar [PATH…] [--json]` lists the same groups of similar photos from the command line, with the photo suggested to keep; move the ones you pick with `cleanmate trash` and put them back with `cleanmate restore`. The Agent Skill uses it too.
 - **Overview**: shows the last Smart Scan and what it found or freed, with **Scan Now**, and **Clean … Selected** while Smart Scan has results.
+- `cleanmate uninstall`, `cleanmate privacy` and `cleanmate login-items` bring the Uninstaller, Privacy and Login Items to the terminal and AI agents: open apps are skipped, everything moves to the Trash and `cleanmate restore` puts it back.
 - `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
 - **Login Items**: after removing an agent, **Undo** (also ⌘Z) puts it back and loads it again, and **View Moved Items…** shows it.
 

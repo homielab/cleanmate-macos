@@ -34,7 +34,8 @@ cleanmate --help
 When the Homebrew tap is published, `brew install --cask homielab/tap/cleanmate` will install the app and
 link `cleanmate` for you (planned; the cask lives in `packaging/Casks/cleanmate.rb`).
 
-Everything the command does — `list`, `scan`, `clean`, `space`, `large`, `dupes`, `similar`, `trash`, `restore`, `--json`,
+Everything the command does — `list`, `scan`, `clean`, `space`, `large`, `dupes`, `similar`, `trash`, `restore`,
+`uninstall`, `privacy`, `login-items`, `--json`,
 Full Disk Access — and installing it for [AI agents](https://agentskills.io) (`bunx skills add homielab/cleanmate-macos`):
 [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
 
