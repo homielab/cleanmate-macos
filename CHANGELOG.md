@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan › Developer Junk** finds forgotten Colima, Lima, Podman, minikube and Rancher Desktop VMs (often tens of GB), and the Overview suggests ones idle for 3 months.
 - **Duplicate Files** in Large & Old Files now finds copies from 1 MB (or 100 KB) anywhere in your home folder, 200,000 files in about 5 seconds with under 30 MB of memory, and **Stop** keeps what it found.
 - **Shortcuts and Spotlight**: scan for junk, check free space, open any module, or open the review of the ticked junk from the Shortcuts app, Spotlight and Siri; results can be passed to the next action, and nothing is cleaned until you confirm in CleanMate. Settings › Integrations has **Open Shortcuts**.
 - **Open at login** and **Menu bar only** (Settings › General and the welcome guide, both off by default): CleanMate can start in the menu bar when you log in, with no window, and leave the Dock while its window is closed, so the low disk warning and scan reminder work without opening it. It still never cleans unless you click.

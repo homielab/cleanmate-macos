@@ -28,6 +28,10 @@ struct EndToEndCleanTests {
         ".local/share/mise/installs/junk/9.0.0/bin/junk", "Developer/tools/MISE_DATA_DIR/installs/junk/9.0.0/bin/junk",
         // The newest version of a Vagrant box, kept next to the old one
         ".vagrant.d/boxes/junk/9.0.0/virtualbox/box.vmdk", "Developer/tools/VAGRANT_HOME/boxes/junk/9.0.0/virtualbox/box.vmdk",
+        // Next to container VMs: Colima's settings, Lima's own settings and named disk, minikube's profile, and a file
+        // in Podman's settings folder that names no disk
+        ".colima/default/colima.yaml", ".lima/_config/user", ".lima/_disks/shared/datadisk",
+        ".minikube/profiles/minikube/config.json", ".config/containers/podman/machine/applehv/notes.txt",
         "Developer/tools/XDG_DATA_HOME/mise/installs/junk/9.0.0/bin/junk",
         // The simulator sets' own lists next to the simulators and test device clones
         "Library/Developer/CoreSimulator/Devices/device_set.plist", "Library/Developer/XCTestDevices/device_set.plist",
@@ -264,6 +268,24 @@ struct EndToEndCleanTests {
                     try write(folder.appending(path: "junk/1.0.0/virtualbox/box.vmdk"), Data(repeating: 1, count: 4096))
                     continue
                 }
+                if item.id == ContainerVMs.id { // a VM of each tool (a Lima-based one, Podman's disk, minikube's machine)
+                    let disk = Data(repeating: 1, count: 4096)
+                    switch folder.lastPathComponent {
+                    case "machine": // Podman: the disk and the settings naming it
+                        let image = folder.appending(path: "applehv/junk-arm64.raw")
+                        try write(image, disk)
+                        try write(home.appending(path: ".config/containers/podman/machine/applehv/junk.json"),
+                                  Data(#"{"Name": "junk", "ImagePath": {"Path": "\#(image.path)"}}"#.utf8))
+                    case "machines": // minikube
+                        try write(folder.appending(path: "junk/config.json"), Data(#"{"DriverName": "qemu2"}"#.utf8))
+                        try write(folder.appending(path: "junk/disk.qcow2"), disk)
+                    default: // Colima (`colima`, its data disk too), Lima, Rancher Desktop
+                        try write(folder.appending(path: "colima/lima.yaml"), Data("vmType: vz\n".utf8))
+                        try write(folder.appending(path: "colima/diffdisk"), disk)
+                        try write(folder.appending(path: "_disks/colima/datadisk"), disk)
+                    }
+                    continue
+                }
                 if [ToolVersionManagers.asdfID, ToolVersionManagers.miseID].contains(item.id) { // older than the bait 9.0.0
                     try write(folder.appending(path: "junk/1.0.0/bin/junk"), Data(repeating: 1, count: 4096))
                     continue
@@ -432,9 +454,11 @@ struct EndToEndCleanTests {
             try FileManager.default.moveItem(at: url, to: target)
             return target
         }
+        var movedToTrash = 0
         for item in items {
             let scan = scans[item.id]!
             let report = await Cleaner.clean(item, scan: scan, policy: policy, trash: moveToFakeTrash, openPaths: Self.ownOpenPaths)
+            movedToTrash += report.trashed.count
             #expect(report.skipped == 0, "\(item.id) skipped \(report.skipped)")
             // Freed = the scanned size of what went (a database erase: how much the file shrank), never negative.
             #expect(report.freed >= 0 && report.upTo == (item.sizeIsUpperBound ? report.freed : 0), "\(item.id)")
@@ -447,10 +471,10 @@ struct EndToEndCleanTests {
             let after = rescans[item.id]!
             #expect(after.entries.isEmpty, "\(item.id) left \(after.entries.map(\.url.lastPathComponent))")
         }
-        // Trash-mode entries are in the fake Trash.
+        // Trash-mode entries are in the fake Trash, with the parts that go with some (a container VM's disk).
         let trashed = items.filter { $0.mode == .trash }.reduce(0) { $0 + scans[$1.id]!.entries.count }
-        #expect(trashed > 0)
-        #expect(try fm.contentsOfDirectory(atPath: trash.path).count == trashed)
+        #expect(trashed > 0 && movedToTrash > trashed)
+        #expect(try fm.contentsOfDirectory(atPath: trash.path).count == movedToTrash)
         #expect(fm.fileExists(atPath: pipe.path), "running process's pipe removed")
         // Bait intact, byte for byte.
         for (path, data) in baitData {

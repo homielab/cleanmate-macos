@@ -7,12 +7,16 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
         /// Junk the last Smart Scan found in a group and that was not cleaned since; `title` is the group's.
         case junk(title: LocalizedStringResource)
         case trash, externalTrash, unusedApps, downloads, docker, snapshots
+        /// Container VMs not run for at least `days` days (the most recently run of them).
+        case containerVMs(days: Int)
     }
 
     /// Where the button leads (`ModuleRouter.open`).
     enum Target: Equatable, Sendable {
         /// Smart Scan, scrolled to this group id (scanning first when it has no results).
         case smartScanGroup(String)
+        /// Smart Scan, scrolled to this item of this group (scanning first like `smartScanGroup`).
+        case smartScanItem(group: String, item: String)
         /// Uninstaller, showing apps not used for 3 months, largest first.
         case uninstallerUnused
         /// Maintenance, at the local snapshots.
@@ -20,7 +24,7 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
 
         var module: Module {
             switch self {
-            case .smartScanGroup: .smartScan
+            case .smartScanGroup, .smartScanItem: .smartScan
             case .uninstallerUnused: .uninstaller
             case .maintenanceSnapshots: .maintenance
             }
@@ -42,7 +46,8 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
 /// Reads Overview › Suggestions in the background from data CleanMate already has or reads cheaply: the last Smart Scan
 /// per group, the Trash, apps not opened for 3 months (the Uninstaller's list, no new Spotlight query), old installers
 /// and downloads and the Trash of external drives (only with Full Disk Access: reading them without makes macOS ask),
-/// unused Docker data (only while Docker runs; never started) and Time Machine's local snapshots.
+/// unused Docker data (only while Docker runs; never started), container VMs not run for `vmIdleAge` and Time
+/// Machine's local snapshots.
 nonisolated enum OverviewSuggestions {
     /// At most this many suggestions show.
     static let limit = 5
@@ -51,7 +56,10 @@ nonisolated enum OverviewSuggestions {
     /// An older Smart Scan no longer says what is on the disk: its groups are not suggested.
     static let scanMaxAge: TimeInterval = 30 * 86_400
     /// Smart Scan items measured live here, so the last scan's groups leave them out (`LastScan.groups`).
-    static let liveItems = Set(["empty-trash", "external-trash", "old-installers", "old-downloads"]).union(dockerItems)
+    static let liveItems = Set(["empty-trash", "external-trash", "old-installers", "old-downloads", ContainerVMs.id])
+        .union(dockerItems)
+    /// A container VM not run for longer than this is suggested.
+    static let vmIdleAge: TimeInterval = 90 * 86_400
     static let dockerItems: Set<String> = ["docker-images", "docker-dangling", "docker-build-cache", "docker-containers",
                                            "docker-volumes"]
     /// The Trash has its own suggestion, measured live.
@@ -70,6 +78,8 @@ nonisolated enum OverviewSuggestions {
         /// The Uninstaller's app list, when it was not loaded yet.
         var apps: @Sendable () async -> [InstalledApp]
         var appSize: @Sendable (URL) async -> Int64
+        /// Size and last run of each container VM that is not running (`ContainerVMs`).
+        var containerVMs: @Sendable () async -> [(size: Int64, lastRun: Date?)] = { [] }
 
         /// Nothing found, nothing run: the default under tests.
         static let none = Sources(trash: { 0 }, externalTrash: { 0 }, downloads: { (0, 0) }, docker: { nil },
@@ -85,7 +95,16 @@ nonisolated enum OverviewSuggestions {
                 return await scanSize(dockerItems, hasFullDiskAccess: false).size
             },
             apps: { await Uninstaller.installedApps() },
-            appSize: { await Uninstaller.size(of: $0) })
+            appSize: { await Uninstaller.size(of: $0) },
+            containerVMs: {
+                let items = CleanerGroup.smartScan(hasFullDiskAccess: false).flatMap(\.items).filter { $0.id == ContainerVMs.id }
+                var found: [(size: Int64, lastRun: Date?)] = []
+                for item in items {
+                    let scan = await Scanner.scan(item, openPaths: { _ in [] })
+                    found += scan.entries.filter { $0.lockReason == nil }.map { ($0.size, $0.date) }
+                }
+                return found
+            })
 
         /// Entries and bytes of these Smart Scan items. Open files are not read (no `lsof`): a file still open is
         /// counted, Smart Scan itself skips it.
@@ -122,6 +141,14 @@ nonisolated enum OverviewSuggestions {
         if let docker = await sources.docker() {
             found.append(Suggestion(id: "docker", kind: .docker, systemImage: "shippingbox", size: docker,
                                     target: .smartScanGroup("developer")))
+        }
+        let idle = await sources.containerVMs().compactMap { vm in
+            vm.lastRun.map { (size: vm.size, idle: now.timeIntervalSince($0)) }
+        }.filter { $0.idle > vmIdleAge }
+        if let latest = idle.map(\.idle).min() {
+            found.append(Suggestion(id: "container-vms", kind: .containerVMs(days: Int(latest / 86_400)),
+                                    systemImage: "server.rack", size: idle.reduce(0) { $0 + $1.size }, count: idle.count,
+                                    target: .smartScanItem(group: "developer", item: ContainerVMs.id)))
         }
         let apps: [InstalledApp] = if let loadedApps { loadedApps } else { await sources.apps() }
         let unused = UninstallerModel.filtered(apps, search: "", unused: .months3, now: now)

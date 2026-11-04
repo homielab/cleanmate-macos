@@ -309,12 +309,14 @@ struct SmartScanView: View {
         return total.size == 0 && total.upTo == 0 ? recordsText : Text("\(bytes) + \(recordsText)")
     }
 
-    /// Overview › Suggestions asked for `group`: scrolls to its first row once the list is laid out.
+    /// Overview › Suggestions asked for `group`: scrolls to the item asked for (`revealedItem`), else its first row,
+    /// once the list is laid out.
     private func reveal(_ group: String?, _ proxy: ScrollViewProxy) {
-        guard let group, let first = model.shownGroups.first(where: { $0.id == group })?.items.first else { return }
+        guard let group, let items = model.shownGroups.first(where: { $0.id == group })?.items,
+              let row = items.first(where: { $0.id == model.revealedItem }) ?? items.first else { return }
         Task {
             try? await Task.sleep(for: .milliseconds(100)) // the module just appeared: rows are not laid out yet
-            withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(first.id, anchor: .center) }
+            withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(row.id, anchor: .center) }
             model.revealedGroup = nil
         }
     }

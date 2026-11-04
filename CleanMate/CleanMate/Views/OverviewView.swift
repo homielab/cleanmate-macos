@@ -327,6 +327,7 @@ private struct SuggestionRow: View {
         case .externalTrash: Text("Trash on external drives")
         case .downloads: Text("Old installers and downloads")
         case .docker: Text("Unused Docker data")
+        case .containerVMs(let days): Text("Container VMs not run for \(days) days")
         case .unusedApps: Text("Apps not opened for 3 months")
         case .snapshots: Text("Time Machine local snapshots")
         }
@@ -340,6 +341,7 @@ private struct SuggestionRow: View {
         case .externalTrash: Text("Files deleted from your external drives still take space on them.")
         case .downloads: Text("\(count) files in Downloads you have not used for a while. Review them before they go to the Trash.")
         case .docker: Text("Images, stopped containers, volumes and build cache nothing uses. Docker is never started to measure them.")
+        case .containerVMs: Text("Disks of Colima, Lima, Podman, minikube or Rancher Desktop VMs. Removing one loses the containers and images inside, never your code.")
         case .unusedApps: Text("\(count) apps you have not opened for 3 months, largest first.")
         case .snapshots: Text("Measuring their size needs administrator rights. macOS deletes them by itself when it needs the space.")
         }

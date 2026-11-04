@@ -12313,6 +12313,86 @@
           }
         }
       }
+    },
+    "Container VMs not in use" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo container không dùng"
+          }
+        }
+      }
+    },
+    "Disks of the virtual machines Colima, Lima, Podman, minikube and Rancher Desktop run containers in. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đĩa của các máy ảo mà Colima, Lima, Podman, minikube và Rancher Desktop dùng để chạy container. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "A virtual machine that is running" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo đang chạy"
+          }
+        }
+      }
+    },
+    "The disk of a virtual machine a container tool made to run Linux containers. Removing it loses the containers, images and volumes inside the VM, never your code or project files." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đĩa của máy ảo mà công cụ container tạo ra để chạy container Linux. Xoá nó sẽ mất container, image và volume bên trong máy ảo, không bao giờ mất code hay tệp dự án của bạn."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. Make the VM again with colima start, limactl start, podman machine init or minikube start; Rancher Desktop makes a new one when it starts. Pull or build your images again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. Tạo lại máy ảo bằng colima start, limactl start, podman machine init hoặc minikube start; Rancher Desktop tự tạo máy mới khi khởi động. Sau đó tải hoặc build lại image."
+          }
+        }
+      }
+    },
+    "This virtual machine is running. Stop it and scan again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo này đang chạy. Hãy dừng nó rồi quét lại"
+          }
+        }
+      }
+    },
+    "Container VMs not run for %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo container không chạy %lld ngày"
+          }
+        }
+      }
+    },
+    "Disks of Colima, Lima, Podman, minikube or Rancher Desktop VMs. Removing one loses the containers and images inside, never your code." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đĩa máy ảo của Colima, Lima, Podman, minikube hoặc Rancher Desktop. Xoá một máy sẽ mất container và image bên trong, không bao giờ mất code của bạn."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

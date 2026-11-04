@@ -243,6 +243,8 @@ struct ContentView: View {
             router.suggestion = nil
             switch target {
             case .smartScanGroup(let group): smartScan.reveal(group: group, measuredAt: router.suggestionMeasuredAt)
+            case .smartScanItem(let group, let item):
+                smartScan.reveal(group: group, item: item, measuredAt: router.suggestionMeasuredAt)
             case .uninstallerUnused: uninstaller.showUnusedSuggestion()
             case .maintenanceSnapshots: maintenance.revealSnapshots()
             }

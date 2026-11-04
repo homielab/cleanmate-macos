@@ -388,6 +388,27 @@ struct OverviewTests {
         #expect(found[2].size == 400_000_000 && found[2].count == 1)
     }
 
+    /// Container VMs not run for more than 90 days: one suggestion with their total, dated by the most recently run
+    /// of them, opening Smart Scan at the item. A recent or undated VM doesn't count; none idle, no suggestion.
+    @Test func idleContainerVMsMakeASuggestion() async throws {
+        var sources = OverviewSuggestions.Sources.none
+        let ago = { (days: Double) in Self.now.addingTimeInterval(-days * 86_400) }
+        sources.containerVMs = { [(3 * Self.gb, ago(120)), (2 * Self.gb, ago(400)), (9 * Self.gb, ago(10)),
+                                  (8 * Self.gb, nil), (Self.gb, ago(89))] }
+        let found = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: false, apps: [],
+                                                   appSizes: [:], now: Self.now, sources: sources)
+        let vms = try #require(found.first { $0.id == "container-vms" })
+        #expect(vms.kind == .containerVMs(days: 120) && vms.size == 5 * Self.gb && vms.count == 2)
+        #expect(vms.target == .smartScanItem(group: "developer", item: ContainerVMs.id))
+        #expect(vms.target.module == .smartScan)
+        #expect(OverviewSuggestions.liveItems.contains(ContainerVMs.id)) // not counted again in the Developer group
+
+        sources.containerVMs = { [(9 * Self.gb, ago(10)), (8 * Self.gb, nil)] }
+        let none = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: false, apps: [],
+                                                  appSizes: [:], now: Self.now, sources: sources)
+        #expect(!none.contains { $0.id == "container-vms" })
+    }
+
     /// The last Smart Scan's groups count while the scan is under 30 days old; the Trash group is measured live
     /// instead; under 100 MB is left out; at most 5, largest first, snapshots (no size) kept last.
     @Test func lastScanGroupsRankedAndCapped() async throws {
@@ -502,7 +523,9 @@ struct OverviewTests {
 
         model.reveal(group: "g1", measuredAt: .now.addingTimeInterval(-60)) // results newer than the suggestion
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
-        #expect(model.revealedGroup == "g1")
+        #expect(model.revealedGroup == "g1" && model.revealedItem == nil)
+        model.reveal(group: "g1", item: "s390.up") // a suggestion about one item scrolls to it
+        #expect(model.revealedGroup == "g1" && model.revealedItem == "s390.up")
 
         model.cleanItem = { item, scan, _ in CleanReport(freed: item.id == "s390.b" ? 0 : scan.size) }
         model.selected = ["s390.a", "s390.b", "s390.live"]

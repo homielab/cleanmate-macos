@@ -28,6 +28,8 @@ final class SmartScanModel: ObservableObject {
     @Published var offGroupAsked: String?
     /// A suggestion's group waiting for the scan it started: shown (`revealedGroup`) once the results are in.
     private var pendingReveal: String?
+    /// The item of `revealedGroup` to scroll to instead of the group's first row; nil = its first row.
+    private(set) var revealedItem: String?
     /// When the results shown were scanned; nil without results.
     private(set) var resultsDate: Date?
     /// Turns a group on in Settings (the real Smart Scan writes `Preferences.disabledScanGroups`).
@@ -724,8 +726,10 @@ final class SmartScanModel: ObservableObject {
     /// (a scan or a clean under way is left to finish). Nothing is ticked or cleaned.
     /// `measuredAt`: when the suggestion measured what it shows; results older than that are scanned again first.
     /// A group turned off in Settings is not scanned: `offGroupAsked` lets the view say so.
-    func reveal(group: String, measuredAt: Date? = nil) {
+    /// `item`: the row to scroll to in that group (its first row when it isn't shown).
+    func reveal(group: String, item: String? = nil, measuredAt: Date? = nil) {
         search = ""
+        revealedItem = item
         offGroupAsked = nil
         guard !disabledGroups().contains(group) else {
             offGroupAsked = group

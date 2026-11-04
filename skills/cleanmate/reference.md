@@ -140,6 +140,12 @@ An item may also have `records` (database rows a Privacy item erases) and `needs
 have a `name` (a Docker volume or container, a simulator…): show it, its `path` is then an identifier (a volume name,
 a container or image ID), not a file.
 
+`container-vms` (unticked, moved to the Trash) has one entry per disk of a Colima, Lima, Podman, minikube or Rancher
+Desktop virtual machine, `name` like `default (Colima)`; a VM that is running has a `reason` and is never cleaned.
+Removing one loses the containers, images and volumes inside that VM, never the user's code. Say so before cleaning it,
+with the command that makes it again (`colima start`, `limactl start`, `podman machine init`, `minikube start`;
+Rancher Desktop makes a new one when it starts); `restore` puts it back while it is in the Trash.
+
 ## `clean --yes --json` (shortened)
 
 ```json

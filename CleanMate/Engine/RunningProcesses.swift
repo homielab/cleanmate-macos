@@ -97,6 +97,17 @@ nonisolated enum RunningProcesses {
         return paths.map(withoutPrivate)
     }
 
+    /// Working folder and every argument (executable path first) of every readable process, without the `/private`
+    /// prefix: also paths inside an option (`file=/…/disk,if=virtio`), which `usedPaths` leaves out.
+    static func workingFoldersAndArguments() -> [String] {
+        var strings: [String] = []
+        for pid in allPIDs() where pid > 0 {
+            if let folder = workingFolder(of: pid) { strings.append(folder) }
+            strings += argumentStrings(arguments(of: pid))
+        }
+        return strings.map(withoutPrivate)
+    }
+
     /// The current folder of `pid` (`PROC_PIDVNODEPATHINFO`); nil when the process cannot be read.
     static func workingFolder(of pid: pid_t) -> String? {
         var info = proc_vnodepathinfo()
