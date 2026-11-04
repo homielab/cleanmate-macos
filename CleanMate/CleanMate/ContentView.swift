@@ -316,8 +316,8 @@ struct ContentView: View {
         }
     }
 
-    /// ⌘.: stops the visible module's scan, clean (after the item under way), Maintenance task or wait for an app to
-    /// quit; nil (menu item disabled) when nothing can be stopped.
+    /// ⌘.: stops the visible module's scan, clean or move to the Trash (after the item under way), Maintenance task or
+    /// wait for an app to quit; nil (menu item disabled) when nothing can be stopped.
     private var stopScan: (() -> Void)? {
         let running: Bool
         let stop: () -> Void
@@ -333,22 +333,39 @@ struct ContentView: View {
             default: running = false; stop = {}
             }
         case .largeFiles:
+            let photos = largeFiles.similarPhotos
             if case .scanning = largeFiles.phase {
                 running = true
                 stop = { largeFiles.cancel() }
+            } else if case .trashing = largeFiles.phase {
+                running = !largeFiles.stoppingTrash
+                stop = { largeFiles.stopTrash() }
+            } else if largeFiles.similarPhotosShown, case .trashing = photos.phase {
+                running = !photos.stoppingTrash
+                stop = { photos.stopTrash() }
             } else {
                 running = largeFiles.similarPhotosShown && largeFiles.similarPhotos.isSearching
                 stop = { largeFiles.similarPhotos.stop() }
             }
         case .spaceLens:
-            running = spaceLens.measuring && !spaceLens.trashing
-            stop = { spaceLens.cancel() }
+            if spaceLens.trashing {
+                running = !spaceLens.undoing && !spaceLens.stoppingTrash
+                stop = { spaceLens.stopTrash() }
+            } else {
+                running = spaceLens.measuring
+                stop = { spaceLens.cancel() }
+            }
         case .maintenance:
             running = maintenance.running != nil
             stop = { maintenance.stop() }
-        case .uninstaller: // "Quit and Uninstall" waiting for the app to quit
-            running = uninstaller.quitting != nil
-            stop = { uninstaller.cancelQuit() }
+        case .uninstaller: // "Quit and Uninstall" waiting for the app to quit, or the move to the Trash
+            if uninstaller.movingToTrash {
+                running = !uninstaller.stoppingTrash
+                stop = { uninstaller.stopTrash() }
+            } else {
+                running = uninstaller.quitting != nil
+                stop = { uninstaller.cancelQuit() }
+            }
         case .loginItems: // short loads
             running = false
             stop = {}

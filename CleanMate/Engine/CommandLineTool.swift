@@ -255,17 +255,31 @@ nonisolated enum CommandLineTool {
         case .trash(let paths, let json, let yes):
             return await trash(paths, json: json, yes: yes, sources: sources, output: output)
         case .restore(let paths, let json):
-            let report = HeadlessTrash.restore(paths, sources: sources)
+            let report = noteBrokenRecords(sources: sources, output: output) { HeadlessTrash.restore(paths, sources: sources) }
             guard let text = json ? encode(report) : restoreText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
         case .restoreList(let limit, let json):
-            let report = HeadlessTrash.list(limit: limit, sources: sources)
+            let report = noteBrokenRecords(sources: sources, output: output) { HeadlessTrash.list(limit: limit, sources: sources) }
             guard let text = json ? encode(report) : restoreListText(report, home: sources.policy().homeURL, color: output.color)
             else { return Exit.failure.rawValue }
             output.out(text)
         }
         return Exit.ok.rawValue
+    }
+
+    /// Runs `body`; when it found the records file unreadable and set it aside (`TrashRecords.setAside`), says so on
+    /// stderr (the JSON on stdout stays as it is).
+    private static func noteBrokenRecords<T>(sources: HeadlessScan.Sources, output: Output, _ body: () -> T) -> T {
+        let home = sources.policy().homeURL
+        let before = Set(TrashRecords.broken(home: home))
+        let result = body()
+        if let kept = TrashRecords.broken(home: home).first(where: { !before.contains($0) }) {
+            output.err("cleanmate: the list of moved items couldn’t be read; it was kept as "
+                       + "\(HeadlessScan.displayPath(kept, home: home)) and a new one started. "
+                       + "Items moved before that are still in the Trash: put them back in Finder.\n")
+        }
+        return result
     }
 
     private static func pathError(_ error: HeadlessFiles.PathError, _ output: Output) -> Int32 {

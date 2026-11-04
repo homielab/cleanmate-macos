@@ -390,7 +390,7 @@ struct SpaceLensView: View {
             } else if model.undoing {
                 ProgressView("Putting back…").controlSize(.small)
             } else if model.trashing {
-                ProgressView("Moving to Trash…").controlSize(.small)
+                TrashProgress(stopping: model.stoppingTrash, compact: true) { model.stopTrash() }
             } else if let report = model.report {
                 // One line per note: side by side they wrapped to 3 lines and cut the Move button in VI.
                 VStack(alignment: .leading, spacing: 2) {
@@ -399,7 +399,9 @@ struct SpaceLensView: View {
                         TrashReportButtons(report: report, showsMovedItems: false) { await model.undoTrash() }.buttonStyle(.link)
                     }
                     Group {
+                        StoppedTrashSummary(report: report)
                         NotCleanedSummary(report: report)
+                        if report.freed > 0 && report.undo == nil { TrashSpaceSummary() }
                         if let result = report.undo { UndoTrashResult(result: result) }
                     }.foregroundStyle(.secondary)
                     if report.freed > 0 { ViewMovedItemsButton().buttonStyle(.link) }

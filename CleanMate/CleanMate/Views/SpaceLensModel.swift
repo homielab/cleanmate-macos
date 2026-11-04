@@ -25,6 +25,10 @@ final class SpaceLensModel: ObservableObject {
     @Published private(set) var trashing = false
     /// `trashing` is an undo: the bottom bar says "Putting back…".
     @Published private(set) var undoing = false
+    /// Stop was clicked while moving to the Trash: the move ends after the item under way.
+    @Published private(set) var stoppingTrash = false
+    /// The move to the Trash under way, for Stop.
+    private var trashRun: TrashRun?
     /// "Show Hidden Files": off leaves hidden items out of the table and the donut's own slices, but in the total.
     /// The view keeps the setting.
     @Published var showsHidden = true
@@ -204,7 +208,12 @@ final class SpaceLensModel: ObservableObject {
         trashing = true
         undoManager?.removeAllActions(withTarget: self)
         let folder = current
-        let result = await trashItems(selection)
+        let run = TrashRun()
+        trashRun = run
+        let trashItems = trashItems
+        let result = await TrashRun.$current.withValue(run) { await trashItems(selection) }
+        trashRun = nil
+        stoppingTrash = false
         trashing = false
         if current == folder { // moved elsewhere meanwhile: no report about another folder
             report = result
@@ -218,6 +227,13 @@ final class SpaceLensModel: ObservableObject {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash(items) }
         }
         forget(selection.map(\.url))
+    }
+
+    /// Stop (or ⌘.) while moving to the Trash: the item under way finishes, the others stay; the report says how many.
+    func stopTrash() {
+        guard trashing, !undoing, let trashRun, !stoppingTrash else { return }
+        trashRun.stop()
+        stoppingTrash = true
     }
 
     /// "Never Clean This": `urls` join Settings › Exclusions and stay listed (Move to Trash refuses them now);

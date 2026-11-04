@@ -341,7 +341,8 @@ until the Trash is emptied. `trashed` is the argument for `restore` (Finder may 
 
 `path` is the old place. `restore` only knows what CleanMate moved: `trash`, `clean`, and in the app
 Smart Scan, Large & Old Files, Space Lens and the Uninstaller (kept in
-`~/Library/Application Support/CleanMate/trashed.json`, the last 1,000). Items the user moved to the Trash in Finder
+`~/Library/Application Support/CleanMate/trashed.json`: every item of the last 20 moves, up to 20,000 items; an
+unreadable file is set aside as `trashed.json.broken-<date>`, `restore` says so on stderr and starts a new one). Items the user moved to the Trash in Finder
 are put back with Put Back in Finder; deleted junk can't be put back.
 
 ## `restore --list --json` (shortened)

@@ -638,6 +638,7 @@ nonisolated enum Uninstaller {
     /// An app installed by Homebrew (`cask`) is refused while `brew` runs; once it is in the Trash,
     /// `brew uninstall --cask <token>` (`uninstallCask`) clears Homebrew's record (it finds the app gone and only drops
     /// the record). If that fails the app stays in the Trash and the token goes to `CleanReport.casksLeft`.
+    /// Stop (`TrashRun`) leaves the data not reached yet in place (`stopped`); the app, once moving, is never cut.
     /// `moveToTrash` (app and data), `recycle` and `uninstallCask` are injectable so tests never touch a real app, the real
     /// Trash or brew.
     @concurrent static func trash(app: URL?, data: [AppDataEntry], policy: SafetyPolicy = .current, cask: HomebrewCask? = nil,
@@ -650,6 +651,12 @@ nonisolated enum Uninstaller {
                                   uninstallCask: @Sendable (HomebrewCask) async -> Bool = HomebrewCasks.uninstall)
         async throws(AppTrashError) -> CleanReport {
         var report = CleanReport()
+        // One run for the app and its data: their records are kept together. Stopped before anything moved: nothing does.
+        let run = TrashRun.currentID
+        if TrashRun.current?.isStopped == true {
+            report.stopped = (app == nil ? 0 : 1) + data.count
+            return report
+        }
         if let app {
             guard policy.allowsApp(app) else { throw .notTrashed }
             guard !Scanner.isLocked(app) else { throw .locked }
@@ -675,7 +682,7 @@ nonisolated enum Uninstaller {
             report.freed += size
             if let inTrash { report.trashed.append(TrashedItem(original: app, inTrash: inTrash, size: size)) }
             ActivityLog.record(module: "Uninstaller", item: app.path, size: size, mode: .trash, home: policy.homeURL)
-            TrashRecords.add(report.trashed, module: "Uninstaller", home: policy.homeURL)
+            TrashRecords.add(report.trashed, module: "Uninstaller", home: policy.homeURL, run: run)
             if let cask {
                 let cleared = await uninstallCask(cask)
                 if !cleared { report.casksLeft.append(cask.token) }
@@ -685,7 +692,8 @@ nonisolated enum Uninstaller {
         }
         await bootOutAgents(in: data, policy: policy, run: launchctl)
         report += CleanReport.trashing(data.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
-                                       allows: { policy.allowsAppData($0) || policy.allowsAppConfig($0) }, trash: moveToTrash)
+                                       allows: { policy.allowsAppData($0) || policy.allowsAppConfig($0) }, trash: moveToTrash,
+                                       run: run)
         return report
     }
 

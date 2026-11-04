@@ -7,7 +7,7 @@ final class UninstallerModel: ObservableObject {
     enum Selection: Hashable { case app(URL), leftovers, hiddenConfig, extensions }
     enum Outcome { case removed(CleanReport), appNotTrashed(InstalledApp), appTrashCancelled(InstalledApp), appLocked(InstalledApp), appBrewBusy(InstalledApp), appStore(InstalledApp), appDidNotQuit(InstalledApp), restored(TrashUndo.Result), batch(BatchResult) }
     /// Why an app ticked for a batch uninstall stayed.
-    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed, brewBusy, appStore }
+    enum SkipReason: Equatable { case running, locked, cancelled, notTrashed, brewBusy, appStore, stopped }
     /// Several ticked apps uninstalled at once: what went to the Trash, and the apps left with their reason.
     struct BatchResult {
         var report = CleanReport()
@@ -80,6 +80,12 @@ final class UninstallerModel: ObservableObject {
     /// Rows ticked in the Reset sheet (`resetEntries`); all of them when it opens (`prepareReset`).
     @Published var resetChecked: Set<URL> = []
     @Published var working = false
+    /// `working` is a move to the Trash (Uninstall, Reset, extensions): Stop (⌘.) ends it after the item under way.
+    @Published private(set) var movingToTrash = false
+    /// Stop was clicked while moving to the Trash.
+    @Published private(set) var stoppingTrash = false
+    /// The move to the Trash under way, for Stop.
+    private var trashRun: TrashRun?
     /// "Quit and Uninstall" / "Quit and Reset" is waiting for this app to quit; `cancelQuit()` stops waiting.
     @Published private(set) var quitting: InstalledApp?
     /// Stop was clicked while waiting for an app to quit.
@@ -470,17 +476,23 @@ final class UninstallerModel: ObservableObject {
         guard !ticked.isEmpty else { return }
         runningApps = appBundleIDs() // a launch may not have been notified yet
         working = true
-        defer { working = false }
+        let run = startTrashRun()
+        defer { working = false; endTrashRun() }
         undoManager?.removeAllActions(withTarget: self)
         var result = BatchResult()
         for app in ticked {
+            // Stopped: the apps not started yet stay, each listed as stopped; the one under way finished.
+            if run.isStopped { result.skipped.append((app, .stopped)); continue }
             if isRunning(app) { result.skipped.append((app, .running)); continue }
             let ownData: [AppDataEntry]
             if let loaded = batchData[app.url] { ownData = loaded } else { ownData = await data(of: app).filter { $0.kind == .data } }
-            do {
-                result.report += try await trash(app.url, ownData)
+            switch await trashing(run, app: app.url, data: ownData) {
+            case .success(let report) where Self.stoppedBeforeApp(report, data: ownData):
+                result.skipped.append((app, .stopped))
+            case .success(let report):
+                result.report += report
                 result.removed.append(app)
-            } catch {
+            case .failure(let error):
                 let reason: SkipReason = switch error {
                 case .locked: .locked
                 case .cancelled: .cancelled
@@ -604,11 +616,14 @@ final class UninstallerModel: ObservableObject {
     /// `app` (nil: a reset, or leftovers) and `data` to the Trash, then the result alert, Undo, and the list again.
     private func move(app: InstalledApp?, data: [AppDataEntry]) async {
         working = true
-        defer { working = false }
+        let run = startTrashRun()
+        defer { working = false; endTrashRun() }
         undoManager?.removeAllActions(withTarget: self)
         let removing = selection
         let report: CleanReport
-        do { report = try await trash(app?.url, data) } catch {
+        switch await trashing(run, app: app?.url, data: data) {
+        case .success(let done): report = done
+        case .failure(let error):
             if let app {
                 switch error {
                 case .cancelled: outcome = .appTrashCancelled(app)
@@ -626,6 +641,8 @@ final class UninstallerModel: ObservableObject {
             Attention.finished()
             return
         }
+        // Stopped before the app went: it stays listed, the alert says nothing was moved.
+        let appMoved = app != nil && !Self.stoppedBeforeApp(report, data: data)
         outcome = .removed(report)
         invalidateAppData() // data of the reset/removed app (and any entry it shared) changed
         if !report.trashed.isEmpty {
@@ -633,13 +650,47 @@ final class UninstallerModel: ObservableObject {
         }
         Attention.finished()
         // The user may have picked another app meanwhile: leave that selection and its entries alone.
-        if let app {
+        if let app, appMoved {
             apps.removeAll { $0.url == app.url }
             appTicks.remove(app.url)
             if selection == removing { selection = nil }
-        } else if selection == removing {
+        } else if selection == removing, app == nil {
             await loadEntries() // leftovers, or the reset app's data
         }
+    }
+
+    /// `trash` with `run` as the Stop of the move.
+    private func trashing(_ run: TrashRun, app: URL?, data: [AppDataEntry]) async -> Result<CleanReport, Uninstaller.AppTrashError> {
+        let trash = trash
+        return await TrashRun.$current.withValue(run) {
+            do throws(Uninstaller.AppTrashError) { return .success(try await trash(app, data)) } catch { return .failure(error) }
+        }
+    }
+
+    /// Stop came before the app moved: `Uninstaller.trash` counts the app and every data entry as stopped.
+    nonisolated static func stoppedBeforeApp(_ report: CleanReport, data: [AppDataEntry]) -> Bool {
+        report.stopped > data.count
+    }
+
+    private func startTrashRun() -> TrashRun {
+        let run = TrashRun()
+        trashRun = run
+        movingToTrash = true
+        return run
+    }
+
+    private func endTrashRun() {
+        trashRun = nil
+        movingToTrash = false
+        stoppingTrash = false
+    }
+
+    /// Stop (or ⌘.) while moving to the Trash: the item under way finishes (an app being moved is never cut), the
+    /// rest stay where they are; the result says how many.
+    func stopTrash() {
+        guard movingToTrash, let trashRun, !stoppingTrash else { return }
+        trashRun.stop()
+        stoppingTrash = true
     }
 
     /// Why an item stayed when the move threw `error` (it names no file).
@@ -658,20 +709,23 @@ final class UninstallerModel: ObservableObject {
         let data = checkedEntries
         guard !working, !data.isEmpty else { return }
         working = true
+        let run = startTrashRun()
         undoManager?.removeAllActions(withTarget: self)
         let ids = appBundleIDs
         // Same test as `isInUse`: the item's kind, not its name extension.
         let panes = Set((extensionItems ?? []).filter { $0.kind == .preferencePane }.map(\.url))
-        let report = await trashExtensions(data) { url in
-            panes.contains(url) && ids().contains(Self.systemSettingsID)
+        let trashExtensions = trashExtensions
+        let report = await TrashRun.$current.withValue(run) {
+            await trashExtensions(data) { url in panes.contains(url) && ids().contains(Self.systemSettingsID) }
         }
+        endTrashRun()
         working = false
         outcome = .removed(report)
         if !report.trashed.isEmpty {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undo(report) }
         }
         Attention.finished()
-        checked.subtract(data.map(\.url))
+        checked.subtract(data.dropLast(report.stopped).map(\.url)) // the ones Stop left stay ticked
         await loadExtensions()
     }
 

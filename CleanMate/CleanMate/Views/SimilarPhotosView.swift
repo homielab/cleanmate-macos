@@ -41,7 +41,7 @@ struct SimilarPhotosView<Listing: View>: View {
                     Button("Stop") { model.stop() }
                 }
             case .trashing:
-                ProgressView("Moving to Trash…")
+                TrashProgress(stopping: model.stoppingTrash) { model.stopTrash() }
             case .results:
                 if model.groups.isEmpty {
                     EmptyStateView(title: Text("No Similar Photos"), systemImage: "photo.on.rectangle") {
@@ -59,7 +59,8 @@ struct SimilarPhotosView<Listing: View>: View {
                 }
             case .done(let report):
                 EmptyStateView(title: Text("Moved \(report.freed, format: .fileSize) to the Trash"), systemImage: "checkmark.circle") {
-                    Text("Empty the Trash to free the space.")
+                    StoppedTrashSummary(report: report)
+                    if report.freed > 0 { TrashSpaceSummary() }
                     NotCleanedSummary(report: report)
                     if let result = report.undo { UndoTrashResult(result: result) }
                 } actions: {

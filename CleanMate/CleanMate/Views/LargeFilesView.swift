@@ -89,7 +89,7 @@ struct LargeFilesView: View {
                     Button("Stop") { model.cancel() }
                 }
             case .trashing:
-                ProgressView("Moving to Trash…")
+                TrashProgress(stopping: model.stoppingTrash) { model.stopTrash() }
             case .results:
                 if model.similarPhotosShown, !model.needsAccess {
                     SimilarPhotosView(model: model.similarPhotos, scopeName: model.scopeName, confirming: $confirmingPhotos) {
@@ -526,7 +526,9 @@ private struct MovedToTrashNote: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Moved \(report.freed, format: .fileSize) to the Trash")
                     .help(Text("Empty the Trash to free the space."))
+                StoppedTrashSummary(report: report)
                 NotCleanedSummary(report: report)
+                if report.freed > 0 { TrashSpaceSummary().font(.caption).foregroundStyle(.secondary) }
                 if let result = report.undo { UndoTrashResult(result: result).font(.caption).foregroundStyle(.secondary) }
             }
             Spacer()

@@ -90,13 +90,21 @@ nonisolated struct CleanReport: Sendable {
     /// Moves each item to the Trash (never deletes) if `allows` its real path right before, through
     /// `SafeRemoval.trash`: only the item checked is moved. Logs each one moved, each one that changed since the check
     /// ("skipped") and each one not moved ("failed", with its reason), and keeps a record of each one moved
-    /// (`TrashRecords`, for `cleanmate restore`). `trash` is injectable so tests use a fake Trash folder; `beforeMove`
-    /// lets them swap an item between check and move.
+    /// (`TrashRecords`, for `cleanmate restore`) under `run`. `shouldStop` is asked before each item (by default the
+    /// Stop of the `TrashRun` under way): once true, the item under way has finished and the rest stay where they are,
+    /// counted in `stopped`. `trash` is injectable so tests use a fake Trash folder; `beforeMove` lets them swap an item
+    /// between check and move.
     static func trashing(_ items: [(url: URL, size: Int64)], module: LocalizedStringResource, home: URL,
                          allows: (URL) -> Bool, trash: (URL) throws -> URL? = moveToTrash,
-                         beforeMove: (URL) -> Void = { _ in }) -> CleanReport {
+                         beforeMove: (URL) -> Void = { _ in },
+                         shouldStop: () -> Bool = { TrashRun.current?.isStopped == true },
+                         run: String = TrashRun.currentID) -> CleanReport {
         var report = CleanReport()
-        for (url, size) in items {
+        for (index, (url, size)) in items.enumerated() {
+            if shouldStop() {
+                report.stopped = items.count - index
+                break
+            }
             do {
                 let inTrash = try SafeRemoval.trash(url, allows: allows, beforeMove: { beforeMove(url) }, move: trash)
                 report.freed += size
@@ -112,9 +120,27 @@ nonisolated struct CleanReport: Sendable {
             }
         }
         report.logFailures(module: module, home: home)
-        TrashRecords.add(report.trashed, module: module, home: home)
+        TrashRecords.add(report.trashed, module: module, home: home, run: run)
         return report
     }
+}
+
+/// One move to the Trash the user started (Move to Trash, an uninstall, `cleanmate trash`), set as a task local for
+/// the work under it: Stop ends it after the item under way, and every record it keeps shares one run, so
+/// `TrashRecords` keeps or drops the whole run together.
+nonisolated final class TrashRun: Sendable {
+    @TaskLocal static var current: TrashRun?
+
+    /// The run under way, or a new one for a move made outside any.
+    static var currentID: String { current?.id ?? UUID().uuidString }
+
+    let id = UUID().uuidString
+    private let stopped = Locked(false)
+
+    var isStopped: Bool { stopped.withLock { $0 } }
+
+    /// Stop: the item being moved finishes, the ones after it stay where they are.
+    func stop() { stopped.withLock { $0 = true } }
 }
 
 /// One item moved to the Trash: where it was and where it is now.

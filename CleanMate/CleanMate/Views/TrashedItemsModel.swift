@@ -30,6 +30,10 @@ final class TrashedItemsModel: ObservableObject {
     @Published private(set) var failures: [String: TrashRecords.PutBack] = [:]
     /// Items put back by the last Put Back, for the status line.
     @Published private(set) var restoredCount: Int?
+    /// The records file couldn't be read and was set aside (`TrashRecords.setAside`) in the last `brokenNoticeDays`:
+    /// the window says items moved before then are not listed.
+    @Published private(set) var brokenFile: URL?
+    nonisolated static let brokenNoticeDays = 30
 
     let home: URL
     /// Injected by tests: the volume of a folder.
@@ -82,17 +86,25 @@ final class TrashedItemsModel: ObservableObject {
 
     var sources: [String] { Self.sources(rows) }
 
-    /// Reads the records again (read-only: the file is never made or changed by looking).
+    /// Reads the records again. The file is never made by looking; an unreadable one is set aside (`TrashRecords.inTrash`).
     func load() async {
         let home = home
-        rows = await Self.read(home: home)
+        (rows, brokenFile) = await Self.read(home: home)
         failures = [:]
         loaded = true
         if let source, !rows.contains(where: { $0.source == source }) { self.source = nil }
     }
 
-    @concurrent private nonisolated static func read(home: URL) async -> [Row] {
-        rows(TrashRecords.inTrash(home: home))
+    @concurrent private nonisolated static func read(home: URL) async -> ([Row], URL?) {
+        let rows = rows(TrashRecords.inTrash(home: home))
+        return (rows, recentlyBroken(home: home))
+    }
+
+    /// The newest records file set aside within `brokenNoticeDays` of `now`.
+    nonisolated static func recentlyBroken(home: URL, now: Date = .now) -> URL? {
+        guard let newest = TrashRecords.broken(home: home).first else { return nil }
+        let since = now.addingTimeInterval(-Double(brokenNoticeDays) * 86_400)
+        return TrashRecords.setAsideDate(newest) >= since ? newest : nil
     }
 
     /// Puts `items` back at their old places (`TrashRecords.restore`, logged "restored" under the module that moved

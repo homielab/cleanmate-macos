@@ -209,6 +209,7 @@ nonisolated enum HeadlessTrash {
         let home = policy.homeURL
         var report = TrashReport(version: sources.version(), count: 0, size: 0, items: [],
                                  log: HeadlessScan.displayPath(ActivityLog.url(home: home), home: home))
+        let run = TrashRun.currentID // one command, one run of records
         for target in targets {
             var item = target.item
             defer { report.items.append(item) }
@@ -217,7 +218,7 @@ nonisolated enum HeadlessTrash {
             let url = URL(fileURLWithPath: SafetyPolicy.normalize(target.url))
             let moved = CleanReport.trashing([(url, size)], module: module, home: home,
                                              allows: { inHome($0, policy: policy) && policy.allowsSpaceLensItem($0) },
-                                             trash: sources.trash)
+                                             trash: sources.trash, run: run)
             item.skipped = true
             if moved.locked > 0 {
                 item.reason = "Locked in Finder: unlock it in its Get Info window first"

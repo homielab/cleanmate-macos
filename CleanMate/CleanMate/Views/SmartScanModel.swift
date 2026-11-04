@@ -705,6 +705,7 @@ final class SmartScanModel: ObservableObject {
         undoManager?.removeAllActions(withTarget: self)
         trashedItemNames = [:]
         freedByItem = [:]
+        let run = TrashRun.currentID // one clean, one run of records (`TrashRecords`)
         for (index, item) in todo.enumerated() {
             if stoppingClean { report.stopped = todo.count - index; break }
             guard let scan = selectedScan(item) else { continue } // only the ticked entries
@@ -731,7 +732,7 @@ final class SmartScanModel: ObservableObject {
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
                                    size: result.freed, mode: item.mode, paths: Self.removedPaths(item, scan), home: logHome)
             }
-            TrashRecords.add(result.trashed, module: module.title, home: logHome) { _ in ActivityLog.english(item.title) }
+            TrashRecords.add(result.trashed, module: module.title, home: logHome, run: run) { _ in ActivityLog.english(item.title) }
             result.logFailures(module: module.title, home: logHome)
         }
         scans = [:]

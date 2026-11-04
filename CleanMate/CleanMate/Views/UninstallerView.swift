@@ -12,6 +12,8 @@ struct UninstallerView: View {
     @State private var previewURL: URL?
     /// "Show Details…" of the result alert: what was left in place and why.
     @State private var failureDetails: FailureDetails?
+    /// "Empty Trash…" in the result alert: the alert closes, then this confirmation opens.
+    @State private var confirmingEmptyTrash = false
 
     struct FailureDetails: Identifiable {
         let id = UUID()
@@ -83,16 +85,17 @@ struct UninstallerView: View {
             }
         }
         .sheet(item: $failureDetails) { CleanFailuresSheet(failures: $0.failures) }
+        .emptyTrashConfirmation(isPresented: $confirmingEmptyTrash)
         .alert(outcomeTitle, isPresented: Binding(get: { model.outcome != nil }, set: { if !$0 { model.outcome = nil } }),
                presenting: model.outcome) { outcome in
             switch outcome {
             case .appNotTrashed(let app), .appLocked(let app), .appStore(let app):
                 Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([app.url]) }
             case .removed(let report):
-                TrashReportButtons(report: report) { await model.undo(report) }
+                TrashReportButtons(report: report, undo: { await model.undo(report) }, confirmEmptyTrash: confirmEmptyTrash)
                 failureDetailsButton(report)
             case .batch(let result):
-                TrashReportButtons(report: result.report) { await model.undo(result.report) }
+                TrashReportButtons(report: result.report, undo: { await model.undo(result.report) }, confirmEmptyTrash: confirmEmptyTrash)
                 failureDetailsButton(result.report)
             default:
                 EmptyView()
@@ -102,7 +105,7 @@ struct UninstallerView: View {
             switch outcome {
             case .removed(let report):
                 Text(verbatim: (Self.casksLeftLines(report) + [report.freed > 0 ? String(localized: "Empty the Trash to free the space.") : nil,
-                                Self.notMovedLine(report)])
+                                Self.notMovedLine(report), Self.stoppedLine(report)])
                     .compactMap { $0 }.joined(separator: " "))
             case .restored(let result):
                 if result.skipped > 0 {
@@ -150,12 +153,13 @@ struct UninstallerView: View {
             case .notTrashed: String(localized: "\(app.name) couldn’t be moved to the Trash: it may belong to the system or another user.")
             case .brewBusy: String(localized: "\(app.name) was not moved: it was installed with Homebrew, which is running now. Try again when it finishes.")
             case .appStore: String(localized: "\(app.name) came from the App Store: remove it in Launchpad or drag it to the Trash in Finder.")
+            case .stopped: String(localized: "\(app.name) was not moved: you stopped before it.")
             }
         }
         return ([result.removed.isEmpty ? nil : String(localized: "Uninstalled: \(result.removed.count)")] + skipped
                 + casksLeftLines(report)
                 + [result.removed.isEmpty ? nil : String(localized: "Empty the Trash to free the space."),
-                   notMovedLine(report)])
+                   notMovedLine(report), stoppedLine(report)])
             .compactMap { $0 }.joined(separator: " ")
     }
 
@@ -165,6 +169,14 @@ struct UninstallerView: View {
         return String(localized: "\(report.notCleaned) items couldn’t be moved to the Trash.")
             + (report.failures.isEmpty ? "" : " " + String(localized: "Show Details to see why."))
     }
+
+    /// How many items Stop left where they were.
+    static func stoppedLine(_ report: CleanReport) -> String? {
+        report.stopped > 0 ? String(localized: "Stopped: \(report.stopped) items weren’t moved to the Trash.") : nil
+    }
+
+    /// The alert closes on any of its buttons; the confirmation opens right after.
+    private func confirmEmptyTrash() { confirmingEmptyTrash = true }
 
     @ViewBuilder private func failureDetailsButton(_ report: CleanReport) -> some View {
         if !report.failures.isEmpty {
@@ -466,7 +478,11 @@ struct UninstallerView: View {
         return HStack {
             Text("Selected: \(going.count) apps, \(sizeText)").monospacedDigit()
             Spacer()
-            if model.working { ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…") }
+            if model.movingToTrash {
+                TrashProgress(stopping: model.stoppingTrash, compact: true) { model.stopTrash() }
+            } else if model.working {
+                ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…")
+            }
             Button("Uninstall \(going.count) Apps…") { confirmingBatch = true }
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.working || size == nil || going.isEmpty)
@@ -701,6 +717,8 @@ struct UninstallerView: View {
                 Text("Waiting for \(quitting.name) to quit…").foregroundStyle(.secondary)
                 Button("Stop") { model.cancelQuit() }
                     .help("Stop waiting. Nothing is moved to the Trash.")
+            } else if model.movingToTrash {
+                TrashProgress(stopping: model.stoppingTrash, compact: true) { model.stopTrash() }
             } else if model.working {
                 ProgressView().controlSize(.small).accessibilityLabel("Moving to Trash…")
             }

@@ -18,6 +18,7 @@ struct TrashedItemsView: View {
     @Environment(\.locale) private var locale
     @FocusState private var searchFocused: Bool
     @State private var confirmingAll = false
+    @ObservedObject private var bin = TrashBin.shared
 
     init(model: TrashedItemsModel = TrashedItemsModel()) {
         _model = StateObject(wrappedValue: model)
@@ -50,6 +51,7 @@ struct TrashedItemsView: View {
                 Text("Everything CleanMate moved to the Trash that is still there. Put an item back to return it to where it was.")
                     .font(.callout).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if let broken = model.brokenFile { brokenNotice(broken) }
             }
             HStack {
                 Picker("Source", selection: $model.source) {
@@ -69,6 +71,7 @@ struct TrashedItemsView: View {
                 status
                 Spacer()
                 OpenTrashButton()
+                EmptyTrashButton(bin: bin)
                 Button("Put Back All Shown…") { confirmingAll = true }
                     .disabled(shown.isEmpty || model.working)
                     .help("Put every item in the list back where it was.")
@@ -87,6 +90,8 @@ struct TrashedItemsView: View {
         } message: {
             Text("Each item returns to where it was. Nothing already there is replaced.")
         }
+        // Emptied here: the items are gone, so is their list.
+        .onChange(of: bin.emptiedCount) { _ in Task { await model.load() } }
         .onChange(of: model.restoredCount) { count in
             if let count { announceForAccessibility(String(localized: "Put back from the Trash: \(count)")) }
         }
@@ -178,6 +183,23 @@ struct TrashedItemsView: View {
         } else {
             Task { await model.load() }
         }
+    }
+
+    /// One line when the list of moved items couldn't be read and a new one was started.
+    private func brokenNotice(_ url: URL) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Label {
+                Text("CleanMate’s list of moved items couldn’t be read, so a new one was started. Items moved before that are still in the Trash: put them back from Finder.")
+            } icon: {
+                Image(systemName: "exclamationmark.triangle")
+            }
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+            Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                .buttonStyle(.link)
+                .help("Show the unreadable list, kept as it was.")
+        }
+        .font(.callout)
     }
 
     @ViewBuilder private var status: some View {

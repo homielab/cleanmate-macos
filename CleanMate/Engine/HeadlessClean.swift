@@ -134,6 +134,7 @@ nonisolated enum HeadlessClean {
         let openPaths: OpenPaths = { await openFiles.paths(under: $0) }
         var report = Report(version: plan.version, dryRun: dryRun, freed: 0, upTo: 0, inTrash: 0, items: [],
                             log: dryRun ? nil : HeadlessScan.displayPath(ActivityLog.url(home: home), home: home))
+        let run = TrashRun.currentID // one clean, one run of records (`TrashRecords`)
         for target in plan.targets {
             var result = Item(id: target.report.id, name: target.report.name, freed: 0, trashed: 0, skipped: [],
                               dataLoss: target.report.dataLoss, locked: false, reason: nil)
@@ -176,7 +177,7 @@ nonisolated enum HeadlessClean {
                     ActivityLog.record(module: module, item: ActivityLog.english(item.title), count: removed,
                                        size: cleaned.freed, mode: item.mode, home: home)
                 }
-                TrashRecords.add(cleaned.trashed, module: module, home: home) { _ in ActivityLog.english(item.title) }
+                TrashRecords.add(cleaned.trashed, module: module, home: home, run: run) { _ in ActivityLog.english(item.title) }
                 cleaned.logFailures(module: module, home: home)
             }
             result.freed = freed

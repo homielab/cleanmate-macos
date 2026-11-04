@@ -23,6 +23,10 @@ final class SimilarPhotosModel: ObservableObject {
     @Published private(set) var truncated = false
     /// "Undo" is putting photos back.
     @Published private(set) var undoing = false
+    /// Stop was clicked while moving to the Trash: the move ends after the photo under way.
+    @Published private(set) var stoppingTrash = false
+    /// The move to the Trash under way, for Stop.
+    private var trashRun: TrashRun?
     /// The window's, set by the view: ⌘Z after a move to the Trash.
     weak var undoManager: UndoManager?
     /// Called with the photos just moved to the Trash, so Large & Old Files drops them from its list.
@@ -194,7 +198,12 @@ final class SimilarPhotosModel: ObservableObject {
         let selection = checkedPhotos
         guard !selection.isEmpty else { return }
         phase = .trashing
-        let report = await trashPhotos(selection, policy)
+        let run = TrashRun()
+        trashRun = run
+        let trashPhotos = trashPhotos
+        let report = await TrashRun.$current.withValue(run) { await trashPhotos(selection, policy) }
+        trashRun = nil
+        stoppingTrash = false
         let gone = Set(report.trashed.map(\.original))
         groups = groups.map { SimilarPhotos.Group(photos: $0.photos.filter { !gone.contains($0.url) }) }.filter { $0.photos.count >= 2 }
         checked = []
@@ -204,6 +213,14 @@ final class SimilarPhotosModel: ObservableObject {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash() }
         }
         Attention.finished()
+    }
+
+    /// Stop (or ⌘.) while moving to the Trash: the photo under way finishes, the others stay; the done screen says how
+    /// many were left.
+    func stopTrash() {
+        guard case .trashing = phase, let trashRun, !stoppingTrash else { return }
+        trashRun.stop()
+        stoppingTrash = true
     }
 
     /// "Undo" on the done screen: puts the photos just trashed back. Once only; Find Again shows them again.

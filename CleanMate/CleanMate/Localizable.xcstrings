@@ -54,6 +54,16 @@
         }
       }
     },
+    "%@ in the Trash, not freed until it is emptied" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ đang trong Thùng rác, chưa được giải phóng cho tới khi dọn sạch"
+          }
+        }
+      }
+    },
     "%@ measured" : {
       "localizations" : {
         "vi" : {
@@ -90,6 +100,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã dùng %1$@, còn trống %2$@ / %3$@"
+          }
+        }
+      }
+    },
+    "%@ was not moved: you stopped before it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ chưa được chuyển: bạn đã dừng trước khi tới ứng dụng này."
           }
         }
       }
@@ -576,6 +596,16 @@
         }
       }
     },
+    "CleanMate’s list of moved items couldn’t be read, so a new one was started. Items moved before that are still in the Trash: put them back from Finder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đọc được danh sách mục CleanMate đã chuyển nên một danh sách mới đã được bắt đầu. Các mục chuyển trước đó vẫn trong Thùng rác: hãy khôi phục chúng từ Finder."
+          }
+        }
+      }
+    },
     "Close" : {
       "localizations" : {
         "vi" : {
@@ -682,6 +712,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Số ngày"
+          }
+        }
+      }
+    },
+    "Delete everything in the Trash for good to free the space. This can’t be undone." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá vĩnh viễn mọi thứ trong Thùng rác để giải phóng dung lượng. Không thể hoàn tác."
           }
         }
       }
@@ -816,6 +856,36 @@
         }
       }
     },
+    "Empty the Trash?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn sạch Thùng rác?"
+          }
+        }
+      }
+    },
+    "Empty Trash…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn sạch Thùng rác…"
+          }
+        }
+      }
+    },
+    "Emptying the Trash…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang dọn sạch Thùng rác…"
+          }
+        }
+      }
+    },
     "Erasing cookies signs you out of websites." : {
       "localizations" : {
         "vi" : {
@@ -842,6 +912,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mọi thứ CleanMate đã chuyển vào Thùng rác và vẫn còn ở đó. Khôi phục một mục để đưa nó về chỗ cũ."
+          }
+        }
+      }
+    },
+    "Everything in the Trash (%@) is deleted for good, also what you put there yourself. This can’t be undone." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ trong Thùng rác (%@) bị xoá vĩnh viễn, kể cả những gì bạn tự bỏ vào. Không thể hoàn tác."
+          }
+        }
+      }
+    },
+    "Everything in the Trash is deleted for good, also what you put there yourself. This can’t be undone." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mọi thứ trong Thùng rác bị xoá vĩnh viễn, kể cả những gì bạn tự bỏ vào. Không thể hoàn tác."
           }
         }
       }
@@ -932,6 +1022,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm ảnh tương tự"
+          }
+        }
+      }
+    },
+    "Finish the item being moved and leave the rest where they are." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển xong mục đang chuyển, các mục còn lại giữ nguyên chỗ cũ."
           }
         }
       }
@@ -3996,6 +4096,16 @@
         }
       }
     },
+    "Show the unreadable list, kept as it was." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện danh sách không đọc được, vẫn giữ nguyên như cũ."
+          }
+        }
+      }
+    },
     "Shows here after a few days of use." : {
       "localizations" : {
         "vi" : {
@@ -4180,6 +4290,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dừng đo; các dung lượng đang hiện vẫn giữ nguyên."
+          }
+        }
+      }
+    },
+    "Stopped: %lld items weren’t moved to the Trash." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Stopped: %lld item wasn’t moved to the Trash."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Stopped: %lld items weren’t moved to the Trash."
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng: %lld mục chưa được chuyển vào Thùng rác."
           }
         }
       }
@@ -4408,6 +4546,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Các toolchain khác bản mặc định và override của rustup, cài lại bằng rustup toolchain install"
+          }
+        }
+      }
+    },
+    "Trash emptied: %@ freed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dọn sạch Thùng rác: giải phóng %@"
           }
         }
       }

@@ -230,6 +230,10 @@ final class LargeFilesModel: ObservableObject {
     /// The last move to the Trash, shown above the list (what went, what didn't, "Undo") until the next scan or
     /// until dismissed. Set by `trash()` (tests and snapshots set it directly).
     @Published var lastTrash: CleanReport?
+    /// Stop was clicked while moving to the Trash: the move ends after the file under way.
+    @Published private(set) var stoppingTrash = false
+    /// The move to the Trash under way, for Stop.
+    private var trashRun: TrashRun?
     /// The rows that move took out of the list: "Undo" lists again those put back.
     private var trashedRows: [LargeFile] = []
     private var scanTask: Task<Void, Never>?
@@ -612,11 +616,18 @@ final class LargeFilesModel: ObservableObject {
         let searching = duplicateTask != nil
         stopFindingDuplicates() // its result would bring back groups of trashed files
         similarPhotos.reset()
-        let report = await trashFiles(selection)
+        let run = TrashRun()
+        trashRun = run
+        let trashFiles = trashFiles
+        let report = await TrashRun.$current.withValue(run) { await trashFiles(selection) }
+        trashRun = nil
+        stoppingTrash = false
         let gone = Set(report.trashed.map(\.original))
         trashedRows = selection.filter { gone.contains($0.url) }
         dropTrashed(Array(gone))
-        checked.subtract(selection.map(\.url))
+        // The files a Stop left (the last ones the engine would have moved) keep their tick.
+        let left = Set(selection.filter(\.trashable).suffix(report.stopped).map(\.url))
+        checked.subtract(selection.map(\.url).filter { !left.contains($0) })
         lastTrash = report
         phase = .results
         if searching, duplicatesOnly { findDuplicates() } // among the files left
@@ -624,6 +635,14 @@ final class LargeFilesModel: ObservableObject {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash() }
         }
         Attention.finished()
+    }
+
+    /// Stop (or ⌘.) while moving to the Trash: the file under way finishes, the others stay listed and ticked, and the
+    /// note says how many were left.
+    func stopTrash() {
+        guard case .trashing = phase, let trashRun, !stoppingTrash else { return }
+        trashRun.stop()
+        stoppingTrash = true
     }
 
     /// Closes the note of the last move to the Trash; its ⌘Z goes too (Moved Items still puts files back).
