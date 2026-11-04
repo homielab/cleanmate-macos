@@ -16,13 +16,14 @@
 | `cleanmate restore --list --json` | what CleanMate (the app and `cleanmate`) moved to the Trash and is still there, newest first; read-only |
 | `cleanmate restore --json TRASHED…` | puts items CleanMate moved back at their old place, never overwriting |
 | `cleanmate uninstall --json` | apps like the Uninstaller (source, sizes, last used, open or not), then leftovers of removed apps; read-only |
-| `cleanmate uninstall --yes --json APP` | moves the app and its data to the Trash (`--leftovers-only`: only its data; `--dry-run`: nothing) |
+| `cleanmate uninstall --yes --json APP` | moves the app and its data to the Trash (`--leftovers-only`: only its data; `--quit`: ask an open app to quit first; `--dry-run`: nothing) |
 | `cleanmate uninstall --leftovers --yes --json PATH…` | moves leftovers that `uninstall --leftovers` listed to the Trash |
 | `cleanmate privacy --json` | Privacy items per browser with size; items of a running browser are `skipped`; read-only |
 | `cleanmate privacy --erase --yes --json ID…` | erases those Privacy items (default: the ones ticked in the app); can't be undone |
 | `cleanmate login-items --json` | login items and launch agents: label, scope, state, program, `removable` |
 | `cleanmate login-items remove --yes --json LABEL` | moves one of the user's own to the Trash and stops it |
 | `cleanmate login-items restore --json LABEL` | puts it back from the Trash and loads it again |
+| `cleanmate --version` | the app's version |
 | `cleanmate --help` | every option, Undo, Full Disk Access, exit codes |
 
 On failure (`space`, `large`, `dupes`, `similar`, `uninstall --leftovers`) `--json` prints

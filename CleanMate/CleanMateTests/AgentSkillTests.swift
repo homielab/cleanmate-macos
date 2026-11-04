@@ -84,6 +84,19 @@ struct AgentSkillTests {
         }
     }
 
+    /// Options as `--name`, outside longer words.
+    static func options(in text: String) -> Set<String> {
+        Set(text.matches(of: /(?:^|[^\w-])(--[a-z][a-z-]*)/).map { String($0.output.1) })
+    }
+
+    @Test func referenceListsEveryOptionOfHelp() throws {
+        let reference = Self.options(in: try Self.text("reference.md"))
+        let help = Self.options(in: CommandLineTool.help)
+        #expect(help.count >= 15)
+        #expect(help.subtracting(reference).isEmpty, "in --help but not in reference.md: \(help.subtracting(reference).sorted())")
+        #expect(reference.subtracting(help).isEmpty, "in reference.md but not in --help: \(reference.subtracting(help).sorted())")
+    }
+
     @Test func jsonSamplesDecodeAsReports() throws {
         let text = try Self.text("reference.md")
         let blocks = text.components(separatedBy: "```json\n").dropFirst().map { $0.components(separatedBy: "```").first ?? "" }

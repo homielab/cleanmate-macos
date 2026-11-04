@@ -31,34 +31,52 @@ ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanm
 cleanmate --help
 ```
 
-When the Homebrew tap is published, `brew install --cask homielab/tap/cleanmate` will install the app and
-link `cleanmate` for you (planned; the cask lives in `packaging/Casks/cleanmate.rb`).
+Homebrew is not available yet: the cask (`packaging/Casks/cleanmate.rb`, which also links `cleanmate`) is ready, but
+its tap is not published.
 
-Everything the command does — `list`, `scan`, `clean`, `space`, `large`, `dupes`, `similar`, `trash`, `restore`,
-`uninstall`, `privacy`, `login-items`, `--json`,
-Full Disk Access — and installing it for [AI agents](https://agentskills.io) (`bunx skills add homielab/cleanmate-macos`):
-[docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
+```sh
+cleanmate scan                       # what Smart Scan would find, read-only
+cleanmate clean --dry-run --only npm-cache,xcode-derived-data
+cleanmate large --json               # also: space, dupes, similar, uninstall, privacy, login-items
+cleanmate trash --yes -- ~/Downloads/old.dmg && cleanmate restore --list
+```
+
+Every command and option, `--json` and exit codes: [docs/FEATURES.md › Command line](docs/FEATURES.md#command-line).
+The [Agent Skill](https://agentskills.io) teaches Claude Code, Codex, Cursor and other agents to use it:
+`bunx skills add homielab/cleanmate-macos`.
 
 > CleanMate is an independent open-source project, not affiliated with MacPaw or CleanMyMac.
 
 ## Features
 
-- **Overview** — free space on each drive, what CleanMate freed, and the largest folders in your home.
-- **Smart Scan** — system junk, developer junk (Xcode, simulators, package caches, Docker, Homebrew…), AI tool data
-  and app caches in one scan, using each tool's own cleanup command when it is installed.
-- **Privacy** — browsing history, download history, cookies and autofill per browser, plus recent items, QuickLook
-  thumbnails and shell history. Nothing is ticked by default.
-- **Large & Old Files** — find big or unused files in your home folder or a folder you pick, including duplicates.
-- **Uninstaller** — remove apps together with their data, reset an app, find leftovers, unknown hidden config and
+- **[Overview](docs/FEATURES.md#overview)** — free space on each drive and over time, the largest folders in your home, what CleanMate
+  freed, and your Mac's security settings.
+- **[Suggestions](docs/FEATURES.md#suggestions)** — up to 5 places to free space next, largest first, each opening the right module.
+- **[Smart Scan](docs/FEATURES.md#smart-scan)** — system junk, developer junk (Xcode, simulators, package caches, Docker, container
+  VMs, Homebrew…), AI tool data and models, and app caches (chat, design and game apps…) in one scan; each item says
+  why it is safe to clean.
+- **[Privacy](docs/FEATURES.md#privacy)** — browsing history, cookies and autofill per browser, recent items, download history and
+  shell history. Nothing is ticked by default.
+- **[Large & Old Files](docs/FEATURES.md#large--old-files)** — big or unused files in your home, a folder or an external drive, in
+  nine kinds (videos, audio, images, documents, code & projects, archives, disk images, installers, other).
+- **[Duplicate Files](docs/FEATURES.md#duplicate-files)** — identical copies from 1 MB anywhere in your home, the copy to keep
+  suggested.
+- **[Similar Photos](docs/FEATURES.md#similar-photos)** — bursts, edits and resized copies, compared on your Mac; the Photos library
+  is never read.
+- **[Space Lens](docs/FEATURES.md#space-lens)** — browse any folder or the whole disk by size.
+- **[Uninstaller](docs/FEATURES.md#uninstaller)** — remove or reset apps with their data, and find leftovers, hidden config and
   extensions.
-- **Space Lens** — browse any folder sorted by size, with a donut chart of its contents.
-- **Login Items** — disable, enable or remove your launch agents.
-- **Maintenance** — rebuild Launch Services (duplicate "Open With" apps), reset Quick Look, restart Finder and Dock, reset the
-  font and icon caches; no administrator password.
+- **[Login Items](docs/FEATURES.md#login-items)** — disable, enable or remove launch agents.
+- **[Maintenance](docs/FEATURES.md#maintenance)** — rebuild Launch Services, reset Quick Look and the font and icon caches, restart
+  Finder and Dock, update Homebrew, delete local snapshots; no administrator password.
+- **[Moved to the Trash](docs/FEATURES.md#moved-to-the-trash)** — everything CleanMate moved to the Trash, from any module, to put
+  back at any time; ⌘Z undoes the last move, and an activity log records every removal.
+- **[Menu bar](docs/FEATURES.md#menu-bar-and-notifications)** — free space and junk found, open at login, a low disk warning and
+  a scan reminder (all optional).
+- **[Shortcuts and Spotlight](docs/FEATURES.md#shortcuts-and-spotlight)** — scan for junk, check free space, open a module or the
+  review of the ticked junk; nothing is cleaned until you confirm.
+- **[Command line and Agent Skill](docs/FEATURES.md#command-line)** — `cleanmate` for scripts and AI agents (below).
 
-Undo (⌘Z) puts back what a module just moved to the Trash, and an activity log records every removal.
-**Shortcuts** and Spotlight can scan for junk, show free space, open a module, or open the review of the ticked junk
-(nothing is cleaned until you confirm).
 See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and shortcut in detail.
 
 ## How it compares
