@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Overview**: measuring your home folder shows which folder is being measured and how much so far, with a **Stop** button; after a clean only the folders it touched are measured again.
 
 ### Fixed
+- VoiceOver reads why a locked item cannot be ticked, Escape closes **Moved Items**, size bars and disabled checkboxes stay visible with Increase Contrast, and group headers open without motion when Reduce Motion is on.
 - Closing the window no longer loses scan results or a scan still running; quitting during a Maintenance task asks first and ends its tool; after a hidden start at login, the update check waits until you open the window.
 - CleanMate no longer stalls while checking Full Disk Access with a large Trash: the check reads one entry instead of listing the whole Trash, in the background when CleanMate becomes active.
 - **Similar Photos**: when too many photos look nearly alike to compare them all, the results say **Results may be incomplete** instead of leaving photos out silently.

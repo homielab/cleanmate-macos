@@ -81,6 +81,7 @@ struct TrashedItemsView: View {
         }
         .padding(20)
         .frame(width: 680, height: 520)
+        .onExitCommand { dismiss() } // Escape closes it like Done
         .task { await model.load() }
         // ⌘F: the search field, as in the module lists.
         .onFindKey { _ in searchFocused = true; return true }

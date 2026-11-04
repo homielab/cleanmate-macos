@@ -136,6 +136,11 @@ struct SelectionCheckboxStyle: ToggleStyle {
         SelectionCheckbox(configuration: configuration, lockReason: lockReason)
     }
 
+    /// A disabled box fades, less so with Increase Contrast so it stays visible.
+    static func opacity(isEnabled: Bool, increasedContrast: Bool) -> Double {
+        isEnabled ? 1 : increasedContrast ? 0.6 : 0.4
+    }
+
     /// The SF Symbol for each state.
     static func symbol(isOn: Bool, isMixed: Bool) -> String {
         isMixed ? "minus.square.fill" : isOn ? "checkmark.square.fill" : "square"
@@ -146,6 +151,7 @@ private struct SelectionCheckbox: View {
     let configuration: ToggleStyleConfiguration
     let lockReason: Text?
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
         // Like a native checkbox, a click on mixed ticks everything.
@@ -164,8 +170,10 @@ private struct SelectionCheckbox: View {
             let sources = configuration.isMixed
                 ? [Binding { true } set: { on.wrappedValue = $0 }, Binding { false } set: { on.wrappedValue = $0 }]
                 : [on]
+            // A locked row says why, as the tooltip does.
             Toggle(sources: sources, isOn: \.self) { configuration.label }
                 .toggleStyle(.checkbox)
+                .accessibilityHint(lockReason ?? Text(verbatim: ""))
         }
     }
 
@@ -178,7 +186,7 @@ private struct SelectionCheckbox: View {
             .foregroundStyle(ticked ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary),
                              ticked ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
             .frame(width: 20, height: 20)
-            .opacity(isEnabled ? 1 : 0.4)
+            .opacity(SelectionCheckboxStyle.opacity(isEnabled: isEnabled, increasedContrast: contrast == .increased))
             .overlay(alignment: .bottomTrailing) {
                 if lockReason != nil {
                     Image(systemName: "lock.fill")
@@ -252,16 +260,20 @@ struct SizeBar: View {
     var tint: Color = .accentColor
     var height: CGFloat = 6
     var width: CGFloat = 48
+    @Environment(\.colorSchemeContrast) private var contrast
 
     private var fraction: Double { largest > 0 ? Double(size) / Double(largest) : 0 }
 
     var body: some View {
-        Capsule().fill(.quaternary)
+        // Increase Contrast: a darker track with an outline, so the bar's extent stays visible.
+        let increased = contrast == .increased
+        Capsule().fill(increased ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.quaternary))
             .overlay(alignment: .leading) {
                 GeometryReader { bar in
                     Capsule().fill(tint).frame(width: bar.size.width * min(max(fraction, 0), 1))
                 }
             }
+            .overlay { if increased { Capsule().strokeBorder(.secondary, lineWidth: 1) } }
             .frame(width: width, height: height)
             .accessibilityHidden(true)
     }

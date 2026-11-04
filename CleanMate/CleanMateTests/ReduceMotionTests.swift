@@ -181,3 +181,12 @@ struct ReduceMotionTests {
         #expect(state.capturedRevealed == true)
     }
 }
+
+struct IncreaseContrastTests {
+    @Test func disabledCheckboxStaysVisibleWithIncreaseContrast() {
+        #expect(SelectionCheckboxStyle.opacity(isEnabled: true, increasedContrast: false) == 1)
+        #expect(SelectionCheckboxStyle.opacity(isEnabled: true, increasedContrast: true) == 1)
+        #expect(SelectionCheckboxStyle.opacity(isEnabled: false, increasedContrast: true)
+            > SelectionCheckboxStyle.opacity(isEnabled: false, increasedContrast: false))
+    }
+}

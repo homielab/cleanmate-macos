@@ -337,7 +337,7 @@ struct SmartScanView: View {
         let sources = [Binding { model.isAnySelected(group) } set: { set($0) }, Binding { allOn } set: { set($0) }]
         return HStack {
             // Plain macOS lists don't draw the native disclosure (only .sidebar does), so the header carries its own.
-            Button { withAnimation { isExpanded.wrappedValue.toggle() } } label: {
+            Button { withAnimation(reduceMotion ? nil : .default) { isExpanded.wrappedValue.toggle() } } label: {
                 Image(systemName: "chevron.right")
                     .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
                     .frame(width: 22, height: 22)
