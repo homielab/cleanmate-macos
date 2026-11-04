@@ -40,7 +40,8 @@ enum Module: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Sidebar badge after a scan: what Clean will free for Smart Scan/Privacy, files found for Large & Old Files.
+    /// Sidebar badge after a scan: what Clean will free for Smart Scan/Privacy; for Large & Old Files the files found,
+    /// or in Duplicate Files what the ticked copies free once some are ticked.
     enum Badge: Equatable { case size(Int64), files(Int) }
 
     /// nil (no badge) without results or when there is nothing to show; other modules never get one.
@@ -48,7 +49,7 @@ enum Module: String, CaseIterable, Identifiable {
         guard hasResults else { return nil }
         switch self {
         case .smartScan, .privacy: return size > 0 ? .size(size) : nil // Privacy records have no size: no badge
-        case .largeFiles: return files > 0 ? .files(files) : nil
+        case .largeFiles: return size > 0 ? .size(size) : files > 0 ? .files(files) : nil
         case .overview, .uninstaller, .spaceLens, .loginItems, .maintenance: return nil
         }
     }
@@ -284,8 +285,14 @@ struct ContentView: View {
         case .privacy: hasResults(privacy) ? module.badge(hasResults: true, size: privacy.selectedSize) : nil
         case .largeFiles:
             if case .results = largeFiles.phase {
-                module.badge(hasResults: true, files: largeFiles.similarPhotosShown ? largeFiles.similarPhotos.photoCount
-                                                                                    : largeFiles.visibleFiles.count)
+                if largeFiles.duplicatesShown {
+                    if case .results = largeFiles.duplicates.phase {
+                        module.badge(hasResults: true, size: largeFiles.duplicates.checkedSize, files: largeFiles.duplicates.fileCount)
+                    } else { nil }
+                } else {
+                    module.badge(hasResults: true, files: largeFiles.similarPhotosShown ? largeFiles.similarPhotos.photoCount
+                                                                                        : largeFiles.visibleFiles.count)
+                }
             } else { nil }
         case .overview, .uninstaller, .spaceLens, .loginItems, .maintenance: nil
         }
@@ -309,7 +316,7 @@ struct ContentView: View {
         case .largeFiles:
             switch largeFiles.phase {
             case .scanning, .trashing: nil
-            default: largeFiles.undoing || largeFiles.similarPhotos.isChanging ? nil : { largeFiles.scan() } // scan() ignores it while putting back
+            default: largeFiles.undoing || largeFiles.subModelChanging ? nil : { largeFiles.scan() } // scan() ignores it while putting back
             }
         case .uninstaller: uninstaller.loadingApps || uninstaller.working ? nil : { uninstaller.refresh() }
         case .spaceLens: spaceLens.trashing ? nil : { spaceLens.rescan() }
@@ -343,6 +350,7 @@ struct ContentView: View {
             }
         case .largeFiles:
             let photos = largeFiles.similarPhotos
+            let duplicates = largeFiles.duplicates
             if case .scanning = largeFiles.phase {
                 running = true
                 stop = { largeFiles.cancel() }
@@ -352,6 +360,12 @@ struct ContentView: View {
             } else if largeFiles.similarPhotosShown, case .trashing = photos.phase {
                 running = !photos.stoppingTrash
                 stop = { photos.stopTrash() }
+            } else if largeFiles.duplicatesShown, case .trashing = duplicates.phase {
+                running = !duplicates.stoppingTrash
+                stop = { duplicates.stopTrash() }
+            } else if largeFiles.duplicatesShown {
+                running = duplicates.isSearching && !duplicates.stopping
+                stop = { duplicates.stop() }
             } else {
                 running = largeFiles.similarPhotosShown && largeFiles.similarPhotos.isSearching
                 stop = { largeFiles.similarPhotos.stop() }

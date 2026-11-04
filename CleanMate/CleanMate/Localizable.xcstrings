@@ -704,6 +704,16 @@
         }
       }
     },
+    "Comparing files…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang so sánh tệp…"
+          }
+        }
+      }
+    },
     "Comparing photos…" : {
       "localizations" : {
         "vi" : {
@@ -884,6 +894,16 @@
         }
       }
     },
+    "Duplicate Files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp trùng lặp"
+          }
+        }
+      }
+    },
     "Each item returns to where it was. Nothing already there is replaced." : {
       "localizations" : {
         "vi" : {
@@ -1060,6 +1080,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm lại"
+          }
+        }
+      }
+    },
+    "Find Duplicates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm tệp trùng lặp"
+          }
+        }
+      }
+    },
+    "Find files with the same content anywhere in the scope, and keep one copy. Nothing is selected for you." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm các tệp có cùng nội dung ở mọi nơi trong phạm vi và giữ lại một bản. Không tệp nào được chọn sẵn."
           }
         }
       }
@@ -1718,16 +1758,6 @@
         }
       }
     },
-    "Copies" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Số bản"
-          }
-        }
-      }
-    },
     "Copies of simulators Xcode makes to run tests in parallel, made again by the next parallel test run" : {
       "localizations" : {
         "vi" : {
@@ -1948,16 +1978,6 @@
         }
       }
     },
-    "Duplicates Only" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chỉ tệp trùng lặp"
-          }
-        }
-      }
-    },
     "Edge downloads it again when an AI feature is used" : {
       "localizations" : {
         "vi" : {
@@ -2110,16 +2130,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đang lọc. Số tổng ở trên vẫn tính mọi mục."
-          }
-        }
-      }
-    },
-    "Finding duplicates…" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đang tìm tệp trùng lặp…"
           }
         }
       }
@@ -2632,12 +2642,12 @@
         }
       }
     },
-    "Keeps the oldest copy of each file" : {
+    "Keeps the suggested copy of each group" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Giữ lại bản cũ nhất của mỗi tệp"
+            "value" : "Giữ lại bản được gợi ý của mỗi nhóm"
           }
         }
       }
@@ -2738,6 +2748,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm nó trong Thùng rác, hoặc bấm Xem mục đã chuyển…"
+          }
+        }
+      }
+    },
+    "Looking for files…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang tìm tệp…"
           }
         }
       }
@@ -2872,12 +2892,42 @@
         }
       }
     },
+    "No Matching Files" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có tệp khớp"
+          }
+        }
+      }
+    },
     "No suggestions — your disk is in good shape." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không có gợi ý — ổ đĩa gọn gàng."
+          }
+        }
+      }
+    },
+    "No two files of %@ or more in %@ have the same content." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trong %2$@ không có hai tệp nào từ %1$@ trở lên có cùng nội dung."
+          }
+        }
+      }
+    },
+    "No two files of %@ or more in your home folder have the same content." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trong thư mục người dùng không có hai tệp nào từ %@ trở lên có cùng nội dung."
           }
         }
       }
@@ -3494,16 +3544,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không có ảnh tương tự"
-          }
-        }
-      }
-    },
-    "No two large files have the same content." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Không có hai tệp lớn nào cùng nội dung."
           }
         }
       }
@@ -4291,7 +4331,7 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chọn tất cả trừ ảnh gợi ý giữ"
+            "value" : "Chọn tất cả trừ bản gợi ý giữ"
           }
         }
       }
@@ -4350,16 +4390,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Phím tắt"
-          }
-        }
-      }
-    },
-    "Show All Files" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hiện mọi tệp"
           }
         }
       }
@@ -4680,6 +4710,26 @@
         }
       }
     },
+    "Stopped: only the duplicates found before you stopped are shown. Find Again to compare every file." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng: chỉ hiện các tệp trùng lặp tìm được trước khi dừng. Bấm Tìm lại để so sánh mọi tệp."
+          }
+        }
+      }
+    },
+    "Stopping…" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang dừng…"
+          }
+        }
+      }
+    },
     "Stops any app, even with admin rights, from changing macOS system files." : {
       "localizations" : {
         "vi" : {
@@ -4706,6 +4756,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gợi ý giữ"
+          }
+        }
+      }
+    },
+    "Suggested: a copy outside Downloads, then the oldest. Nothing is selected for you." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gợi ý giữ: bản nằm ngoài thư mục Tải về, sau đó là bản cũ nhất. Không tệp nào được chọn sẵn."
           }
         }
       }
@@ -5404,16 +5464,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản tải về của rustup"
-          }
-        }
-      }
-    },
-    "Select Extra Copies" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chọn bản thừa"
           }
         }
       }

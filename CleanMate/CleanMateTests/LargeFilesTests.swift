@@ -549,12 +549,14 @@ struct DuplicateFinderTests {
         try FileManager.default.linkItem(at: a, to: link)
         let result = try await DuplicateFinder.find([a, link, b, c, unique])
         #expect(result.groups == [[a, b]])
-        #expect(result.hashedCount == 3) // a, b, c; the hard link and the unique size are never read
+        // a and b; c is ruled out by its last 64 KB, the hard link and the unique size are never read.
+        #expect(result.hashedCount == 2)
         // Second run answers from the cache, and a changed file is read again.
         #expect(try await DuplicateFinder.find([a, b, c], cache: result.hashes).hashedCount == 0)
         try other.write(to: b)
         let changed = try await DuplicateFinder.find([a, b, c], cache: result.hashes)
-        #expect(changed.groups == [[b, c]] && changed.hashedCount == 1) // only b is read again
+        #expect(changed.groups == [[b, c]])
+        #expect(changed.hashedCount == 2) // b changed, c was never read in full; a is ruled out by its sample
     }
 
     @Test func onlyHardLinksAreNotDuplicates() async throws {
@@ -628,11 +630,40 @@ struct DuplicateFinderTests {
         let locked = try file("f.mov", Data(repeating: 1, count: 200_000))
         #expect(chmod(locked.path, 0) == 0)
         let fractions = Locked<[Double]>([])
-        let result = try await DuplicateFinder.find([a, b, c, d, e, locked]) { f in fractions.withLock { $0.append(f) } }
+        let result = try await DuplicateFinder.find([a, b, c, d, e, locked]) { p in fractions.withLock { $0.append(p.fraction) } }
         #expect(result.groups == [[a, b]])
         #expect(result.hashedCount == 2) // a and b; c, d, e ruled out by their head, f unreadable
         let seen = fractions.withLock { $0 }
-        #expect(seen.last == 1 && seen == seen.sorted())
+        #expect(seen.first == 0 && seen.last == 1 && seen == seen.sorted())
+    }
+
+    /// Same-size files whose first 64 KB match but whose last 64 KB differ are not read in full either.
+    @Test func differentTailsAreNotReadInFull() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let content = Data((0..<1_500_000).map { UInt8($0 % 251) })
+        var other = content
+        other[other.count - 1] ^= 0xFF
+        let a = try file("a.mov", content), b = try file("b.mov", other)
+        let result = try await DuplicateFinder.find([a, b])
+        #expect(result.groups.isEmpty && result.hashedCount == 0)
+        let same = try await DuplicateFinder.find([a, b, try file("c.mov", content)])
+        #expect(same.groups == [[a, root.appending(path: "c.mov")]] && same.hashedCount == 2)
+    }
+
+    /// A stop keeps the groups of the sizes compared before it (the largest first), with what they free.
+    @Test func cancelledKeepsTheGroupsFoundSoFar() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let big = Data(repeating: 4, count: 3_000_000), small = Data(repeating: 5, count: 2_000_000)
+        let (a1, a2) = (try file("a1.mov", big), try file("a2.mov", big))
+        let (b1, b2) = (try file("b1.mov", small), try file("b2.mov", small))
+        let task = Task {
+            try await DuplicateFinder.find([b1, a1, b2, a2]) { p in
+                if p.done > 6_000_000 { withUnsafeCurrentTask { $0?.cancel() } } // a1 and a2 hashed, b1 started
+            }
+        }
+        do { _ = try await task.value; Issue.record("not cancelled") } catch let cancelled as DuplicateFinder.Cancelled {
+            #expect(cancelled.groups == [[a1, a2]] && cancelled.privateSizes.isEmpty)
+        }
     }
 
     /// Cancelling while a big file is being hashed stops at the next 1 MB chunk, and no result (no hash) comes back.
@@ -642,13 +673,13 @@ struct DuplicateFinderTests {
         let urls = [try file("a.mov", content), try file("b.mov", content)]
         let reports = Locked(0)
         let task = Task {
-            try await DuplicateFinder.find(urls) { _ in
+            try await DuplicateFinder.find(urls) { p in
                 reports.withLock { $0 += 1 }
-                withUnsafeCurrentTask { $0?.cancel() } // first report: 1 MB of a.mov read
+                if p.done > 0 { withUnsafeCurrentTask { $0?.cancel() } } // 1 MB of a.mov read
             }
         }
         await #expect(throws: DuplicateFinder.Cancelled.self) { try await task.value }
-        #expect(reports.withLock { $0 } == 1)
+        #expect(reports.withLock { $0 } == 2) // the start (nothing compared yet), then the first chunk
     }
 
     @Test func canBeCancelled() async throws {
@@ -669,8 +700,8 @@ struct DuplicateFinderTests {
         let content = Data((0..<2_000_000).map { UInt8($0 % 251) }) // 2 chunks each, heads all equal
         let urls = try ["a.mov", "b.mov", "c.mov"].map { try file($0, content) }
         let task = Task {
-            try await DuplicateFinder.find(urls) { fraction in
-                if fraction > 0.7 { withUnsafeCurrentTask { $0?.cancel() } } // 5/6: first chunk of c.mov read
+            try await DuplicateFinder.find(urls) { p in
+                if p.fraction > 0.7 { withUnsafeCurrentTask { $0?.cancel() } } // 5/6: first chunk of c.mov read
             }
         }
         var kept: [DuplicateFinder.Key: Data] = [:]
@@ -683,109 +714,6 @@ struct DuplicateFinderTests {
         #expect(rerun.hashedCount == 1)
         #expect(rerun.groups == [urls])
     }
-}
-
-/// The duplicates filter shows only grouped files, keeps groups together and works with Select All.
-@MainActor @Test func duplicatesFilterShowsGroupsTogether() async throws {
-    let model = LargeFilesModel()
-    let f = { (path: String, size: Int64) in LargeFile(url: URL(fileURLWithPath: path), size: size, lastUsed: .now, kind: .other) }
-    let (a1, a2, b1, b2, lone) = (f("/a1", 300_000_000), f("/z/a2", 300_000_000), f("/b1", 200_000_000), f("/b2", 200_000_000), f("/lone", 999_000_000))
-    model.files = [lone, a1, a2, b1, b2]
-    model.phase = .results
-    model.findDuplicateFiles = { urls, _, _ in
-        #expect(urls.count == 5)
-        return DuplicateFinder.Result(groups: [[a1.url, a2.url], [b1.url, b2.url]])
-    }
-    model.duplicatesOnly = true
-    while model.duplicateGroups == nil { await Task.yield() }
-    #expect(model.duplicateProgress == nil)
-    #expect(Set(model.visibleFiles.map(\.url)) == [a1.url, a2.url, b1.url, b2.url])
-    #expect(model.duplicateCount(of: a1.url) == 2 && model.duplicateCount(of: lone.url) == nil)
-    let byName = [a1, b1, b2, a2].sorted { $0.url.path < $1.url.path } // /a1 /b1 /b2 /z/a2: a group split by sorting
-    #expect(model.groupedByDuplicates(byName).map(\.url) == [a1.url, a2.url, b1.url, b2.url])
-    #expect(model.checked.isEmpty) // nothing ticked for the user
-    model.setVisibleChecked(true)
-    #expect(model.checked.count == 4)
-    model.duplicatesOnly = false
-    #expect(model.visibleFiles.count == 5)
-}
-
-/// Select Extra Copies keeps one copy per group: oldest modified, tie → shortest path, counted over hidden copies too;
-/// trashing every copy of a group is flagged for the confirmation.
-@Test func selectExtraCopiesKeepsTheOldestCopyOfEachGroup() {
-    let model = LargeFilesModel()
-    let day: TimeInterval = 86_400
-    let f = { (path: String, age: Double, kind: FileKind) in
-        LargeFile(url: URL(fileURLWithPath: path), size: 100_000_000, lastUsed: .now, kind: kind, modified: .now.addingTimeInterval(-age * day))
-    }
-    // a: /x/a-old is the oldest. b: same date, /b shortest path. c: the oldest copy is a zip, hidden by the kind filter.
-    let (aNew, aOld, b, bLong, cOld, cNew) = (f("/a-new", 1, .other), f("/x/a-old", 9, .other), f("/b", 5, .other),
-                                             f("/long/b", 5, .other), f("/c.zip", 9, .archive), f("/c2", 1, .other))
-    model.files = [aNew, aOld, b, bLong, cOld, cNew]
-    model.duplicateGroups = [[aNew.url, aOld.url], [bLong.url, b.url], [cNew.url, cOld.url]]
-    model.duplicatesOnly = true
-    model.phase = .results
-    #expect(model.keptCopies == [aOld.url, b.url, cOld.url])
-    model.kind = .other
-    model.checkExtraCopies()
-    #expect(model.checked == [aNew.url, bLong.url, cNew.url]) // c's kept copy is hidden, so its shown copy goes
-    #expect(model.groupsLosingEveryCopy.isEmpty)
-    model.checked.insert(aOld.url)
-    #expect(model.groupsLosingEveryCopy == ["a-old"])
-    model.setVisibleChecked(false)
-    #expect(model.checked.isEmpty)
-}
-
-/// Select Extra Copies leaves exactly one copy per group even when the kept copy was ticked while a filter hid it;
-/// with the Duplicates filter off, Select All on every copy still gets the warning.
-@Test func extraCopiesUntickKeptCopyAndLosingEveryCopyWarnsWithFilterOff() {
-    let model = LargeFilesModel()
-    let f = { (path: String, age: Double) in
-        LargeFile(url: URL(fileURLWithPath: path), size: 100_000_000, lastUsed: .now, kind: .other, modified: .now.addingTimeInterval(-age))
-    }
-    let (old, new) = (f("/keep-old", 9), f("/new", 1))
-    model.files = [old, new]
-    model.duplicateGroups = [[new.url, old.url]]
-    model.phase = .results
-    model.setVisibleChecked(true) // filter off: every copy ticked
-    #expect(model.groupsLosingEveryCopy == ["keep-old"])
-    model.duplicatesOnly = true
-    model.search = "keep" // kept copy shown and ticked; then hidden by the search
-    model.search = "new"
-    model.setVisibleChecked(false)
-    #expect(model.checked == [old.url])
-    model.checkExtraCopies()
-    model.search = ""
-    #expect(model.checked == [new.url])
-    #expect(model.groupsLosingEveryCopy.isEmpty)
-}
-
-/// APFS clones: the selection counts only what they free, Select Extra Copies leaves them unticked, and a group
-/// that frees nothing is still shown.
-@MainActor @Test func apfsClonesCountWhatTheyFreeAndAreNotSelectedAsExtraCopies() async throws {
-    let model = LargeFilesModel()
-    let f = { (path: String, age: Double) in
-        LargeFile(url: URL(fileURLWithPath: path), size: 100_000_000, lastUsed: .now, kind: .other, modified: .now.addingTimeInterval(-age))
-    }
-    let (original, clone, copy, a, b) = (f("/original", 9), f("/clone", 5), f("/copy", 1), f("/a", 9), f("/b", 1))
-    model.files = [original, clone, copy, a, b]
-    model.phase = .results
-    model.findDuplicateFiles = { _, _, _ in
-        DuplicateFinder.Result(groups: [[clone.url, copy.url, original.url], [a.url, b.url]],
-                               privateSizes: [original.url: 0, clone.url: 0, a.url: 0, b.url: 4_096])
-    }
-    model.duplicatesOnly = true
-    while model.duplicateGroups == nil { await Task.yield() }
-    #expect(model.visibleFiles.count == 5)
-    #expect(model.cloneFreedSize(of: clone) == 0 && model.cloneFreedSize(of: b) == 4_096 && model.cloneFreedSize(of: copy) == nil)
-    model.checkExtraCopies()
-    #expect(model.checked == [copy.url]) // the original is kept, its clone and the a/b clones are not ticked
-    #expect(model.checkedSize == 100_000_000)
-    model.checked = [clone.url, b.url]
-    #expect(model.checkedSize == 4_096)
-    model.duplicatesOnly = false
-    model.duplicateGroups = nil // a new scan: sizes are full again
-    #expect(model.privateSizes.isEmpty && model.checkedSize == 200_000_000)
 }
 
 @Test func largeFilesProgressFractionNeedsAnEstimateAndStopsAt99Percent() {
@@ -895,19 +823,19 @@ struct DuplicateFinderTests {
     try content.write(to: a); try content.write(to: b)
     let cacheURL = root.appending(path: "Caches/hashes.json") // folder created on save
     func run() async -> Int {
-        let model = LargeFilesModel()
-        model.hashCacheURL = cacheURL
-        model.files = [a, b].map { LargeFile(url: $0, size: 2_000, lastUsed: .now, kind: .other) }
-        model.phase = .results
+        let model = DuplicatesModel()
+        model.cacheURL = cacheURL
         let read = Counter()
-        model.findDuplicateFiles = { urls, cache, progress in
-            let result = try await DuplicateFinder.find(urls, cache: cache, progress: progress)
+        model.findDuplicates = { _, _, _, _, cache, _ in
+            let result = try await DuplicateFinder.find([a, b], cache: cache)
             await read.add(result.hashedCount)
-            return result
+            let files = [a, b].map { LargeFile(url: $0, size: 2_000, lastUsed: .now, kind: .other) }
+            return DuplicateScanner.Result(groups: result.groups.map { _ in DuplicateScanner.Group(files: files, privateSizes: [:]) },
+                                           hashes: result.hashes)
         }
-        model.duplicatesOnly = true
-        while model.duplicateGroups == nil { await Task.yield() }
-        #expect(model.duplicateGroups == [[a, b]])
+        model.find(in: root, policy: SafetyPolicy(home: root, temp: root.appending(path: "tmp")), skipping: [])
+        await until(model) { if case .results = $0.phase { true } else { false } }
+        #expect(model.groups.map { $0.files.map(\.url) } == [[a, b]])
         return await read.value
     }
     #expect(await run() == 2)
@@ -988,21 +916,23 @@ private func hashKey(_ url: URL) -> DuplicateFinder.Key {
     for url in [a, b, old] { try Data(repeating: 7, count: 2_000).write(to: url) }
     let cacheURL = root.appending(path: "Caches/hashes.json")
     await DuplicateFinder.HashCache.save([hashKey(old): Data(repeating: 3, count: 32)], to: cacheURL)
-    let model = LargeFilesModel()
-    model.hashCacheURL = cacheURL
-    model.files = [a, b].map { LargeFile(url: $0, size: 2_000, lastUsed: .now, kind: .other) }
-    model.phase = .results
+    let model = DuplicatesModel()
+    model.cacheURL = cacheURL
     let started = Counter()
-    model.findDuplicateFiles = { _, cache, _ in
+    model.findDuplicates = { _, _, _, _, cache, progress in
+        progress(.comparing(.init(done: 0, total: 4_000)))
         await started.add(1)
         while !Task.isCancelled { await Task.yield() }
         // a.mov finished before the stop; b.mov's value is a partial (non-SHA-256) one that must not be saved.
-        throw DuplicateFinder.Cancelled(hashes: cache.merging([hashKey(a): Data(repeating: 1, count: 32), hashKey(b): Data([9])]) { $1 })
+        return DuplicateScanner.Result(hashes: cache.merging([hashKey(a): Data(repeating: 1, count: 32), hashKey(b): Data([9])]) { $1 },
+                                       stopped: true)
     }
-    model.duplicatesOnly = true
+    model.find(in: root, policy: SafetyPolicy(home: root, temp: root.appending(path: "tmp")), skipping: [])
     while await started.value == 0 { await Task.yield() }
-    model.duplicatesOnly = false
-    #expect(model.duplicateProgress == nil && model.duplicateGroups == nil)
+    await until(model) { if case .comparing = $0.phase { true } else { false } }
+    model.stop()
+    await until(model) { if case .results = $0.phase { true } else { false } }
+    #expect(model.stopped && model.groups.isEmpty)
     // The stopped task saves on its own; wait for the file to change, bounded so a regression fails instead of hanging.
     var saved: [DuplicateFinder.Key: Data] = [:]
     for _ in 0..<1_000 {

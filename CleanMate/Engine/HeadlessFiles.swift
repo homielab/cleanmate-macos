@@ -29,7 +29,7 @@ nonisolated enum HeadlessFiles {
     struct DupesOptions: Equatable, Sendable {
         /// `--in`: the folder to search, as typed; nil = the home folder.
         var root: String? = nil
-        /// Bytes; nil = `defaultMinSize`.
+        /// Bytes; nil = `DuplicateScanner.defaultMinSize`.
         var minSize: Int64? = nil
         /// Groups listed, most wasted space first.
         var limit = 20
@@ -376,9 +376,10 @@ nonisolated enum HeadlessFiles {
     // MARK: - large
 
     /// The folder `large` searches, checked like the app's Scope menu: the home folder, a folder in it (not in
-    /// ~/Library nor hidden) or an external drive; `--min-size` at least 50 MB for the home folder, 1 MB for a folder.
-    static func largeFolder(_ options: LargeOptions, sources: HeadlessScan.Sources,
-                            command: String = "large") throws(PathError) -> URL {
+    /// ~/Library nor hidden) or an external drive; `--min-size` at least `floor.home` (50 MB) for the home folder,
+    /// `floor.folder` (1 MB) for a folder.
+    static func largeFolder(_ options: LargeOptions, sources: HeadlessScan.Sources, command: String = "large",
+                            floor: (home: Int64, folder: Int64) = (defaultMinSize, folderMinSize)) throws(PathError) -> URL {
         let policy = sources.policy()
         let home = policy.homeURL
         let skipping = protectedFolders(home: home, hasFullDiskAccess: sources.hasFullDiskAccess())
@@ -389,10 +390,10 @@ nonisolated enum HeadlessFiles {
                             + "~/Library or hidden folders) or on an external drive")
         }
         let isHome = url.standardizedFileURL.path == home.standardizedFileURL.path
-        let floor = isHome ? defaultMinSize : folderMinSize
-        if let minSize = options.minSize, minSize < floor {
-            throw PathError(message: "--min-size must be at least \(CommandLineTool.size(floor))"
-                            + (isHome ? " for the whole home folder (use --in for a folder)" : ""))
+        let least = isHome ? floor.home : floor.folder
+        if let minSize = options.minSize, minSize < least {
+            throw PathError(message: "--min-size must be at least \(CommandLineTool.size(least))"
+                            + (isHome && floor.home > floor.folder ? " for the whole home folder (use --in for a folder)" : ""))
         }
         return url
     }
@@ -441,36 +442,39 @@ nonisolated enum HeadlessFiles {
 
     // MARK: - dupes
 
-    /// The folder `dupes` searches: the same rules as `large` (`largeFolder`).
+    /// The folder `dupes` searches: the same rules as `large` (`largeFolder`), `--min-size` down to 100 KB anywhere
+    /// (the smallest the app's Size menu offers for duplicates).
     static func dupesFolder(_ options: DupesOptions, sources: HeadlessScan.Sources) throws(PathError) -> URL {
-        try largeFolder(LargeOptions(root: options.root, minSize: options.minSize), sources: sources, command: "dupes")
+        let least = DuplicateScanner.sizeOptions[0]
+        return try largeFolder(LargeOptions(root: options.root, minSize: options.minSize), sources: sources, command: "dupes",
+                               floor: (least, least))
     }
 
-    /// Duplicates among the files `large` finds, as the Duplicates Only filter of Large & Old Files finds them
-    /// (`DuplicateFinder`: same content by SHA-256, a hard-linked file counted once, APFS clones free nothing).
-    /// Throws when the scan fails.
+    /// Duplicates under `root` as Duplicate Files in Large & Old Files finds them (`DuplicateScanner`: its own walk
+    /// down to `--min-size`, default 1 MB; same content by SHA-256, a hard-linked file counted once, APFS clones free
+    /// nothing). Throws when the scan fails.
     static func dupes(_ root: URL, options: DupesOptions, sources: HeadlessScan.Sources) async throws -> DupesReport {
-        let large = try await large(root, options: LargeOptions(root: options.root, minSize: options.minSize,
-                                                                limit: Int.max), sources: sources)
-        let found = try await DuplicateFinder.find(large.files.map { URL(fileURLWithPath: $0.path) })
-        let byPath = Dictionary(large.files.map { ($0.path, $0) }) { a, _ in a }
-        let groups = found.groups.compactMap { urls -> DuplicateGroup? in
-            let files = urls.compactMap { byPath[$0.path] }
-            guard files.count >= 2 else { return nil }
-            let ordered = files.sorted { ($0.modified, $0.path) < ($1.modified, $1.path) }
+        let access = sources.hasFullDiskAccess()
+        let policy = sources.policy()
+        let skipping = protectedFolders(home: policy.homeURL, hasFullDiskAccess: access)
+        let minSize = options.minSize ?? DuplicateScanner.defaultMinSize
+        let found = try await DuplicateScanner.scan(root: root, minSize: minSize, policy: policy, skipping: skipping)
+        let groups = found.groups.map { group -> DuplicateGroup in
+            let ordered = group.files.sorted { ($0.modified, $0.url.path) < ($1.modified, $1.url.path) }
             let copies = ordered.enumerated().map { index, file in
-                DuplicateFile(path: file.path, modified: file.modified,
-                              freeable: file.hardLinked ? 0 : found.privateSizes[URL(fileURLWithPath: file.path)] ?? file.size,
+                DuplicateFile(path: file.url.path, modified: file.modified.formatted(.iso8601), freeable: group.freed(file),
                               oldest: index == 0)
             }
-            return DuplicateGroup(size: files[0].size, count: copies.count,
+            return DuplicateGroup(size: ordered[0].size, count: copies.count,
                                   wasted: copies.dropFirst().reduce(0) { $0 + $1.freeable }, files: copies)
         }.sorted { ($0.wasted, $0.size, $1.files[0].path) > ($1.wasted, $1.size, $0.files[0].path) }
         let shown = groups.prefix(options.limit)
-        return DupesReport(version: large.version, fullDiskAccess: large.fullDiskAccess, scannedAt: large.scannedAt,
-                           root: large.root, minSize: large.minSize, count: groups.count,
+        let real = realPath(root.path) ?? root.path
+        return DupesReport(version: sources.version(), fullDiskAccess: access, scannedAt: sources.now().formatted(.iso8601),
+                           root: real, minSize: minSize, count: groups.count,
                            wasted: groups.reduce(0) { $0 + $1.wasted }, groups: Array(shown),
-                           moreGroups: groups.count - shown.count, skipped: large.skipped)
+                           moreGroups: groups.count - shown.count,
+                           skipped: skippedOutsideLibrary(skipping, inside: URL(fileURLWithPath: real), home: policy.homeURL))
     }
 
     // MARK: - similar

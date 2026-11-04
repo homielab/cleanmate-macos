@@ -836,7 +836,7 @@ extension CommandLineToolTests {
         let fixture = try FilesFixture()
         let home = fixture.home.path
         for arguments in [["dupes", "extra"], ["dupes", "--in", home + "/nope"], ["dupes", "--in", home + "/Library"],
-                          ["dupes", "--min-size", "10MB"], ["dupes", "--min-size", "abc"], ["dupes", "--limit", "0"],
+                          ["dupes", "--min-size", "50KB"], ["dupes", "--min-size", "abc"], ["dupes", "--limit", "0"],
                           ["dupes", "--older-than", "3"], ["dupes", "--in", home, "--in", home]] {
             let (code, printed) = await Self.run(arguments, fixture.sources(fullDiskAccess: true))
             #expect(code == 2 && printed.stdout.isEmpty && printed.stderr.hasPrefix("cleanmate: "), "\(arguments)")

@@ -97,8 +97,8 @@ cleanmate space --json                       # the home folder's children by siz
 cleanmate space ~/Library --json --limit 10  # drill into the biggest folder
 cleanmate large --json                       # files of 50 MB or more in the home folder, like Large & Old Files
 cleanmate large --json --min-size 1GB --older-than 180 --in ~/Downloads
-cleanmate dupes --json                       # duplicate files among those, like the Duplicates Only filter
-cleanmate dupes --json --in ~/Pictures --min-size 1MB --limit 10
+cleanmate dupes --json                       # duplicate files of 1 MB or more, like Duplicate Files
+cleanmate dupes --json --in ~/Pictures --min-size 100KB --limit 10
 cleanmate similar --json ~/Pictures ~/Desktop # photos that look alike, like Similar Photos (default: the home folder)
 ```
 
@@ -109,7 +109,7 @@ audio, image, document, code, archive, diskImage, installer, other), `modified`,
 the Trash frees nothing while other links remain), and `icloud` on iCloud Drive files (`uploaded`: Remove Download in
 Large & Old Files frees it and keeps it in iCloud; never `trash` a file inside iCloud Drive); `--older-than DAYS`
 keeps files not used for that long, `--in` a folder (then `--min-size` can go down to 1 MB). `dupes` takes the same
-`--in` and `--min-size` and lists `groups` of identical files, most `wasted` bytes first (what moving every copy but
+`--in` and `--min-size` (default 1 MB, at least 100KB) and lists `groups` of identical files, most `wasted` bytes first (what moving every copy but
 the oldest would free); each group has the copies' `size`, `count` and `files` (`path`, `modified`, `freeable`,
 `oldest` first). A copy with `freeable` 0 is an APFS clone or has other hard links: removing it frees nothing. Show
 sizes human readable and paths with `~`.

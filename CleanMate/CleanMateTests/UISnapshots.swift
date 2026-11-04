@@ -300,26 +300,24 @@ struct UISnapshots {
             model.phase = .results
             return LargeFilesView(model: model)
         }
-        // Duplicates filter: two copies of the installer, three of the movie; nothing ticked for the user.
+        // Duplicate Files: two copies of the installer, three of the movie, the copy to keep first; nothing ticked.
         // Wider than the other screens so the toolbar shows the Duplicates picker instead of moving it to the overflow menu.
         try await snapshot("largefiles-duplicates", size: CGSize(width: 1_000, height: 600)) {
             let model = LargeFilesModel()
-            let copies: [(String, Int64, Double, FileKind)] = [
-                ("Desktop/macOS-Installer copy.dmg", 13_200_000_000, 200, .installer),
-                ("Movies/Old/Holiday 2023.mov", 4_800_000_000, 700, .video),
-                ("Desktop/Holiday 2023 (1).mov", 4_800_000_000, 380, .video),
-            ]
-            model.files = (files + copies).map {
-                LargeFile(url: Self.sample.appending(path: $0.0), size: $0.1, lastUsed: Self.today.addingTimeInterval(-$0.2 * day), kind: $0.3,
-                          home: Self.sample)
-            }.sorted { $0.size > $1.size }
-            let url = { (path: String) in Self.sample.appending(path: path) }
-            model.duplicateGroups = [
-                [url("Desktop/macOS-Installer copy.dmg"), url("Downloads/macOS-Installer.dmg")],
-                [url("Desktop/Holiday 2023 (1).mov"), url("Movies/Holiday 2023.mov"), url("Movies/Old/Holiday 2023.mov")],
-            ]
-            model.duplicatesOnly = true
+            model.duplicatesShown = true // before results: no search starts
             model.phase = .results
+            let file = { (path: String, size: Int64, age: Double, kind: FileKind) in
+                LargeFile(url: Self.sample.appending(path: path), size: size, lastUsed: Self.today.addingTimeInterval(-age * day), kind: kind,
+                          modified: Self.today.addingTimeInterval(-age * day), home: Self.sample)
+            }
+            model.duplicates.groups = [
+                DuplicateScanner.Group(files: [file("Desktop/macOS-Installer copy.dmg", 13_200_000_000, 200, .installer),
+                                               file("Downloads/macOS-Installer.dmg", 13_200_000_000, 300, .installer)], privateSizes: [:]),
+                DuplicateScanner.Group(files: [file("Movies/Old/Holiday 2023.mov", 4_800_000_000, 700, .video),
+                                               file("Movies/Holiday 2023.mov", 4_800_000_000, 500, .video),
+                                               file("Desktop/Holiday 2023 (1).mov", 4_800_000_000, 380, .video)], privateSizes: [:]),
+            ]
+            model.duplicates.phase = .results
             return LargeFilesView(model: model)
         }
         try await snapshot("largefiles-done") {

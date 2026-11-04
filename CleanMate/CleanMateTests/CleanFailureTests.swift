@@ -216,24 +216,22 @@ struct CleanFailureTests {
         #expect(report.failures.allSatisfy { $0.reason == .kept(String(localized: "a Homebrew command is running")) })
     }
 
-    /// A duplicate search that fails says so (banner) instead of stopping silently; Try Again searches again.
-    @MainActor @Test func duplicateSearchErrorIsShown() async {
-        let model = LargeFilesModel()
-        model.files = [LargeFile(url: URL(fileURLWithPath: "/a"), size: 1, lastUsed: .now, kind: .other)]
-        model.phase = .results
+    /// A duplicate search that fails says so instead of stopping silently; Try Again searches again.
+    @MainActor @Test(.timeLimit(.minutes(1))) func duplicateSearchErrorIsShown() async {
+        let model = DuplicatesModel()
         let calls = Locked(0)
-        model.findDuplicateFiles = { _, _, _ in
+        model.findDuplicates = { _, _, _, _, _, _ in
             let call = calls.withLock { $0 += 1; return $0 }
             if call == 1 { throw CocoaError(.fileReadNoPermission) }
-            return DuplicateFinder.Result(groups: [])
+            return DuplicateScanner.Result()
         }
-        model.duplicatesOnly = true
-        while model.duplicateError == nil { await Task.yield() }
-        #expect(model.duplicateGroups == nil && model.duplicateProgress == nil)
-        model.retryDuplicates()
-        #expect(model.duplicateError == nil)
-        while model.duplicateGroups == nil { await Task.yield() }
-        #expect(model.duplicateError == nil && calls.withLock { $0 } == 2)
+        model.find(in: URL(fileURLWithPath: "/Users/test"), policy: .current, skipping: [])
+        await until(model) { $0.error != nil }
+        guard case .idle = model.phase else { Issue.record("not idle"); return }
+        model.findAgain()
+        #expect(model.error == nil)
+        await until(model) { if case .results = $0.phase { true } else { false } }
+        #expect(model.error == nil && model.groups.isEmpty && calls.withLock { $0 } == 2)
     }
 
     /// Space Lens: a folder macOS won't list is "Not Readable" and never measured, not an empty folder.

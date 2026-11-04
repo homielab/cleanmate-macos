@@ -324,14 +324,23 @@ struct ScanBenchmark {
             try await LargeFileScanner.scan(root: root, minSize: minSize, policy: policy, skipping: skipping, spotlightLastUsed: { _ in nil })
         }
         report("large-files no Spotlight", plain, 0)
-        // Duplicates: reads same-size files to hash them, nothing else. Clones = files counted once.
-        let urls = files.map(\.url)
-        let (found, hashing) = try await timed { try await peakMemory("dupes") { try await DuplicateFinder.find(urls) } }
-        let clones = Dictionary(grouping: urls.compactMap(DuplicateFinder.cloneID), by: { $0 }).values.reduce(0) { $0 + $1.count - 1 }
-        let extra = found.groups.reduce(Int64(0)) { sum, group in
-            sum + Int64(group.count - 1) * (files.first { $0.url == group[0] }?.size ?? 0)
-        }
-        report("dupes \(found.groups.count)g \(found.hashedCount)read \(clones)clone", hashing, extra)
+    }
+
+    /// Duplicate Files as the app runs it (`DuplicateScanner`: its own walk, then size → 64 KB samples → full hash),
+    /// without the hash cache, so every candidate is read. `CLEANMATE_BENCH_MINSIZE=<bytes>` (default 1 MB).
+    @Test func duplicates() async throws {
+        guard mayRead("duplicates \(root.path)", root) else { return }
+        let skipping = skipping
+        let minSize = ProcessInfo.processInfo.environment["CLEANMATE_BENCH_MINSIZE"].flatMap(Int64.init) ?? DuplicateScanner.defaultMinSize
+        let listed = Locked(0)
+        let (found, seconds) = try await timed { try await peakMemory("duplicates") {
+            try await DuplicateScanner.scan(root: root, minSize: minSize, policy: policy, skipping: skipping, progress: { step in
+                if case .listing(let count) = step { listed.withLock { $0 = max($0, count) } }
+            })
+        } }
+        let extra = found.groups.reduce(Int64(0)) { $0 + $1.extraSize }
+        report("duplicates ≥\(minSize / 1_000)KB", seconds, extra)
+        print("BENCH duplicates entries=\(listed.withLock { $0 }) groups=\(found.groups.count) hashed=\(found.hashes.count)")
     }
 
     /// The home level as `SpaceLensModel` loads it: list, then every folder measured in parallel.

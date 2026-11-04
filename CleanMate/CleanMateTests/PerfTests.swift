@@ -112,13 +112,19 @@ struct PerfTests {
         model.search = ""
         #expect(timed("largeFiles \(count) checkedFiles + size") { _ = (model.checkedFiles.count, model.checkedSize) } < 500)
         #expect(render("largeFiles \(count) view render", LargeFilesView(model: model)) < 5_000)
-        // Duplicates filter: every 10th file has a copy; filter + regroup per render.
-        model.duplicateGroups = stride(from: 0, to: count - 1, by: 10).map { [model.files[$0].url, model.files[$0 + 1].url] }
-        model.duplicatesOnly = true
-        #expect(timed("largeFiles \(count) duplicates filter + grouped") {
-            _ = model.groupedByDuplicates(model.sorted(model.visibleFiles, using: byName))
-        } < 2_000)
-        model.duplicatesOnly = false
+        // Duplicate Files: every two files a group; search, selection and render per keystroke or tick.
+        let duplicates = DuplicatesModel()
+        duplicates.groups = stride(from: 0, to: count - 1, by: 2).map {
+            DuplicateScanner.Group(files: [model.files[$0], model.files[$0 + 1]], privateSizes: [:])
+        }
+        duplicates.phase = .results
+        duplicates.checkAllButSuggested()
+        #expect(timed("duplicates \(count) checkedFiles + size") { _ = (duplicates.checkedFiles.count, duplicates.checkedSize) } < 1_000)
+        duplicates.search = "folder4"
+        #expect(timed("duplicates \(count) search") { _ = duplicates.shownGroups.count } < 1_000)
+        duplicates.search = ""
+        #expect(render("duplicates \(count) view render",
+                       DuplicatesView(model: duplicates, scopeName: nil, confirming: .constant(false)) { EmptyView() }) < 5_000)
     }
 
     /// Finding duplicates on real temporary files: 40 files of ~8 MB, 10 of one size (5 identical pairs), the

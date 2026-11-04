@@ -100,8 +100,9 @@ nonisolated enum CommandLineTool {
                           hidden folders; node_modules, Pods and DerivedData skipped) or the folder named with
                           --in, Settings › Exclusions left out. Read-only: to move files to the Trash, use
                           `cleanmate trash`.
-          dupes           Duplicate files among the files large finds (same folders, --min-size and
-                          exclusions), like the Duplicates Only filter of Large & Old Files: same content,
+          dupes           Duplicate files, like Duplicate Files in Large & Old Files: files of 1 MB or more
+                          (--min-size) in the same folders as large (exclusions left out, never inside an
+                          app or the Photos library, iCloud files not downloaded never read), same content,
                           a hard-linked file counted once, APFS clones freeing nothing. Groups by space
                           wasted (what moving every copy but the oldest would free). Read-only: to move
                           copies to the Trash, use `cleanmate trash`.
@@ -141,7 +142,8 @@ nonisolated enum CommandLineTool {
                           restore --list: the N newest (default 200).
           --list          restore: list what can be put back instead of putting anything back.
           --min-size SIZE large, dupes: only files of at least SIZE, like 100MB or 1.5GB (1 MB = 1,000,000 bytes).
-                          Default and minimum 50MB for the home folder; 1MB minimum with --in.
+                          large: default and minimum 50MB for the home folder; 1MB minimum with --in.
+                          dupes: default 1MB, minimum 100KB.
           --older-than DAYS
                           large: only files not opened or changed for DAYS days.
           --in PATH       large, dupes: search this folder (in your home folder or on an external drive) instead.

@@ -149,22 +149,25 @@ nonisolated enum LargeFileScanner {
     /// those and Desktop & Documents in iCloud) is injectable for tests.
     /// `extensions` (lowercased) lists only files with one of them, never one inside a library or app
     /// (`SimilarPhotos.isInLibraryOrApp`), and leaves iCloud Drive out (its files never go to the Trash).
+    /// `lean` (the duplicate search, which lists far more files) leaves iCloud Drive out and asks nothing per file
+    /// beyond the walk's own values: no Spotlight, iCloud, project or hard-link lookup (`kind` is `.other`,
+    /// `lastUsed` the access or modification date). `DuplicateScanner` looks those up for the files it groups.
     @concurrent static func scan(root: URL, minSize: Int64, policy: SafetyPolicy = .current, skipping: Set<String> = [],
-                                 extensions: Set<String>? = nil,
+                                 extensions: Set<String>? = nil, lean: Bool = false,
                                  spotlightLastUsed: @escaping @Sendable (URL) -> Date? = spotlightLastUsedDate,
                                  icloudStatus: @escaping @Sendable (URL) -> ICloudStatus? = ICloudStatus.current,
                                  progress: (@Sendable (Int) -> Void)? = nil) async throws -> [LargeFile] {
         guard allowsRoot(root, policy: policy) else { throw OutsideHomeError() }
         let home = URL(fileURLWithPath: realpath(policy.homeURL.path, nil).map { defer { free($0) }; return String(cString: $0) }
                        ?? policy.homeURL.path, isDirectory: true)
-        let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, extensions: extensions,
+        let walk = Walk(minSize: minSize, policy: policy, skipping: skipping, extensions: extensions, lean: lean,
                         spotlightLastUsed: spotlightLastUsed, icloudStatus: icloudStatus, progress: progress,
                         library: policy.homeURL.appending(path: "Library").standardizedFileURL.path, home: home.path)
         // The enumerator lists a root's files under its real path (/var → /private/var); the parallel levels do the same.
         let real = realpath(root.path, nil).map { defer { free($0) }; return String(cString: $0) } ?? root.path
         var found = try await walk.tree(URL(fileURLWithPath: real, isDirectory: true), depth: splitDepth)
         let drive = ICloudDownloads.folder(home: home)
-        if extensions == nil, real == home.path, !ProtectedFolders.contains(skipping, drive),
+        if extensions == nil, !lean, real == home.path, !ProtectedFolders.contains(skipping, drive),
            !ProtectedFolders.contains(skipping, ICloudDownloads.folder(home: policy.homeURL)) {
             found += try await walk.iCloudDrive(ICloudDownloads.roots(home: home))
         }
@@ -183,6 +186,7 @@ nonisolated enum LargeFileScanner {
         let policy: SafetyPolicy
         let skipping: Set<String>
         let extensions: Set<String>?
+        let lean: Bool
         let spotlightLastUsed: @Sendable (URL) -> Date?
         let icloudStatus: @Sendable (URL) -> ICloudStatus?
         let progress: (@Sendable (Int) -> Void)?
@@ -193,11 +197,12 @@ nonisolated enum LargeFileScanner {
         /// Folders already known to be in a project or not (`FileKind.isInProject`).
         let projectFolders = Locked([String: Bool]())
 
-        init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, extensions: Set<String>?,
+        init(minSize: Int64, policy: SafetyPolicy, skipping: Set<String>, extensions: Set<String>?, lean: Bool,
              spotlightLastUsed: @escaping @Sendable (URL) -> Date?, icloudStatus: @escaping @Sendable (URL) -> ICloudStatus?,
              progress: (@Sendable (Int) -> Void)?, library: String, home: String) {
-            (self.minSize, self.policy, self.skipping, self.extensions, self.spotlightLastUsed, self.icloudStatus, self.progress,
-             self.library, self.home) = (minSize, policy, skipping, extensions, spotlightLastUsed, icloudStatus, progress, library, home)
+            (self.minSize, self.policy, self.skipping, self.extensions, self.lean, self.spotlightLastUsed, self.icloudStatus,
+             self.progress, self.library, self.home) = (minSize, policy, skipping, extensions, lean, spotlightLastUsed,
+                                                        icloudStatus, progress, library, home)
         }
 
         /// The extension's kind; a file of no known kind inside a project (a model, a database, a build product) is code.
@@ -290,6 +295,12 @@ nonisolated enum LargeFileScanner {
             guard values.isRegularFile == true, let size = values.totalFileAllocatedSize, Int64(size) >= minSize,
                   extensions.map({ $0.contains(url.pathExtension.lowercased()) && !SimilarPhotos.isInLibraryOrApp(url) }) ?? true,
                   inDrive ? policy.allowsICloudDownload(url) : policy.allowsUserFile(url) else { return nil }
+            if lean {
+                return LargeFile(url: url, size: Int64(size),
+                                 lastUsed: lastUsed(spotlight: nil, accessed: values.contentAccessDate,
+                                                    modified: values.contentModificationDate),
+                                 kind: .other, modified: values.contentModificationDate, home: policy.homeURL)
+            }
             let icloud = icloudStatus(url)
             if inDrive, icloud == nil { return nil }
             let used = lastUsed(spotlight: spotlightLastUsed(url), accessed: values.contentAccessDate,
@@ -321,7 +332,8 @@ nonisolated enum LargeFileScanner {
     }
 }
 
-/// Duplicates among the large files: only files of equal byte size are read, and only to compare SHA-256 hashes.
+/// Files with the same content (`DuplicateScanner`): only files of equal byte size are read, and only to compare
+/// SHA-256 hashes.
 nonisolated enum DuplicateFinder {
     /// A file's content is assumed unchanged while its path, byte size, modification date and inode are (hash cache key).
     struct Key: Hashable, Sendable, Codable {
@@ -344,8 +356,21 @@ nonisolated enum DuplicateFinder {
     }
 
     /// Thrown instead of `CancellationError` by `find`: carries the cache passed in plus every full-file hash
-    /// finished before the stop (never a partial or head hash), so the next run does not read those files again.
-    struct Cancelled: Error { let hashes: [Key: Data] }
+    /// finished before the stop (never a partial or sample hash), so the next run does not read those files again,
+    /// and the groups of the sizes compared before the stop (largest first) with their `privateSizes`.
+    struct Cancelled: Error {
+        let hashes: [Key: Data]
+        var groups: [[URL]] = []
+        var privateSizes: [URL: Int64] = [:]
+    }
+
+    /// How far a search is: bytes of the files to compare settled (read in full, ruled out by their sample,
+    /// answered from the cache, or unreadable) out of `total`, the bytes of every file with a same-size twin.
+    struct Progress: Sendable, Equatable {
+        var done: Int64
+        var total: Int64
+        var fraction: Double { total > 0 ? min(Double(done) / Double(total), 1) : 1 }
+    }
 
     /// One file on disk: a hard link's inode, or an APFS clone ID shared by whole-file clones (`number` vs `clone`).
     private struct Inode: Hashable { let device: Int32, number: UInt64, clone: Bool }
@@ -353,24 +378,31 @@ nonisolated enum DuplicateFinder {
     /// Hard links to one file (same device + inode) count once. APFS clones that still share every block (Finder
     /// Duplicate, `cp -c`, same `cloneID`) are grouped without being read: only the first one found is hashed.
     /// Grouped files that share blocks get their freeable size in `privateSizes` (0 for a whole-file clone).
-    /// `progress` gets the fraction of bytes to read done so far. Throws `Cancelled` when cancelled.
+    /// A file iCloud keeps only in the cloud (dataless) is never read: reading it would download it.
+    /// `progress` gets the bytes settled so far: 0 once the files to compare are known, then about every 1%.
+    /// Throws `Cancelled` when cancelled.
     @concurrent static func find(_ urls: [URL], cache: [Key: Data] = [:],
-                                 progress: (@Sendable (Double) -> Void)? = nil) async throws -> Result {
+                                 progress: (@Sendable (Progress) -> Void)? = nil) async throws -> Result {
         var result = Result(hashes: cache)
         do {
             try findGroups(urls, cache: cache, into: &result, progress: progress)
-            for url in result.groups.joined() {
-                try Task.checkCancellation()
-                if let size = privateSize(of: url) { result.privateSizes[url] = size }
-            }
         } catch is CancellationError {
-            throw Cancelled(hashes: result.hashes)
+            addPrivateSizes(to: &result)
+            throw Cancelled(hashes: result.hashes, groups: result.groups, privateSizes: result.privateSizes)
         }
+        addPrivateSizes(to: &result)
         return result
     }
 
+    /// One `getattrlist` per grouped file: cheap, so also done for the groups a stop keeps.
+    private static func addPrivateSizes(to result: inout Result) {
+        for url in result.groups.joined() {
+            if let size = privateSize(of: url) { result.privateSizes[url] = size }
+        }
+    }
+
     private static func findGroups(_ urls: [URL], cache: [Key: Data], into result: inout Result,
-                                   progress: (@Sendable (Double) -> Void)?) throws {
+                                   progress: (@Sendable (Progress) -> Void)?) throws {
         var seen = Set<Inode>()
         var firstClone: [Inode: URL] = [:]
         /// First whole-file clone found → the other files of its clone ID: same content, never read.
@@ -378,7 +410,7 @@ nonisolated enum DuplicateFinder {
         var bySize: [Int64: [(url: URL, key: Key)]] = [:]
         for url in urls {
             var info = stat()
-            guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
+            guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_flags & UInt32(SF_DATALESS) == 0,
                   seen.insert(Inode(device: info.st_dev, number: info.st_ino, clone: false)).inserted
             else { continue }
             let modified = Date(timeIntervalSince1970: Double(info.st_mtimespec.tv_sec) + Double(info.st_mtimespec.tv_nsec) / 1e9)
@@ -393,17 +425,19 @@ nonisolated enum DuplicateFinder {
         /// A file and its whole-file clones, in that order.
         func copies(_ file: (url: URL, key: Key)) -> [(url: URL, key: Key)] { [file] + (clonesOf[file.url] ?? []) }
         let candidates = bySize.filter { $0.value.reduce(0) { $0 + copies($1).count } >= 2 }.sorted { $0.key > $1.key }
-        let total = candidates.reduce(0.0) { $0 + Double($1.key) * Double($1.value.count) }
-        var done = 0.0
+        let total = candidates.reduce(Int64(0)) { $0 + $1.key * Int64($1.value.count) }
+        var done: Int64 = 0
         var reported = 0.0
-        func report(_ fraction: Double) {
-            let fraction = min(fraction, 1) // a file that grew while being read
-            if fraction - reported >= 0.01 { reported = fraction; progress?(fraction) } // ~100 updates, not one per MB
+        func report(_ bytes: Int64) {
+            let now = Progress(done: min(bytes, total), total: total) // a file that grew while being read
+            // ~100 updates, not one per MB; the last one always.
+            if now.fraction - reported >= 0.01 || (now.done == total && reported < 1) { reported = now.fraction; progress?(now) }
         }
-        // Every candidate counts toward progress once settled: hashed, cached, ruled out by its head, or unreadable.
+        progress?(Progress(done: 0, total: total)) // the amount to compare is known: comparing starts
+        // Every candidate counts toward progress once settled: hashed, cached, ruled out by its sample, or unreadable.
         func settled(_ size: Int64) {
-            done += Double(size)
-            if total > 0 { report(done / total) }
+            done += size
+            if total > 0 { report(done) }
         }
         for (size, files) in candidates {
             var pending = files
@@ -412,14 +446,16 @@ nonisolated enum DuplicateFinder {
             if files.count == 1 {
                 (pending, alone) = ([], files)
                 settled(size)
-            } else if size > headSize, !files.contains(where: { cache[$0.key] != nil }) {
-                // Head pass: a file whose first `headSize` bytes no other file of its size shares is not read in full.
-                // Skipped when a cached hash is in the group: that file's head is unknown.
+            } else if size > 2 * Int64(headSize) {
+                // Sample pass: a file whose first and last `headSize` bytes no other file of its size shares is not
+                // read in full. Cached files are sampled too (128 KB each), so an uncached twin of a cached file is
+                // still ruled out by its sample. Smaller files are read in full at once: their sample would be the
+                // whole file.
                 var heads: [Data: Int] = [:]
                 var headOf: [URL: Data] = [:]
                 for file in files {
                     try Task.checkCancellation()
-                    guard let head = try sha256(of: file.url, limit: headSize) else { continue }
+                    guard let head = try sampleHash(of: file.url, size: size) else { continue }
                     headOf[file.url] = head
                     heads[head, default: 0] += 1
                 }
@@ -437,7 +473,7 @@ nonisolated enum DuplicateFinder {
                 } else {
                     let base = done
                     guard let read = try sha256(of: file.url, progress: { bytes in
-                        if total > 0 { report((base + Double(bytes)) / total) }
+                        if total > 0 { report(base + Int64(bytes)) }
                     }) else { settled(size); continue } // unreadable: never reported as a duplicate
                     hash = read
                     result.hashedCount += 1
@@ -549,8 +585,31 @@ nonisolated enum DuplicateFinder {
         }
     }
 
-    /// Bytes read from the start of each same-size file before reading any in full.
+    /// Bytes read from the start and from the end of each same-size file before reading any in full.
     static let headSize = 64 * 1024
+
+    /// SHA-256 of the first and the last `headSize` bytes of a file of `size` bytes (over `2 * headSize`); nil when it
+    /// cannot be read. Keeps the access date like `sha256`.
+    static func sampleHash(of url: URL, size: Int64) throws -> Data? {
+        try Task.checkCancellation()
+        return keepingAccessDate(of: url) {
+            autoreleasepool {
+                guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+                defer { try? handle.close() }
+                var hasher = SHA256()
+                do {
+                    guard let head = try handle.read(upToCount: headSize), head.count == headSize else { return nil }
+                    hasher.update(data: head)
+                    try handle.seek(toOffset: UInt64(size - Int64(headSize)))
+                    guard let tail = try handle.read(upToCount: headSize) else { return nil }
+                    hasher.update(data: tail)
+                } catch {
+                    return nil
+                }
+                return Data(hasher.finalize())
+            }
+        }
+    }
 
     /// SHA-256 of the file's first `limit` bytes read in 1 MB chunks, checking for cancellation between chunks; nil when
     /// it cannot be read.

@@ -51,12 +51,17 @@ final class LargeFilesModel: ObservableObject {
     @Published var kind: FileKind?
     /// Toolbar search: file name or location; "" = no search.
     @Published var search = ""
-    /// Only files with an identical copy among the scanned files; turning it on finds them once per scan.
-    @Published var duplicatesOnly = false {
+    /// Duplicates › Duplicate Files replaces the file list with its own search of the scan's scope (down to 1 MB,
+    /// not limited to the large files listed); turning it on searches once per scan.
+    @Published var duplicatesShown = false {
         didSet {
-            guard duplicatesOnly != oldValue else { return }
-            if duplicatesOnly { similarPhotosShown = false }
-            duplicatesOnly ? findDuplicates() : stopFindingDuplicates()
+            guard duplicatesShown != oldValue else { return }
+            if duplicatesShown {
+                similarPhotosShown = false
+                findDuplicates()
+            } else {
+                duplicates.reset()
+            }
         }
     }
     /// Duplicates › Similar Photos replaces the file list; turning it on searches the scan's scope once per scan.
@@ -64,62 +69,38 @@ final class LargeFilesModel: ObservableObject {
         didSet {
             guard similarPhotosShown != oldValue else { return }
             if similarPhotosShown {
-                duplicatesOnly = false
+                duplicatesShown = false
                 findSimilarPhotos()
             } else {
                 similarPhotos.reset()
             }
         }
     }
-    /// The Duplicates menu: all files, identical copies, or similar photos.
+    /// The Duplicates menu: all files, identical files, or similar photos.
     enum Listing: Hashable { case allFiles, duplicates, similarPhotos }
     var listing: Listing {
-        get { similarPhotosShown ? .similarPhotos : duplicatesOnly ? .duplicates : .allFiles }
+        get { similarPhotosShown ? .similarPhotos : duplicatesShown ? .duplicates : .allFiles }
         set {
             switch newValue {
-            case .allFiles: (duplicatesOnly, similarPhotosShown) = (false, false)
-            case .duplicates: duplicatesOnly = true
+            case .allFiles: (duplicatesShown, similarPhotosShown) = (false, false)
+            case .duplicates: duplicatesShown = true
             case .similarPhotos: similarPhotosShown = true
             }
         }
     }
+    let duplicates = DuplicatesModel()
     let similarPhotos = SimilarPhotosModel()
-    private var similarPhotosChanges: AnyCancellable?
-    /// Same-content groups of the current scan, nil until found (the filter has not been on since the scan).
-    @Published var duplicateGroups: [[URL]]? {
-        didSet {
-            duplicateIndex = Dictionary((duplicateGroups ?? []).enumerated().flatMap { i, g in g.map { ($0, i) } }) { a, _ in a }
-            if duplicateGroups == nil { privateSizes = [:] }
-        }
-    }
-    /// Grouped files sharing blocks with another file (APFS clones) → bytes trashing them frees
-    /// (`DuplicateFinder.Result.privateSizes`); set with `duplicateGroups`, cleared when they are.
-    @Published var privateSizes: [URL: Int64] = [:]
-    /// File → its index in `duplicateGroups`; kept so the filter does no work per file.
-    @Published private(set) var duplicateIndex: [URL: Int] = [:]
-    /// Fraction of bytes read while finding duplicates; nil when not running.
-    @Published var duplicateProgress: Double?
-    /// Why the last duplicate search stopped before it finished (not a Stop): shown as a banner with "Try Again".
-    @Published private(set) var duplicateError: String?
-    /// Hashes by (path, size, inode, modification date): a new scan only reads files that are new or changed.
-    private var duplicateHashes: [DuplicateFinder.Key: Data] = [:]
-    /// Where hashes persist across launches; nil = memory only. Never the real cache under a test host.
-    var hashCacheURL: URL? =
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil ? DuplicateFinder.HashCache.defaultURL : nil
-    private var hashCacheLoaded = false
-    private var duplicateTask: Task<Void, Never>?
-    /// Bumped by every start/stop: a stopped search that is still finishing never writes its result.
-    private var duplicateRun = 0
+    private var subModelChanges: [AnyCancellable] = []
     init() {
-        // The sidebar badge and the Duplicates menu follow the similar photos too.
-        similarPhotosChanges = similarPhotos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        // The sidebar badge and the Duplicates menu follow the duplicates and similar photos too.
+        subModelChanges = [duplicates.objectWillChange.sink { [weak self] in self?.objectWillChange.send() },
+                           similarPhotos.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }]
+        duplicates.onTrashed = { [weak self] urls in self?.dropTrashed(urls) }
         similarPhotos.onTrashed = { [weak self] urls in self?.dropTrashed(urls) }
     }
 
-    /// Injected by tests.
-    var findDuplicateFiles: @Sendable ([URL], [DuplicateFinder.Key: Data], @escaping @Sendable (Double) -> Void) async throws -> DuplicateFinder.Result = {
-        try await DuplicateFinder.find($0, cache: $1, progress: $2)
-    }
+    /// Duplicate Files or Similar Photos is moving files to the Trash or putting them back: no scan now.
+    var subModelChanging: Bool { duplicates.isChanging || similarPhotos.isChanging }
     /// Files and folders checked so far by the running scan (the total is unknown up front).
     @Published var scannedCount = 0
     /// Entries the last finished scan of the same scope checked; 0 = unknown (first scan).
@@ -179,7 +160,7 @@ final class LargeFilesModel: ObservableObject {
     func setScope(_ folder: URL?) -> Bool {
         if let folder, !LargeFileScanner.allowsRoot(folder, policy: policy) { return false }
         if case .trashing = phase { return true }
-        if undoing || similarPhotos.isChanging { return true }
+        if undoing || subModelChanging { return true }
         let url = folder.map { Self.folder($0.path) }
         scope = url == Self.folder(home.path) ? nil : url
         if scope == nil { minSize = max(minSize, Self.sizeOptions[0]) } // only raises: no scan from `didSet`
@@ -234,7 +215,7 @@ final class LargeFilesModel: ObservableObject {
     /// The last move to the Trash, shown above the list (what went, what didn't, "Undo") until the next scan or
     /// until dismissed. Set by `trash()` (tests and snapshots set it directly).
     @Published var lastTrash: CleanReport?
-    /// Space the last move frees once the Trash is emptied: an APFS clone counts only its own blocks (`freedSize`).
+    /// Space the last move frees once the Trash is emptied.
     private(set) var lastTrashFreed: Int64 = 0
     /// Stop was clicked while moving to the Trash: the move ends after the file under way.
     @Published private(set) var stoppingTrash = false
@@ -257,13 +238,7 @@ final class LargeFilesModel: ObservableObject {
         return files.filter {
             $0.matches(minSize: minSize, unusedSince: cutoff) && (kind == nil || $0.kind == kind)
                 && (search.isEmpty || $0.name.localizedStandardContains(search) || $0.location.localizedStandardContains(search))
-                && (!duplicatesOnly || duplicateIndex[$0.url] != nil)
         }
-    }
-
-    /// Copies in the file's duplicate group (2+), nil when it has none or duplicates are not found yet.
-    func duplicateCount(of url: URL) -> Int? {
-        duplicateIndex[url].map { duplicateGroups?[$0].count ?? 0 }
     }
 
     /// `files.sorted(using: order)`, same order, but Name and Location compare precomputed ranks.
@@ -312,84 +287,10 @@ final class LargeFilesModel: ObservableObject {
         return ranks
     }
 
-    /// `files` (already in the table's sort order) with each duplicate group kept together, groups in order of their first file.
-    func groupedByDuplicates(_ files: [LargeFile]) -> [LargeFile] {
-        var order: [Int] = []
-        var groups: [Int: [LargeFile]] = [:]
-        for file in files {
-            let group = duplicateIndex[file.url] ?? -1
-            if groups[group] == nil { order.append(group) }
-            groups[group, default: []].append(file)
-        }
-        return order.flatMap { groups[$0] ?? [] }
-    }
-
-    /// Hashes same-size files once per scan; nothing is ticked. Turning the filter off stops it (found again next time).
-    private func findDuplicates() {
-        guard duplicateGroups == nil, duplicateTask == nil else { return }
-        duplicateRun += 1
-        let urls = files.map(\.url)
-        let (find, current, cacheURL) = (findDuplicateFiles, duplicateRun, hashCacheURL)
-        duplicateProgress = 0
-        duplicateError = nil
-        duplicateTask = Task {
-            if !hashCacheLoaded, let cacheURL {
-                hashCacheLoaded = true
-                duplicateHashes.merge(await DuplicateFinder.HashCache.load(from: cacheURL)) { current, _ in current }
-            }
-            var result: DuplicateFinder.Result?
-            var failure: Error?
-            do {
-                result = try await find(urls, duplicateHashes) { fraction in
-                    Task { @MainActor in if current == self.duplicateRun, self.duplicateTask != nil { self.duplicateProgress = fraction } }
-                }
-            } catch let cancelled as DuplicateFinder.Cancelled { // keep hashes finished before the stop
-                duplicateHashes.merge(cancelled.hashes) { current, _ in current }
-                if let cacheURL { await DuplicateFinder.HashCache.save(duplicateHashes, to: cacheURL) }
-            } catch {
-                failure = error
-            }
-            if let result, let cacheURL { await DuplicateFinder.HashCache.save(result.hashes, to: cacheURL) }
-            guard current == duplicateRun else { return } // stopped, or a newer search owns the state now
-            duplicateProgress = nil
-            duplicateTask = nil
-            if let failure { duplicateError = failure.localizedDescription }
-            guard let result else { return }
-            duplicateHashes = result.hashes
-            privateSizes = result.privateSizes
-            duplicateGroups = result.groups
-        }
-    }
-
-    /// "Try Again" of the duplicate search's error banner.
-    func retryDuplicates() {
-        duplicateError = nil
-        if duplicatesOnly { findDuplicates() }
-    }
-
-    private func stopFindingDuplicates() {
-        duplicateError = nil
-        duplicateRun += 1
-        duplicateTask?.cancel()
-        duplicateTask = nil
-        duplicateProgress = nil
-    }
-
     /// Only ticked files that the current filters still show are trashed (never one in iCloud Drive).
     var checkedFiles: [LargeFile] { visibleFiles.filter { $0.trashable && checked.contains($0.url) } }
-    /// What the ticked files free: an APFS clone counts only its own blocks.
-    var checkedSize: Int64 { checkedFiles.reduce(0) { $0 + freedSize(of: $1) } }
+    var checkedSize: Int64 { checkedFiles.reduce(0) { $0 + $1.size } }
 
-    /// Bytes trashing `file` frees: its size, or only the blocks it alone holds when it is an APFS clone.
-    func freedSize(of file: LargeFile) -> Int64 {
-        privateSizes[file.url].map { min($0, file.size) } ?? file.size
-    }
-
-    /// What trashing an APFS clone frees (less than its size: 0 for a whole-file clone); nil for any other file.
-    func cloneFreedSize(of file: LargeFile) -> Int64? {
-        let freed = freedSize(of: file)
-        return freed < file.size ? freed : nil
-    }
     /// Every shown file is ticked (false when nothing is shown): the bottom bar's button reads "Deselect All".
     var allVisibleChecked: Bool {
         let visible = visibleFiles.filter(\.trashable)
@@ -402,42 +303,8 @@ final class LargeFilesModel: ObservableObject {
         if on { checked.formUnion(urls) } else { checked.subtract(urls) }
     }
 
-    /// ⌘A / ⇧⌘A, like the bottom bar's button: Select All (with Duplicates Only, Select Extra Copies: never every copy)
-    /// or Deselect All, on the shown files.
-    func setCheckedByKey(_ on: Bool) {
-        if !on { setVisibleChecked(false) } else if duplicatesOnly { checkExtraCopies() } else { setVisibleChecked(true) }
-    }
-
-    /// The copy each duplicate group keeps: oldest modification date (the original), tie → shortest path.
-    /// Counted over the whole group, so a copy hidden by search/kind/age can be the kept one.
-    var keptCopies: Set<URL> { Set(keptCopyByGroup.compactMap(\.self)) }
-
-    /// Kept copy of each group in `duplicateGroups`, same order.
-    private var keptCopyByGroup: [URL?] {
-        let byURL = Dictionary(files.map { ($0.url, $0) }) { a, _ in a }
-        return (duplicateGroups ?? []).map { group in
-            group.compactMap { byURL[$0] }.min { ($0.modified, $0.url.path.count) < ($1.modified, $1.url.path.count) }?.url
-        }
-    }
-
-    /// Select Extra Copies: ticks every shown duplicate except the kept copy of its group and APFS clones (trashing
-    /// one frees little or nothing), and unticks kept copies: one ticked earlier, maybe hidden by a filter then,
-    /// would leave no copy once shown again.
-    func checkExtraCopies() {
-        let keep = keptCopies
-        checked.formUnion(visibleFiles.filter { $0.trashable && duplicateIndex[$0.url] != nil && !keep.contains($0.url) && cloneFreedSize(of: $0) == nil }
-            .map(\.url))
-        checked.subtract(keep)
-    }
-
-    /// Names of duplicate groups whose every copy would go to the Trash: the confirmation warns before nothing is left.
-    /// Also with the Duplicates filter off once groups are known: Select All ticks every copy just the same.
-    var groupsLosingEveryCopy: [String] {
-        guard let groups = duplicateGroups else { return [] }
-        let trashed = Set(checkedFiles.map(\.url))
-        return zip(groups, keptCopyByGroup).filter { $0.0.allSatisfy(trashed.contains) }
-            .compactMap { ($0.1 ?? $0.0.first)?.lastPathComponent }
-    }
+    /// ⌘A / ⇧⌘A, like the bottom bar's button: Select All or Deselect All, on the shown files.
+    func setCheckedByKey(_ on: Bool) { setVisibleChecked(on) }
 
     /// "Never Clean This": `urls` join Settings › Exclusions and leave the list; false when none could.
     func neverClean(_ urls: Set<URL>) -> Bool {
@@ -445,7 +312,6 @@ final class LargeFilesModel: ObservableObject {
         guard !gone.isEmpty else { return false }
         files.removeAll { gone.contains($0.url) }
         checked.subtract(gone)
-        if duplicateGroups != nil { duplicateGroups = duplicateGroups?.map { $0.filter { !gone.contains($0) } }.filter { $0.count > 1 } }
         return true
     }
 
@@ -473,7 +339,6 @@ final class LargeFilesModel: ObservableObject {
             return file
         }
         checked.subtract(gone)
-        if duplicateGroups != nil { duplicateGroups = duplicateGroups?.map { $0.filter { !gone.contains($0) } }.filter { $0.count > 1 } }
         downloadsRemoved = report
         downloadRemovals += 1
     }
@@ -486,7 +351,7 @@ final class LargeFilesModel: ObservableObject {
     /// Ignored while trashing (the listing would show files that are about to go) or undoing (it would miss files coming back).
     func scan() {
         if case .trashing = phase { return }
-        if undoing || similarPhotos.isChanging { return }
+        if undoing || subModelChanging { return }
         undoManager?.removeAllActions(withTarget: self)
         lastTrash = nil
         trashedRows = []
@@ -499,7 +364,7 @@ final class LargeFilesModel: ObservableObject {
         let root = scope ?? home
         let threshold = scope == nil ? Self.sizeOptions[0] : min(minSize, Self.sizeOptions[0])
         let skipping = ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess())
-        stopFindingDuplicates()
+        duplicates.reset()
         similarPhotos.reset()
         // Listing a protected folder without Full Disk Access would make macOS prompt: ask for access instead.
         if ProtectedFolders.contains(skipping, root) {
@@ -507,7 +372,6 @@ final class LargeFilesModel: ObservableObject {
             scannedScope = scope
             files = []
             checked = []
-            duplicateGroups = nil
             skippedProtected = false
             phase = .results
             return
@@ -540,8 +404,7 @@ final class LargeFilesModel: ObservableObject {
                 needsAccess = false
                 skippedProtected = !skipping.isEmpty
                 checked = []
-                duplicateGroups = nil
-                if duplicatesOnly { findDuplicates() }
+                if duplicatesShown { findDuplicates() }
                 if similarPhotosShown { findSimilarPhotos() }
                 // shortcut: progress arrives every 500 entries, so this undercounts by < 500; fine for an estimate.
                 storeLastCount(progress.withLock { $0.count }, for: scopeKey)
@@ -555,13 +418,21 @@ final class LargeFilesModel: ObservableObject {
                     scope = scannedScope
                     minSize = max(minSize, scannedMinSize) // only raises: no scan from `didSet`
                 }
-                if duplicatesOnly { findDuplicates() } // stopped when the scan started
+                if duplicatesShown { findDuplicates() } // stopped when the scan started
                 if similarPhotosShown { findSimilarPhotos() }
             }
         }
     }
 
     func cancel() { scanTask?.cancel() }
+
+    /// Duplicates in the scope of the files shown, with the same skips; not where Full Disk Access is needed.
+    private func findDuplicates() {
+        guard !needsAccess else { return }
+        if case .results = phase {} else { return }
+        duplicates.find(in: scannedScope ?? home, policy: policy,
+                        skipping: ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess()))
+    }
 
     /// Similar photos in the scope of the files shown, with the same skips; not where Full Disk Access is needed.
     private func findSimilarPhotos() {
@@ -571,13 +442,12 @@ final class LargeFilesModel: ObservableObject {
                            skipping: ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess()))
     }
 
-    /// Files moved to the Trash, here or by Similar Photos, leave the file list and its duplicate groups.
+    /// Files moved to the Trash (or excluded) by Duplicate Files or Similar Photos leave the file list.
     private func dropTrashed(_ urls: [URL]) {
         let gone = Set(urls)
         guard !gone.isEmpty else { return }
         files.removeAll { gone.contains($0.url) }
         checked.subtract(gone)
-        if duplicateGroups != nil { duplicateGroups = duplicateGroups?.map { $0.filter { !gone.contains($0) } }.filter { $0.count > 1 } }
     }
 
     /// Entry count of each scan scope (`"<path>|full"` or `"<path>|limited"`) from the last finished scans.
@@ -614,13 +484,12 @@ final class LargeFilesModel: ObservableObject {
     }
 
     /// Only from results: not twice, nor after a new scan started behind the dialog (⌘R). The list stays: the files
-    /// moved leave it (and their duplicate groups), the others stay listed, nothing is scanned again.
+    /// moved leave it, the others stay listed, nothing is scanned again.
     func trash() async {
         guard case .results = phase else { return }
         let selection = checkedFiles
         phase = .trashing
-        let searching = duplicateTask != nil
-        stopFindingDuplicates() // its result would bring back groups of trashed files
+        duplicates.reset() // a search's result would bring back groups of trashed files
         similarPhotos.reset()
         let run = TrashRun()
         trashRun = run
@@ -630,14 +499,13 @@ final class LargeFilesModel: ObservableObject {
         stoppingTrash = false
         let gone = Set(report.trashed.map(\.original))
         trashedRows = selection.filter { gone.contains($0.url) }
-        lastTrashFreed = trashedRows.reduce(0) { $0 + freedSize(of: $1) }
+        lastTrashFreed = trashedRows.reduce(0) { $0 + $1.size }
         dropTrashed(Array(gone))
         // The files a Stop left (the last ones the engine would have moved) keep their tick.
         let left = Set(selection.filter(\.trashable).suffix(report.stopped).map(\.url))
         checked.subtract(selection.map(\.url).filter { !left.contains($0) })
         lastTrash = report
         phase = .results
-        if searching, duplicatesOnly { findDuplicates() } // among the files left
         if !report.trashed.isEmpty {
             undoManager?.registerTrashUndo(self, name: String(localized: "Move to Trash")) { await $0.undoTrash() }
         }
@@ -678,11 +546,6 @@ final class LargeFilesModel: ObservableObject {
         trashedRows = []
         guard !back.isEmpty else { return }
         files += back
-        if duplicateGroups != nil { // groups may gain the files back: found again
-            stopFindingDuplicates()
-            duplicateGroups = nil
-            if duplicatesOnly { findDuplicates() }
-        }
     }
 }
 

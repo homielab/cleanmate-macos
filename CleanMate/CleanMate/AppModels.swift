@@ -44,7 +44,7 @@ final class AppModels {
         let cleaning = [smartScan, privacy].contains { if case .cleaning? = $0?.phase { true } else { $0?.undoing == true } }
         let trashingFiles = if case .trashing? = largeFiles?.phase { true } else { false }
         // Uninstaller `working` (also while waiting for an app to quit) and Space Lens `trashing` also cover their Undo.
-        return cleaning || trashingFiles || largeFiles?.undoing == true || largeFiles?.similarPhotos.isChanging == true
+        return cleaning || trashingFiles || largeFiles?.undoing == true || largeFiles?.subModelChanging == true
             || uninstaller?.working == true
             || spaceLens?.trashing == true || loginItems?.working == true
     }

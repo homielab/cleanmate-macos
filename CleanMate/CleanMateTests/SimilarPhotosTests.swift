@@ -411,9 +411,9 @@ import UniformTypeIdentifiers
         model.scan()
         await until(model) { if case .results = $0.phase { true } else { false } }
         model.listing = .duplicates
-        #expect(model.duplicatesOnly && !model.similarPhotosShown)
+        #expect(model.duplicatesShown && !model.similarPhotosShown)
         model.listing = .similarPhotos
-        #expect(!model.duplicatesOnly && model.similarPhotosShown && model.listing == .similarPhotos)
+        #expect(!model.duplicatesShown && model.similarPhotosShown && model.listing == .similarPhotos)
         await results(model.similarPhotos)
         #expect(model.similarPhotos.photoCount == 3)
         #expect(Set(model.similarPhotos.groups.flatMap(\.photos).map(\.url.lastPathComponent))
@@ -421,7 +421,7 @@ import UniformTypeIdentifiers
         model.similarPhotos.checked = [set.recompressed]
         model.listing = .allFiles
         guard case .idle = model.similarPhotos.phase else { Issue.record("not reset"); return }
-        #expect(!model.similarPhotosShown && !model.duplicatesOnly && model.similarPhotos.checked.isEmpty)
+        #expect(!model.similarPhotosShown && !model.duplicatesShown && model.similarPhotos.checked.isEmpty)
     }
 
     /// `cleanmate similar --json` groups what the app groups (Settings › Exclusions left out, nothing chosen), and the

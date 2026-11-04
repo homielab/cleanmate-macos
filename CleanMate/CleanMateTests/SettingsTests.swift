@@ -412,7 +412,7 @@ struct SettingsTests {
         #expect(model.scans["c"]?.entries.count == 1)
     }
 
-    /// Large & Old Files: excluded files leave the list, the ticks and the duplicate groups.
+    /// Large & Old Files: excluded files leave the list and the ticks; in Duplicate Files, their group too.
     @MainActor @Test func neverCleanDropsLargeFile() throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let big = try file("big.iso"), copy = try file("copy.iso")
@@ -422,12 +422,16 @@ struct SettingsTests {
         model.exclude = { Preferences.exclude($0, defaults: defaults) }
         model.files = [big, copy].map { LargeFile(url: $0, size: 10_000, lastUsed: .now, kind: .other) }
         model.checked = [big, copy]
-        model.duplicateGroups = [[big, copy]]
         #expect(model.neverClean([big]))
-        #expect(model.files.map(\.url) == [copy] && model.checked == [copy] && model.duplicateGroups == [])
+        #expect(model.files.map(\.url) == [copy] && model.checked == [copy])
         let policy = SafetyPolicy(home: home, temp: root.appending(path: "tmp"),
                                   excluded: defaults.stringArray(forKey: Preferences.excludedFolders) ?? [])
         #expect(!policy.allows(big) && policy.allows(copy))
+        model.files = [big, copy].map { LargeFile(url: $0, size: 10_000, lastUsed: .now, kind: .other) }
+        model.duplicates.exclude = { Preferences.exclude($0, defaults: defaults) }
+        model.duplicates.groups = [DuplicateScanner.Group(files: model.files, privateSizes: [:])]
+        #expect(model.duplicates.neverClean([copy]))
+        #expect(model.duplicates.groups.isEmpty && model.files.map(\.url) == [big])
     }
 
     /// Settings › Activity filter: module, search on name or path, and both together.

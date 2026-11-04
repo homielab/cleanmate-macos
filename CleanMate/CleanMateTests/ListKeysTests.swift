@@ -7,23 +7,24 @@ import Testing
 struct ListKeysTests {
     // MARK: Large Files
 
-    /// ⌘A ticks like Select All: in Duplicates, every copy but the one to keep.
+    /// ⌘A ticks like Select All; in Duplicate Files, like Select All but Suggested: every copy but the one to keep.
     @Test func largeFilesSelectAllKeepsOneCopyOfEachDuplicate() {
         let model = LargeFilesModel()
-        let f = { (path: String, age: Double) in
-            LargeFile(url: URL(fileURLWithPath: path), size: 100_000_000, lastUsed: .now, kind: .other, modified: .now.addingTimeInterval(-age))
-        }
-        let (old, new, single) = (f("/old", 9), f("/new", 1), f("/single", 1))
+        let f = { (path: String) in LargeFile(url: URL(fileURLWithPath: path), size: 100_000_000, lastUsed: .now, kind: .other) }
+        let (old, new, single) = (f("/old"), f("/new"), f("/single"))
         model.files = [old, new, single]
-        model.duplicateGroups = [[new.url, old.url]]
         model.phase = .results
         model.setCheckedByKey(true)
         #expect(model.checked == [old.url, new.url, single.url])
         model.setCheckedByKey(false)
         #expect(model.checked.isEmpty)
-        model.duplicatesOnly = true
-        model.setCheckedByKey(true)
-        #expect(model.checked == [new.url])
+        let duplicates = DuplicatesModel()
+        duplicates.groups = [DuplicateScanner.Group(files: [old, new], privateSizes: [:])]
+        duplicates.checked = [old.url]
+        duplicates.checkAllButSuggested()
+        #expect(duplicates.checked == [new.url])
+        duplicates.uncheckAll()
+        #expect(duplicates.checked.isEmpty)
     }
 
     // MARK: Similar Photos

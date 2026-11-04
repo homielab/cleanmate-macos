@@ -292,30 +292,40 @@ struct RaceTests {
         #expect(model.revealed == nil)
     }
 
-    /// The search running when files go to the Trash is stopped (its groups would bring them back) and started again
-    /// among the files left.
+    /// The duplicate search running when the file list moves files to the Trash is stopped: its groups would bring
+    /// them back. Files Duplicate Files moves leave the file list.
     @Test func largeFilesTrashStopsFindingDuplicates() async throws {
         let gates = Gates()
         let a = LargeFile(url: URL(fileURLWithPath: "/nonexistent/a"), size: 1, lastUsed: .now, kind: .other)
         let b = LargeFile(url: URL(fileURLWithPath: "/nonexistent/b"), size: 1, lastUsed: .now, kind: .other)
+        let c = LargeFile(url: URL(fileURLWithPath: "/nonexistent/c"), size: 1, lastUsed: .now, kind: .other)
         let model = LargeFilesModel()
-        model.findDuplicateFiles = { urls, _, _ in
+        model.hasFullDiskAccess = { true }
+        model.duplicates.findDuplicates = { _, _, _, _, _, _ in
             _ = await gates.enter()
-            return DuplicateFinder.Result(groups: urls.count >= 2 ? [urls] : [])
+            return DuplicateScanner.Result(groups: [DuplicateScanner.Group(files: [a, b, c], privateSizes: [:])])
         }
         model.trashFiles = { _ in CleanReport(freed: 1, trashed: [TrashedItem(original: a.url, inTrash: a.url, size: 1)]) }
-        model.files = [a, b]
+        model.files = [a, b, c]
         model.checked = [a.url]
         model.phase = .results
-        model.duplicatesOnly = true
+        model.duplicatesShown = true
         try await until { gates.calls == 1 }
         await model.trash()
-        #expect(model.files.map(\.url) == [b.url])
+        #expect(model.files.map(\.url) == [b.url, c.url])
         gates.open(1)
-        try await until { gates.calls == 2 }
+        try await until { gates.left == 1 }
+        await Task.yield()
+        guard case .idle = model.duplicates.phase else { Issue.record("not stopped"); return }
+        #expect(model.duplicates.groups.isEmpty) // a's group never back
+
+        model.duplicates.trashFiles = { _, _ in CleanReport(freed: 1, trashed: [TrashedItem(original: b.url, inTrash: b.url, size: 1)]) }
+        model.duplicates.findAgain()
         gates.open(2)
-        try await until { gates.left == 2 && model.duplicateGroups != nil }
-        #expect(model.duplicateGroups == [] && model.duplicateProgress == nil) // b alone: no group, a's group never back
+        try await until { if case .results = model.duplicates.phase { true } else { false } }
+        model.duplicates.checked = [b.url]
+        await model.duplicates.trash()
+        #expect(model.files.map(\.url) == [c.url])
     }
 
     @Test func largeFilesNoScanWhileUndoing() async throws {

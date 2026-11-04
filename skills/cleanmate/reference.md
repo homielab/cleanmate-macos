@@ -10,7 +10,7 @@
 | `cleanmate clean --yes --json --only ID,ID` | scans again, then cleans those items |
 | `cleanmate space [PATH] --json` | a folder's children by size, like Space Lens (default: the home folder); read-only |
 | `cleanmate large --json` | large files, like Large & Old Files (default: 50 MB or more in the home folder); read-only |
-| `cleanmate dupes --json` | duplicate files among those `large` finds, like the Duplicates Only filter; read-only |
+| `cleanmate dupes --json` | duplicate files of 1 MB or more (`--min-size` down to 100KB), like Duplicate Files in Large & Old Files; read-only |
 | `cleanmate similar [PATH…] --json` | photos that look alike, like Similar Photos (default: the home folder); read-only |
 | `cleanmate trash --yes --json PATH…` | moves exactly those files and folders to the Trash, after the user confirmed them |
 | `cleanmate restore --list --json` | what CleanMate (the app and `cleanmate`) moved to the Trash and is still there, newest first; read-only |
@@ -38,8 +38,9 @@ Options for `space`, `large`, `dupes` and `similar`:
 
 - `--limit N`: show the N biggest (`space` 20, `large` 50, `dupes` and `similar` 20 groups); the rest is counted in
   `moreItems` / `moreSize`, `moreFiles` or `moreGroups`.
-- `large` / `dupes --min-size SIZE`: `50MB` by default, `1GB`, `500MB`… (1 MB = 10⁶ bytes). At least 50 MB for the whole home
+- `large --min-size SIZE`: `50MB` by default, `1GB`, `500MB`… (1 MB = 10⁶ bytes). At least 50 MB for the whole home
   folder, 1 MB with `--in`.
+- `dupes --min-size SIZE`: `1MB` by default, at least `100KB`, anywhere (home folder or `--in`).
 - `large --older-than DAYS`: only files not opened or changed for that many days.
 - `large` / `dupes --in PATH`: search this folder (in the home folder but not in `~/Library`, or an external drive).
 - `similar PATH…`: search these folders (same rules as `--in`; `--in PATH` works too). Photos of 20 KB or more;
@@ -257,7 +258,7 @@ download: for an `uploaded` file, point to **Remove Download** in Large & Old Fi
     }
   ],
   "fullDiskAccess" : true,
-  "minSize" : 50000000,
+  "minSize" : 1000000,
   "moreGroups" : 0,
   "root" : "/Users/me",
   "scannedAt" : "2026-11-02T08:00:00Z",

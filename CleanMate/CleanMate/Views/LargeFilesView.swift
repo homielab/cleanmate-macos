@@ -56,6 +56,7 @@ struct LargeFilesView: View {
     @State private var previewURL: URL?
     @State private var confirming = false
     @State private var confirmingPhotos = false
+    @State private var confirmingDuplicates = false
     /// Files whose download the confirmation asks to remove; empty = not asking.
     @State private var removingDownloads: [LargeFile] = []
     @State private var excludedCount = 0
@@ -94,6 +95,11 @@ struct LargeFilesView: View {
                 if model.similarPhotosShown, !model.needsAccess {
                     SimilarPhotosView(model: model.similarPhotos, scopeName: model.scopeName,
                                       skipsProtected: model.skipsProtectedFolders, confirming: $confirmingPhotos) {
+                        listingMenu
+                    }
+                } else if model.duplicatesShown, !model.needsAccess {
+                    DuplicatesView(model: model.duplicates, scopeName: model.scopeName,
+                                   skipsProtected: model.skipsProtectedFolders, confirming: $confirmingDuplicates) {
                         listingMenu
                     }
                 } else {
@@ -166,17 +172,17 @@ struct LargeFilesView: View {
             Label("Scope", systemImage: model.scope == nil ? "house" : model.scope!.path.hasPrefix("/Volumes/") ? "externaldrive" : "folder")
         }
         .help(Text("Scope: \(model.scopeName ?? String(localized: "Home Folder"))"))
-        .disabled(model.undoing || model.similarPhotos.isChanging || { if case .trashing = model.phase { true } else { false } }())
+        .disabled(model.undoing || model.subModelChanging || { if case .trashing = model.phase { true } else { false } }())
     }
 
-    /// All files, identical copies only, or Similar Photos (which replaces the file list).
+    /// All files, or Duplicate Files or Similar Photos (each replaces the file list with its own search).
     private var listingMenu: some View {
         Picker("Duplicates", selection: $model.listing) {
             Text("All Files").tag(LargeFilesModel.Listing.allFiles)
-            Text("Duplicates Only").tag(LargeFilesModel.Listing.duplicates)
+            Text("Duplicate Files").tag(LargeFilesModel.Listing.duplicates)
             Text("Similar Photos").tag(LargeFilesModel.Listing.similarPhotos)
         }
-        .disabled(model.similarPhotos.isChanging)
+        .disabled(model.subModelChanging)
     }
 
     /// File › Move to Trash… (⌘⌫): opens the same confirmation as the button; nil (disabled) outside results or with nothing ticked.
@@ -186,13 +192,16 @@ struct LargeFilesView: View {
             guard case .results = model.similarPhotos.phase, !model.similarPhotos.checkedPhotos.isEmpty else { return nil }
             return { confirmingPhotos = true }
         }
+        if model.duplicatesShown {
+            guard case .results = model.duplicates.phase, !model.duplicates.checkedFiles.isEmpty else { return nil }
+            return { confirmingDuplicates = true }
+        }
         guard !model.checkedFiles.isEmpty else { return nil }
         return { confirming = true }
     }
 
     private var results: some View {
-        let sorted = model.sorted(model.visibleFiles, using: sortOrder)
-        let files = model.duplicatesOnly ? model.groupedByDuplicates(sorted) : sorted
+        let files = model.sorted(model.visibleFiles, using: sortOrder)
         let largest = files.lazy.map(\.size).max() ?? 0
         return Table(files, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("" as String) { file in // a Text title needs macOS 13.5
@@ -214,15 +223,6 @@ struct LargeFilesView: View {
                             if let icloud = file.icloud { iCloudLine(file, icloud) }
                             if file.hardLinked {
                                 Text("Hard link — moving it frees no space").font(.caption).foregroundStyle(.secondary)
-                            } else if let freed = model.cloneFreedSize(of: file) {
-                                Group {
-                                    if freed == 0 {
-                                        Text("APFS clone — moving it frees no space")
-                                    } else {
-                                        Text("APFS clone — moving it frees only \(freed, format: .fileSize)")
-                                    }
-                                }
-                                .font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     } icon: {
@@ -237,19 +237,6 @@ struct LargeFilesView: View {
                 }
             }
             .width(min: 140, ideal: 180)
-            // Own column so the name is not cut by the label. Always present (a conditional column needs macOS 14.4)
-            // and collapsed to zero width outside the duplicates view.
-            TableColumn(model.duplicatesOnly ? LocalizedStringKey("Copies") : "") { file in
-                if model.duplicatesOnly, let copies = model.duplicateCount(of: file.url) {
-                    Text("\(copies) copies")
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                        .padding(.horizontal, 6).padding(.vertical, 1)
-                        .background(.quaternary, in: Capsule())
-                        .fixedSize()
-                }
-            }
-            .width(min: model.duplicatesOnly ? 60 : 0, ideal: model.duplicatesOnly ? 64 : 0,
-                   max: model.duplicatesOnly ? nil : 0)
             TableColumn("Location", value: \.location) { file in
                 Text(verbatim: file.location).truncationMode(.middle).foregroundStyle(.secondary)
                     .help(file.url.deletingLastPathComponent().path(percentEncoded: false))
@@ -306,20 +293,7 @@ struct LargeFilesView: View {
             DownloadsRemovedNotice(report: model.downloadsRemoved, count: model.downloadRemovals)
         }
         .overlay {
-            if model.duplicatesOnly, let fraction = model.duplicateProgress {
-                VStack(spacing: 12) {
-                    ProgressView("Finding duplicates…", value: fraction).frame(maxWidth: 320)
-                    Text("Only files of the same size are compared.").foregroundStyle(.secondary)
-                    Button("Stop") { model.duplicatesOnly = false }
-                }
-            } else if model.duplicatesOnly, let error = model.duplicateError {
-                EmptyStateView(title: Text("Couldn’t Finish Finding Duplicates"), systemImage: "exclamationmark.triangle") {
-                    Text(verbatim: error)
-                } actions: {
-                    Button("Try Again") { model.retryDuplicates() }
-                    Button("Show All Files") { model.duplicatesOnly = false }
-                }
-            } else if model.needsAccess {
+            if model.needsAccess {
                 EmptyStateView(title: Text("Full Disk Access Needed"), systemImage: "lock.shield") {
                     Text("macOS protects this folder. Grant Full Disk Access to scan it.")
                 } actions: {
@@ -332,10 +306,6 @@ struct LargeFilesView: View {
                     } else {
                         Text("Your home folder has no files of \(model.scannedMinSize, format: .fileSize) or more.")
                     }
-                }
-            } else if files.isEmpty, model.duplicatesOnly, model.duplicateGroups?.isEmpty == true {
-                EmptyStateView(title: Text("No Duplicate Files"), systemImage: "doc.on.doc") {
-                    Text("No two large files have the same content.")
                 }
             } else if files.isEmpty {
                 EmptyStateView(title: Text("No Files Match the Filters"), systemImage: "line.3.horizontal.decrease.circle")
@@ -394,20 +364,10 @@ struct LargeFilesView: View {
                     .monospacedDigit()
                 Spacer()
                 // ⌘A / ⇧⌘A in the table do what this button does (`setCheckedByKey`); rows highlight with click and Shift-click.
-                if model.duplicatesOnly {
-                    // Never "Select All" here: it would tick every copy, the one to keep too.
-                    let anyOn = !model.checkedFiles.isEmpty
-                    Button(anyOn ? "Deselect All" : "Select Extra Copies") {
-                        if anyOn { model.setVisibleChecked(false) } else { model.checkExtraCopies() }
-                    }
+                let allOn = model.allVisibleChecked
+                Button(allOn ? "Deselect All" : "Select All") { model.setVisibleChecked(!allOn) }
                     .disabled(files.isEmpty)
-                    .accessibilityHint(Text("Keeps the oldest copy of each file"))
-                } else {
-                    let allOn = model.allVisibleChecked
-                    Button(allOn ? "Deselect All" : "Select All") { model.setVisibleChecked(!allOn) }
-                        .disabled(files.isEmpty)
-                        .accessibilityHint(Text("Only files that match the filters"))
-                }
+                    .accessibilityHint(Text("Only files that match the filters"))
                 Button("Scan Again") { model.scan() }
                 Button("Move to Trash…") { confirming = true }
                     .keyboardShortcut(.defaultAction)
@@ -433,12 +393,7 @@ struct LargeFilesView: View {
         ) {
             Button("Move to Trash", role: .destructive) { Task { await model.trash() } }
         } message: {
-            let lost = model.groupsLosingEveryCopy
-            if lost.isEmpty {
-                Text("You can put them back from the Trash until it is emptied.")
-            } else {
-                Text("Every copy is selected: no copy of \(lost, format: .list(type: .and)) will be left. You can put them back from the Trash until it is emptied.")
-            }
+            Text("You can put them back from the Trash until it is emptied.")
         }
     }
 
@@ -501,7 +456,7 @@ struct LargeFilesView: View {
 
     /// Icon by file type (no disk read), looked up once per extension so 50k rows don't hit LaunchServices on every redraw.
     // shortcut: a file with a custom icon shows its type's icon instead.
-    @MainActor private static func icon(forExtension ext: String) -> NSImage {
+    @MainActor static func icon(forExtension ext: String) -> NSImage {
         let ext = ext.lowercased()
         return IconCache.image("ext:" + ext) { NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data) } ?? NSImage()
     }
@@ -517,7 +472,7 @@ struct LargeFilesView: View {
 /// After Move to Trash, above the list: what went (and what didn't), Undo, Open Trash, View Moved Items.
 private struct MovedToTrashNote: View {
     let report: CleanReport
-    /// What the move frees (APFS clones count only their own blocks); `report.freed` is the files' sizes.
+    /// What the move frees once the Trash is emptied.
     let freed: Int64
     let undoing: Bool
     let undo: () async -> Void
