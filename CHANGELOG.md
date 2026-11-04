@@ -59,22 +59,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.7] - 2026-11-02
 
 ### Added
-- **Smart Scan** cleans caches and logs of Steam, Epic Games Launcher, Battle.net and GOG Galaxy; games and saves are never touched.
-- **Smart Scan** also cleans Minecraft and Prism Launcher logs and caches; worlds and mods stay.
-- **Large & Old Files**: **Remove Download** frees the space of iCloud Drive files on this Mac and keeps them in iCloud.
+- **Smart Scan** cleans the caches and logs of Steam, Epic Games, Battle.net and GOG Galaxy. Your games and saves stay put.
+- **Smart Scan** also tidies Minecraft and Prism Launcher logs and caches; worlds and mods are safe.
+- **Large & Old Files**: **Remove Download** frees space taken by iCloud Drive files and keeps them in iCloud.
 
 ## [1.6] - 2026-11-02
 
 ### Added
 - A `cleanmate` command line tool for scripts: scan, clean, and find big files, duplicates and what fills a folder.
 - AI agents like Claude Code, Codex and Cursor can scan and clean with CleanMate, only touching what you confirm.
-- See what CleanMate moved to the Trash and put it back, even after quitting the app.
-- **Developer Junk** can clean Docker images, volumes and stopped containers one by one, so you can keep a database volume.
-- **Developer Junk** finds old versions you no longer use: Xcode (15–30 GB each), Unity Editor, asdf and mise runtimes, Vagrant boxes.
-- **Developer Junk** also finds more build folders (Android, Flutter, Next.js and others) and Terraform, Haskell and Scala caches.
+- See everything CleanMate moved to the Trash and put it back, even after you quit the app.
+- **Developer Junk** cleans Docker images, volumes and stopped containers one by one, so your database volume can stay.
+- **Developer Junk** finds old Xcode (15–30 GB each), Unity Editor, asdf and mise versions and Vagrant boxes you forgot about.
+- **Developer Junk** also finds more build folders and Terraform, Haskell and Scala caches.
 
 ### Changed
-- **Smart Scan** is much faster after the first scan, about 10 seconds down to 5 on a developer Mac.
+- **Smart Scan** is much faster after the first scan: about half the time on a developer Mac.
 
 ### Fixed
 - Moving items to the Trash is safer.
@@ -83,18 +83,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - A **Welcome guide** on first launch explains what CleanMate does, helps you give Full Disk Access and sets the main options.
-- **Uninstaller**: **Reset…** an app to a fresh start, uninstall several apps at once, and remove Homebrew cask apps cleanly.
-- **Help › Report a Bug…** fills in your system details and opens a GitHub issue; nothing is sent until you submit.
+- **Uninstaller**: **Reset…** an app to a fresh start, uninstall several apps at once, and remove Homebrew apps cleanly.
+- **Help › Report a Bug…** fills in your system details and opens a GitHub issue. Nothing is sent until you submit.
 - **Maintenance**: update and clean Homebrew, reset the font cache, clear the icon cache and delete Time Machine local snapshots.
 - **Privacy** clears download history, each app's recent items, and Terminal and iTerm2 saved state.
 - **Smart Scan** finds old macOS installers (12–15 GB each) and downloaded Apple Podcasts episodes.
-- **Smart Scan** cleans more app leftovers: Telegram and Spotify caches, Zoom and Microsoft updates, and downloaded app updates.
-- **Developer Junk** finds old Android SDK components, old code editor extensions, Xcode test device clones and more caches.
+- **Smart Scan** cleans more app leftovers: Telegram, Spotify, Zoom, Microsoft and downloaded app updates.
+- **Developer Junk** finds old Android SDK parts, code editor extensions, Xcode test device clones and more caches.
 
 ### Changed
-- The **Smart Scan** progress bar is accurate and names the slow items still running.
+- The **Smart Scan** progress bar tells the truth now, and names the slow items still running.
 - **Simulator data** lists each simulator, so you erase only the ones you pick.
-- **Overview** shows what CleanMate freed in three cards with a daily chart, and results after cleaning animate smoothly.
+- **Overview** shows what CleanMate freed in three cards with a daily chart.
 - The first **Smart Scan** is about twice as fast with many JavaScript projects.
 
 ### Fixed
@@ -104,28 +104,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4] - 2026-10-31
 
 ### Added
-- CleanMate opens on a new **Overview** with free space per drive, a 30-day chart, what it freed and your largest folders.
-- **Overview** also shows whether Gatekeeper, the firewall and FileVault are on, and what takes space outside your folders.
-- **Maintenance** fixes **Open With** menus, blank previews and a stuck Finder or Dock with one click.
-- **Smart Scan** lists old downloads, old screenshots, unfinished downloads and old installers; nothing is ticked and you can Undo.
+- A new **Overview** greets you with free space per drive, a 30-day chart, what CleanMate freed and your largest folders.
+- **Overview** also shows whether Gatekeeper, the firewall and FileVault are on.
+- **Maintenance** fixes **Open With** menus, blank previews and a stuck Finder or Dock in one click.
+- **Smart Scan** lists old downloads, screenshots, unfinished downloads and old installers. Nothing is ticked, and you can Undo.
 - A notification when your disk is almost full, and an optional reminder to scan.
 - **Undo** (⌘Z) after a **Smart Scan** clean puts back what went to the Trash.
 - The menu bar item shows free space and your last scan, with a **Scan Now** button.
-- **Large & Old Files** and **Space Lens** work on external drives, with Undo; **Smart Scan** can empty their Trash.
-- **Settings › General › Language**: English or Tiếng Việt, whatever your Mac uses.
-- **Apps**: cleans Adobe media cache, Final Cut Pro and iMovie render files, and Google Drive, Dropbox and OneDrive caches.
+- **Large & Old Files** and **Space Lens** work on external drives, with Undo.
+- **Settings › General › Language**: English or Tiếng Việt.
+- **Apps** cleans Adobe media cache, Final Cut Pro and iMovie render files, and Google Drive, Dropbox and OneDrive caches.
 - **AI tools** lists downloaded PyTorch, Whisper, Keras and LM Studio models one by one.
-- **Developer Junk** finds old Node, Python, Ruby, Rust and Go versions, stale project build folders and Android emulator images.
-- **Developer Junk** can clean Docker images and build cache one by one, and unused Homebrew dependencies.
+- **Developer Junk** finds old Node, Python, Ruby, Rust and Go versions, stale build folders and Android emulator images.
+- **Developer Junk** cleans Docker images and build cache one by one, and unused Homebrew dependencies.
 
 ### Changed
 - CleanMate now runs on macOS 13 or later.
-- Checkboxes are larger and a click anywhere on a row ticks it.
+- Checkboxes are bigger, and a click anywhere on a row ticks it.
 - **Smart Scan** is faster, especially with many old projects.
-- **Large & Old Files** shows what moving duplicate clones really frees.
 
 ### Fixed
-- Sizes now match what cleaning really frees, including `node_modules`, Ollama models and the space shown as freed.
+- Sizes now match what cleaning really frees, including `node_modules` and Ollama models.
 - Fixed a few **Uninstaller** mistakes with unused apps and leftovers.
 
 ## [1.3] - 2026-10-24
@@ -141,21 +140,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1] - 2026-10-24
 
 ### Added
-- **Check for Updates…** installs new versions of CleanMate; it is the app's only network connection and sends no data about you.
+- **Check for Updates…** installs new versions of CleanMate. It is the app's only network connection and sends nothing about you.
 - **Smart Scan** cleans caches of Orca, OrbStack, Windsurf, Cline and opencode, and downloaded Ollama models.
-- **Uninstaller** also lists an app's config outside Library, not ticked.
+- **Uninstaller** also lists an app's settings outside Library, not ticked.
 
 ### Fixed
-- **Uninstaller** finds data of more apps, including ones with short or unusual names.
+- **Uninstaller** finds data of more apps, even ones with short or unusual names.
 
 ## [1.0] - 2026-10-24
 
-First public release: a native macOS cleaner that frees disk space and removes privacy traces,
-showing everything first and removing only what you confirm.
+First public release: a native macOS cleaner that frees disk space and clears privacy traces. It shows everything first and removes only what you confirm.
 
 ### Added
 - **Smart Scan**: system junk, developer junk, AI tool data and app caches in one scan.
-- **Privacy**: browsing history, cookies and autofill per browser, plus recent items and shell history; nothing is ticked.
+- **Privacy**: browsing history, cookies and autofill per browser, plus recent items and shell history. Nothing is ticked.
 - **Large & Old Files**: find big or unused files and duplicates.
 - **Uninstaller**: remove apps with their data, reset an app and find leftovers.
 - **Space Lens**: browse any folder by size.
