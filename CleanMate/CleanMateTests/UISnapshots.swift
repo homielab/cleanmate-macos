@@ -528,7 +528,7 @@ struct UISnapshots {
         model.disk = root // opens as the root: a one-folder breadcrumb, as before
         model.start(at: root)
         model.volume = .init(name: "Macintosh HD", total: 494_000_000_000, available: 182_000_000_000)
-        while model.measuring { try await Task.sleep(for: .milliseconds(50)) }
+        try await eventually("model.measuring to end", timeout: .seconds(600)) { !model.measuring }
         try await snapshot("spacelens-results") { SpaceLensView(model: model) }
         model.search = "zzz" // Search with no match shows the empty state; total/donut stay the whole folder
         try await snapshot("spacelens-search-empty") { SpaceLensView(model: model) }
@@ -603,8 +603,8 @@ struct UISnapshots {
         model.suggestionSources = suggestions
         model.introduced = Set(OverviewModel.Intro.allCases) // still, final values: no count-up or growing bars
         model.refresh()
-        while model.measuring || model.security == nil || model.snapshots == nil || model.suggesting {
-            try await Task.sleep(for: .milliseconds(50))
+        try await eventually("Overview to load", timeout: .seconds(600)) {
+            !(model.measuring || model.security == nil || model.snapshots == nil || model.suggesting)
         }
         try await snapshot("overview") { OverviewView(model: model) }
         // Tall enough for the whole form, from Smart Scan down to "System protection" at the bottom.

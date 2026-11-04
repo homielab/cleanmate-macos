@@ -5,7 +5,7 @@ import Testing
 @testable import CleanMate
 
 /// Space Lens runs against a throwaway fake home; nothing is ever moved to the real Trash.
-/// The `settle()` waits are unbounded, so a hang fails the test after the limit instead of stalling the run.
+/// Waits end after a deadline (`eventually`), so a hang fails the test instead of stalling the run.
 @Suite(.timeLimit(.minutes(2)))
 struct SpaceLensTests {
     let root = FileManager.default.temporaryDirectory.appending(path: "CleanMateSpaceLens-\(UUID().uuidString)")
@@ -67,7 +67,7 @@ struct SpaceLensTests {
         let model = SpaceLensModel()
         model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         #expect(model.total > 7_000_000 && model.total < 8_000_000) // the link once in A's listing
@@ -93,7 +93,7 @@ struct SpaceLensTests {
         var access = true
         model.hasFullDiskAccess = { access }
         model.measure = { calls.add(); return try await SpaceLens.measure($0, links: $1, skipping: $2) }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         let before = model.items.map(\.size)
@@ -128,12 +128,12 @@ struct SpaceLensTests {
         model.hasFullDiskAccess = { true }
         model.measure = {
             calls.add()
-            while gate.value == 0 { try await Task.sleep(for: .milliseconds(5)) }
+            try await eventually("gate to open") { !(gate.value == 0) }
             return try await SpaceLens.measure($0, links: $1, skipping: $2)
         }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
-        while calls.value < 2 { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("second measure to start") { !(calls.value < 2) }
         model.invalidate() // e.g. Large Files moved a file to the Trash meanwhile
         gate.add()
         try await settle()
@@ -159,7 +159,7 @@ struct SpaceLensTests {
             measured.add(url.lastPathComponent)
             return try await SpaceLens.measure(url, links: links, skipping: skipping)
         }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "a/b/c"))
         try await settle()
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["home", "a", "b", "c"])
@@ -183,7 +183,7 @@ struct SpaceLensTests {
         model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
         model.measure = { calls.add(); return try await SpaceLens.measure($0, links: $1, skipping: $2) }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         #expect(calls.value == 2)
@@ -444,7 +444,7 @@ struct SpaceLensTests {
             for item in items { try? FileManager.default.removeItem(at: item.url) }
             return CleanReport(freed: 20_000)
         }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         let selection: Set<URL> = [a, b]
@@ -465,7 +465,7 @@ struct SpaceLensTests {
         model.hasFullDiskAccess = { true }
         var calls = 0
         model.trashItems = { _ in calls += 1; return CleanReport(freed: 1) }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         let confirmed = model.items
@@ -486,7 +486,7 @@ struct SpaceLensTests {
         model.hasFullDiskAccess = { true }
         var trashed: [URL] = []
         model.trashItems = { items in trashed += items.map(\.url); return CleanReport(freed: 0) }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         let total = model.total

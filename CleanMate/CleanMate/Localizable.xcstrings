@@ -544,6 +544,36 @@
         }
       }
     },
+    "Cancelled" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng"
+          }
+        }
+      }
+    },
+    "Cancelled: %@ not measured." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng: %@ chưa được đo."
+          }
+        }
+      }
+    },
+    "Cancelled: you stopped measuring." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã dừng: bạn đã dừng đo."
+          }
+        }
+      }
+    },
     "Capacity in Bytes" : {
       "localizations" : {
         "vi" : {
@@ -740,6 +770,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không tìm xong tệp trùng lặp"
+          }
+        }
+      }
+    },
+    "Couldn’t Measure" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đo được"
+          }
+        }
+      }
+    },
+    "Couldn’t measure: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đo được: %@"
           }
         }
       }
@@ -2812,6 +2862,26 @@
         }
       }
     },
+    "Measure Again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đo lại"
+          }
+        }
+      }
+    },
+    "Measure the folders left when you stopped." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đo các thư mục còn lại khi bạn dừng."
+          }
+        }
+      }
+    },
     "Measured %@" : {
       "localizations" : {
         "vi" : {
@@ -2942,12 +3012,12 @@
         }
       }
     },
-    "Not measured: %@" : {
+    "Not measured yet. Click Rescan to measure it." : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Chưa đo: %@"
+            "value" : "Chưa đo. Bấm Quét lại để đo."
           }
         }
       }
@@ -4938,6 +5008,16 @@
         }
       }
     },
+    "Their size couldn’t be measured, so it is not counted. Click Refresh to try again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không đo được dung lượng nên không được tính. Bấm Làm mới để thử lại."
+          }
+        }
+      }
+    },
     "This drive has no Trash" : {
       "localizations" : {
         "vi" : {
@@ -5274,6 +5354,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bạn xem trước mọi thứ, và không gì bị xoá cho tới khi bạn xác nhận. Bộ nhớ đệm và rác tự tạo lại được thì xoá thẳng; tệp và ứng dụng của bạn vào Thùng rác, và Hoàn tác trả chúng về."
+          }
+        }
+      }
+    },
+    "You stopped measuring before these folders, so their size is not counted." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn đã dừng đo trước các thư mục này nên dung lượng của chúng không được tính."
+          }
+        }
+      }
+    },
+    "You stopped measuring before this folder. Click Measure Again to measure it." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn đã dừng đo trước thư mục này. Bấm Đo lại để đo."
           }
         }
       }

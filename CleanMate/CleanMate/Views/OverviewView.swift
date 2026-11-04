@@ -214,11 +214,25 @@ struct OverviewView: View {
                 }
             }
             if !model.unmeasuredFolders.isEmpty {
-                Text("Not measured: \(model.unmeasuredFolders.formatted(.list(type: .and).locale(locale)))")
+                Text("Couldn’t measure: \(model.unmeasuredFolders.formatted(.list(type: .and).locale(locale)))")
                     .foregroundStyle(.secondary)
+                    .help("Their size couldn’t be measured, so it is not counted. Click Refresh to try again.")
+            }
+            if let cancelled = model.cancelledFolders, !model.measuring {
+                HStack {
+                    Image(systemName: "stop.circle").foregroundStyle(.secondary)
+                    if cancelled.isEmpty {
+                        Text("Cancelled: you stopped measuring.")
+                    } else {
+                        Text("Cancelled: \(cancelled.formatted(.list(type: .and).locale(locale))) not measured.")
+                            .help("You stopped measuring before these folders, so their size is not counted.")
+                    }
+                    Spacer()
+                    Button("Measure Again") { model.measureAgain() }
+                }
             }
             if model.folders.isEmpty, !model.measuring, model.measured, model.unreadableFolders.isEmpty,
-               model.unmeasuredFolders.isEmpty {
+               model.unmeasuredFolders.isEmpty, model.cancelledFolders == nil {
                 Text("Your home folder is empty.").foregroundStyle(.secondary)
             }
             let largest = model.folders.first?.sortSize ?? 0

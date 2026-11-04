@@ -110,7 +110,7 @@ struct SecurityStatusTests {
         model.readSecurity = { status }
         #expect(model.security == nil)
         model.refresh()
-        while model.security == nil { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("security status") { !(model.security == nil) }
         model.cancel()
 
         let checks = try #require(model.security?.checks)

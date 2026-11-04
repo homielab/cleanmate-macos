@@ -278,11 +278,17 @@ struct SpaceLensView: View {
                 } else if item.isUnreadable {
                     Text("Not Readable").foregroundStyle(.secondary).lineLimit(1)
                         .help("macOS doesn’t let CleanMate read this folder. Grant Full Disk Access to measure it.")
+                } else if item.isCancelled {
+                    Text("Cancelled").foregroundStyle(.secondary).lineLimit(1)
+                        .help("You stopped measuring before this folder. Click Measure Again to measure it.")
+                } else if item.failure == .other {
+                    Text("Couldn’t Measure").foregroundStyle(.secondary).lineLimit(1)
+                        .help("Its size couldn’t be measured. Open it, or click Rescan to try again.")
                 } else if model.measuring {
                     ProgressView().controlSize(.small).accessibilityLabel("Measuring…")
                 } else {
                     Text("Not measured").foregroundStyle(.secondary).lineLimit(1)
-                        .help("Its size couldn’t be measured. Open it, or click Rescan to try again.")
+                        .help("Not measured yet. Click Rescan to measure it.")
                 }
             }
             .width(min: 70, ideal: 90)
@@ -406,6 +412,9 @@ struct SpaceLensView: View {
                     }.foregroundStyle(.secondary)
                     if report.freed > 0 { ViewMovedItemsButton().buttonStyle(.link) }
                 }
+            } else if model.hasCancelled {
+                Button("Measure Again") { model.measureAgain() }
+                    .help("Measure the folders left when you stopped.")
             }
             Spacer()
             Button("Move to Trash…") { confirming = !allowed.isEmpty }

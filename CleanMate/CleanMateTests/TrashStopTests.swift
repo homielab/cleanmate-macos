@@ -240,7 +240,7 @@ extension SpaceLensTests {
         let (started, resume) = (SignalCount(), SignalCount())
         model.trashItems = { await fakeMoveWithStop($0.map(\.url), started: started, resume: resume) }
         model.start(at: home.appending(path: "A"))
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end") { !model.measuring }
         try #require(model.items.count == 3)
         let moving = Task { await model.trash(model.items) }
         await started.reach(1)

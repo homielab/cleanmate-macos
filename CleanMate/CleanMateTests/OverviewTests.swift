@@ -135,7 +135,7 @@ struct OverviewTests {
         model.spaceLens = spaceLens
         model.startIfNeeded()
         #expect(model.measuring)
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end") { !model.measuring }
 
         #expect(model.measured && model.skippedProtected)
         #expect(model.folders.count == OverviewModel.folderLimit)
@@ -143,7 +143,7 @@ struct OverviewTests {
         #expect(!model.folders.contains { ["Documents", "loose.bin", "Empty"].contains($0.name) })
         #expect(model.folders.map(\.sortSize) == model.folders.map(\.sortSize).sorted(by: >))
 
-        func settle() async throws { while spaceLens.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("spaceLens.measuring to end") { !spaceLens.measuring } }
         spaceLens.start(at: home)
         try await settle()
         #expect(calls.value == 0)
@@ -270,7 +270,7 @@ struct OverviewTests {
         model.now = { Self.now }
         model.sizesFile = sizesFile
         model.measure = { url, _, _ in
-            while !gate.isOpen { try await Task.sleep(for: .milliseconds(5)) }
+            try await eventually("gate to open") { gate.isOpen }
             return (url.lastPathComponent == "Big" ? 80_000 : 3_000, [:])
         }
         model.startIfNeeded()
@@ -280,7 +280,7 @@ struct OverviewTests {
         #expect(model.homeSize == 12_000 && model.savedSizesDate == measuredAt)
 
         gate.open()
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end") { !model.measuring }
         #expect(model.folders.map(\.name) == ["Big", "Small"] && model.folders.map(\.size) == [80_000, 3_000])
         #expect(model.savedSizesDate == nil)
         let saved = try #require(HomeFolderSizes.read(from: sizesFile, home: home))
@@ -301,7 +301,7 @@ struct OverviewTests {
         model.measure = { _, _, _ in (4_000, [:]) }
         model.startIfNeeded()
         #expect(model.folders.isEmpty && model.savedSizesDate == nil)
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end") { !model.measuring }
         #expect(model.folders.map(\.size) == [4_000])
         #expect(HomeFolderSizes.read(from: sizesFile, home: home)?.folders.map(\.name) == ["Big"])
     }
@@ -451,7 +451,7 @@ struct OverviewTests {
         var sources = OverviewSuggestions.Sources.none
         sources.trash = { reads.add(); return 2 * Self.gb }
         model.suggestionSources = sources
-        func settle() async throws { while model.suggesting { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.suggesting to end") { !model.suggesting } }
 
         #expect(model.suggestions == nil)
         model.startIfNeeded()

@@ -205,7 +205,7 @@ struct PerfTests {
         model.hasFullDiskAccess = { true }
         let start = ContinuousClock.now
         model.start(at: folder)
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end", timeout: .seconds(600)) { !model.measuring }
         let ms = (ContinuousClock.now - start) / .milliseconds(1)
         print("PERF " + "spaceLens 3000 subfolders measured".padding(toLength: 44, withPad: " ", startingAt: 0) + String(format: "%9.3f ms", ms))
         #expect(model.items.count == 3_000)

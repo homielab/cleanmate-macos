@@ -5,6 +5,8 @@ import SwiftUI
 struct MaintenanceView: View {
     @ObservedObject var model: MaintenanceModel
     @State private var confirming: MaintenanceTask?
+    /// The form has drawn its rows: revealing the snapshots waits for it instead of a fixed delay.
+    @State private var laidOut = false
     private static let snapshotsID = "local-snapshots"
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -20,22 +22,28 @@ struct MaintenanceView: View {
                                        stop: model.running == task ? { model.stop() } : nil) {
                             if task.asksFirst { confirming = task } else { model.start(task) }
                         }
+                        .onAppear { if !laidOut { laidOut = true } }
                     }
                 } footer: {
                     Text("These tasks need no administrator password and remove none of your files. Each run is recorded in Settings › Activity.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if model.showsSnapshots { LocalSnapshotsSection(model: model).id(Self.snapshotsID) }
+                if model.showsSnapshots {
+                    LocalSnapshotsSection(model: model).id(Self.snapshotsID)
+                        .onAppear { if !laidOut { laidOut = true } }
+                }
             }
             .formStyle(.grouped)
-            .onAppearAndChange(of: model.revealsSnapshots) { reveal in
+            // Asked before the form drew its rows (the module just appeared), it waits for them.
+            .onAppearAndChange(of: model.revealsSnapshots && laidOut) { reveal in
                 guard reveal else { return }
-                Task {
-                    try? await Task.sleep(for: .milliseconds(100)) // the module just appeared: the form is not laid out yet
+                // Next main-queue turn: a row's appearance is mid-layout.
+                DispatchQueue.main.async {
                     withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(Self.snapshotsID, anchor: .top) }
                     model.revealsSnapshots = false
                 }
             }
+            .onDisappear { laidOut = false }
         }
         .overlay {
             if model.tasks.isEmpty && !model.showsSnapshots {

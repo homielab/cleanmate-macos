@@ -1,9 +1,45 @@
+import AppKit
 import Combine
 import Foundation
+import Testing
 @testable import CleanMate
 
 // Waiting on what the code under test signals, never on the clock: a wait of N seconds fails on a busy Mac and
 // slows every run on an idle one. A signal that never comes hangs the test; give such tests a `.timeLimit`.
+
+/// A wait in a test that ran out of time (`eventually`); the issue is already recorded.
+struct WaitTimedOut: Error {}
+
+/// Returns once `condition` holds, checked every 5 ms (for state no publisher announces, or a fake's counter). After
+/// `timeout` it records an issue naming `what` at the caller's line and throws, so a state that never comes fails the
+/// test instead of hanging the whole suite.
+@MainActor func eventually(_ what: String, timeout: Duration = .seconds(5), every interval: Duration = .milliseconds(5),
+                           sourceLocation: SourceLocation = #_sourceLocation,
+                           _ condition: @MainActor () -> Bool) async throws {
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while !condition() {
+        guard ContinuousClock.now < deadline else {
+            Issue.record("Still waiting after \(timeout): \(what)", sourceLocation: sourceLocation)
+            throw WaitTimedOut()
+        }
+        try await Task.sleep(for: interval)
+    }
+}
+
+/// Lays out `host` until `value` (a size the test checks) reads the same for 20 polls in a row (about 0.1 s), at
+/// most `timeout`: the view settled, without a fixed delay.
+@MainActor func settledLayout<Value: Equatable>(_ host: NSView, timeout: Duration = .seconds(10),
+                                                sourceLocation: SourceLocation = #_sourceLocation,
+                                                _ value: @MainActor () -> Value) async throws {
+    var last: Value?, same = 0
+    try await eventually("a stable layout", timeout: timeout, sourceLocation: sourceLocation) {
+        host.layoutSubtreeIfNeeded()
+        let now = value()
+        same = now == last ? same + 1 : 0
+        last = now
+        return same >= 19
+    }
+}
 
 /// Returns once `condition` holds for `model`: checked now, then after each change the model publishes.
 @MainActor func until<Model: ObservableObject>(_ model: Model, _ condition: @escaping @MainActor (Model) -> Bool) async {

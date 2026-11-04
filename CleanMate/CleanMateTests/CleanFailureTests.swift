@@ -248,7 +248,7 @@ struct CleanFailureTests {
         let model = SpaceLensModel(center: NotificationCenter())
         model.disk = home.appending(path: "A")
         model.hasFullDiskAccess = { true }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: home.appending(path: "A"))
         try await settle()
         let row = try #require(model.items.first { $0.url.lastPathComponent == "locked" })

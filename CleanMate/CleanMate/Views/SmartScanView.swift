@@ -9,6 +9,8 @@ struct SmartScanView: View {
     @State private var reviewing = false
     @State private var reviewIDs: Set<String> = []
     @State private var excludedCount = 0
+    /// The results list has drawn its first rows: a suggestion's scroll waits for it instead of a fixed delay.
+    @State private var rowsShown = false
     @ObservedObject private var access = FullDiskAccessStatus.shared
     /// Idle-screen overview source; snapshots inject fixed values instead of reading the disk.
     var readOverview: @MainActor () -> Overview = { Self.readOverview() }
@@ -213,6 +215,7 @@ struct SmartScanView: View {
                                                },
                                                entryFilter: entryFilter(item))
                                     .tag(item.id)
+                                    .onAppear { if !rowsShown { rowsShown = true } }
                             }
                         }
                     } header: {
@@ -220,7 +223,9 @@ struct SmartScanView: View {
                     }
                 }
             }
-            .onAppearAndChange(of: model.revealedGroup) { reveal($0, proxy) }
+            // The revealed group counts once rows are on screen; asked earlier, it waits for them.
+            .onAppearAndChange(of: rowsShown ? model.revealedGroup : nil) { reveal($0, proxy) }
+            .onDisappear { rowsShown = false }
         }
         .onSpaceKey {
             guard !model.highlighted.isEmpty else { return false }
@@ -310,12 +315,11 @@ struct SmartScanView: View {
     }
 
     /// Overview › Suggestions asked for `group`: scrolls to the item asked for (`revealedItem`), else its first row,
-    /// once the list is laid out.
+    /// once the list shows rows (`rowsShown`). On the next main-queue turn: a row's appearance is mid-layout.
     private func reveal(_ group: String?, _ proxy: ScrollViewProxy) {
         guard let group, let items = model.shownGroups.first(where: { $0.id == group })?.items,
               let row = items.first(where: { $0.id == model.revealedItem }) ?? items.first else { return }
-        Task {
-            try? await Task.sleep(for: .milliseconds(100)) // the module just appeared: rows are not laid out yet
+        DispatchQueue.main.async {
             withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(row.id, anchor: .center) }
             model.revealedGroup = nil
         }

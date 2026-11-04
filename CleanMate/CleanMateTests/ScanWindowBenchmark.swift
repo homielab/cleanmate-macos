@@ -88,7 +88,8 @@ extension ScanBenchmark {
             return model
         }, view: { ContentView(largeFiles: $0, selection: .largeFiles) }) { model in
             guard model.setScope(root) else { return }
-            while case .scanning = model.phase { try? await Task.sleep(for: .milliseconds(20)) }
+            let deadline = ContinuousClock.now + .seconds(1_800)
+            while case .scanning = model.phase, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(20)) }
         }
     }
 }

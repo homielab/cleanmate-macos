@@ -194,10 +194,26 @@ final class SpaceLensModel: ObservableObject {
         load()
     }
 
-    /// Stops measuring; sizes found so far stay.
+    /// Stops measuring; sizes found so far stay, and the folders not measured yet say "Cancelled".
     func cancel() {
         task?.cancel()
+        if measuring {
+            for index in items.indices where items[index].isFolder && items[index].size == nil && items[index].failure == nil
+                && !items[index].isProtected && !items[index].isMountPoint {
+                items[index].failure = .cancelled
+            }
+        }
         measuring = false
+    }
+
+    /// Some folders of the listing shown were left unmeasured by Stop: "Measure Again" shows.
+    var hasCancelled: Bool { !measuring && items.contains(where: \.isCancelled) }
+
+    /// "Measure Again" after Stop: measures the folders left, keeping the sizes already known.
+    func measureAgain() {
+        guard !measuring else { return }
+        if !stale { for item in items where item.isFolder { if let size = item.size { sizes[item.url.path] = size } } }
+        load()
     }
 
     func trash(_ selection: [SpaceItem]) async {
@@ -343,21 +359,27 @@ final class SpaceLensModel: ObservableObject {
             if let revealed, !listed.contains(where: { $0.url.standardizedFileURL == revealed.standardizedFileURL }) { self.revealed = nil }
             // firstIndex(where:) per result was O(n²) URL compares: 1.2 s for a folder of 3k subfolders.
             let indexByURL = Dictionary(listed.indices.map { (listed[$0].url, $0) }) { first, _ in first }
-            await withTaskGroup(of: (URL, Int64, [String: Int64])?.self) { group in
+            typealias Measured = Result<(size: Int64, folders: [String: Int64]), SpaceLens.MeasureFailure>
+            await withTaskGroup(of: (URL, Measured).self) { group in
                 for item in listed where item.size == nil && !item.isProtected && !item.isMountPoint && !item.isUnreadable {
                     group.addTask {
-                        guard let result = try? await measure(item.url, links, fenced)
-                        else { return nil }
-                        return (item.url, result.size, result.folders)
+                        do { return (item.url, .success(try await measure(item.url, links, fenced))) }
+                        catch { return (item.url, .failure(SpaceLens.MeasureFailure(error, at: item.url))) }
                     }
                 }
-                for await result in group {
-                    guard let (url, size, folders) = result, !Task.isCancelled else { continue }
-                    if epoch == cacheEpoch { sizes.merge(folders) { $1 } }
-                    if let index = indexByURL[url], items.indices.contains(index) { items[index].size = size }
+                for await (url, result) in group {
+                    guard !Task.isCancelled, let index = indexByURL[url], items.indices.contains(index) else { continue }
+                    switch result {
+                    case .success(let measured):
+                        if epoch == cacheEpoch { sizes.merge(measured.folders) { $1 } }
+                        items[index].size = measured.size
+                    case .failure(let failure):
+                        items[index].failure = failure
+                    }
                 }
             }
             guard !Task.isCancelled else { return } // a cancelled listing is not remembered: its sizes are partial
+            items.removeAll { $0.failure == .notFound } // gone since it was listed
             if epoch == cacheEpoch { listings[folder.path] = Dictionary(items.filter(\.isFolder).compactMap { item in item.size.map { (item.url.path, $0) } }) { $1 } }
             measuring = false
             Attention.finished()

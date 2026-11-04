@@ -109,7 +109,7 @@ struct LocalSnapshotsTests {
         model.readSnapshots = { snapshots }
         #expect(model.systemAndApps == nil) // home not measured yet
         model.refresh()
-        while model.measuring || model.snapshots == nil { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("snapshots to load") { !(model.measuring || model.snapshots == nil) }
         let homeSize = try #require(model.homeSize)
         #expect(homeSize >= 400_000 + 40_960)
         #expect(model.systemAndApps == 1_000_000 - homeSize)
@@ -118,7 +118,7 @@ struct LocalSnapshotsTests {
         // A home larger than the used space (clones counted twice): no row rather than a negative size.
         model.readDisks = { [.init(url: home, volume: .init(name: "Macintosh HD", total: 2_000_000, available: 1_900_000))] }
         model.refresh()
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end") { !model.measuring }
         #expect(model.systemAndApps == nil)
     }
 }

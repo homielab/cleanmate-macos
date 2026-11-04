@@ -62,6 +62,9 @@ final class OverviewModel: ObservableObject {
     /// named instead so a short list is not taken for an empty home.
     @Published private(set) var unreadableFolders: [String] = []
     @Published private(set) var unmeasuredFolders: [String] = []
+    /// Stop ended the last measure: the folders it had not measured yet (empty when it stopped before listing them).
+    /// "Measure Again" measures them; nil when the last measure was not stopped.
+    @Published private(set) var cancelledFolders: [String]?
     /// Gatekeeper, firewall, SIP, FileVault, XProtect; nil until first read.
     @Published private(set) var security: SecurityStatus?
     /// Time Machine's local snapshots of the startup disk; nil until first read.
@@ -132,6 +135,8 @@ final class OverviewModel: ObservableObject {
     /// a measure after a clean keeps those of the folders the clean didn't touch.
     private var listing: [SpaceItem] = []
     private var nestedSizes: [String: Int64] = [:]
+    /// Folders the running measure has not measured yet, for `cancelledFolders`.
+    private var leftToMeasure: [String] = []
     private var observer: (any NSObjectProtocol)?
 
     /// `center`: tests pass their own, so cleans recorded by tests running in parallel don't mark it stale.
@@ -199,7 +204,10 @@ final class OverviewModel: ObservableObject {
     func cancel() {
         task?.cancel()
         task = nil
-        if measuring { changedFolders.formUnion(remeasuring) }
+        if measuring {
+            changedFolders.formUnion(remeasuring)
+            cancelledFolders = leftToMeasure
+        }
         remeasuring = []
         measuring = false
         progress = nil
@@ -281,6 +289,14 @@ final class OverviewModel: ObservableObject {
         }
     }
 
+    /// "Measure Again" after Stop: the folders a stopped measure after a clean left, else everything.
+    func measureAgain() {
+        guard !measuring else { return }
+        let changed = changedFolders
+        changedFolders = []
+        measureFolders(changed: measured && !changed.isEmpty ? changed : nil)
+    }
+
     /// Measures each folder of the home folder in parallel. `changed` (after a clean): only those folders, and folders
     /// new since; the others keep their last size. The home folder itself is always listed again (its loose files).
     private func measureFolders(changed: Set<String>? = nil) {
@@ -293,6 +309,8 @@ final class OverviewModel: ObservableObject {
         let kept = changed == nil ? [:] : Dictionary(listing.map { ($0.url.path, $0.size) }) { $1 }
         showSavedSizes(home: home)
         remeasuring = changed ?? []
+        cancelledFolders = nil
+        leftToMeasure = []
         measuring = true
         progress = MeasureProgress()
         task = Task {
@@ -319,25 +337,35 @@ final class OverviewModel: ObservableObject {
             }
             progress = MeasureProgress(current: pending.first.map { listed[$0].name }, total: pending.count,
                                        bytes: listed.reduce(0) { $0 + ($1.size ?? 0) })
-            await withTaskGroup(of: (index: Int, measured: (size: Int64, folders: [String: Int64])?).self) { group in
+            leftToMeasure = pending.map { listed[$0].name }
+            typealias Measured = Result<(size: Int64, folders: [String: Int64]), SpaceLens.MeasureFailure>
+            await withTaskGroup(of: (index: Int, measured: Measured).self) { group in
                 for index in pending {
                     let url = listed[index].url
-                    group.addTask { (index, try? await measure(url, links, skipping)) } // nil: stays unmeasured
+                    group.addTask {
+                        do { return (index, .success(try await measure(url, links, skipping))) }
+                        catch { return (index, .failure(SpaceLens.MeasureFailure(error, at: url))) }
+                    }
                 }
                 var left = pending
                 for await (index, measured) in group {
                     guard !Task.isCancelled else { continue }
                     left.removeAll { $0 == index }
-                    if let measured {
+                    switch measured {
+                    case .success(let measured):
                         nested.merge(measured.folders) { $1 }
                         listed[index].size = measured.size
                         progress?.bytes += measured.size
+                    case .failure(let failure):
+                        listed[index].failure = failure
                     }
                     progress?.done += 1
                     progress?.current = left.first.map { listed[$0].name }
+                    leftToMeasure = left.map { listed[$0].name }
                 }
             }
             guard !Task.isCancelled else { return }
+            listed.removeAll { $0.failure == .notFound } // gone since it was listed
             listing = listed
             nestedSizes = nested
             remeasuring = []
@@ -345,7 +373,10 @@ final class OverviewModel: ObservableObject {
             folders = Array(sized.filter { $0.sortSize > 0 }.sorted { $0.sortSize > $1.sortSize }.prefix(Self.folderLimit))
             skippedProtected = listed.contains(where: \.isProtected)
             unreadableFolders = listed.filter(\.isUnreadable).map(\.name)
-            unmeasuredFolders = listed.filter { !$0.isProtected && !$0.isUnreadable && $0.size == nil }.map(\.name)
+            unmeasuredFolders = listed.filter { !$0.isProtected && $0.failure == .other }.map(\.name)
+            let cancelled = listed.filter(\.isCancelled).map(\.name)
+            cancelledFolders = cancelled.isEmpty ? nil : cancelled
+            leftToMeasure = []
             homeSize = sized.reduce(looseFiles) { $0 + max($1.sortSize, 0) }
             measured = true
             measuring = false

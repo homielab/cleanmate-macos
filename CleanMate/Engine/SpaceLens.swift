@@ -24,8 +24,15 @@ nonisolated struct SpaceItem: Identifiable, Hashable, Sendable {
     var isMountPoint = false
     /// Why an item outside the home folder can't be moved to the Trash; nil inside home and on external drives.
     var viewOnly: SpaceLens.ViewOnly?
+    /// Why it has no size after measuring: not readable, measuring stopped before it, or the walk failed.
+    var failure: SpaceLens.MeasureFailure?
     /// A folder macOS doesn't let CleanMate read (no Full Disk Access, another user's): left unmeasured.
-    var isUnreadable = false
+    var isUnreadable: Bool {
+        get { failure == .notReadable }
+        set { if newValue { failure = .notReadable } else if failure == .notReadable { failure = nil } }
+    }
+    /// Measuring was stopped before its size was known.
+    var isCancelled: Bool { failure == .cancelled }
 
     var id: URL { url }
     var name: String { url.lastPathComponent }
@@ -129,6 +136,32 @@ nonisolated enum SpaceLens {
         guard let stream = opendir(folder.path) else { return errno == EPERM || errno == EACCES }
         closedir(stream)
         return false
+    }
+
+    /// Why a folder has no size, read from the error its measure threw and the folder as it is now.
+    enum MeasureFailure: Error, Hashable, Sendable {
+        /// macOS refused to list it (no Full Disk Access, another user's folder).
+        case notReadable
+        /// Stop was clicked before it was measured.
+        case cancelled
+        /// Gone since it was listed.
+        case notFound
+        /// Any other error.
+        case other
+
+        init(_ error: any Error, at url: URL) {
+            if let failure = error as? MeasureFailure { self = failure; return }
+            if error is CancellationError { self = .cancelled; return }
+            var info = stat()
+            if lstat(url.path, &info) != 0 {
+                self = errno == ENOENT ? .notFound : errno == EPERM || errno == EACCES ? .notReadable : .other
+            } else if info.st_mode & S_IFMT == S_IFDIR, SpaceLens.isUnreadable(url) {
+                self = .notReadable
+            } else {
+                let code = (error as NSError).domain == NSPOSIXErrorDomain ? Int32((error as NSError).code) : 0
+                self = code == EPERM || code == EACCES ? .notReadable : .other
+            }
+        }
     }
 
     /// Why an item outside the home folder stays view-only, for the lock shown next to it.

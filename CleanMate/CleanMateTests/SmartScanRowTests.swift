@@ -9,8 +9,9 @@ import Testing
 /// and nothing else in a collapsed row is blue.
 @MainActor
 struct SmartScanRowTests {
-    /// Pixels of `row` where blue clearly dominates (the link text), rendered offscreen in light mode; re-rendered
-    /// until there are more than `moreThan` (≥ 10 s), so a busy machine that draws late doesn't fail.
+    /// Pixels of `row` where blue clearly dominates (the link text), rendered offscreen in light mode; re-rendered until
+    /// there are more than `moreThan`, or by default until the row has drawn (its dark title shows), at most 10 s: a
+    /// busy machine that draws late doesn't fail and a fast one doesn't wait.
     func bluePixels(_ row: CleanerItemRow, moreThan: Int = -1) async throws -> Int {
         let size = CGSize(width: 600, height: 100)
         let host = NSHostingView(rootView: row.frame(width: size.width, height: size.height)
@@ -20,21 +21,22 @@ struct SmartScanRowTests {
         window.appearance = NSAppearance(named: .aqua)
         window.contentView = host
         defer { window.close() }
-        var count = 0, tries = 0
-        repeat {
-            tries += 1
+        var count = 0
+        try await eventually("the row to draw more than \(moreThan) blue pixels", timeout: .seconds(10), every: .milliseconds(50)) {
             host.layoutSubtreeIfNeeded()
-            try await Task.sleep(for: .milliseconds(200))
-            let rep = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { return false }
             host.cacheDisplay(in: host.bounds, to: rep)
+            var drawn = false
             count = 0
             for x in 0..<rep.pixelsWide {
                 for y in 0..<rep.pixelsHigh {
                     guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
                     if c.blueComponent - max(c.redComponent, c.greenComponent) > 0.3 { count += 1 }
+                    if max(c.redComponent, c.greenComponent, c.blueComponent) < 0.4 { drawn = true } // the dark title
                 }
             }
-        } while count <= moreThan && tries < 50
+            return moreThan < 0 ? drawn : count > moreThan // a locked row's title is gray: wait on the blue itself
+        }
         return count
     }
 

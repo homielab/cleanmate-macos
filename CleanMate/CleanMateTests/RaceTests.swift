@@ -13,7 +13,8 @@ struct RaceTests {
         /// Counts the call and waits for its gate when `gated` holds; returns the call number.
         func enter(gated: (Int) -> Bool = { _ in true }) async -> Int {
             let call = state.withLock { $0.calls += 1; return $0.calls }
-            while gated(call) && !state.withLock({ $0.open.contains(call) }) {
+            let deadline = ContinuousClock.now + .seconds(60) // a gate the test never opens fails its checks, not the run
+            while gated(call) && !state.withLock({ $0.open.contains(call) }) && ContinuousClock.now < deadline {
                 // A detached sleep: a cancelled caller's own sleep throws at once and would busy-spin.
                 await Task.detached { try? await Task.sleep(for: .milliseconds(5)) }.value
             }

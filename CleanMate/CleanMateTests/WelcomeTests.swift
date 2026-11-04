@@ -189,7 +189,7 @@ final class WelcomeTests {
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
-        for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200)) }
+        try await settledLayout(host) { GeneralSettingsLayoutTests.scrollView(in: host)?.documentView?.frame.height }
         let scroll = try #require(GeneralSettingsLayoutTests.scrollView(in: host))
         let content = try #require(scroll.documentView).frame.height
         let visible = scroll.contentView.bounds.height

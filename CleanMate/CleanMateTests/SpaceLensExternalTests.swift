@@ -87,7 +87,7 @@ struct SpaceLensExternalTests {
         model.home = home
         model.hasFullDiskAccess = { true }
         model.externalVolume = { url in policy.externalVolume(SafetyPolicy.normalize(url)).map { URL(fileURLWithPath: $0) } }
-        func settle() async throws { while model.measuring { try await Task.sleep(for: .milliseconds(5)) } }
+        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
         model.start(at: ext.appending(path: "Movies/Sub"))
         try await settle()
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["Ext", "Movies", "Sub"])
@@ -156,7 +156,7 @@ struct SpaceLensExternalTests {
     }
 
     @MainActor func settle(_ model: SpaceLensModel) async throws {
-        while model.measuring { try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("model.measuring to end") { !model.measuring }
     }
 
     /// Startup Disk lists the disk's top level measured like `du -x` but never inside the data volume mounted in
