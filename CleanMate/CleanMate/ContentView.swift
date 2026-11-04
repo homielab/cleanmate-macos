@@ -70,6 +70,8 @@ final class ModuleRouter: ObservableObject {
     @Published var trashedItemsRequested = false
     /// Overview › Suggestions: ContentView opens the module on what the suggestion is about.
     @Published var suggestion: Suggestion.Target?
+    /// Shortcuts' Clean Selected Junk: ContentView opens Smart Scan's review, also on first appearance.
+    @Published var cleanReviewRequested = false
     /// Reopens the main window after it was closed; kept by ContentView (the scan reminder has no SwiftUI environment).
     var openMainWindow: OpenWindowAction?
 
@@ -86,6 +88,14 @@ final class ModuleRouter: ObservableObject {
         guard canScanNow else { return }
         scanRequested = true
         show(.smartScan, openWindow: openWindow)
+    }
+
+    /// Shortcuts' Clean Selected Junk: Smart Scan's review of the ticked junk, scanning first without results. Only the
+    /// review opens; nothing is removed until the user confirms there. A confirmation open on the window keeps it.
+    func reviewClean() {
+        guard Self.mainWindow?.attachedSheet == nil else { show(nil); NSSound.beep(); return }
+        cleanReviewRequested = true
+        show(.smartScan)
     }
 
     /// Opens the welcome guide on the main window (reopened if closed); settings are not changed by opening it.
@@ -221,6 +231,12 @@ struct ContentView: View {
             router.scanRequested = false
             selection = .smartScan
             scanAction(smartScan)?() // nil while it already scans or cleans
+        }
+        .onAppearAndChange(of: router.cleanReviewRequested) { _ in
+            guard router.cleanReviewRequested else { return }
+            router.cleanReviewRequested = false
+            selection = .smartScan
+            smartScan.requestReview()
         }
         .onAppearAndChange(of: router.spaceLensItem) { _ in
             if let url = router.spaceLensItem { spaceLens.reveal(url); selection = .spaceLens; router.spaceLensItem = nil }

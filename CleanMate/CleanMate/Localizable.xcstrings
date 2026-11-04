@@ -210,6 +210,34 @@
         }
       }
     },
+    "%lld items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld mục"
+          }
+        }
+      }
+    },
     "%lld items couldn’t be cleaned" : {
       "localizations" : {
         "en" : {
@@ -516,6 +544,16 @@
         }
       }
     },
+    "Capacity in Bytes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng ổ (byte)"
+          }
+        }
+      }
+    },
     "Changed since the scan" : {
       "localizations" : {
         "vi" : {
@@ -542,6 +580,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xem Thùng rác: mục ở đó không phải mục đã được kiểm tra."
+          }
+        }
+      }
+    },
+    "Clean Selected Junk" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn rác đã chọn"
+          }
+        }
+      }
+    },
+    "Clean Selected Junk: opens the review in CleanMate. Nothing is deleted until you confirm there." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dọn rác đã chọn: mở bảng xem lại trong CleanMate. Không xoá gì cho đến khi bạn xác nhận ở đó."
           }
         }
       }
@@ -1046,6 +1104,36 @@
         }
       }
     },
+    "Free Bytes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng trống (byte)"
+          }
+        }
+      }
+    },
+    "Free Space" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng trống"
+          }
+        }
+      }
+    },
+    "Free Space: free space on your Mac and the junk the last scan found." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dung lượng trống: dung lượng trống trên máy Mac và rác mà lần quét gần nhất tìm thấy."
+          }
+        }
+      }
+    },
     "Free the space: the file stays in iCloud Drive and downloads again when you open it." : {
       "localizations" : {
         "vi" : {
@@ -1076,6 +1164,16 @@
         }
       }
     },
+    "Full Disk Access is off, so some items were not scanned. Turn it on in CleanMate’s Settings." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa bật quyền Truy cập toàn bộ ổ đĩa nên một số mục không được quét. Hãy bật trong Cài đặt của CleanMate."
+          }
+        }
+      }
+    },
     "Get Started" : {
       "localizations" : {
         "vi" : {
@@ -1102,6 +1200,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cấp cho CleanMate Truy cập toàn bộ ổ đĩa trong Cài đặt hệ thống, rồi thử lại."
+          }
+        }
+      }
+    },
+    "Group" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhóm"
           }
         }
       }
@@ -2344,6 +2452,16 @@
         }
       }
     },
+    "Integrations" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tích hợp"
+          }
+        }
+      }
+    },
     "Intermediate images left by docker build; the next build makes them again. Sizes may count layers shared with other images" : {
       "localizations" : {
         "vi" : {
@@ -2380,6 +2498,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mục"
+          }
+        }
+      }
+    },
+    "Items" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Số mục"
           }
         }
       }
@@ -2450,6 +2578,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không đo được dung lượng. Mở nó, hoặc bấm Quét lại để thử lại."
+          }
+        }
+      }
+    },
+    "Junk Found by the Last Scan in Bytes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác tìm thấy ở lần quét gần nhất (byte)"
+          }
+        }
+      }
+    },
+    "Junk in Bytes" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác (byte)"
+          }
+        }
+      }
+    },
+    "Junk ready to clean: %@ (%@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác có thể dọn: %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Junk ready to clean: up to %@ (%@)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rác có thể dọn: tới %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Junk Scan" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kết quả quét rác"
           }
         }
       }
@@ -2674,6 +2852,16 @@
         }
       }
     },
+    "No junk to clean." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có rác để dọn."
+          }
+        }
+      }
+    },
     "No longer in the Trash." : {
       "localizations" : {
         "vi" : {
@@ -2794,6 +2982,16 @@
         }
       }
     },
+    "Open ${module}" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở ${module}"
+          }
+        }
+      }
+    },
     "Open %@" : {
       "localizations" : {
         "vi" : {
@@ -2820,6 +3018,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở lúc đăng nhập"
+          }
+        }
+      }
+    },
+    "Open Module" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở module"
+          }
+        }
+      }
+    },
+    "Open Module: opens CleanMate on Smart Scan, Large & Old Files, the Uninstaller or another module." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở module: mở CleanMate ở Smart Scan, Tệp lớn & cũ, Gỡ ứng dụng hoặc module khác."
+          }
+        }
+      }
+    },
+    "Open Shortcuts" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở Phím tắt"
+          }
+        }
+      }
+    },
+    "Opens CleanMate on a module, such as Smart Scan, Large & Old Files or the Uninstaller." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở CleanMate ở một module, như Smart Scan, Tệp lớn & cũ hay Gỡ ứng dụng."
+          }
+        }
+      }
+    },
+    "Opens Smart Scan with the review of the junk ticked, scanning first if needed. Nothing is deleted until you confirm in CleanMate." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở Smart Scan với bảng xem lại rác đã chọn, quét trước nếu cần. Không xoá gì cho đến khi bạn xác nhận trong CleanMate."
           }
         }
       }
@@ -3890,12 +4138,92 @@
         }
       }
     },
+    "Scan for Junk" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét rác"
+          }
+        }
+      }
+    },
+    "Scan for junk in ${group}" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét rác trong ${group}"
+          }
+        }
+      }
+    },
+    "Scan for Junk: how much junk can be cleaned, by group. Nothing is deleted." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét rác: dọn được bao nhiêu rác, theo từng nhóm. Không xoá gì."
+          }
+        }
+      }
+    },
+    "Scan Group" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhóm quét"
+          }
+        }
+      }
+    },
+    "Scan Junk" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét rác"
+          }
+        }
+      }
+    },
     "Scan Now" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quét ngay"
+          }
+        }
+      }
+    },
+    "Scan only this group. Leave it empty to scan the groups turned on in Settings." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ quét nhóm này. Để trống để quét các nhóm đang bật trong Cài đặt."
+          }
+        }
+      }
+    },
+    "Scans for junk like Smart Scan, with your Scan Groups and Exclusions, and reports how much can be cleaned. Nothing is deleted." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét rác như Smart Scan, theo Nhóm quét và Loại trừ của bạn, rồi cho biết dọn được bao nhiêu. Không xoá gì."
+          }
+        }
+      }
+    },
+    "Scans use your Scan Groups and Exclusions. CleanMate never cleans on a schedule: a shortcut you set to run on its own can scan, but cleaning always waits for you." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khi quét, CleanMate dùng Nhóm quét và Loại trừ của bạn. CleanMate không bao giờ dọn theo lịch: phím tắt bạn đặt tự chạy có thể quét, nhưng việc dọn luôn chờ bạn xác nhận."
           }
         }
       }
@@ -4016,6 +4344,16 @@
         }
       }
     },
+    "Shortcuts" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phím tắt"
+          }
+        }
+      }
+    },
     "Show All Files" : {
       "localizations" : {
         "vi" : {
@@ -4126,6 +4464,16 @@
         }
       }
     },
+    "Shows the free space on your Mac and the junk the last Smart Scan found." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cho biết dung lượng trống trên máy Mac và rác mà lần Smart Scan gần nhất tìm thấy."
+          }
+        }
+      }
+    },
     "Shows what takes up space on your disk, folder by folder." : {
       "localizations" : {
         "vi" : {
@@ -4172,6 +4520,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bỏ qua"
+          }
+        }
+      }
+    },
+    "Smart Scan has not run yet." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Scan chưa chạy lần nào."
           }
         }
       }
@@ -4368,6 +4726,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Gợi ý"
+          }
+        }
+      }
+    },
+    "Summary" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tóm tắt"
           }
         }
       }
@@ -4726,6 +5094,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản cập nhật các ứng dụng tự tải về để cài; sẽ được tải lại khi cần. Bỏ qua ứng dụng đang mở"
+          }
+        }
+      }
+    },
+    "Use CleanMate in the Shortcuts app, in Spotlight and with Siri:" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng CleanMate trong app Phím tắt, Spotlight và với Siri:"
           }
         }
       }

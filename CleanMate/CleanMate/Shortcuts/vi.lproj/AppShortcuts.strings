@@ -1,0 +1,14 @@
+/* Phrases of CleanMate's App Shortcuts (CleanMateIntents.swift); ${applicationName} and ${module} stay as they are. */
+
+"${applicationName} clean junk" = "${applicationName} dọn rác";
+"${applicationName} free space" = "${applicationName} dung lượng trống";
+"${applicationName} open ${module}" = "${applicationName} mở ${module}";
+"${applicationName} scan junk" = "${applicationName} quét rác";
+"Clean junk with ${applicationName}" = "Dọn rác bằng ${applicationName}";
+"Clean selected junk in ${applicationName}" = "Dọn rác đã chọn trong ${applicationName}";
+"Free space in ${applicationName}" = "Dung lượng trống trong ${applicationName}";
+"How much space is free in ${applicationName}" = "Còn trống bao nhiêu trong ${applicationName}";
+"Open ${module} in ${applicationName}" = "Mở ${module} trong ${applicationName}";
+"Open a module in ${applicationName}" = "Mở module trong ${applicationName}";
+"Scan for junk in ${applicationName}" = "Quét rác trong ${applicationName}";
+"Scan junk with ${applicationName}" = "Quét rác bằng ${applicationName}";

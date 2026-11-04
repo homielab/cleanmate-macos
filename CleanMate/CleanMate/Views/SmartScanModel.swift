@@ -20,6 +20,8 @@ final class SmartScanModel: ObservableObject {
     @Published var collapsedGroups: Set<String> = []
     /// Group Overview › Suggestions asked for: the results scroll to it once, then clear it.
     @Published var revealedGroup: String?
+    /// Shortcuts' Clean Selected Junk asked for the review: the view opens it once there are results (`takeReviewRequest`).
+    @Published var reviewRequested = false
     /// Item ids of the result rows highlighted with the keyboard/mouse (List selection), not the ticks.
     @Published var highlighted: Set<String> = []
     /// The toolbar search (⌘F) over the results: item names and entry paths. Kept across scans, like the other searches.
@@ -581,7 +583,39 @@ final class SmartScanModel: ObservableObject {
         scanTask = Task { await scan() }
     }
 
-    func cancelScan() { scanTask?.cancel() }
+    func cancelScan() {
+        reviewRequested = false // stopped: the review of the results from before would not be what was asked for
+        scanTask?.cancel()
+    }
+
+    /// Shortcuts' Clean Selected Junk: asks for the review of the ticked items, scanning first when there are no
+    /// results (a scan under way is left to finish, a clean under way keeps its screen). Nothing is cleaned here:
+    /// the review's Clean button does that, after the user looks.
+    func requestReview() {
+        switch phase {
+        case .cleaning: return
+        case .results, .scanning: reviewRequested = true
+        case .idle, .done:
+            guard !undoing else { return }
+            reviewRequested = true
+            startScan()
+        }
+    }
+
+    /// True once, when the requested review should open: results with something ticked. Results with nothing ticked,
+    /// or a clean, drop the request; before the results (the scan asked for is starting or running) it waits.
+    func takeReviewRequest() -> Bool {
+        guard reviewRequested else { return false }
+        switch phase {
+        case .idle, .scanning, .done: return false
+        case .cleaning:
+            reviewRequested = false
+            return false
+        case .results:
+            reviewRequested = false
+            return hasSelection
+        }
+    }
 
     /// Where cleaning `item` removed things, for the Overview to measure only those folders again: its entries (what
     /// was removed is among them); nil when a command ran (what it removed is not known).

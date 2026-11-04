@@ -56,6 +56,8 @@ Full Disk Access — and installing it for [AI agents](https://agentskills.io) (
   font and icon caches; no administrator password.
 
 Undo (⌘Z) puts back what a module just moved to the Trash, and an activity log records every removal.
+**Shortcuts** and Spotlight can scan for junk, show free space, open a module, or open the review of the ticked junk
+(nothing is cleaned until you confirm).
 See **[docs/FEATURES.md](docs/FEATURES.md)** for every module, setting and shortcut in detail.
 
 ## How it compares

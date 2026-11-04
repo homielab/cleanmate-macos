@@ -33,6 +33,7 @@ struct SettingsView: View {
             SmartScanSettings().tabItem { Label("Scan Groups", systemImage: "sparkles") }.tag("groups")
             ExclusionSettings().tabItem { Label("Exclusions", systemImage: "nosign") }.tag(Self.exclusionsTab)
             ActivitySettings().tabItem { Label("Activity", systemImage: "list.bullet.rectangle") }.tag("activity")
+            IntegrationSettings().tabItem { Label("Integrations", systemImage: "square.2.layers.3d") }.tag("integrations")
         }
         .frame(width: Self.size.width, height: Self.size.height)
     }
@@ -344,6 +345,35 @@ struct SmartScanSettings: View {
             if on { off.remove(id) } else { off.insert(id) }
             disabledText = off.sorted().joined(separator: "\n")
         })
+    }
+}
+
+/// Where CleanMate's actions show up outside the app: the Shortcuts app, Spotlight and Siri (`CleanMateShortcuts`).
+struct IntegrationSettings: View {
+    var body: some View {
+        Form {
+            Section {
+                Text("Use CleanMate in the Shortcuts app, in Spotlight and with Siri:")
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Scan for Junk: how much junk can be cleaned, by group. Nothing is deleted.", systemImage: "sparkles")
+                    Label("Clean Selected Junk: opens the review in CleanMate. Nothing is deleted until you confirm there.", systemImage: "trash")
+                    Label("Free Space: free space on your Mac and the junk the last scan found.", systemImage: "internaldrive")
+                    Label("Open Module: opens CleanMate on Smart Scan, Large & Old Files, the Uninstaller or another module.", systemImage: "macwindow")
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button("Open Shortcuts") { ShortcutsApp.open() }
+                }
+            } header: {
+                Text("Shortcuts")
+            } footer: {
+                Text("Scans use your Scan Groups and Exclusions. CleanMate never cleans on a schedule: a shortcut you set to run on its own can scan, but cleaning always waits for you.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

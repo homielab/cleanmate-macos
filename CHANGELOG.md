@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Shortcuts and Spotlight**: scan for junk, check free space, open any module, or open the review of the ticked junk from the Shortcuts app, Spotlight and Siri; results can be passed to the next action, and nothing is cleaned until you confirm in CleanMate. Settings › Integrations has **Open Shortcuts**.
 - **Open at login** and **Menu bar only** (Settings › General and the welcome guide, both off by default): CleanMate can start in the menu bar when you log in, with no window, and leave the Dock while its window is closed, so the low disk warning and scan reminder work without opening it. It still never cleans unless you click.
 - **Overview › Suggestions**: up to 5 places to free space next, largest first — junk the last Smart Scan found per group, the Trash, apps not opened for 3 months, unused Docker data, Time Machine local snapshots and, with Full Disk Access, old downloads and external drives' Trash; each opens the right module (Smart Scan at the group, Uninstaller on unused apps, Maintenance at the snapshots) and nothing is cleaned from the Overview.
 - **Smart Scan › Applications**: clean the caches of Zalo, Canva, the new Microsoft Teams and WhatsApp (Teams and WhatsApp need Full Disk Access); messages, received photos and files, designs and sign-in are never touched, and each app is skipped while it runs.

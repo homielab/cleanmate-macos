@@ -219,10 +219,20 @@ struct SmartScanView: View {
             .background(.bar)
         }
         .focusedSceneValue(\.confirming, reviewing)
+        .onAppearAndChange(of: model.reviewRequested) { _ in openRequestedReview() }
+        .onChange(of: isScanning) { _ in openRequestedReview() }
         .sheet(isPresented: $reviewing) {
             CleanReviewSheet(model: model, module: module, ids: reviewIDs)
         }
         .searchable(text: $model.search, placement: .toolbar, prompt: Text("Search Results"))
+    }
+
+    /// Shortcuts' Clean Selected Junk: the same review as Clean…, once the results are in. Another sheet open keeps it.
+    private func openRequestedReview() {
+        guard !reviewing, model.takeReviewRequest() else { return }
+        guard ModuleRouter.mainWindow?.attachedSheet == nil else { NSSound.beep(); return }
+        reviewIDs = model.selectedIDs
+        reviewing = true
     }
 
     private var isScanning: Bool {

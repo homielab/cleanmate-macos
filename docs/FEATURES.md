@@ -8,6 +8,7 @@ For a short overview, see the [README](../README.md). CleanMate requires macOS 1
 - [Smart Scan in detail](#smart-scan-in-detail)
 - [Safety](#safety)
 - [Permissions](#permissions)
+- [Shortcuts and Spotlight](#shortcuts-and-spotlight)
 - [Command line](#command-line)
 - [Privacy](#privacy) · [Languages](#languages)
 
@@ -190,6 +191,30 @@ Each row in Smart Scan, Privacy and Review Before Cleaning has an ⓘ button (**
 - **App Sandbox is off**: a cleaner must read and remove caches of other apps and developer tools across your home
   folder, which a sandboxed app cannot do. Hardened Runtime is on. CleanMate is distributed outside the Mac App Store
   (Developer ID, notarized).
+
+## Shortcuts and Spotlight
+
+CleanMate adds four actions to the Shortcuts app; Spotlight and Siri offer them too, without making a shortcut
+("Scan junk with CleanMate", "Free space in CleanMate"…; in Vietnamese "Quét rác bằng CleanMate"…).
+Settings › Integrations describes them and has **Open Shortcuts**.
+
+- **Scan for Junk** scans like Smart Scan, with the Scan Groups and Exclusions set in CleanMate, and reports the junk
+  that would be cleaned (items ticked by default, not in use or excluded): the total, the item count and a line per
+  group. **Group** limits it to one group (System Junk, Trash, Developer Junk, AI Tools, Applications), even one turned
+  off in Settings. Without Full Disk Access the result says some items were not scanned. Nothing is ticked, cleaned or
+  saved: it is the same scan as `cleanmate scan`, and Smart Scan's last scan does not change.
+- **Clean Selected Junk** opens Smart Scan with **Review Before Cleaning** for the items ticked, scanning first when
+  there are no results. It never cleans: you confirm in the review as after **Clean…**. Nothing ticked, a clean running
+  or a scan stopped → no review opens.
+- **Free Space** reports the free space and size of the disk holding your home folder and the junk the last Smart
+  Scan found.
+- **Open Module** opens CleanMate on any module.
+
+The results can be passed to the next action: Scan for Junk gives **Junk in Bytes**, **Items**, **Summary** and
+**Full Disk Access**; Free Space gives **Free Bytes**, **Capacity in Bytes**, **Junk Found by the Last Scan in Bytes**
+and **Summary**. Texts follow CleanMate's language. CleanMate has no scheduled cleaning: a shortcut run by an
+automation can scan or report, but cleaning always waits for you. Scan for Junk and Free Space start CleanMate if it
+is not running.
 
 ## Command line
 
