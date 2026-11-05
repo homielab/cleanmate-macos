@@ -9,6 +9,8 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
         case trash, externalTrash, unusedApps, downloads, docker, snapshots
         /// Container VMs not run for at least `days` days (the most recently run of them).
         case containerVMs(days: Int)
+        /// Models of local AI apps not used for at least `days` days (the most recently used of them).
+        case unusedModels(days: Int)
     }
 
     /// Where the button leads (`ModuleRouter.open`).
@@ -46,8 +48,8 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
 /// Reads Overview › Suggestions in the background from data CleanMate already has or reads cheaply: the last Smart Scan
 /// per group, the Trash, apps not opened for 3 months (the Uninstaller's list, no new Spotlight query), old installers
 /// and downloads and the Trash of external drives (only with Full Disk Access: reading them without makes macOS ask),
-/// unused Docker data (only while Docker runs; never started), container VMs not run for `vmIdleAge` and Time
-/// Machine's local snapshots.
+/// unused Docker data (only while Docker runs; never started), container VMs not run for `vmIdleAge`, local AI models
+/// not used for `modelIdleAge` and Time Machine's local snapshots.
 nonisolated enum OverviewSuggestions {
     /// At most this many suggestions show.
     static let limit = 5
@@ -57,9 +59,11 @@ nonisolated enum OverviewSuggestions {
     static let scanMaxAge: TimeInterval = 30 * 86_400
     /// Smart Scan items measured live here, so the last scan's groups leave them out (`LastScan.groups`).
     static let liveItems = Set(["empty-trash", "external-trash", "old-installers", "old-downloads", ContainerVMs.id])
-        .union(dockerItems)
+        .union(dockerItems).union(LocalModels.ids)
     /// A container VM not run for longer than this is suggested.
     static let vmIdleAge: TimeInterval = 90 * 86_400
+    /// A local AI model not used for longer than this is suggested.
+    static let modelIdleAge: TimeInterval = 90 * 86_400
     static let dockerItems: Set<String> = ["docker-images", "docker-dangling", "docker-build-cache", "docker-containers",
                                            "docker-volumes"]
     /// The Trash has its own suggestion, measured live.
@@ -80,6 +84,8 @@ nonisolated enum OverviewSuggestions {
         var appSize: @Sendable (URL) async -> Int64
         /// Size and last run of each container VM that is not running (`ContainerVMs`).
         var containerVMs: @Sendable () async -> [(size: Int64, lastRun: Date?)] = { [] }
+        /// Item id, size and last use of each model of a local AI app (`LocalModels`).
+        var aiModels: @Sendable () async -> [(item: String, size: Int64, lastUsed: Date?)] = { [] }
 
         /// Nothing found, nothing run: the default under tests.
         static let none = Sources(trash: { 0 }, externalTrash: { 0 }, downloads: { (0, 0) }, docker: { nil },
@@ -102,6 +108,17 @@ nonisolated enum OverviewSuggestions {
                 for item in items {
                     let scan = await Scanner.scan(item, openPaths: { _ in [] })
                     found += scan.entries.filter { $0.lockReason == nil }.map { ($0.size, $0.date) }
+                }
+                return found
+            },
+            aiModels: {
+                let ids = Set(LocalModels.ids)
+                let items = CleanerGroup.smartScan(hasFullDiskAccess: FullDiskAccess.isGranted).flatMap(\.items)
+                    .filter { ids.contains($0.id) }
+                var found: [(item: String, size: Int64, lastUsed: Date?)] = []
+                for item in items {
+                    let scan = await Scanner.scan(item, openPaths: { _ in [] })
+                    found += scan.entries.filter { $0.lockReason == nil }.map { (item.id, $0.size, $0.date) }
                 }
                 return found
             })
@@ -149,6 +166,17 @@ nonisolated enum OverviewSuggestions {
             found.append(Suggestion(id: "container-vms", kind: .containerVMs(days: Int(latest / 86_400)),
                                     systemImage: "server.rack", size: idle.reduce(0) { $0 + $1.size }, count: idle.count,
                                     target: .smartScanItem(group: "developer", item: ContainerVMs.id)))
+        }
+        let models = await sources.aiModels().compactMap { model in
+            model.lastUsed.map { (item: model.item, size: model.size, idle: now.timeIntervalSince($0)) }
+        }.filter { $0.idle > modelIdleAge }
+        if let latest = models.map(\.idle).min() {
+            // Opens the item holding the most of them.
+            let bytes = Dictionary(grouping: models, by: \.item).mapValues { $0.reduce(0) { $0 + $1.size } }
+            let item = bytes.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? models[0].item
+            found.append(Suggestion(id: "ai-models", kind: .unusedModels(days: Int(latest / 86_400)), systemImage: "brain",
+                                    size: models.reduce(0) { $0 + $1.size }, count: models.count,
+                                    target: .smartScanItem(group: "ai-tools", item: item)))
         }
         let apps: [InstalledApp] = if let loadedApps { loadedApps } else { await sources.apps() }
         let unused = UninstallerModel.filtered(apps, search: "", unused: .months3, now: now)

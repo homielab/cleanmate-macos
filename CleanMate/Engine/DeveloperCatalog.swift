@@ -219,6 +219,14 @@ extension CleanerGroup {
             note: "Downloaded models and datasets, downloaded again when a program loads them",
             ["~/.cache/huggingface/hub"], included: ["models--*", "datasets--*", "spaces--*"],
             shell: ["HF_HOME": ["hub"], "HF_HUB_CACHE": [""]], selected: false, selectableEntries: true),
+        // Hugging Face's Xet download cache (`hf_xet`): chunks and shards of recent downloads per endpoint
+        // (`https___cas…`), its staging files and logs. Content-addressed, so no model owns a file: one entry per
+        // endpoint folder, deleted (the next download fetches what it needs). Only those names (`included`):
+        // HF_XET_CACHE is scanned itself, so a mistaken value lists nothing. Kept while a download holds a file open.
+        dev("huggingface-xet", "Hugging Face download cache",
+            note: "Pieces of recent model downloads, downloaded again when needed",
+            ["~/.cache/huggingface/xet"], included: ["https___*", "http___*", "logs"],
+            shell: ["HF_HOME": ["xet"], "HF_XET_CACHE": [""]], selected: false, openFiles: true),
         dev("prisma-engines", "Prisma engines", note: "Engine binaries of Prisma versions, downloaded again when needed",
             ["~/.cache/prisma"]),
         gradleCaches(),

@@ -12613,6 +12613,206 @@
           }
         }
       }
+    },
+    "%@: downloaded models" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: mô hình đã tải"
+          }
+        }
+      }
+    },
+    "Models llama.cpp downloaded; downloaded again when you run it with the same model" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình llama.cpp đã tải; sẽ được tải lại khi bạn chạy nó với cùng mô hình"
+          }
+        }
+      }
+    },
+    "Models downloaded in Jan; downloaded again from its Hub" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình đã tải trong Jan; tải lại được từ Hub của Jan"
+          }
+        }
+      }
+    },
+    "Models downloaded in GPT4All; downloaded again from its Models page" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình đã tải trong GPT4All; tải lại được từ trang Models của nó"
+          }
+        }
+      }
+    },
+    "Image models downloaded in Draw Things; downloaded again from its model list" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình ảnh đã tải trong Draw Things; tải lại được từ danh sách mô hình của nó"
+          }
+        }
+      }
+    },
+    "Model files in ComfyUI's models folder; downloaded again from where you got them" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File mô hình trong thư mục models của ComfyUI; tải lại được từ nơi bạn đã lấy"
+          }
+        }
+      }
+    },
+    "A model file llama.cpp downloaded into its own cache (llama-cli or llama-server with -hf or a model URL), with the files that record where it came from. Your settings are kept." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File mô hình llama.cpp đã tải vào bộ nhớ đệm riêng (llama-cli hoặc llama-server với -hf hay URL mô hình), cùng các file ghi nguồn tải. Cài đặt của bạn được giữ nguyên."
+          }
+        }
+      }
+    },
+    "A model Jan downloaded from its Hub, with its settings file. Your chats, assistants and Jan's settings are kept; a model you imported from a file elsewhere is not listed." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình Jan đã tải từ Hub, cùng file cài đặt của nó. Cuộc trò chuyện, trợ lý và cài đặt của Jan được giữ nguyên; mô hình bạn nhập từ file ở nơi khác không được liệt kê."
+          }
+        }
+      }
+    },
+    "A model file GPT4All downloaded. Your chats, LocalDocs collections and settings are kept, and so are downloads not finished." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File mô hình GPT4All đã tải. Cuộc trò chuyện, bộ sưu tập LocalDocs và cài đặt được giữ nguyên, các bản tải chưa xong cũng vậy."
+          }
+        }
+      }
+    },
+    "A model Draw Things downloaded (an image model, a LoRA, an encoder or an upscaler) with its tensor data. Your images, projects and settings are kept." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình Draw Things đã tải (mô hình ảnh, LoRA, bộ mã hoá hoặc bộ phóng to ảnh) cùng dữ liệu tensor của nó. Ảnh, dự án và cài đặt của bạn được giữ nguyên."
+          }
+        }
+      }
+    },
+    "A model file in the models folder of a ComfyUI install (a checkpoint, LoRA, VAE or upscaler). Your workflows, images, custom nodes and settings are kept." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File mô hình trong thư mục models của một bản cài ComfyUI (checkpoint, LoRA, VAE hoặc bộ phóng to ảnh). Workflow, ảnh, custom node và cài đặt của bạn được giữ nguyên."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. llama.cpp downloads the model again from Hugging Face the next time you start it with the same -hf model or URL." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. llama.cpp tải lại mô hình từ Hugging Face ở lần tới bạn chạy nó với cùng mô hình -hf hoặc URL."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. Download the model again from Jan's Hub." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. Tải lại mô hình từ Hub của Jan."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. Download the model again from the Models page in GPT4All." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. Tải lại mô hình từ trang Models trong GPT4All."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. Pick the model again in Draw Things to download it; a model you imported must be imported again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. Chọn lại mô hình trong Draw Things để tải về; mô hình bạn đã nhập phải nhập lại."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. Download the model again with ComfyUI Manager, or from Hugging Face or Civitai, into the same models folder." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. Tải lại mô hình bằng ComfyUI Manager, hoặc từ Hugging Face hay Civitai, vào cùng thư mục models."
+          }
+        }
+      }
+    },
+    "Hugging Face download cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm tải xuống Hugging Face"
+          }
+        }
+      }
+    },
+    "Pieces of recent model downloads, downloaded again when needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các mảnh của những lần tải mô hình gần đây, sẽ được tải lại khi cần"
+          }
+        }
+      }
+    },
+    "AI models not used for %lld days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình AI không dùng %lld ngày"
+          }
+        }
+      }
+    },
+    "Models llama.cpp, Jan, GPT4All, Draw Things or ComfyUI downloaded. They go to the Trash and can be downloaded again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình do llama.cpp, Jan, GPT4All, Draw Things hoặc ComfyUI tải về. Chúng vào Thùng rác và tải lại được."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

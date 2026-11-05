@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Smart Scan › Developer Junk** shows what else hides in `~/.cache`, one folder per row, nothing ticked, plus RubyGems, Bundler and Carthage caches.
+- **Smart Scan › Developer Junk** shows what else hides in `~/.cache`, one folder per row, nothing ticked, plus RubyGems, Bundler, Carthage and Hugging Face download caches.
 - **Smart Scan** cleans caches and old chats of Amp, Qwen Code, Kiro, Trae, Jan, GPT4All, llama.cpp and ComfyUI, and caches of Warp, Ghostty and Raycast. Models and sign-ins stay put.
+- **Smart Scan › AI Tools** lists each model you downloaded in llama.cpp, Jan, GPT4All, Draw Things and ComfyUI, with when you last used it. Nothing is ticked, and **Undo** brings a model back.
+- **Overview** suggests AI models you haven't touched in over 90 days.
 
 ## [1.8] - 2026-11-06
 

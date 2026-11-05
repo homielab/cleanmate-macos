@@ -150,6 +150,12 @@ Removing one loses the containers, images and volumes inside that VM, never the 
 with the command that makes it again (`colima start`, `limactl start`, `podman machine init`, `minikube start`;
 Rancher Desktop makes a new one when it starts); `restore` puts it back while it is in the Trash.
 
+`llamacpp-models`, `jan-models`, `gpt4all-models`, `drawthings-models` and `comfyui-models` (unticked, moved to the
+Trash) have one entry per downloaded model, `name` its model (`Qwen3-4B-Q4_K_M`, `ae.safetensors (vae)` for ComfyUI).
+While the app runs the item is `locked` with a `reason` and is never cleaned. Name the models before cleaning; the
+app downloads a model again (llama.cpp `-hf <repo>`, Jan's Hub,
+GPT4All's Models page, Draw Things' model menu, ComfyUI's Model Manager); `restore` puts it back while it is in the Trash.
+
 ## `clean --yes --json` (shortened)
 
 ```json

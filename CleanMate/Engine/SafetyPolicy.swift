@@ -161,18 +161,28 @@ nonisolated struct SafetyPolicy: Sendable {
         guard key.hasPrefix(cloud + "/") else { return false }
         let parts = key.dropFirst(cloud.count + 1).split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count >= 2, parts[0].hasPrefix("dropbox"), parts[1] == ".dropbox.cache" else { return false }
-        return allows(normalized: path, skippingTree: cloud)
+        return allows(normalized: path, skipping: [cloud])
     }
 
-    /// `allows` for a normalized path; `skippingTree` (lowercased) is left out of the never-touch trees.
-    private func allows(normalized path: String, skippingTree: String? = nil) -> Bool {
+    /// `allows`, also inside Documents and Desktop (never the other never-touch trees): for a model file whose app keeps
+    /// its install there (ComfyUI Desktop's default is `~/Documents/ComfyUI`), after the item checked its exact place
+    /// (`LocalModels`).
+    func allowsInDocuments(_ url: URL) -> Bool {
+        guard let home = allowedRoots.first else { return false }
+        let trees = Set(["Documents", "Desktop"].map { (home + "/" + $0).lowercased() })
+        let path = Self.normalize(url)
+        return !trees.contains(path.lowercased()) && allows(normalized: path, skipping: trees)
+    }
+
+    /// `allows` for a normalized path; the trees in `skipping` (lowercased) are left out of the never-touch trees.
+    private func allows(normalized path: String, skipping: Set<String> = []) -> Bool {
         guard let root = allowedRoots.firstIndex(where: { path.hasPrefix($0 + "/") }), !isExcluded(path) else { return false }
         // Another volume mounted inside (a mount point or anything on it): never listed, measured nor removed.
         if let rootDevice = rootDevices[root], let entryDevice = device(path), entryDevice != rootDevice { return false }
         if holdsMount(path) { return false }
         // APFS is case-insensitive by default: `~/documents` or `~/.SSH` is the protected folder itself.
         let key = path.lowercased()
-        let trees = skippingTree.map { tree in protectedTrees.filter { $0 != tree } } ?? protectedTrees
+        let trees = protectedTrees.filter { !skipping.contains($0) }
         for folder in protectedFolders + trees where folder == key || folder.hasPrefix(key + "/") {
             return false
         }

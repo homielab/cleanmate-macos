@@ -7,7 +7,8 @@ import Foundation
 extension CleanerGroup {
     /// AI session transcripts are user history: only those untouched for `sessionDays` (Settings, default 30),
     /// unticked, moved to the Trash.
-    nonisolated static func aiTools(sessionDays: Int = CleanupAges.default.sessions) -> CleanerGroup {
+    /// `hasFullDiskAccess`: also the models in folders macOS asks about (`LocalModels`).
+    nonisolated static func aiTools(sessionDays: Int = CleanupAges.default.sessions, hasFullDiskAccess: Bool = false) -> CleanerGroup {
         func sessions(_ id: String, _ name: String, _ paths: [String], excluded: Set<String> = [],
                       included: [String]? = nil, apps: [String] = [], processes: [String] = [],
                       label: CleanerItem.EntryLabel? = nil) -> CleanerItem {
@@ -207,7 +208,9 @@ extension CleanerGroup {
             item.configFolders = ConfigFolders(read: comfyUIInstalls(home:), subpaths: ["temp"])
             return item
         }(),
-    ])
+    // Models of llama.cpp, Jan, GPT4All, Draw Things and ComfyUI: one unticked row per model, moved to the Trash,
+    // skipped while the app runs (`LocalModels`).
+    ] + LocalModels.App.allCases.map { LocalModels.item($0, hasFullDiskAccess: hasFullDiskAccess) })
     }
 
     /// Chrome/Edge/Brave Beta/Dev/Canary/Nightly: own bundle id and data folder (same name under Caches and

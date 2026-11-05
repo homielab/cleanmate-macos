@@ -150,7 +150,7 @@ extension CleanerGroup {
                         about: "Files apps leave in your temporary folder while they work"),
         ]),
         developer,
-        aiTools(sessionDays: ages.sessions),
+        aiTools(sessionDays: ages.sessions, hasFullDiskAccess: hasFullDiskAccess),
         applications(hasFullDiskAccess: hasFullDiskAccess, runningApps: runningApps, isUpdating: isUpdating),
         CleanerGroup(id: "trash", title: "Trash", systemImage: "trash", items: [
             // Unticked by default: emptying the Trash cannot be undone.

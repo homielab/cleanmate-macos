@@ -235,6 +235,9 @@ struct EndToEndCleanTests {
             for path in item.paths + shellPaths {
                 let concrete = path.split(separator: "/", omittingEmptySubsequences: false)
                     .map { $0.hasPrefix("*") ? "Default" + $0.dropFirst() : $0.replacingOccurrences(of: "*", with: "") }.joined(separator: "/")
+                    // The gem cache of an rbenv Ruby lies in the version rbenv uses (bait 3.3.0): any other is an old Ruby
+                    // version, removed whole by its own item.
+                    .replacingOccurrences(of: "/.rbenv/versions/Default/", with: "/.rbenv/versions/3.3.0/")
                 let folder = policy.expand(concrete)
                 try fm.createDirectory(at: folder, withIntermediateDirectories: true)
                 if item.id == "group-caches" { // a group with no known creator is never cleaned
@@ -288,6 +291,18 @@ struct EndToEndCleanTests {
                 }
                 if [ToolVersionManagers.asdfID, ToolVersionManagers.miseID].contains(item.id) { // older than the bait 9.0.0
                     try write(folder.appending(path: "junk/1.0.0/bin/junk"), Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if LocalModels.ids.contains(item.id) { // a model laid out as the app that owns this folder keeps it
+                    let disk = Data(repeating: 1, count: 4096)
+                    switch item.id {
+                    case LocalModels.App.jan.id:
+                        try write(folder.appending(path: "junk/model.yml"), Data("model_path: model.gguf\n".utf8))
+                        try write(folder.appending(path: "junk/model.gguf"), disk)
+                    case LocalModels.App.comfyUI.id: try write(folder.appending(path: "checkpoints/junk.safetensors"), disk)
+                    case LocalModels.App.drawThings.id: try write(folder.appending(path: "junk.ckpt"), disk)
+                    default: try write(folder.appending(path: "junk.gguf"), disk)
+                    }
                     continue
                 }
                 if item.findEntries != nil { // a stale project in each folder: only its node_modules or target goes

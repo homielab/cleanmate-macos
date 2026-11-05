@@ -1412,6 +1412,28 @@ struct DeveloperToolsTests {
         #expect(tokens.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
     }
 
+    /// Hugging Face's Xet cache: one unticked entry per server folder and the logs, deleted; anything else in it stays,
+    /// and HF_XET_CACHE pointed at an ordinary folder lists nothing.
+    @Test func huggingFaceXetCacheEntries() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let xet = try #require(CleanerGroup.developer.items.first { $0.id == "huggingface-xet" })
+        #expect(xet.paths == ["~/.cache/huggingface/xet"] && !xet.selectedByDefault && xet.mode == .delete && xet.skipsOpenFiles)
+        try box.file(".cache/huggingface/xet/https___cas_serv_tGqkUaZf_CBPHQ6h/chunk-cache/ab/cd")
+        try box.file(".cache/huggingface/xet/https___cas_serv_tGqkUaZf_CBPHQ6h/shard-cache/s.mdb")
+        try box.file(".cache/huggingface/xet/logs/xet.log")
+        let kept = try box.file(".cache/huggingface/xet/config.toml")
+        let listed = await Scanner.scan(xet, policy: box.policy).entries.map(\.url.lastPathComponent)
+        #expect(Set(listed) == ["https___cas_serv_tGqkUaZf_CBPHQ6h", "logs"])
+        let report = await Cleaner.clean(xet, scan: await Scanner.scan(xet, policy: box.policy), policy: box.policy)
+        #expect(report.trashed.isEmpty && FileManager.default.fileExists(atPath: kept.path))
+        #expect(!FileManager.default.fileExists(atPath: box.home.appending(path: ".cache/huggingface/xet/logs").path))
+
+        try box.file("Developer/app/main.swift")
+        try "export HF_XET_CACHE=~/Developer\n".write(to: box.home.appending(path: ".zshrc"), atomically: true, encoding: .utf8)
+        #expect(await Scanner.scan(xet, policy: box.policy).entries.allSatisfy { !$0.url.path.contains("/Developer/") })
+    }
+
     /// HF_HUB_CACHE pointed at an ordinary folder lists only hub repo folders, never its other children,
     /// and the clean re-checks the names (a forged scan entry is kept).
     @Test func huggingFaceHubCacheOnlyRepoFolders() async throws {
@@ -2062,7 +2084,9 @@ struct AppCatalogTests {
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
                                               ofItemAtPath: box.home.appending(path: ".cursor/projects/Users-me-app/agent-transcripts/1").path)
         var listed: [URL] = []
-        for item in [CleanerGroup.aiTools(), .applications(hasFullDiskAccess: true)].flatMap(\.items) {
+        // The models items list models on purpose, one row each (`LocalModelsTests`); no other item may.
+        for item in [CleanerGroup.aiTools(), .applications(hasFullDiskAccess: true)].flatMap(\.items)
+            where !LocalModels.ids.contains(item.id) {
             listed += await Scanner.scan(item, policy: box.policy).entries.map { $0.url.resolvingSymlinksInPath() }
         }
         for path in protected {

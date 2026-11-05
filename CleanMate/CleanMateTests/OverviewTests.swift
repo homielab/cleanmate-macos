@@ -409,6 +409,30 @@ struct OverviewTests {
         #expect(!none.contains { $0.id == "container-vms" })
     }
 
+    /// Local AI models unused for over 90 days: one suggestion with their total, dated by the most recently used of
+    /// them, opening Smart Scan at the AI Tools item holding the most of those bytes; none when all were used lately.
+    @Test func unusedAIModelsMakeASuggestion() async throws {
+        var sources = OverviewSuggestions.Sources.none
+        let ago = { (days: Double) in Self.now.addingTimeInterval(-days * 86_400) }
+        sources.aiModels = { [("jan-models", 4 * Self.gb, ago(100)), ("comfyui-models", 3 * Self.gb, ago(200)),
+                              ("comfyui-models", 2 * Self.gb, ago(300)), ("gpt4all-models", 9 * Self.gb, ago(5)),
+                              ("llamacpp-models", 8 * Self.gb, nil), ("drawthings-models", Self.gb, ago(89))] }
+        let found = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: false, apps: [],
+                                                   appSizes: [:], now: Self.now, sources: sources)
+        let models = try #require(found.first { $0.id == "ai-models" })
+        #expect(models.kind == .unusedModels(days: 100) && models.size == 9 * Self.gb && models.count == 3)
+        #expect(models.target == .smartScanItem(group: "ai-tools", item: "comfyui-models"))
+        #expect(models.target.module == .smartScan)
+        let catalog = CleanerGroup.smartScan(ages: .default)
+        #expect(catalog.first { $0.id == "ai-tools" }?.items.contains { $0.id == "comfyui-models" } == true)
+        #expect(LocalModels.ids.allSatisfy(OverviewSuggestions.liveItems.contains)) // not counted again in AI Tools
+
+        sources.aiModels = { [("jan-models", 9 * Self.gb, ago(10)), ("gpt4all-models", 8 * Self.gb, nil)] }
+        let none = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: false, apps: [],
+                                                  appSizes: [:], now: Self.now, sources: sources)
+        #expect(!none.contains { $0.id == "ai-models" })
+    }
+
     /// The last Smart Scan's groups count while the scan is under 30 days old; the Trash group is measured live
     /// instead; under 100 MB is left out; at most 5, largest first, snapshots (no size) kept last.
     @Test func lastScanGroupsRankedAndCapped() async throws {
