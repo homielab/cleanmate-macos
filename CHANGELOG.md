@@ -7,66 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- **Smart Scan › Developer Junk** finds forgotten Colima, Lima, Podman, minikube and Rancher Desktop VMs (often tens of GB), and the Overview suggests ones idle for 3 months.
-- **Duplicate Files** in Large & Old Files now finds copies from 1 MB (or 100 KB) anywhere in your home folder, 200,000 files in about 5 seconds with under 30 MB of memory, and **Stop** keeps what it found.
-- **Shortcuts and Spotlight**: scan for junk, check free space, open any module, or open the review of the ticked junk from the Shortcuts app, Spotlight and Siri; results can be passed to the next action, and nothing is cleaned until you confirm in CleanMate. Settings › Integrations has **Open Shortcuts**.
-- **Open at login** and **Menu bar only** (Settings › General and the welcome guide, both off by default): CleanMate can start in the menu bar when you log in, with no window, and leave the Dock while its window is closed, so the low disk warning and scan reminder work without opening it. It still never cleans unless you click.
-- **Overview › Suggestions**: up to 5 places to free space next, largest first — junk the last Smart Scan found per group, the Trash, apps not opened for 3 months, unused Docker data, Time Machine local snapshots and, with Full Disk Access, old downloads and external drives' Trash; each opens the right module (Smart Scan at the group, Uninstaller on unused apps, Maintenance at the snapshots) and nothing is cleaned from the Overview.
-- **Smart Scan › Applications**: clean the caches of Zalo, Canva, the new Microsoft Teams and WhatsApp (Teams and WhatsApp need Full Disk Access); messages, received photos and files, designs and sign-in are never touched, and each app is skipped while it runs.
-- **Smart Scan › Applications**: also clean the caches and logs of Slack (download and App Store builds), Discord, Signal, Notion, Figma, Postman and Obsidian, each with a "Why is this safe?" note; messages, attachments, vaults, collections and sign-in are never touched, and each app is skipped while it runs.
-- **Moved to the Trash**: see everything CleanMate moved to the Trash from any module, also after quitting, and put items back one by one or all at once, filtered by source or search, even after a clean of thousands of files; open it with **View Moved Items…** after a move to the Trash or in Settings › Activity.
-- **Stop** (⌘.) a move to the Trash in Large & Old Files, Duplicates, Similar Photos, Space Lens and Uninstaller, and **Empty Trash…** right on the done screen to really free the space.
-- **Uninstaller**: each app shows its source (App Store, Homebrew, Setapp or Downloaded) and the **Show** menu filters the list by source; an open app has **Quit and Uninstall…**, which quits it and uninstalls it in one step.
-- **Uninstaller › Reset…** works on an open app: **Quit and Reset** asks it to quit, waits up to 10 seconds, then moves its data to the Trash and keeps the app; if it doesn't quit, nothing is moved.
-- CleanMate opens on the module you used last, with its window at the same place and size; a notification or the menu bar's **Scan Now** still opens Smart Scan.
-- **Similar Photos**, **Login Items** and **Maintenance** have a search field, and ⌘F goes to the search field in every list; ⌘A / ⇧⌘A tick or untick what **Large & Old Files**, **Similar Photos** and **Uninstaller** show.
-- A **Freed 1.2 GB** notification when a Smart Scan clean or a Privacy erase finishes while CleanMate is in the background (only if notifications are already allowed; it never asks).
-- **Space Lens**: **Startup Disk** in the Location menu shows the top level of the disk (Applications, Library, System, Users…) with sizes; folders outside your home folder open with the breadcrumb from the disk, and view-only items show a lock saying why (protected by SIP, system library, another user's folder, apps). **View in Space Lens** on the Overview's **System and apps** opens it.
-- **Space Lens**: **Show Hidden Files** (⇧⌘.) hides dotfiles from the list while still counting them in the total.
-- **Large & Old Files**: the Kind filter has nine kinds with icons — videos, audio, images, documents, code & projects (also unknown files inside a project folder or Git repository), archives, disk images, installers and other — so far fewer files land in **Other**; `cleanmate large --json` reports the same kinds.
-- **Large & Old Files**, **Duplicate Files** and **Similar Photos**: **Open** a file with its app (right-click or Return, and double-click in the file list), and preview it with the eye button on each row as well as Space; **Last Used** adds **Over 1 month ago** and **Custom…** for any number of days.
-- **Similar Photos**: **Sort By** lists groups by space to free, date or number of photos.
-- **Smart Scan** and **Privacy**: every item has a **Why is this safe?** button that explains what it is, where it is, what cleaning does to it (made again, moved to the Trash or deleted for good) and when it is skipped, in English and Vietnamese.
-- **Smart Scan** and **Privacy**: **Clean…** / **Erase…** first opens a review of everything ticked, by group, with each item's size and whether it goes to the Trash or is deleted permanently, the total of each, and what will be skipped; untick anything there before cleaning.
-- **Smart Scan** and **Privacy**: search the results with ⌘F by item name or file path; ⌘A / ⇧⌘A tick or untick the whole group of the selected row.
-- **Large & Old Files › Similar Photos**: groups photos that look alike (bursts, edits, resized or recompressed copies), compared on this Mac with Vision; each group suggests the photo to keep, nothing is ticked for you, and moved photos can be put back with `cleanmate restore`. Photos libraries and apps are never read. Stop ends the search at once, even while photos are being analyzed.
-- `cleanmate similar [PATH…] [--json]` lists the same groups of similar photos from the command line, with the photo suggested to keep; move the ones you pick with `cleanmate trash` and put them back with `cleanmate restore`. The Agent Skill uses it too.
-- **Overview**: shows the last Smart Scan and what it found or freed, with **Scan Now**, and **Clean … Selected** while Smart Scan has results.
-- `cleanmate uninstall`, `cleanmate privacy` and `cleanmate login-items` bring the Uninstaller, Privacy and Login Items to the terminal and AI agents: open apps are skipped, everything moves to the Trash and `cleanmate restore` puts it back.
-- `cleanmate scan` ends with how long the scan took and its three slowest items; `cleanmate scan --json` adds `durationMs` to the report and to each item.
-- **Login Items**: after removing an agent, **Undo** (also ⌘Z) puts it back and loads it again, and **View Moved Items…** shows it.
+## [1.8] - 2026-11-06
 
-- **Stop** while a Smart Scan or Privacy clean runs (the rest is left as it is and the done screen says how many items weren’t cleaned), on a running Maintenance task, and while the Uninstaller waits for an app to quit; ⌘. does the same.
+### Added
+- **Similar Photos** (in Large & Old Files) groups photos that look alike, like bursts and edited copies, and suggests which to keep. Nothing is ticked for you, and it all runs on your Mac.
+- **Duplicate Files** is much faster: it searches your whole home folder in seconds, and **Stop** keeps what it found.
+- **Moved to the Trash**: see everything CleanMate moved to the Trash from any module, even after quitting, and put items back one by one or all at once.
+- **Shortcuts and Spotlight**: scan for junk, check free space or open any module from Shortcuts, Spotlight and Siri. Nothing is cleaned until you confirm in CleanMate.
+- **Smart Scan** and **Privacy** open a review before cleaning, with sizes and what goes to the Trash or is deleted. Every item has a **Why is this safe?** button, and ⌘F searches the results.
+- **Smart Scan › Applications** cleans caches of Zalo, Canva, Teams, WhatsApp, Slack, Discord, Signal, Notion, Figma, Postman and Obsidian. Your messages, files and sign-ins stay put.
+- **Smart Scan › Developer Junk** finds forgotten Colima, Lima, Podman, minikube and Rancher Desktop VMs, often tens of GB.
+- **Overview** opens instantly and suggests up to 5 places to free space next, and shows your last Smart Scan with **Scan Now**.
+- **Open at login** and **Menu bar only** (both off by default) let CleanMate live in the menu bar, so the low disk warning works without a window.
+- **Space Lens** can start from the whole startup disk, and **Show Hidden Files** (⇧⌘.) hides dotfiles from the list.
+- **Uninstaller** shows where each app came from and has **Quit and Uninstall…**; **Reset…** works on open apps too.
+- **Large & Old Files** sorts files into nine kinds with icons, and you can open or preview any file, in Duplicates and Similar Photos too.
+- **Stop** (⌘.) works on cleaning, moving to the Trash and Maintenance tasks, and you get a **Freed 1.2 GB** notification when a clean ends in the background.
+- CleanMate reopens on the module you used last, with its window in the same place.
+- The `cleanmate` command gets `similar`, `space`, `trash`, `restore`, `uninstall`, `privacy` and `login-items`, so the terminal and AI agents can do the same.
+
 ### Changed
-- Without Full Disk Access, Smart Scan, Similar Photos and Suggestions say what they skip and how to fix it, instead of "nothing found".
-- The menu bar and Overview show "found X · selected Y", the same number as the sidebar, and lifetime "freed" never goes down.
-- Suggestions rescan old results, offer to turn a disabled group back on, and their Uninstaller filter lasts only this visit.
-- The welcome guide introduces every module, and **Skip** still lets you set Open at login and the menu bar.
-- The menu bar item shows **Junk found: X (scanned …)**, everything the last Smart Scan found, and opens Smart Scan when clicked.
-- **Large & Old Files › Similar Photos** and `cleanmate similar` use about a third less memory on large libraries (20,000 photos: 490 MB → 320 MB at peak), with the same groups.
-- **Overview** opens at once: the largest folders in your home show the sizes of the last measure, with when they were measured, while they are measured again in the background.
-- Each release also carries `CleanMate.dmg` (+ `.sha256`), so the README download link always points to the latest version.
-- **Smart Scan › Developer**: Gradle caches are measured faster (their folders are read in parallel), with the same items and sizes.
-- **Smart Scan**: Simulator data and Old temporary files are measured faster, with far less CPU, with the same items and sizes.
-- When something can't be cleaned, moved to the Trash, uninstalled or reset, the done screen says how many items stayed and **Show Details…** lists each one with the real reason (not permitted, in use, locked, no Trash on the drive, iCloud file not downloaded, or the tool's exit code and error) and what to do, such as granting Full Disk Access or quitting the app. Settings › Activity shows the reason too.
-- **Large & Old Files**: after a move to the Trash the list stays, without the files moved, and nothing is scanned again; a bar above it shows what was moved, with **Undo**.
-- **Overview**: measuring your home folder shows which folder is being measured and how much so far, with a **Stop** button; after a clean only the folders it touched are measured again.
+- Smart Scan and Overview are noticeably faster, and Similar Photos uses a third less memory on big libraries.
+- When a clean fails, the done screen says why for each item and what to do, such as granting Full Disk Access.
+- Without Full Disk Access, CleanMate says what it skips instead of "nothing found".
+- Each release now also carries `CleanMate.dmg`, so the README download link always points to the latest version.
 
 ### Fixed
-- `cleanmate large`, `dupes`, `similar` and `uninstall --leftovers` now say why they failed (Full Disk Access, permission, cancelled) with a matching exit code and `error` in `--json`; a disk history that can't be saved shows in Settings › Activity.
-- VoiceOver reads why a locked item cannot be ticked, Escape closes **Moved Items**, size bars and disabled checkboxes stay visible with Increase Contrast, and group headers open without motion when Reduce Motion is on.
-- Closing the window no longer loses scan results or a scan still running; quitting during a Maintenance task asks first and ends its tool; after a hidden start at login, the update check waits until you open the window.
-- CleanMate no longer stalls while checking Full Disk Access with a large Trash: the check reads one entry instead of listing the whole Trash, in the background when CleanMate becomes active.
-- **Similar Photos**: when too many photos look nearly alike to compare them all, the results say **Results may be incomplete** instead of leaving photos out silently.
-- The menu bar and Overview line **Junk found: … (scanned …)**, dates in notifications and some Settings texts now use CleanMate's language (for example Vietnamese) and its date format even when macOS is set to another language.
-- `cleanmate dupes` with a folder it can't search names `cleanmate dupes` in the error, not `cleanmate large`.
-- `cleanmate space /` no longer counts the startup disk's data volume a second time inside /System: another volume mounted in a folder is listed as a mounted volume and left out of the total, as in Space Lens.
-- **Uninstaller**: an App Store app macOS won't let CleanMate move no longer brings up an unexplained password prompt; CleanMate says to remove it in Launchpad or drag it to the Trash in Finder, with **Reveal in Finder**.
-- **Space Lens**: a volume mounted inside a folder is no longer measured with it — /System no longer counts the whole data volume again, and network shares in your home folder are not walked.
-- **Space Lens** and **Overview** say why a folder has no size: **Not Readable** (with a way to grant Full Disk Access), **Cancelled** after Stop (with **Measure Again**) or **Couldn’t Measure**, never an empty folder.
-- **Overview › Suggestions** now open Smart Scan and Maintenance right at the group or snapshots the first time, even on a busy Mac.
-- **Large & Old Files**: a duplicate search that fails now says so, with **Try Again**, instead of stopping silently; a reset in the **Uninstaller** that fails now always shows its result.
+- Better VoiceOver, Reduce Motion and Increase Contrast support.
+- Closing the window no longer loses scan results, and CleanMate no longer stalls with a large Trash.
+- Space Lens no longer counts the whole disk twice inside /System or walks network shares.
+- Dates and some texts now follow CleanMate's language instead of macOS's.
+- A few small fixes in the Uninstaller and Large & Old Files.
 
 ## [1.7] - 2026-11-02
 
