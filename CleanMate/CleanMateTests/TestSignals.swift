@@ -22,22 +22,36 @@ struct WaitTimedOut: Error {}
             Issue.record("Still waiting after \(timeout): \(what)", sourceLocation: sourceLocation)
             throw WaitTimedOut()
         }
-        try await Task.sleep(for: interval)
+        try await pause(interval)
     }
 }
 
-/// Lays out `host` until `value` (a size the test checks) reads the same for 20 polls in a row (about 0.1 s), at
-/// most `timeout`: the view settled, without a fixed delay.
+/// Waits `interval` on the main queue's own timer. `Task.sleep` wakes on the shared thread pool before it comes back
+/// to the main actor: with the whole suite running, every pool thread is busy and a 5 ms sleep took seconds.
+@MainActor private func pause(_ interval: Duration) async throws {
+    try Task.checkCancellation()
+    let (seconds, attoseconds) = interval.components
+    await withCheckedContinuation { continuation in
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(seconds) + Double(attoseconds) / 1e18) { continuation.resume() }
+    }
+}
+
+/// Lays out `host` until `value` (a size the test checks) reads the same for 0.1 s and at least 3 polls in a row, at
+/// most `timeout`: the view settled, without a fixed delay. Time, not a number of polls: with the whole suite running
+/// a poll can wait half a second for the main thread, and 20 polls outlasted the timeout.
 @MainActor func settledLayout<Value: Equatable>(_ host: NSView, timeout: Duration = .seconds(10),
                                                 sourceLocation: SourceLocation = #_sourceLocation,
                                                 _ value: @MainActor () -> Value) async throws {
-    var last: Value?, same = 0
+    var last: Value?, same = 0, since = ContinuousClock.now
     try await eventually("a stable layout", timeout: timeout, sourceLocation: sourceLocation) {
         host.layoutSubtreeIfNeeded()
         let now = value()
-        same = now == last ? same + 1 : 0
-        last = now
-        return same >= 19
+        if now == last {
+            same += 1
+        } else {
+            (last, same, since) = (now, 0, .now)
+        }
+        return same >= 2 && ContinuousClock.now - since >= .milliseconds(100)
     }
 }
 

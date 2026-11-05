@@ -87,19 +87,19 @@ struct SpaceLensExternalTests {
         model.home = home
         model.hasFullDiskAccess = { true }
         model.externalVolume = { url in policy.externalVolume(SafetyPolicy.normalize(url)).map { URL(fileURLWithPath: $0) } }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: ext.appending(path: "Movies/Sub"))
-        try await settle()
+        await settle()
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["Ext", "Movies", "Sub"])
         model.go(to: 0)
-        try await settle()
+        await settle()
         #expect(model.current.lastPathComponent == "Ext")
         for name in ["Movies", "Docs"] {
             let item = try #require(model.items.first { $0.name == name })
             #expect(item.size == (try du(ext.appending(path: name))), "\(name)")
         }
         model.start(at: home)
-        try await settle()
+        await settle()
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["home"])
     }
 
@@ -155,8 +155,8 @@ struct SpaceLensExternalTests {
         return model
     }
 
-    @MainActor func settle(_ model: SpaceLensModel) async throws {
-        try await eventually("model.measuring to end") { !model.measuring }
+    @MainActor func settle(_ model: SpaceLensModel) async {
+        await until(model) { !$0.measuring }
     }
 
     /// Startup Disk lists the disk's top level measured like `du -x` but never inside the data volume mounted in
@@ -166,7 +166,7 @@ struct SpaceLensExternalTests {
         defer { try? fm.removeItem(at: root) }
         let model = try diskModel()
         model.start(at: model.disk)
-        try await settle(model)
+        await settle(model)
         #expect(model.breadcrumb == [disk.standardizedFileURL])
         func item(_ name: String) throws -> SpaceItem { try #require(model.items.first { $0.name == name }, "\(name)") }
         for name in ["Users", "Library", "Applications", "opt"] {
@@ -183,28 +183,28 @@ struct SpaceLensExternalTests {
         #expect(try item(".hidden.bin").isHidden)
 
         model.open(disk.appending(path: "Users"))
-        try await settle(model)
+        await settle(model)
         #expect(try item("me").viewOnly == .holdsHome)
         #expect(try item("bob").viewOnly == .otherUser)
         #expect(try item("Shared").viewOnly == .outsideHome)
         model.open(diskHome)
-        try await settle(model)
+        await settle(model)
         #expect(model.items.allSatisfy { $0.viewOnly == nil })
 
         model.start(at: dataVolume.deletingLastPathComponent())
-        try await settle(model)
+        await settle(model)
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["Disk", "System", "Volumes"])
         let volume = try item("Data")
         #expect(volume.isMountPoint && volume.size == nil && volume.viewOnly == .otherVolume && !model.canOpen(volume))
         model.go(to: 0)
-        try await settle(model)
+        await settle(model)
         #expect(model.current == disk.standardizedFileURL && model.items.contains { $0.name == "opt" })
 
         model.start(at: disk.appending(path: "opt/tool"))
-        try await settle(model)
+        await settle(model)
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["Disk", "opt", "tool"])
         model.start(at: diskHome.appending(path: "Docs"))
-        try await settle(model)
+        await settle(model)
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["me", "Docs"]) // home keeps its own breadcrumb
     }
 
@@ -213,7 +213,7 @@ struct SpaceLensExternalTests {
         defer { try? fm.removeItem(at: root) }
         let model = try diskModel(fullDiskAccess: false)
         model.start(at: model.disk)
-        try await settle(model)
+        await settle(model)
         #expect(model.skippedProtected)
         let users = try #require(model.items.first { $0.name == "Users" }?.size)
         #expect(users <= (try du(disk.appending(path: "Users"))) - 400_000)
@@ -224,11 +224,11 @@ struct SpaceLensExternalTests {
         defer { try? fm.removeItem(at: root) }
         let model = try diskModel()
         model.start(at: model.disk)
-        try await settle(model)
+        await settle(model)
         model.open(disk.appending(path: "Users"))
         model.open(diskHome)
         model.open(diskHome.appending(path: "Docs"))
-        try await settle(model)
+        await settle(model)
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["Disk", "Users", "me", "Docs"])
         let file = try #require(model.items.first { $0.name == "a.txt" })
         #expect(file.viewOnly == nil)
@@ -268,7 +268,7 @@ struct SpaceLensExternalTests {
         defer { try? fm.removeItem(at: root) }
         let model = try diskModel()
         model.start(at: model.disk)
-        try await settle(model)
+        await settle(model)
         let total = model.total
         model.showsHidden = false
         #expect(!model.shown.contains { $0.isHidden } && model.shown.count < model.items.count && model.total == total)

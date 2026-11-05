@@ -135,7 +135,7 @@ struct OverviewTests {
         model.spaceLens = spaceLens
         model.startIfNeeded()
         #expect(model.measuring)
-        try await eventually("model.measuring to end") { !model.measuring }
+        await until(model) { !$0.measuring }
 
         #expect(model.measured && model.skippedProtected)
         #expect(model.folders.count == OverviewModel.folderLimit)
@@ -143,13 +143,13 @@ struct OverviewTests {
         #expect(!model.folders.contains { ["Documents", "loose.bin", "Empty"].contains($0.name) })
         #expect(model.folders.map(\.sortSize) == model.folders.map(\.sortSize).sorted(by: >))
 
-        func settle() async throws { try await eventually("spaceLens.measuring to end") { !spaceLens.measuring } }
+        func settle() async { await until(spaceLens) { !$0.measuring } }
         spaceLens.start(at: home)
-        try await settle()
+        await settle()
         #expect(calls.value == 0)
         #expect(spaceLens.items.first { $0.name == "Big" }?.size == model.folders.first?.size)
         spaceLens.open(home.appending(path: "Big"))
-        try await settle()
+        await settle()
         #expect(calls.value == 0) // Big/inner (≥ 1 MB) remembered too
 
         // A clean elsewhere: the Overview measures again next time it is shown.
@@ -280,7 +280,7 @@ struct OverviewTests {
         #expect(model.homeSize == 12_000 && model.savedSizesDate == measuredAt)
 
         gate.open()
-        try await eventually("model.measuring to end") { !model.measuring }
+        await until(model) { !$0.measuring }
         #expect(model.folders.map(\.name) == ["Big", "Small"] && model.folders.map(\.size) == [80_000, 3_000])
         #expect(model.savedSizesDate == nil)
         let saved = try #require(HomeFolderSizes.read(from: sizesFile, home: home))
@@ -301,7 +301,7 @@ struct OverviewTests {
         model.measure = { _, _, _ in (4_000, [:]) }
         model.startIfNeeded()
         #expect(model.folders.isEmpty && model.savedSizesDate == nil)
-        try await eventually("model.measuring to end") { !model.measuring }
+        await until(model) { !$0.measuring }
         #expect(model.folders.map(\.size) == [4_000])
         #expect(HomeFolderSizes.read(from: sizesFile, home: home)?.folders.map(\.name) == ["Big"])
     }

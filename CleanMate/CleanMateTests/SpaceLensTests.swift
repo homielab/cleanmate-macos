@@ -5,7 +5,8 @@ import Testing
 @testable import CleanMate
 
 /// Space Lens runs against a throwaway fake home; nothing is ever moved to the real Trash.
-/// Waits end after a deadline (`eventually`), so a hang fails the test instead of stalling the run.
+/// Waits follow what the model publishes (`until`), never the clock: a whole-suite run keeps the CPU busy for a
+/// minute, so a measure may take longer than any fixed wait. A hang fails at the suite's time limit.
 @Suite(.timeLimit(.minutes(2)))
 struct SpaceLensTests {
     let root = FileManager.default.temporaryDirectory.appending(path: "CleanMateSpaceLens-\(UUID().uuidString)")
@@ -67,14 +68,14 @@ struct SpaceLensTests {
         let model = SpaceLensModel()
         model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await settle()
+        await settle()
         #expect(model.total > 7_000_000 && model.total < 8_000_000) // the link once in A's listing
         for name in ["x", "y"] {
             model.go(to: 0)
             model.open(home.appending(path: "A/\(name)"))
-            try await settle()
+            await settle()
             let s = try #require(model.items.first { $0.name == "s" })
             #expect(s.size == (try du(s.url)), "\(name)/s")
         }
@@ -87,33 +88,33 @@ struct SpaceLensTests {
         let big = try file("A/x/s/big.bin", bytes: 3_000_000)
         try file("A/y/s/own.bin", bytes: 2_000_000)
         try FileManager.default.linkItem(at: big, to: home.appending(path: "A/y/s/big.bin"))
-        let calls = Counter()
+        let calls = SignalCount()
         let model = SpaceLensModel(center: NotificationCenter())
         model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         var access = true
         model.hasFullDiskAccess = { access }
         model.measure = { calls.add(); return try await SpaceLens.measure($0, links: $1, skipping: $2) }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await settle()
+        await settle()
         let before = model.items.map(\.size)
         #expect(calls.value == 2 && model.total > 5_000_000)
         model.open(home.appending(path: "A/x"))
-        try await settle()
+        await settle()
         model.go(to: 0)
         #expect(calls.value == 3)
-        try await settle()
+        await settle()
         #expect(calls.value == 3); #expect(model.items.map(\.size) == before) // no measuring: same sizes at once
         model.rescan()
-        try await settle()
+        await settle()
         #expect(calls.value == 5)
         model.invalidate()
         model.startIfNeeded()
-        try await settle()
+        await settle()
         #expect(calls.value == 7)
         access = false // the skipped set changes
         model.go(to: 0)
-        try await settle()
+        await settle()
         #expect(calls.value == 9)
     }
 
@@ -122,24 +123,24 @@ struct SpaceLensTests {
         defer { try? FileManager.default.removeItem(at: root) }
         try file("A/x/big.bin", bytes: 2_000_000)
         try file("A/y/big.bin", bytes: 2_000_000)
-        let calls = Counter(), gate = Counter()
+        let calls = SignalCount(), gate = SignalCount()
         let model = SpaceLensModel(center: NotificationCenter())
         model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
         model.measure = {
             calls.add()
-            try await eventually("gate to open") { !(gate.value == 0) }
+            await gate.reach(1)
             return try await SpaceLens.measure($0, links: $1, skipping: $2)
         }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await eventually("second measure to start") { !(calls.value < 2) }
+        await calls.reach(2)
         model.invalidate() // e.g. Large Files moved a file to the Trash meanwhile
         gate.add()
-        try await settle()
+        await settle()
         #expect(model.total > 4_000_000) // still shown
         model.go(to: 0)
-        try await settle()
+        await settle()
         #expect(calls.value == 4) // measured again, not answered from the old listing
     }
 
@@ -159,40 +160,40 @@ struct SpaceLensTests {
             measured.add(url.lastPathComponent)
             return try await SpaceLens.measure(url, links: links, skipping: skipping)
         }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "a/b/c"))
-        try await settle()
+        await settle()
         #expect(model.breadcrumb.map(\.lastPathComponent) == ["home", "a", "b", "c"])
         #expect(model.current.standardizedFileURL.path == home.appending(path: "a/b/c").standardizedFileURL.path)
         model.go(to: 1)
-        try await settle()
+        await settle()
         #expect(model.current.lastPathComponent == "a" && model.breadcrumb.count == 2)
         #expect(measured.value.isSuperset(of: ["b", "other"]))
         access = false
         model.start(at: home.appending(path: "Documents/x/y"))
         #expect(model.path.isEmpty && model.root.lastPathComponent == "y")
-        try await settle()
+        await settle()
     }
 
     @MainActor @Test func revealOpensTheItemsFolderLikeChooseFolderAndReusesSizes() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let big = try file("A/x/big.bin", bytes: 1_000_000)
         try file("A/y/own.bin", bytes: 2_000)
-        let calls = Counter()
+        let calls = SignalCount()
         let model = SpaceLensModel(center: NotificationCenter())
         model.disk = home.appending(path: "A") // A opens as the root, so going back to index 0 lists A
         model.hasFullDiskAccess = { true }
         model.measure = { calls.add(); return try await SpaceLens.measure($0, links: $1, skipping: $2) }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await settle()
+        await settle()
         #expect(calls.value == 2)
         model.reveal(home.appending(path: "A/x")) // a folder: its parent A, listing remembered
-        try await settle()
+        await settle()
         #expect(model.current.path == home.appending(path: "A").path && model.path.isEmpty)
         #expect(calls.value == 2 && model.revealed?.lastPathComponent == "x")
         model.reveal(big)
-        try await settle()
+        await settle()
         #expect(model.current.path == home.appending(path: "A/x").path)
         #expect(model.revealed == big && model.items.contains { $0.url.standardizedFileURL == big.standardizedFileURL })
         model.open(home.appending(path: "A/x")) // navigating on drops the pending selection
@@ -200,7 +201,7 @@ struct SpaceLensTests {
         model.invalidate() // another module cleaned: reveal measures afresh, showing the module does not measure twice
         model.reveal(home.appending(path: "A/y"))
         model.startIfNeeded()
-        try await settle()
+        await settle()
         #expect(calls.value == 4)
     }
 
@@ -444,13 +445,13 @@ struct SpaceLensTests {
             for item in items { try? FileManager.default.removeItem(at: item.url) }
             return CleanReport(freed: 20_000)
         }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await settle()
+        await settle()
         let selection: Set<URL> = [a, b]
         #expect(model.pruned(selection) == selection)
         await model.trash(model.items.filter { $0.url == a })
-        try await settle()
+        await settle()
         #expect(model.pruned(selection) == [b])
         #expect(model.report?.freed == 20_000)
         await model.trash([])
@@ -465,15 +466,15 @@ struct SpaceLensTests {
         model.hasFullDiskAccess = { true }
         var calls = 0
         model.trashItems = { _ in calls += 1; return CleanReport(freed: 1) }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await settle()
+        await settle()
         let confirmed = model.items
         model.rescan()
         #expect(model.measuring)
         await model.trash(confirmed)
         #expect(calls == 0 && model.report == nil && !model.trashing)
-        try await settle()
+        await settle()
         await model.trash(model.items)
         #expect(calls == 1)
     }
@@ -486,9 +487,9 @@ struct SpaceLensTests {
         model.hasFullDiskAccess = { true }
         var trashed: [URL] = []
         model.trashItems = { items in trashed += items.map(\.url); return CleanReport(freed: 0) }
-        func settle() async throws { try await eventually("model.measuring to end") { !model.measuring } }
+        func settle() async { await until(model) { !$0.measuring } }
         model.start(at: home.appending(path: "A"))
-        try await settle()
+        await settle()
         let total = model.total
         model.search = " REPORT "
         #expect(model.shown.map(\.url) == [a])
@@ -497,23 +498,16 @@ struct SpaceLensTests {
         #expect(selection == [a])
         await model.trash(model.shown.filter { selection.contains($0.url) })
         #expect(trashed == [a])
-        try await settle()
+        await settle()
         model.search = "zzz"
         #expect(model.shown.isEmpty && !model.items.isEmpty)
         model.open(home.appending(path: "A/Sub"))
         #expect(model.search.isEmpty)
-        try await settle()
+        await settle()
         model.search = "x"
         model.go(to: 0)
         #expect(model.search.isEmpty)
     }
-}
-
-private final class Counter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var count = 0
-    var value: Int { lock.withLock { count } }
-    func add() { lock.withLock { count += 1 } }
 }
 
 private final class Names: @unchecked Sendable {

@@ -23,8 +23,40 @@ import UniformTypeIdentifiers
 
     // MARK: - Generated photos
 
+    /// A generated photo: the scene drawn from `seed`, scaled by `factor`.
+    struct Photo: Hashable, Sendable {
+        var seed: UInt64
+        var width = 1200, height = 900
+        var factor = 1.0
+    }
+
+    /// Encoded photos, each made once per run and off the main actor: drawing one takes about a second in a Debug
+    /// build, and tests drawing them on the main actor held up the waits (`eventually`) of every test running beside.
+    private nonisolated static let encodedPhotos = Locked([String: Task<Data, any Error>]())
+
+    nonisolated static func encoded(_ photo: Photo, type: UTType = .jpeg, quality: Double = 0.9) async throws -> Data {
+        let key = "\(photo) \(type.identifier) \(quality)"
+        let task = encodedPhotos.withLock { tasks in
+            if let task = tasks[key] { return task }
+            let task = Task.detached(priority: .high) {
+                var image = scene(seed: photo.seed, width: photo.width, height: photo.height)
+                if photo.factor != 1 { image = resized(image, by: photo.factor) }
+                let data = NSMutableData()
+                guard let destination = CGImageDestinationCreateWithData(data, type.identifier as CFString, 1, nil) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+                guard CGImageDestinationFinalize(destination) else { throw CocoaError(.fileWriteUnknown) }
+                return data as Data
+            }
+            tasks[key] = task
+            return task
+        }
+        return try await task.value
+    }
+
     /// A reproducible "photo": a gradient, overlapping shapes and grain, all drawn from `seed`.
-    static func scene(seed: UInt64, width: Int = 1200, height: Int = 900) -> CGImage {
+    private nonisolated static func scene(seed: UInt64, width: Int = 1200, height: Int = 900) -> CGImage {
         var random = SplitMix(seed)
         let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -55,7 +87,7 @@ import UniformTypeIdentifiers
         return context.makeImage()!
     }
 
-    static func resized(_ image: CGImage, by factor: Double) -> CGImage {
+    private nonisolated static func resized(_ image: CGImage, by factor: Double) -> CGImage {
         let (width, height) = (Int(Double(image.width) * factor), Int(Double(image.height) * factor))
         let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
                                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -66,23 +98,21 @@ import UniformTypeIdentifiers
     }
 
     @discardableResult
-    func write(_ image: CGImage, to path: String, type: UTType = .jpeg, quality: Double = 0.9, in folder: URL? = nil) throws -> URL {
+    func write(_ photo: Photo, to path: String, type: UTType = .jpeg, quality: Double = 0.9, in folder: URL? = nil) async throws -> URL {
         let url = (folder ?? home).appending(path: path)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let destination = try #require(CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil))
-        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
-        try #require(CGImageDestinationFinalize(destination))
+        try await Self.encoded(photo, type: type, quality: quality).write(to: url)
         return url
     }
 
     /// The original, a copy at half size (PNG), a recompressed copy and two unrelated scenes.
-    func writeSet() throws -> (original: URL, resized: URL, recompressed: URL, others: [URL]) {
-        let scene = Self.scene(seed: 1)
-        let original = try write(scene, to: "Pictures/IMG_0001.jpg")
-        let resized = try write(Self.resized(scene, by: 0.5), to: "Desktop/IMG_0001 small.png", type: .png)
-        let recompressed = try write(scene, to: "Downloads/IMG_0001 (1).jpg", quality: 0.4)
-        let others = [try write(Self.scene(seed: 2), to: "Pictures/IMG_0002.jpg"),
-                      try write(Self.scene(seed: 3), to: "Pictures/IMG_0003.heic", type: .heic)]
+    func writeSet() async throws -> (original: URL, resized: URL, recompressed: URL, others: [URL]) {
+        let scene = Photo(seed: 1)
+        let original = try await write(scene, to: "Pictures/IMG_0001.jpg")
+        let resized = try await write(Photo(seed: 1, factor: 0.5), to: "Desktop/IMG_0001 small.png", type: .png)
+        let recompressed = try await write(scene, to: "Downloads/IMG_0001 (1).jpg", quality: 0.4)
+        let others = [try await write(Photo(seed: 2), to: "Pictures/IMG_0002.jpg"),
+                      try await write(Photo(seed: 3), to: "Pictures/IMG_0003.heic", type: .heic)]
         return (original, resized, recompressed, others)
     }
 
@@ -94,7 +124,7 @@ import UniformTypeIdentifiers
     // MARK: - Grouping
 
     @Test func groupsAnOriginalWithItsEditsAndLeavesOtherPhotosOut() async throws {
-        let set = try writeSet()
+        let set = try await writeSet()
         let groups = try await groups()
         try #require(groups.count == 1)
         #expect(Set(groups[0].photos.map(\.url.lastPathComponent))
@@ -106,7 +136,7 @@ import UniformTypeIdentifiers
     }
 
     @Test func reusesCachedPrintsAndMakesNoneForUnchangedFiles() async throws {
-        _ = try writeSet()
+        _ = try await writeSet()
         let photos = try await SimilarPhotos.photos(in: home, policy: policy)
         let first = try await SimilarPhotos.find(photos)
         #expect(first.analyzedCount == 5 && first.prints.count == 5)
@@ -117,13 +147,13 @@ import UniformTypeIdentifiers
         let cacheURL = root.appending(path: "cache/feature-prints.plist")
         await SimilarPhotos.Cache.save(first.prints, to: cacheURL)
         #expect(await SimilarPhotos.Cache.load(from: cacheURL) == first.prints)
-        try write(Self.scene(seed: 9), to: "Pictures/IMG_0002.jpg")
+        try await write(Photo(seed: 9), to: "Pictures/IMG_0002.jpg")
         await SimilarPhotos.Cache.save([:], to: cacheURL)
         #expect(await SimilarPhotos.Cache.load(from: cacheURL).count == 4)
     }
 
     @Test func aCancelledSearchKeepsThePrintsItFinished() async throws {
-        _ = try writeSet()
+        _ = try await writeSet()
         let photos = try await SimilarPhotos.photos(in: home, policy: policy)
         let task = Task { try await SimilarPhotos.find(photos) }
         task.cancel()
@@ -233,7 +263,7 @@ import UniformTypeIdentifiers
         let cut = SimilarPhotos.clustering(columns: columns(burst), count: 4, threshold: 0.35, maxPairs: 1)
         #expect(cut.truncated && cut.groups.count <= 1)
 
-        _ = try writeSet() // 3 photos alike: 3 close pairs
+        _ = try await writeSet() // 3 photos alike: 3 close pairs
         let photos = try await SimilarPhotos.photos(in: home, policy: policy)
         let whole = try await SimilarPhotos.find(photos)
         #expect(!whole.truncated && whole.groups.count == 1)
@@ -300,13 +330,13 @@ import UniformTypeIdentifiers
     // MARK: - Never inside a library or an app
 
     @Test func neverListsPhotosInsideAPhotosLibraryOrAnApp() async throws {
-        let scene = Self.scene(seed: 1)
-        try write(scene, to: "Pictures/kept.jpg")
-        try write(scene, to: "Pictures/Photos Library.photoslibrary/originals/A/IMG_0001.jpg")
-        try write(scene, to: "Pictures/Old.migratedphotolibrary/Masters/IMG_0001.jpg")
-        try write(scene, to: "Applications/Viewer.app/Contents/Resources/sample.jpg")
-        try write(scene, to: "Documents/Tool.APP/sample.jpg")
-        try write(scene, to: "Pictures/icon.png", type: .png, quality: 1) // a 20 KB+ PNG too: only the size rule decides
+        let scene = Photo(seed: 1)
+        try await write(scene, to: "Pictures/kept.jpg")
+        try await write(scene, to: "Pictures/Photos Library.photoslibrary/originals/A/IMG_0001.jpg")
+        try await write(scene, to: "Pictures/Old.migratedphotolibrary/Masters/IMG_0001.jpg")
+        try await write(scene, to: "Applications/Viewer.app/Contents/Resources/sample.jpg")
+        try await write(scene, to: "Documents/Tool.APP/sample.jpg")
+        try await write(scene, to: "Pictures/icon.png", type: .png, quality: 1) // a 20 KB+ PNG too: only the size rule decides
         let photos = try await SimilarPhotos.photos(in: home, policy: policy)
         #expect(Set(photos.map(\.url.lastPathComponent)) == ["kept.jpg", "icon.png"])
         // Started inside one, it still lists nothing from it.
@@ -319,16 +349,16 @@ import UniformTypeIdentifiers
     }
 
     @Test func listsOnlyImageFilesOfAtLeastTheMinimumSize() async throws {
-        try write(Self.scene(seed: 1), to: "Pictures/a.JPG")
-        try write(Self.scene(seed: 1, width: 40, height: 30), to: "Pictures/tiny.jpg")
+        try await write(Photo(seed: 1), to: "Pictures/a.JPG")
+        try await write(Photo(seed: 1, width: 40, height: 30), to: "Pictures/tiny.jpg")
         try Data(repeating: 1, count: 200_000).write(to: home.appending(path: "Pictures/movie.mov"))
         let photos = try await SimilarPhotos.photos(in: home, policy: policy)
         #expect(photos.map(\.url.lastPathComponent) == ["a.JPG"])
     }
 
     @Test func aFolderMacOSProtectsIsNotReadWithoutFullDiskAccess() async throws {
-        try write(Self.scene(seed: 1), to: "Pictures/a.jpg")
-        try write(Self.scene(seed: 1), to: "Desktop/a.jpg")
+        try await write(Photo(seed: 1), to: "Pictures/a.jpg")
+        try await write(Photo(seed: 1), to: "Desktop/a.jpg")
         let skipping = ProtectedFolders.skipped(home: home, hasFullDiskAccess: false)
         let photos = try await SimilarPhotos.photos(in: home, policy: policy, skipping: skipping)
         #expect(photos.map(\.url.path).allSatisfy { path in !skipping.contains { path.hasPrefix($0 + "/") } })
@@ -356,7 +386,7 @@ import UniformTypeIdentifiers
     }
 
     @Test(.timeLimit(.minutes(1))) func modelTicksNothingWarnsForAWholeGroupAndTrashesWithUndo() async throws {
-        let set = try writeSet()
+        let set = try await writeSet()
         let model = model()
         #expect(model.cacheURL == nil) // never the real cache under a test host
         model.find(in: home, policy: policy, skipping: [])
@@ -389,7 +419,7 @@ import UniformTypeIdentifiers
     }
 
     @Test(.timeLimit(.minutes(1))) func modelStopsMidSearchAndFindsAgain() async throws {
-        _ = try writeSet()
+        _ = try await writeSet()
         let model = model()
         model.find(in: home, policy: policy, skipping: [])
         #expect(model.isSearching)
@@ -403,7 +433,7 @@ import UniformTypeIdentifiers
     /// The Duplicates menu: Similar Photos replaces the file list and searches the scanned scope (with the files'
     /// FDA skips); going back to the file list drops the photo results and ticks.
     @Test(.timeLimit(.minutes(1))) func largeFilesListingSwitchesToSimilarPhotos() async throws {
-        let set = try writeSet()
+        let set = try await writeSet()
         let model = LargeFilesModel()
         model.home = home
         model.hasFullDiskAccess = { true }
@@ -428,12 +458,12 @@ import UniformTypeIdentifiers
     /// photos the user picks go to the Trash with `cleanmate trash` and come back with `cleanmate restore`.
     @Test func commandLineFindsSimilarPhotosAndTrashedOnesComeBack() async throws {
         let fixture = try CommandLineToolTests.FilesFixture()
-        let scene = Self.scene(seed: 1)
-        try write(scene, to: "Pictures/IMG_0001.jpg", in: fixture.home)
-        try write(Self.resized(scene, by: 0.5), to: "Pictures/IMG_0001 small.png", type: .png, in: fixture.home)
-        try write(scene, to: "Media/IMG_0001 (1).jpg", quality: 0.4, in: fixture.home)
-        try write(Self.scene(seed: 2), to: "Pictures/IMG_0002.jpg", in: fixture.home)
-        try write(scene, to: "Media/Excluded/IMG_0001 copy.jpg", in: fixture.home) // in Settings › Exclusions
+        let scene = Photo(seed: 1)
+        try await write(scene, to: "Pictures/IMG_0001.jpg", in: fixture.home)
+        try await write(Photo(seed: 1, factor: 0.5), to: "Pictures/IMG_0001 small.png", type: .png, in: fixture.home)
+        try await write(scene, to: "Media/IMG_0001 (1).jpg", quality: 0.4, in: fixture.home)
+        try await write(Photo(seed: 2), to: "Pictures/IMG_0002.jpg", in: fixture.home)
+        try await write(scene, to: "Media/Excluded/IMG_0001 copy.jpg", in: fixture.home) // in Settings › Exclusions
         let sources = fixture.sources(fullDiskAccess: true)
 
         let (code, printed) = await CommandLineToolTests.run(["similar", "--json", fixture.home.appending(path: "Pictures").path,
@@ -471,11 +501,7 @@ import UniformTypeIdentifiers
     /// What Similar Photos moves is listed by `cleanmate restore --list` and put back by `cleanmate restore`.
     @Test func commandLineListsAndRestoresWhatItMoved() async throws {
         let fixture = try CommandLineToolTests.FilesFixture()
-        let scene = Self.scene(seed: 4)
-        let copy = fixture.home.appending(path: "Media/copy.jpg")
-        let destination = try #require(CGImageDestinationCreateWithURL(copy as CFURL, UTType.jpeg.identifier as CFString, 1, nil))
-        CGImageDestinationAddImage(destination, scene, nil)
-        try #require(CGImageDestinationFinalize(destination))
+        let copy = try await write(Photo(seed: 4), to: "Media/copy.jpg", in: fixture.home)
         let size = try #require(try copy.resourceValues(forKeys: [.totalFileAllocatedSizeKey]).totalFileAllocatedSize)
         let photo = SimilarPhotos.Photo(url: copy, size: Int64(size), modified: .now, width: 1200, height: 900,
                                         name: "copy.jpg", location: "~/Media")
@@ -492,7 +518,7 @@ import UniformTypeIdentifiers
 }
 
 /// Small seeded generator, so a generated photo is the same on every run.
-private struct SplitMix {
+private nonisolated struct SplitMix {
     var state: UInt64
     init(_ seed: UInt64) { state = seed }
     mutating func next() -> UInt64 {

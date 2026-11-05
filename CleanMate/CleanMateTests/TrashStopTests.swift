@@ -240,7 +240,7 @@ extension SpaceLensTests {
         let (started, resume) = (SignalCount(), SignalCount())
         model.trashItems = { await fakeMoveWithStop($0.map(\.url), started: started, resume: resume) }
         model.start(at: home.appending(path: "A"))
-        try await eventually("model.measuring to end") { !model.measuring }
+        await until(model) { !$0.measuring }
         try #require(model.items.count == 3)
         let moving = Task { await model.trash(model.items) }
         await started.reach(1)
@@ -256,7 +256,7 @@ extension SpaceLensTests {
 extension SimilarPhotosTests {
     /// Similar Photos: Stop while moving 2 photos; the done screen counts the one left.
     @Test(.timeLimit(.minutes(1))) func stopWhileMovingToTheTrash() async throws {
-        _ = try writeSet()
+        _ = try await writeSet()
         let model = model()
         let (started, resume) = (SignalCount(), SignalCount())
         model.trashPhotos = { photos, _ in await fakeMoveWithStop(photos.map(\.url), started: started, resume: resume) }
