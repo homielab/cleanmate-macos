@@ -13,6 +13,13 @@ nonisolated struct SafetyPolicy: Sendable {
     private let protectedFolders: [String]
     /// Never touched at all, nor anything inside.
     private let protectedTrees: [String]
+    /// Folders in `~/.cache` holding sign-ins, tokens or keys (GitHub CLI, gcloud, 1Password CLI, keyring backends,
+    /// Hugging Face's token), never-touch trees like `~/.ssh`: "Other caches in ~/.cache" lists that folder's
+    /// other entries one by one, and these must never be among them.
+    static let dotCacheSignIns = [
+        "gh", "gcloud", "op", "1password", "keyring", "python_keyring", "aws", "azure",
+        "huggingface/token", "huggingface/stored_tokens",
+    ]
     /// Folders the user excluded in Settings: never listed nor removed by any module, nor via a parent.
     let excluded: [String]
     /// Device id of a path, without following a last-component symlink; nil when it does not exist.
@@ -78,7 +85,7 @@ nonisolated struct SafetyPolicy: Sendable {
             ".ssh", ".gnupg", ".aws", ".kube", "Library/Keychains", "Documents", "Desktop", "Pictures",
             "Movies", "Music", "Library/Mobile Documents", "Library/CloudStorage", "Library/Mail",
             "Library/Messages",
-        ].map { (home + "/" + $0).lowercased() }
+        ].map { (home + "/" + $0).lowercased() } + Self.dotCacheSignIns.map { (home + "/.cache/" + $0).lowercased() }
         self.excluded = excluded.map { ($0 as NSString).resolvingSymlinksInPath }
     }
 

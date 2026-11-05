@@ -134,6 +134,16 @@
         }
       }
     },
+    "%@: incomplete downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@: bản tải dở"
+          }
+        }
+      }
+    },
     "%@: on-device AI model" : {
       "localizations" : {
         "vi" : {
@@ -504,12 +514,32 @@
         }
       }
     },
+    "Bundler cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Bundler"
+          }
+        }
+      }
+    },
     "Caches and logs only; chats, files and sign-in are kept" : {
       "localizations" : {
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chỉ bộ nhớ đệm và nhật ký; giữ nguyên trò chuyện, tệp và đăng nhập"
+          }
+        }
+      }
+    },
+    "Caches command-line tools keep in ~/.cache that CleanMate has no item of its own for (node-gyp, Electron, Playwright, Expo…), one row per tool. Each tool downloads or builds them again when it needs them; folders holding sign-ins are never listed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm các công cụ dòng lệnh giữ trong ~/.cache mà CleanMate chưa có mục riêng (node-gyp, Electron, Playwright, Expo…), mỗi công cụ một dòng. Công cụ sẽ tải hoặc tạo lại khi cần; thư mục chứa thông tin đăng nhập không bao giờ được liệt kê"
           }
         }
       }
@@ -580,6 +610,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dung lượng ổ (byte)"
+          }
+        }
+      }
+    },
+    "Carthage cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Carthage"
           }
         }
       }
@@ -934,6 +974,16 @@
         }
       }
     },
+    "Downloaded .gem packages and the gem index; installed gems are kept, and gem install downloads them again when needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói .gem đã tải và chỉ mục gem; gem đã cài được giữ nguyên, gem install sẽ tải lại khi cần"
+          }
+        }
+      }
+    },
     "Downloads removed: %@ freed" : {
       "localizations" : {
         "vi" : {
@@ -1074,6 +1124,16 @@
         }
       }
     },
+    "Files and hidden names directly in ~/.cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp và tên ẩn nằm ngay trong ~/.cache"
+          }
+        }
+      }
+    },
     "Files deleted from your external drives still take space on them." : {
       "localizations" : {
         "vi" : {
@@ -1194,6 +1254,16 @@
         }
       }
     },
+    "Frameworks Carthage downloaded and built; downloaded again by the next carthage bootstrap or update" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Framework Carthage đã tải và build; tải lại ở lần carthage bootstrap hoặc update sau"
+          }
+        }
+      }
+    },
     "Free Bytes" : {
       "localizations" : {
         "vi" : {
@@ -1260,6 +1330,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chưa bật quyền Truy cập toàn bộ ổ đĩa nên một số mục không được quét. Hãy bật trong Cài đặt của CleanMate."
+          }
+        }
+      }
+    },
+    "Gem indexes and packages Bundler downloaded; downloaded again by the next bundle install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ mục và gói gem Bundler đã tải; tải lại ở lần bundle install sau"
           }
         }
       }
@@ -2782,6 +2862,16 @@
         }
       }
     },
+    "Left by an interrupted model download; downloading the model again starts over" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do lần tải mô hình bị ngắt để lại; tải lại mô hình sẽ bắt đầu từ đầu"
+          }
+        }
+      }
+    },
     "Locked in Finder" : {
       "localizations" : {
         "vi" : {
@@ -3102,6 +3192,16 @@
         }
       }
     },
+    "One row per tool; not ticked by default" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mỗi công cụ một dòng; mặc định không được chọn"
+          }
+        }
+      }
+    },
     "Open ${module}" : {
       "localizations" : {
         "vi" : {
@@ -3188,6 +3288,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở Smart Scan với bảng xem lại rác đã chọn, quét trước nếu cần. Không xoá gì cho đến khi bạn xác nhận trong CleanMate."
+          }
+        }
+      }
+    },
+    "Other caches in ~/.cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm khác trong ~/.cache"
           }
         }
       }
@@ -4234,6 +4344,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Các phiên bản Ruby khác bản global của rbenv, cài lại bằng rbenv install"
+          }
+        }
+      }
+    },
+    "RubyGems cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm RubyGems"
           }
         }
       }

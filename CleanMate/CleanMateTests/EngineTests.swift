@@ -2008,6 +2008,21 @@ struct AppCatalogTests {
             "Library/Application Support/ZCode/session/IndexedDB/x/1.ldb",
             "Library/Application Support/ZCode/session/Partitions/p/Cookies",
             "Library/Application Support/ZCode/Preferences", "Library/Application Support/ZCode/Local Storage/leveldb/1.ldb",
+            ".qwen/oauth_creds.json", ".qwen/mcp-oauth-tokens.json", ".qwen/google_accounts.json", ".qwen/settings.json",
+            ".qwen/installation_id", ".qwen/memory.md", ".qwen/commands/c.toml", ".qwen/tmp/abc/logs.json",
+            ".local/share/amp/secrets.json", ".config/amp/settings.json", ".kiro/settings/mcp.json", ".kiro/steering/s.md",
+            "Library/Application Support/kiro-cli/data.sqlite3", "Library/Application Support/Kiro/User/globalStorage/state.vscdb",
+            "Library/Application Support/Trae CN/User/globalStorage/state.vscdb", ".trae/argv.json",
+            "Library/Application Support/Jan/data/models/m.gguf", "Library/Application Support/Jan/data/llamacpp/backends/b",
+            "Library/Application Support/Jan/data/settings.json", "Library/Application Support/Jan/data/mcp_config.json",
+            "Library/Application Support/Jan/data/assistants/jan/assistant.json",
+            "Library/Application Support/nomic.ai/GPT4All/model-q4.gguf", "Library/Application Support/nomic.ai/GPT4All/localdocs_v3.db",
+            "Library/Application Support/nomic.ai/GPT4All/incomplete-model-q4.gguf", ".config/nomic.ai/GPT4All.ini",
+            "Library/Caches/llama.cpp/org_model.gguf", "Library/Caches/llama.cpp/org_model.gguf.etag",
+            "Library/Application Support/ComfyUI/config.json", "Library/Application Support/ComfyUI/Local Storage/leveldb/1.ldb",
+            "Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable/warp.sqlite",
+            ".warp/settings.yaml", ".config/ghostty/config", ".local/state/ghostty/ssh_cache",
+            "Library/Application Support/com.raycast.macos/raycast-enc.sqlite",
         ]
         let junk = [
             ".claude/debug/log.txt", ".claude/projects/-Users-me-app/old.jsonl", ".codex/log/codex.log",
@@ -2030,8 +2045,18 @@ struct AppCatalogTests {
             "Library/Application Support/ZCode/session/Partitions/p/Code Cache/js/f",
             "Library/Application Support/ZCode/remote-assets-cache/components/ripgrep/linux-x64/v14.1.1-1/rg",
             "Library/Application Support/ZCode/remote-assets-cache/releases/3.15.3/linux-x64/manifest-linux-x64.json",
+            ".cache/amp/logs/cli.log", ".qwen/debug/d.txt", ".qwen/tmp/abc/tool-results/r.txt", ".qwen/projects/p/chats/c.jsonl",
+            ".kiro/sessions/h/sess_1.json", "Library/Caches/dev.kiro.cli/c", "Library/Application Support/Kiro/Cache/Cache_Data/f",
+            "Library/Application Support/Trae CN/CachedData/x", "Library/Caches/com.trae.ShipIt/update.zip",
+            "Library/Caches/llama.cpp/org_model.gguf.downloadInProgress", "Library/Application Support/Jan/data/logs/app.log",
+            "Library/Application Support/Jan/data/.npx/p/x.js", "Library/Application Support/Jan/data/threads/t1/messages.jsonl",
+            "Library/Application Support/nomic.ai/GPT4All/log.txt", "Library/Application Support/nomic.ai/GPT4All/gpt4all-abc.chat",
+            "Library/Application Support/ComfyUI/Cache/Cache_Data/f", "Library/Caches/dev.warp.Warp-Stable/c",
+            ".cache/ghostty/sentry/s", ".local/state/ghostty/crash/c.ips", "Library/Caches/com.raycast.macos/c",
         ]
         for path in protected + junk { try box.file(path, age: old) }
+        try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
+                                              ofItemAtPath: box.home.appending(path: "Library/Application Support/Jan/data/threads/t1").path)
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],
                                               ofItemAtPath: box.home.appending(path: ".codex/sessions/2025/01/01").path)
         try FileManager.default.setAttributes([.modificationDate: Date.now.addingTimeInterval(-old)],

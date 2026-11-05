@@ -28,7 +28,8 @@ nonisolated enum RunningProcesses {
         return Array(buffer.prefix(size))
     }
 
-    static let interpreters: Set<String> = ["node", "bun", "deno", "python", "python3"]
+    /// `ruby`: RubyGems and Bundler (`gem`, `bundle`) are Ruby scripts.
+    static let interpreters: Set<String> = ["node", "bun", "deno", "python", "python3", "ruby"]
 
     /// Install paths that name the tool whatever the process or script is called: a wrapper script (`~/.claude/local/claude`)
     /// or a global npm install runs `node …/node_modules/@anthropic-ai/claude-code/cli.js`, whose script name is `cli.js`.

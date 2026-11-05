@@ -4,7 +4,14 @@ import Foundation
 extension CleanerGroup {
     /// Developer junk: one item per tool, shown only when that tool left something behind.
     /// Official commands are used when the tool is installed; otherwise the cache folder is emptied.
-    nonisolated static let developer = CleanerGroup(id: "developer", title: "Developer Junk", systemImage: "hammer", items: [
+    nonisolated static let developer = CleanerGroup(id: "developer", title: "Developer Junk", systemImage: "hammer",
+                                                    items: developerTools + [otherDotCaches])
+
+    /// Last in Developer Junk: what is left in ~/.cache once every other item took its own folders (`DotCaches`).
+    nonisolated static let otherDotCaches = DotCaches.item(
+        owned: DotCaches.ownedNames(of: developerTools + aiTools().items + applications(hasFullDiskAccess: true).items))
+
+    nonisolated static let developerTools: [CleanerItem] = [
         // Xcode
         dev("xcode-derived-data", "Xcode DerivedData", note: "Build products and indexes, rebuilt on the next build",
             ["~/Library/Developer/Xcode/DerivedData"], apps: ["com.apple.dt.Xcode"], processes: ["xcodebuild"],
@@ -67,6 +74,11 @@ extension CleanerGroup {
             ["~/.cocoapods/repos"], selected: false, processes: ["pod"],
             skipsEntry: { { !DeveloperTools.isGitSpecRepo($0) } },
             skipNote: "Anything that is not a git clone of a spec repo; the CDN copy (trunk) stays", selectableEntries: true),
+        // Carthage's shared cache: downloaded binaries, cloned dependencies and its DerivedData; projects keep their
+        // own Carthage/Build, so only the next `carthage bootstrap` downloads and builds again.
+        dev("carthage-cache", "Carthage cache",
+            about: "Frameworks Carthage downloaded and built; downloaded again by the next carthage bootstrap or update",
+            ["~/Library/Caches/org.carthage.CarthageKit"], processes: ["carthage"]),
         // Documentation Xcode downloads and indexes; it fetches it again when the docs are opened.
         dev("xcode-documentation-cache", "Xcode documentation cache", note: "Downloaded again when Xcode shows documentation",
             ["~/Library/Developer/Xcode/DocumentationCache"], selected: false, apps: ["com.apple.dt.Xcode"]),
@@ -270,6 +282,20 @@ extension CleanerGroup {
             command: ShellCommand(executable: "brew", arguments: ["autoremove"], timeout: .seconds(300)),
             probe: DeveloperTools.brewAutoremoveProbe(), selected: false, processes: ["brew"]),
         dev("composer-cache", "Composer cache", about: "PHP packages Composer downloaded; downloaded again by the next composer install", ["~/Library/Caches/composer", "~/.composer/cache", "~/.cache/composer"]),
+        // RubyGems keeps every downloaded `.gem` in the `cache` folder of the gem home it installed into (the system
+        // Ruby's is root's), plus a spec index cache. Only `*.gem` and `specs` (`included`): never `gems`,
+        // `specifications`, `extensions`, `bin` (the installed gems) nor `~/.gem/credentials` (the rubygems.org key).
+        dev("rubygems-cache", "RubyGems cache",
+            about: "Downloaded .gem packages and the gem index; installed gems are kept, and gem install downloads them again when needed",
+            ["~/.gem", "~/.gem/cache", "~/.gem/ruby/*/cache", "~/.cache/gem", "~/.rbenv/versions/*/lib/ruby/gems/*/cache",
+             "~/.asdf/installs/ruby/*/lib/ruby/gems/*/cache", "~/.local/share/mise/installs/ruby/*/lib/ruby/gems/*/cache",
+             "~/.rubies/*/lib/ruby/gems/*/cache"],
+            included: ["*.gem", "specs"], shell: ["GEM_HOME": ["cache"]], processes: rubyTools, openFiles: true),
+        // Bundler's own download cache (compact index, gems and git sources it fetched); never `~/.bundle/config`
+        // (settings and source credentials) nor `plugin`.
+        dev("bundler-cache", "Bundler cache",
+            about: "Gem indexes and packages Bundler downloaded; downloaded again by the next bundle install",
+            ["~/.bundle/cache"], shell: ["BUNDLE_USER_HOME": ["cache"]], processes: rubyTools, openFiles: true),
         // Haskell, Scala and OCaml package caches, each skipped while its tools run, deleted (downloaded again).
         // Only these folders: never the compilers and tools they install (`~/.stack/programs`, `~/.ghcup/ghc|bin`,
         // `~/.cabal/bin`, `~/.cabal/config`), Ivy's locally published artifacts (`~/.ivy2/local`) nor opam switches.
@@ -366,7 +392,7 @@ extension CleanerGroup {
             note: "Downloaded emulators, downloaded again by the next firebase emulators:start",
             [firebaseCache + "/emulators"], included: firebaseEmulatorNames, shell: ["FIREBASE_EMULATORS_PATH": [""]], selected: false,
             processes: ["firebase-emulators"], openFiles: true),
-    ])
+    ]
 
     nonisolated private static let firebaseCache = "~/.cache/firebase"
     nonisolated static let firebaseLogNames = ["firebase-debug.log", "firebase-debug.*.log"]
@@ -404,6 +430,7 @@ extension CleanerGroup {
                   parse: { DeveloperTools.simulatorIDs(in: $0, available: available).map(SizeProbe.Result.only) })
     }
 
+    nonisolated private static let rubyTools = ["gem", "bundle", "bundler"]
     nonisolated private static let haskellTools = ["cabal", "ghc", "ghc-*", "stack", "ghcup"]
     nonisolated private static let scalaTools = ["sbt", "coursier", "cs", "bloop", "metals"]
 

@@ -9,9 +9,12 @@ extension CleanerGroup {
     /// unticked, moved to the Trash.
     nonisolated static func aiTools(sessionDays: Int = CleanupAges.default.sessions) -> CleanerGroup {
         func sessions(_ id: String, _ name: String, _ paths: [String], excluded: Set<String> = [],
-                      apps: [String] = [], processes: [String] = [],
+                      included: [String]? = nil, apps: [String] = [], processes: [String] = [],
                       label: CleanerItem.EntryLabel? = nil) -> CleanerItem {
-            sessionItem(id, name, paths, days: sessionDays, excluded: excluded, apps: apps, processes: processes, label: label)
+            var item = sessionItem(id, name, paths, days: sessionDays, excluded: excluded, apps: apps, processes: processes,
+                                   label: label)
+            item.included = included
+            return item
         }
         return CleanerGroup(id: "ai-tools", title: "AI Tools", systemImage: "brain", items: [
         // Claude Code: never ~/.claude/{.credentials.json,settings.json,CLAUDE.md,plugins,skills}, nor projects/*/memory.
@@ -81,6 +84,27 @@ extension CleanerGroup {
         // Cline: logs only. Never secrets.json, settings, db (sessions.db indexes its sessions), sessions,
         // workspaces, data/cache (holds user_input_history.jsonl), cron, apps.
         cache("cline-cache", "Cline", ["~/.cline/data/logs"], processes: ["cline"], openFiles: true),
+        // Amp's CLI: its logs only. Threads are kept on Amp's servers; never ~/.config/amp (settings) nor
+        // ~/.local/share/amp/secrets.json (the login). The rest of ~/.cache/amp stays too.
+        cache("amp-cache", "Amp", ["~/.cache/amp/logs"], processes: ["amp"], openFiles: true),
+        // Qwen Code (a Gemini CLI fork): debug logs and saved tool output; chats per project are the sessions item.
+        // Never oauth_creds.json, mcp-oauth-tokens.json, google_accounts*, settings.json, installation_id, memory.md,
+        // commands, skills, workflows, plans, todos, arena, nor tmp/*/logs.json (the prompt history).
+        cache("qwen-cache", "Qwen Code", ["~/.qwen/debug", "~/.qwen/tmp/*/tool-results"], processes: ["qwen"],
+              openFiles: true),
+        sessions("qwen-sessions", "Qwen Code", ["~/.qwen/projects/*/chats"], processes: ["qwen"]),
+        // Kiro (a VS Code fork) and its CLI: editor caches, the CLI's cache, and agent sessions (`sess_*` per
+        // workspace). Never the rest of ~/.kiro (settings, steering, specs, mcp.json, extensions) nor kiro-cli's
+        // data.sqlite3 (login and chat history).
+        app("kiro", "Kiro", bundle: [kiroBundle], vscode("Kiro") + ["~/Library/Caches/dev.kiro.desktop"]),
+        cache("kiro-cli-cache", "Kiro CLI", ["~/Library/Caches/dev.kiro.cli"], processes: kiroCLI),
+        sessions("kiro-sessions", "Kiro", ["~/.kiro/sessions/*"], apps: [kiroBundle], processes: kiroCLI),
+        // Trae and Trae CN (VS Code forks): editor caches and downloaded updates. Chats are in its state database and
+        // stay; so do ~/.trae and ~/.trae-cn (extensions, settings).
+        app("trae", "Trae", bundle: ["com.trae.app", "cn.trae.app"], vscode("Trae") + vscode("Trae CN") + [
+            "~/Library/Caches/com.trae.app", "~/Library/Caches/cn.trae.app",
+            "~/Library/Caches/com.trae.ShipIt", "~/Library/Caches/cn.trae.ShipIt",
+        ]),
         // Orca: Electron caches, crash reports and logs only; never its accounts, keys, profiles, terminal history,
         // session index (ai-vault) nor the terminal host it unpacks (daemon-host). Skipped while Orca, a helper or
         // its terminal host (which keeps terminals alive after Orca quits, and writes the daemon log) runs.
@@ -156,6 +180,33 @@ extension CleanerGroup {
                     paths: AIModelCaches.paths, selectedByDefault: false, shellFolders: AIModelCaches.shellFolders,
                     showsWhenEmpty: false, skipsOpenFiles: true, entryLabel: AIModelCaches.label(of:),
                     selectableEntries: true, allowsEntry: AIModelCaches.allows),
+        // llama.cpp: downloads interrupted in its own cache (`LLAMA_CACHE`; newer builds download into the Hugging Face
+        // cache instead). Never a finished .gguf, its .etag (without it the model is downloaded again) nor
+        // ~/.config/llama.cpp. Its own item also keeps the models out of "User caches" (`ownedCachePaths`).
+        CleanerItem(id: "llamacpp-partial", title: "\("llama.cpp"): incomplete downloads",
+                    note: "Left by an interrupted model download; downloading the model again starts over",
+                    paths: ["~/Library/Caches/llama.cpp"], included: ["*.downloadInProgress"], selectedByDefault: false,
+                    showsWhenEmpty: false, runningProcessNames: ["llama-server", "llama-cli", "llama-run", "llama-mtmd-cli"]),
+        // Jan: logs, the npx and uvx caches of its MCP servers, and old chat threads (one folder each, plain files).
+        // Never models, llamacpp, mlx, extensions, assistants, settings.json nor mcp_config.json.
+        app("jan", "Jan", bundle: [janBundle], [jan + "/logs", jan + "/.npx", jan + "/.uvx", "~/Library/Caches/jan.ai.app"]),
+        sessions("jan-sessions", "Jan", [jan + "/threads"], apps: [janBundle]),
+        // GPT4All: its two log files, and saved chats (`gpt4all-*.chat`) as old sessions. Never models (.gguf), the
+        // LocalDocs index (localdocs_v*.db), unfinished model downloads nor ~/.config/nomic.ai/GPT4All.ini (settings).
+        CleanerItem(id: "gpt4all-cache", title: "\("GPT4All"): cache & logs",
+                    note: "Recreated as needed; sign-ins, settings and memory are kept", paths: [gpt4all],
+                    included: ["log.txt", "log-prev.txt"], showsWhenEmpty: false, runningAppBundleIDs: ["gpt4all"],
+                    runningProcessNames: ["gpt4all"]),
+        sessions("gpt4all-sessions", "GPT4All", [gpt4all], included: ["gpt4all-*.chat"], apps: ["gpt4all"],
+                 processes: ["gpt4all"]),
+        // ComfyUI Desktop: Electron caches, and the `temp` folder of its ComfyUI install (`basePath` in config.json),
+        // which ComfyUI empties itself at each start. Never config.json, models, input, output, user, custom_nodes
+        // nor .venv. Its logs (~/Library/Logs/ComfyUI) are left to "Old logs".
+        {
+            var item = running(app("comfyui", "ComfyUI", bundle: [], electron(comfyUI)), processes: ["ComfyUI"])
+            item.configFolders = ConfigFolders(read: comfyUIInstalls(home:), subpaths: ["temp"])
+            return item
+        }(),
     ])
     }
 
@@ -238,6 +289,14 @@ extension CleanerGroup {
             chromium("~/Library/Application Support/Microsoft/Teams") + ["~/Library/Caches/com.microsoft.teams"]),
         app("zoom", "Zoom", bundle: ["us.zoom.xos"], ["~/Library/Caches/us.zoom.xos"]),
         app("spotify", "Spotify", bundle: ["com.spotify.client"], ["~/Library/Caches/com.spotify.client"]),
+        // Terminals and launchers: caches only. Never Warp's database (its group container), ~/.warp, Ghostty's config
+        // or ssh_cache, nor Raycast's Application Support (encrypted databases, extensions).
+        app("warp", "Warp", bundle: ["dev.warp.Warp-Stable", "dev.warp.Warp-Preview"],
+            ["~/Library/Caches/dev.warp.Warp-Stable", "~/Library/Caches/dev.warp.Warp-Preview"]),
+        running(app("ghostty", "Ghostty", bundle: ["com.mitchellh.ghostty"], [
+            "~/Library/Caches/com.mitchellh.ghostty", "~/.cache/ghostty/sentry", "~/.local/state/ghostty/crash",
+        ]), processes: ["ghostty"]),
+        app("raycast", "Raycast", bundle: ["com.raycast.macos"], ["~/Library/Caches/com.raycast.macos"]),
         // Telegram Desktop (not the App Store build): tdata also holds the login, so only its cache folders.
         app("telegram", "Telegram", bundle: ["com.tdesktop.Telegram"], [
             "~/Library/Application Support/Telegram Desktop/tdata/user_data*/cache",
@@ -332,6 +391,21 @@ extension CleanerGroup {
     }
 
     nonisolated private static let orca = "~/Library/Application Support/orca"
+    nonisolated private static let jan = "~/Library/Application Support/Jan/data"
+    nonisolated private static let janBundle = "jan.ai.app"
+    nonisolated private static let gpt4all = "~/Library/Application Support/nomic.ai/GPT4All"
+    nonisolated private static let comfyUI = "~/Library/Application Support/ComfyUI"
+    nonisolated private static let kiroBundle = "dev.kiro.desktop"
+    nonisolated private static let kiroCLI = ["kiro-cli", "kiro-cli-chat"]
+
+    /// The ComfyUI install ComfyUI Desktop uses (`basePath` in its config.json); checked like a shell folder.
+    nonisolated static func comfyUIInstalls(home: URL) -> [String] {
+        let config = home.appending(path: "Library/Application Support/ComfyUI/config.json")
+        guard let data = try? Data(contentsOf: config),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let base = json["basePath"] as? String, !base.isEmpty else { return [] }
+        return [base]
+    }
     nonisolated private static let zcode = "~/Library/Application Support/ZCode/session"
     nonisolated private static let cursorBundle = "com.todesktop.230313mzl4w4u92"
     nonisolated private static let windsurfBundle = "com.exafunction.windsurf"

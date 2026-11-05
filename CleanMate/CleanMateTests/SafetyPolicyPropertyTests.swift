@@ -102,7 +102,7 @@ struct SafetyPolicyPropertyTests {
         let trees = [
             ".ssh", ".gnupg", ".aws", ".kube", "Library/Keychains", "Documents", "Desktop", "Pictures", "Movies", "Music",
             "Library/Mobile Documents", "Library/CloudStorage", "Library/Mail", "Library/Messages",
-        ].map { realHome + "/" + $0 }
+        ].map { realHome + "/" + $0 } + SafetyPolicy.dotCacheSignIns.map { realHome + "/.cache/" + $0 }
         let realExcluded = excluded.map { real($0)! }
         let folderKeys = protectedFolders.map(key), treeKeys = trees.map(key), exclKeys = realExcluded.map(key)
 

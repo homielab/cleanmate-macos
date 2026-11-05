@@ -46,6 +46,9 @@ Options for `scan` and `clean`:
   one by one, except entries with a `reason` (a volume a stopped container still uses). The rows the user ticks in the
   app's Smart Scan stay in the app: `clean` does not see them, so it takes all of them. To keep some (a database), the
   user cleans them in the app instead, ticking only the ones to remove.
+- `other-dot-caches` lists each folder in `~/.cache` no other item covers as one entry (`node-gyp`, `electron`,
+  `nx`…). It is unticked; named with `--only` it deletes every entry, so show the entries first. To keep some, the
+  user ticks the others in the app instead.
 
 Options for `space`, `large`, `dupes` and `similar`:
 
