@@ -202,6 +202,15 @@ final class SmartScanModel: ObservableObject {
         item.runningBlocker(apps: runningApps, processes: runningProcesses) != nil
     }
 
+    /// `groups` with only the items in `ids` (groups left empty dropped); all of them when `ids` is nil.
+    nonisolated static func restrict(_ groups: [CleanerGroup], to ids: Set<String>?) -> [CleanerGroup] {
+        guard let ids else { return groups }
+        return groups.compactMap { group in
+            let items = group.items.filter { ids.contains($0.id) }
+            return items.isEmpty ? nil : CleanerGroup(id: group.id, title: group.title, systemImage: group.systemImage, items: items)
+        }
+    }
+
     /// The catalog without the groups turned off in Settings.
     private func enabledGroups() -> [CleanerGroup] {
         let all = catalog()
@@ -486,6 +495,8 @@ final class SmartScanModel: ObservableObject {
     struct CleanedGroup: Identifiable { let id: String; let title: LocalizedStringResource; let systemImage: String
         var freed: Int64 = 0; var trashed: Int64 = 0 }
     @Published var cleanedGroups: [CleanedGroup] = []
+    /// Items the last clean left as they were (in use, locked, failed): "Rescan Skipped Items" scans just these.
+    @Published private(set) var skippedItemIDs: Set<String> = []
 
     private var items: [CleanerItem] { activeGroups.flatMap(\.items) }
 
@@ -602,6 +613,15 @@ final class SmartScanModel: ObservableObject {
         scanTask = Task { await scan() }
     }
 
+    /// "Rescan Skipped Items" on the done screen: scans only the items the last clean left (in use, locked, failed).
+    /// The results go through the review like any scan; nothing is cleaned here.
+    func rescanSkipped() {
+        guard case .done = phase, !skippedItemIDs.isEmpty, !undoing else { return }
+        scanTask?.cancel()
+        let ids = skippedItemIDs
+        scanTask = Task { await scan(only: ids) }
+    }
+
     func cancelScan() {
         reviewRequested = false // stopped: the review of the results from before would not be what was asked for
         scanTask?.cancel()
@@ -650,13 +670,16 @@ final class SmartScanModel: ObservableObject {
 
     /// Scans every item, showing each result as soon as it is ready.
     /// When cancelled, nothing is kept: the previous phase, groups, results and selection come back.
-    func scan() async {
+    /// `only`: scan just these item ids (the rest of the catalog is left out of the results).
+    func scan(only: Set<String>? = nil) async {
         if case .cleaning = phase { return }
         if undoing { return } // files coming back from the Trash would be missed
-        let newGroups = enabledGroups()
+        let newGroups = Self.restrict(enabledGroups(), to: only)
         guard !newGroups.isEmpty else { return } // every group off in Settings: nothing to scan
         generation += 1
         let current = generation
+        AISessions.startScan()
+        IconCache.clear() // apps installed or removed since the last scan show their icon as it is now
         undoManager?.removeAllActions(withTarget: self) // the done screen and its Undo are gone
         if case .scanning = phase {} else { beforeScan = (phase, groups, scans, selected, excludedEntries, blocked) }
         groups = newGroups
@@ -795,6 +818,7 @@ final class SmartScanModel: ObservableObject {
         undoManager?.removeAllActions(withTarget: self)
         trashedItemNames = [:]
         freedByItem = [:]
+        var skipped: Set<String> = []
         let run = TrashRun.currentID // one clean, one run of records (`TrashRecords`)
         for (index, item) in todo.enumerated() {
             if stoppingClean { report.stopped = todo.count - index; break }
@@ -807,10 +831,12 @@ final class SmartScanModel: ObservableObject {
                 kept.failures[0].title = item.title
                 kept.logFailures(module: module.title, home: logHome)
                 report += kept
+                skipped.insert(item.id)
                 continue
             }
             let result = await cleanItem(item, scan, openPaths)
             report += result
+            if !result.failures.isEmpty || result.skipped + result.locked > 0 || !result.failed.isEmpty { skipped.insert(item.id) }
             freedByItem[item.id, default: 0] += result.freed
             if let index = groups.firstIndex(where: { $0.items.contains { $0.id == item.id } }) {
                 byGroup[index].freed += result.freed
@@ -829,6 +855,7 @@ final class SmartScanModel: ObservableObject {
         selected = []
         excludedEntries = [:]
         cleanedGroups = byGroup.filter { $0.freed > 0 }
+        skippedItemIDs = skipped
         freeSpaceChange = freeBefore.flatMap { before in
             freeSpace().map { FreeSpaceChange(before: before, after: $0, total: volumeSize() ?? 0) }
         }

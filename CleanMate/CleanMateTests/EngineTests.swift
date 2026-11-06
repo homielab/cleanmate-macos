@@ -2560,12 +2560,12 @@ struct AppCatalogTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let folder = AISessions.claudeFolderName(root.path)
         let session = URL(fileURLWithPath: "/x/.claude/projects/\(folder)/s.jsonl")
-        let now = Date()
+        let scan = Int.random(in: 1_000_000...Int.max - 1) // not the app's own scan count
         let path = (root.path as NSString).abbreviatingWithTildeInPath
-        #expect(AISessions.claudeLabel(of: session, now: now)?.title == path)
+        #expect(AISessions.claudeLabel(of: session, scan: scan)?.title == path)
         try FileManager.default.removeItem(at: root)
-        #expect(AISessions.claudeLabel(of: session, now: now + 1)?.title == path) // same scan: cached
-        #expect(AISessions.claudeLabel(of: session, now: now + AISessions.labelLifetime)?.title == folder) // next scan
+        #expect(AISessions.claudeLabel(of: session, scan: scan)?.title == path) // same scan: cached
+        #expect(AISessions.claudeLabel(of: session, scan: scan + 1)?.title == folder) // next scan
     }
 
     @Test func processArgumentNames() {

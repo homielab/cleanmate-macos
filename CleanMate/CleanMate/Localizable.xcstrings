@@ -175,9 +175,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld ứng dụng bạn chưa mở trong 3 tháng, lớn nhất trước."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ứng dụng bạn chưa mở trong 3 tháng, lớn nhất trước."
+                }
+              }
+            }
           }
         }
       }
@@ -203,9 +209,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld tệp trong Downloads đã lâu bạn không dùng. Xem lại trước khi chuyển vào Thùng rác."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld tệp trong Downloads đã lâu bạn không dùng. Xem lại trước khi chuyển vào Thùng rác."
+                }
+              }
+            }
           }
         }
       }
@@ -241,9 +253,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld mục"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mục"
+                }
+              }
+            }
           }
         }
       }
@@ -269,9 +287,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Không dọn được %lld mục"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Không dọn được %lld mục"
+                }
+              }
+            }
           }
         }
       }
@@ -297,9 +321,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Không chuyển được %lld mục vào Thùng rác."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Không chuyển được %lld mục vào Thùng rác."
+                }
+              }
+            }
           }
         }
       }
@@ -309,7 +339,51 @@
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld/%2$lld ảnh"
+            "value" : "%1$lld/%#@photos@"
+          },
+          "substitutions" : {
+            "photos" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg ảnh"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %#@photos@"
+          },
+          "substitutions" : {
+            "photos" : {
+              "argNum" : 2,
+              "formatSpecifier" : "lld",
+              "variations" : {
+                "plural" : {
+                  "one" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg photo"
+                    }
+                  },
+                  "other" : {
+                    "stringUnit" : {
+                      "state" : "translated",
+                      "value" : "%arg photos"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -317,9 +391,33 @@
     "%lld similar photos" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld ảnh tương tự"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ảnh tương tự"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld similar photo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld similar photos"
+                }
+              }
+            }
           }
         }
       }
@@ -1487,9 +1585,33 @@
     "%lld copies" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld bản"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bản"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld copy"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld copies"
+                }
+              }
+            }
           }
         }
       }
@@ -1515,9 +1637,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld bản cũ"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bản cũ"
+                }
+              }
+            }
           }
         }
       }
@@ -1583,9 +1711,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Phiên AI: %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Phiên AI: %lld ngày"
+                }
+              }
+            }
           }
         }
       }
@@ -1701,9 +1835,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Với tốc độ này, ổ sẽ đầy sau khoảng %lld tuần."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Với tốc độ này, ổ sẽ đầy sau khoảng %lld tuần."
+                }
+              }
+            }
           }
         }
       }
@@ -2209,9 +2349,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tệp và thư mục trong Tải về không sửa, thêm hay mở trong %lld ngày. Chuyển vào Thùng rác"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tệp và thư mục trong Tải về không sửa, thêm hay mở trong %lld ngày. Chuyển vào Thùng rác"
+                }
+              }
+            }
           }
         }
       }
@@ -2237,9 +2383,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tệp trong Tải về: %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tệp trong Tải về: %lld ngày"
+                }
+              }
+            }
           }
         }
       }
@@ -2585,9 +2737,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bộ cài trong Tải về: %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Bộ cài trong Tải về: %lld ngày"
+                }
+              }
+            }
           }
         }
       }
@@ -3315,9 +3473,33 @@
     "Over %lld days ago" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hơn %lld ngày trước"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hơn %lld ngày trước"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Over %lld day ago"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Over %lld days ago"
+                }
+              }
+            }
           }
         }
       }
@@ -3415,9 +3597,33 @@
     "Quit %@, then move it and %lld related items (%@) to the Trash?" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thoát %1$@, rồi chuyển nó và %2$lld mục liên quan (%3$@) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Thoát %1$@, rồi chuyển nó và %2$lld mục liên quan (%3$@) vào Thùng rác?"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Quit %@, then move it and %lld related item (%@) to the Trash?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Quit %@, then move it and %lld related items (%@) to the Trash?"
+                }
+              }
+            }
           }
         }
       }
@@ -3543,9 +3749,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nhật ký: %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Nhật ký: %lld ngày"
+                }
+              }
+            }
           }
         }
       }
@@ -3641,9 +3853,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %lld ảnh (%@) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %lld ảnh (%@) vào Thùng rác?"
+                }
+              }
+            }
           }
         }
       }
@@ -4231,9 +4449,33 @@
     "Remove the downloads of %lld files (%@)?" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bỏ bản tải về của %1$lld tệp (%2$@)?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Bỏ bản tải về của %1$lld tệp (%2$@)?"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Remove the downloads of %lld file (%@)?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Remove the downloads of %lld files (%@)?"
+                }
+              }
+            }
           }
         }
       }
@@ -4479,9 +4721,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ảnh chụp và bản quay màn hình không sửa hay mở trong %lld ngày. Chuyển vào Thùng rác"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ảnh chụp và bản quay màn hình không sửa hay mở trong %lld ngày. Chuyển vào Thùng rác"
+                }
+              }
+            }
           }
         }
       }
@@ -4547,9 +4795,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã chọn: %lld ảnh, %@"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã chọn: %lld ảnh, %@"
+                }
+              }
+            }
           }
         }
       }
@@ -4825,9 +5079,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ổn định trong %lld ngày qua."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ổn định trong %lld ngày qua."
+                }
+              }
+            }
           }
         }
       }
@@ -4893,9 +5153,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã dừng: %lld mục chưa được chuyển vào Thùng rác."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã dừng: %lld mục chưa được chuyển vào Thùng rác."
+                }
+              }
+            }
           }
         }
       }
@@ -5051,9 +5317,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tệp tạm: %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tệp tạm: %lld ngày"
+                }
+              }
+            }
           }
         }
       }
@@ -6122,9 +6394,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld bản ghi"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld bản ghi"
+                }
+              }
+            }
           }
         }
       }
@@ -6429,9 +6707,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thay đổi trong %lld ngày qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Thay đổi trong %lld ngày qua"
+                }
+              }
+            }
           }
         }
       }
@@ -6439,9 +6723,33 @@
     "Chat transcripts and checkpoints not modified for %lld days. Moved to the Trash" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lịch sử trò chuyện và checkpoint không thay đổi trong %lld ngày. Chuyển vào Thùng rác"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Lịch sử trò chuyện và checkpoint không thay đổi trong %lld ngày. Chuyển vào Thùng rác"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chat transcripts and checkpoints not modified for %lld day. Moved to the Trash"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chat transcripts and checkpoints not modified for %lld days. Moved to the Trash"
+                }
+              }
+            }
           }
         }
       }
@@ -6888,9 +7196,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ảnh đĩa, gói cài đặt và app nén trong Tải về cũ hơn %lld ngày. Chuyển vào Thùng rác"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ảnh đĩa, gói cài đặt và app nén trong Tải về cũ hơn %lld ngày. Chuyển vào Thùng rác"
+                }
+              }
+            }
           }
         }
       }
@@ -7626,9 +7940,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %1$@ và %2$lld mục liên quan (%3$@) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %1$@ và %2$lld mục liên quan (%3$@) vào Thùng rác?"
+                }
+              }
+            }
           }
         }
       }
@@ -7654,9 +7974,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %1$lld mục dữ liệu (%2$@) của %3$@ vào Thùng rác, giữ lại ứng dụng?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %1$lld mục dữ liệu (%2$@) của %3$@ vào Thùng rác, giữ lại ứng dụng?"
+                }
+              }
+            }
           }
         }
       }
@@ -7682,9 +8008,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %lld tệp (%@) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %lld tệp (%@) vào Thùng rác?"
+                }
+              }
+            }
           }
         }
       }
@@ -7710,9 +8042,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %1$lld mục (%2$@) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %1$lld mục (%2$@) vào Thùng rác?"
+                }
+              }
+            }
           }
         }
       }
@@ -7738,9 +8076,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %1$lld mục (ít nhất %2$@) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %1$lld mục (ít nhất %2$@) vào Thùng rác?"
+                }
+              }
+            }
           }
         }
       }
@@ -7766,9 +8110,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Chuyển %lld mục (chưa đo) vào Thùng rác?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Chuyển %lld mục (chưa đo) vào Thùng rác?"
+                }
+              }
+            }
           }
         }
       }
@@ -7994,9 +8344,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Không thay đổi trong %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Không thay đổi trong %lld ngày"
+                }
+              }
+            }
           }
         }
       }
@@ -8312,9 +8668,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tệp đính kèm đã mở, không thay đổi trong %lld ngày. Chuyển vào Thùng rác"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tệp đính kèm đã mở, không thay đổi trong %lld ngày. Chuyển vào Thùng rác"
+                }
+              }
+            }
           }
         }
       }
@@ -8332,9 +8694,33 @@
     "Over %lld months ago" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hơn %lld tháng trước"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hơn %lld tháng trước"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Over %lld month ago"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Over %lld months ago"
+                }
+              }
+            }
           }
         }
       }
@@ -8840,9 +9226,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã chọn: %lld tệp, %@"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã chọn: %lld tệp, %@"
+                }
+              }
+            }
           }
         }
       }
@@ -8868,9 +9260,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã chọn: %1$lld mục, %2$@"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã chọn: %1$lld mục, %2$@"
+                }
+              }
+            }
           }
         }
       }
@@ -9981,9 +10379,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld app không có ngày mở đang bị ẩn"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld app không có ngày mở đang bị ẩn"
+                }
+              }
+            }
           }
         }
       }
@@ -10169,9 +10573,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld snapshot"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld snapshot"
+                }
+              }
+            }
           }
         }
       }
@@ -10619,9 +11029,33 @@
     "Delete all %lld local snapshots?" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xoá cả %lld snapshot cục bộ?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Xoá cả %lld snapshot cục bộ?"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete all %lld local snapshot?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Delete all %lld local snapshots?"
+                }
+              }
+            }
           }
         }
       }
@@ -10809,9 +11243,33 @@
     "Show the %lld Ticked Apps" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xem %lld ứng dụng đã chọn"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Xem %lld ứng dụng đã chọn"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show the %lld Ticked App"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show the %lld Ticked Apps"
+                }
+              }
+            }
           }
         }
       }
@@ -10819,9 +11277,33 @@
     "%lld Apps Ticked" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã chọn %lld ứng dụng"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã chọn %lld ứng dụng"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld App Ticked"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Apps Ticked"
+                }
+              }
+            }
           }
         }
       }
@@ -10887,9 +11369,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã chọn: %1$lld ứng dụng, %2$@"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã chọn: %1$lld ứng dụng, %2$@"
+                }
+              }
+            }
           }
         }
       }
@@ -10915,9 +11403,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gỡ %lld ứng dụng…"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gỡ %lld ứng dụng…"
+                }
+              }
+            }
           }
         }
       }
@@ -10943,9 +11437,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Gỡ %1$lld ứng dụng (%2$@)?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Gỡ %1$lld ứng dụng (%2$@)?"
+                }
+              }
+            }
           }
         }
       }
@@ -10991,9 +11491,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ứng dụng và %lld mục dữ liệu"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ứng dụng và %lld mục dữ liệu"
+                }
+              }
+            }
           }
         }
       }
@@ -11711,9 +12217,33 @@
     "Anything changed in the last %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mọi thứ thay đổi trong %lld ngày qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mọi thứ thay đổi trong %lld ngày qua"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything changed in the last %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything changed in the last %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -11731,9 +12261,33 @@
     "Anything changed in the last %lld hours" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mọi thứ thay đổi trong %lld giờ qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mọi thứ thay đổi trong %lld giờ qua"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything changed in the last %lld hour"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything changed in the last %lld hours"
+                }
+              }
+            }
           }
         }
       }
@@ -11741,9 +12295,33 @@
     "A project a build or package tool is running in, and a project worked on in the last %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dự án mà công cụ build hoặc trình quản lý gói đang chạy trong đó, và dự án có thao tác trong %lld ngày qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dự án mà công cụ build hoặc trình quản lý gói đang chạy trong đó, và dự án có thao tác trong %lld ngày qua"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A project a build or package tool is running in, and a project worked on in the last %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A project a build or package tool is running in, and a project worked on in the last %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -11751,9 +12329,33 @@
     "A project Terraform or OpenTofu is running in, and a project worked on in the last %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dự án mà Terraform hoặc OpenTofu đang chạy trong đó, và dự án có thao tác trong %lld ngày qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Dự án mà Terraform hoặc OpenTofu đang chạy trong đó, và dự án có thao tác trong %lld ngày qua"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A project Terraform or OpenTofu is running in, and a project worked on in the last %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "A project Terraform or OpenTofu is running in, and a project worked on in the last %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -11791,9 +12393,33 @@
     "Anything that is not an unfinished download, and one touched in the last %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mọi thứ không phải bản tải dang dở, và bản tải có thao tác trong %lld ngày qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mọi thứ không phải bản tải dang dở, và bản tải có thao tác trong %lld ngày qua"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything that is not an unfinished download, and one touched in the last %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything that is not an unfinished download, and one touched in the last %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -11801,9 +12427,33 @@
     "Files that are not screenshots, hidden files, and any touched in the last %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tệp không phải ảnh chụp màn hình, tệp ẩn, và tệp có thao tác trong %lld ngày qua"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Tệp không phải ảnh chụp màn hình, tệp ẩn, và tệp có thao tác trong %lld ngày qua"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Files that are not screenshots, hidden files, and any touched in the last %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Files that are not screenshots, hidden files, and any touched in the last %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -11851,9 +12501,33 @@
     "Anything touched in the last %lld days, hidden files, downloads in progress, installers and the screenshots folder" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mọi thứ có thao tác trong %lld ngày qua, tệp ẩn, bản tải đang dở, bộ cài và thư mục ảnh chụp màn hình"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mọi thứ có thao tác trong %lld ngày qua, tệp ẩn, bản tải đang dở, bộ cài và thư mục ảnh chụp màn hình"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything touched in the last %lld day, hidden files, downloads in progress, installers and the screenshots folder"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Anything touched in the last %lld days, hidden files, downloads in progress, installers and the screenshots folder"
+                }
+              }
+            }
           }
         }
       }
@@ -12089,9 +12763,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Thoát %1$@, rồi chuyển %2$lld mục dữ liệu (%3$@) vào Thùng rác, giữ lại ứng dụng?"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Thoát %1$@, rồi chuyển %2$lld mục dữ liệu (%3$@) vào Thùng rác, giữ lại ứng dụng?"
+                }
+              }
+            }
           }
         }
       }
@@ -12227,9 +12907,15 @@
           }
         },
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã dừng: %lld mục chưa dọn."
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Đã dừng: %lld mục chưa dọn."
+                }
+              }
+            }
           }
         }
       }
@@ -12597,9 +13283,33 @@
     "Container VMs not run for %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Máy ảo container không chạy %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Máy ảo container không chạy %lld ngày"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Container VMs not run for %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Container VMs not run for %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -12797,9 +13507,33 @@
     "AI models not used for %lld days" : {
       "localizations" : {
         "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mô hình AI không dùng %lld ngày"
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Mô hình AI không dùng %lld ngày"
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "AI models not used for %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "AI models not used for %lld days"
+                }
+              }
+            }
           }
         }
       }
@@ -12810,6 +13544,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mô hình do llama.cpp, Jan, GPT4All, Draw Things hoặc ComfyUI tải về. Chúng vào Thùng rác và tải lại được."
+          }
+        }
+      }
+    },
+    "Show %lld More" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show %lld More"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show %lld More"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hiện thêm %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Show All" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tất cả"
+          }
+        }
+      }
+    },
+    "Rescan Skipped Items" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quét lại mục bị bỏ qua"
+          }
+        }
+      }
+    },
+    "Scan only the items this clean left as they were, to review and clean them again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ quét các mục lần dọn này để nguyên, để xem lại và dọn lại."
           }
         }
       }

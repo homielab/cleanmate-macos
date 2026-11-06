@@ -8,10 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan** lists items with thousands of entries quickly with **Show More**, and after a clean **Rescan Skipped Items** scans again only what was left because it was in use.
 - **Smart Scan › Developer Junk** shows what else hides in `~/.cache`, one folder per row, nothing ticked, plus RubyGems, Bundler, Carthage and Hugging Face download caches.
 - **Smart Scan** cleans caches and old chats of Amp, Qwen Code, Kiro, Trae, Jan, GPT4All, llama.cpp and ComfyUI, and caches of Warp, Ghostty and Raycast. Models and sign-ins stay put.
 - **Smart Scan › AI Tools** lists each model you downloaded in llama.cpp, Jan, GPT4All, Draw Things and ComfyUI, with when you last used it. Nothing is ticked, and **Undo** brings a model back.
 - **Overview** suggests AI models you haven't touched in over 90 days.
+
+### Fixed
+- Counts read correctly in English and Vietnamese ("1 file", "1 copy"), and an app installed again shows its new icon without reopening CleanMate.
 
 ## [1.8] - 2026-11-06
 

@@ -103,6 +103,11 @@ struct SmartScanView: View {
             case .done(let report):
                 DoneScreen(model: model, module: module, report: report) {
                     scanButton("Scan Again").disabled(model.undoing)
+                    if !model.skippedItemIDs.isEmpty {
+                        Button("Rescan Skipped Items") { model.rescanSkipped() }
+                            .disabled(model.undoing || allGroupsOff)
+                            .help("Scan only the items this clean left as they were, to review and clean them again.")
+                    }
                     if model.cleanedGroups.contains(where: { $0.trashed > 0 }) { OpenTrashButton() }
                     if report.undo == nil && !report.trashed.isEmpty {
                         Button("Undo") { Task { await model.undoTrash() } }
@@ -444,8 +449,17 @@ struct CleanerItemRow: View {
     /// A search found the item by these entries only: just they are listed, unfolded. nil lists every entry.
     var entryFilter: Set<URL>? = nil
 
-    // shortcut: only the largest entries are listed (the rest get one summary row), so huge folders don't slow the List; add paging if users need all.
-    private let shownLimit = 200
+    /// Entries listed at first and added by each "Show More": a folder with thousands of entries doesn't slow the List.
+    /// Hidden entries still count everywhere else: the item's checkbox, ⌘A and the "Selected" total.
+    static let pageSize = 200
+    @State private var shownCount = CleanerItemRow.pageSize
+
+    /// The first `count` entries (the largest: the scan sorts them), and the size of the rest.
+    nonisolated static func page(_ entries: [ScanEntry], count: Int) -> (shown: ArraySlice<ScanEntry>, hidden: Int, hiddenSize: Int64) {
+        let shown = entries.prefix(max(count, 0))
+        let rest = entries.dropFirst(shown.count)
+        return (shown, rest.count, rest.reduce(0) { $0 + $1.size })
+    }
 
     /// The size column's text; nil while the item is still scanning.
     /// `selectedSize`: some entries left out, shown as "selected of total", like the "Selected" total.
@@ -506,9 +520,8 @@ struct CleanerItemRow: View {
         let all = scan?.entries ?? []
         let entries = entryFilter.map { found in all.filter { found.contains($0.url) } } ?? all
         DisclosureGroup(isExpanded: $isExpanded) {
-            // Selectable items list every entry: none is cleaned without being seen.
-            let shown = entryOn == nil ? Array(entries.prefix(shownLimit)) : entries
-            ForEach(shown) { entry in
+            let page = Self.page(entries, count: shownCount)
+            ForEach(page.shown) { entry in
                 let on = entryOn?(entry.url)
                 let shared = Self.sharedText(entry: entry, in: all, label: item.entryLabel, locale: locale)
                 let entryLocked = isLocked || entry.lockReason != nil
@@ -575,10 +588,15 @@ struct CleanerItemRow: View {
                     }
                 }
             }
-            if entries.count > shown.count {
-                let rest = entries.dropFirst(shown.count)
-                Text("and \(rest.count) more (\(rest.reduce(0) { $0 + $1.size }, format: .fileSize))")
-                    .foregroundStyle(.secondary)
+            if page.hidden > 0 {
+                HStack {
+                    Text("and \(page.hidden) more (\(page.hiddenSize, format: .fileSize))")
+                        .foregroundStyle(.secondary)
+                    Button("Show \(min(page.hidden, Self.pageSize)) More") { shownCount += Self.pageSize }
+                    Button("Show All") { shownCount = entries.count }
+                }
+                .buttonStyle(.link)
+                .padding(.leading, 42)
             }
         } label: {
             let ticked = isOn && !isLocked

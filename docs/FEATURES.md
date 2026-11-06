@@ -67,6 +67,8 @@ System junk, developer junk, AI tool data and app caches in one scan (⌘2). Eac
 
 - System junk, developer junk, AI tool data and app caches in one scan.
 - Items (simulator data too) are measured in parallel, so a scan finishes sooner.
+- An item with many entries lists the largest 200 first; **Show 200 More** and **Show All** list the rest. Hidden entries still count: the item's checkbox, ⌘A and the Selected total include them, and ⌘F searches every entry.
+- When a clean leaves items as they were (app open, tool running, locked or failed files), the done screen has **Rescan Skipped Items**: it scans only those items, and their results go through Review Before Cleaning again.
 - Without Full Disk Access a bar above the screen says Desktop, Documents, Downloads and other protected folders are not scanned, with **Open Settings…**.
 
 Each row in Smart Scan, Privacy and Review Before Cleaning has an ⓘ button (**Why is this safe?**, reached with Tab and opened with Space or a click). Its popover says what the item is, where it is (the folders scanned), what cleaning does (deleted and made again by the app or tool, moved to the Trash, erased for good, or the tool's own clean command; whether it is ticked by default) and when it is skipped (app open, tool running, files in use, recent changes, folders always kept, Exclusions), with **Open Exclusions…**. Everything but the first part is read from the item's own rules in the catalog (`CleanMate/Engine/*Catalog.swift` and the item files next to them, through `ItemExplanation`), so it always matches what the scan and the clean do; the catalog is the source of truth, and this page describes it.

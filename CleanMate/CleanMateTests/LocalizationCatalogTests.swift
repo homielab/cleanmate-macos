@@ -39,4 +39,27 @@ struct LocalizationCatalogTests {
         }
         #expect(missing.isEmpty, "Thiếu bản vi (\(missing.count)):\n\(missing.sorted().joined(separator: "\n"))")
     }
+
+    /// A count followed by a noun ("%lld files", "%lld of %lld photos") reads "1 file" / "2 files" in English and has
+    /// a plural variation in Vietnamese too, so a new language only fills in the cases.
+    @Test func everyCountedNounHasPluralVariations() throws {
+        let data = try Data(contentsOf: Self.catalogURL)
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let strings = try #require(root["strings"] as? [String: [String: Any]])
+        // "%lld of", "%lld in use", "%lld ticked", "%lld more" are not a counted noun.
+        let counted = try Regex(#"%lld (?!(?:of|in|ticked|more)\b)[A-Za-z]"#)
+        func plural(_ node: [String: Any]?) -> Bool {
+            guard let node else { return false }
+            if let variations = node["variations"] as? [String: Any] { return variations["plural"] != nil }
+            return node["substitutions"] != nil
+        }
+        var missing: [String] = []
+        for (key, entry) in strings where key.contains(counted) {
+            let localizations = entry["localizations"] as? [String: [String: Any]]
+            for language in ["en", "vi"] where !plural(localizations?[language]) { missing.append("\(key): \(language)") }
+        }
+        #expect(missing.isEmpty, "Missing plural (\(missing.count)):\n\(missing.sorted().joined(separator: "\n"))")
+        let files = try #require(strings["Move %lld files (%@) to the Trash?"]?["localizations"] as? [String: Any])
+        #expect(String(describing: files).contains("Move %lld file (%@) to the Trash?"))
+    }
 }

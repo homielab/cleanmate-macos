@@ -36,45 +36,46 @@ nonisolated enum AISessions {
         return walk("/", Substring(encoded))
     }
 
-    /// Folder name → (label, when resolved). An entry older than `labelLifetime` is resolved again, so a project
-    /// moved or deleted between scans gets a fresh label while one scan still does one lookup per project.
-    /// shortcut: a time window stands in for "this scan" (the label closure has no scan id); 30 s is far longer
-    /// than labelling one scan's entries.
-    private static let resolved = OSAllocatedUnfairLock(initialState: [String: (title: String, at: Date)]())
-    static let labelLifetime: TimeInterval = 30
+    /// Folder name → (label, the scan that resolved it). A later scan resolves it again, so a project moved or
+    /// deleted between scans gets a fresh label while one scan still does one lookup per project.
+    private static let resolved = OSAllocatedUnfairLock(initialState: [String: (title: String, scan: Int)]())
+    private static let currentScan = OSAllocatedUnfairLock(initialState: 0)
+
+    /// Called when a scan starts: labels resolved by earlier scans are looked up again.
+    static func startScan() { currentScan.withLock { $0 += 1 } }
 
     /// Entries in `~/.claude/projects/<folder>/`: the project path with ~ (the folder name when the project
     /// no longer exists) and the entry's last change. nil for entries of the other Claude Code folders.
-    static func claudeLabel(of url: URL) -> (title: String, date: Date?)? { claudeLabel(of: url, now: Date()) }
+    static func claudeLabel(of url: URL) -> (title: String, date: Date?)? { claudeLabel(of: url, scan: currentScan.withLock { $0 }) }
 
-    static func claudeLabel(of url: URL, now: Date) -> (title: String, date: Date?)? {
+    static func claudeLabel(of url: URL, scan: Int) -> (title: String, date: Date?)? {
         let folder = url.deletingLastPathComponent()
         guard folder.deletingLastPathComponent().lastPathComponent == "projects",
               folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == ".claude"
         else { return nil }
-        return projectLabel(encoded: folder.lastPathComponent, shown: folder.lastPathComponent, of: url, now: now)
+        return projectLabel(encoded: folder.lastPathComponent, shown: folder.lastPathComponent, of: url, scan: scan)
     }
 
     /// Entries in `~/.cursor/projects/<folder>/{agent-transcripts,agent-tools}/`: like Claude Code's, Cursor names
     /// `<folder>` after the project path, but without the leading "-" (`/Users/me/my_app` → `Users-me-my-app`).
-    static func cursorLabel(of url: URL) -> (title: String, date: Date?)? { cursorLabel(of: url, now: Date()) }
+    static func cursorLabel(of url: URL) -> (title: String, date: Date?)? { cursorLabel(of: url, scan: currentScan.withLock { $0 }) }
 
-    static func cursorLabel(of url: URL, now: Date) -> (title: String, date: Date?)? {
+    static func cursorLabel(of url: URL, scan: Int) -> (title: String, date: Date?)? {
         let project = url.deletingLastPathComponent().deletingLastPathComponent()
         guard project.deletingLastPathComponent().lastPathComponent == "projects",
               project.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == ".cursor"
         else { return nil }
-        return projectLabel(encoded: "-" + project.lastPathComponent, shown: project.lastPathComponent, of: url, now: now)
+        return projectLabel(encoded: "-" + project.lastPathComponent, shown: project.lastPathComponent, of: url, scan: scan)
     }
 
     /// The project path of `encoded` with ~ (`shown` when the project no longer exists) and the entry's last change.
-    private static func projectLabel(encoded: String, shown: String, of url: URL, now: Date) -> (title: String, date: Date?) {
+    private static func projectLabel(encoded: String, shown: String, of url: URL, scan: Int) -> (title: String, date: Date?) {
         // One lookup per project, not per session file.
-        let title = resolved.withLock { $0[encoded].flatMap { now.timeIntervalSince($0.at) < labelLifetime ? $0.title : nil } } ?? {
+        let title = resolved.withLock { $0[encoded].flatMap { $0.scan == scan ? $0.title : nil } } ?? {
             let found = claudeProjectPath(encoded: encoded) { path in
                 (try? FileManager.default.contentsOfDirectory(atPath: path)) ?? []
             }.map { ($0 as NSString).abbreviatingWithTildeInPath } ?? shown
-            resolved.withLock { $0[encoded] = (found, now) }
+            resolved.withLock { $0[encoded] = (found, scan) }
             return found
         }()
         return (title, (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate)

@@ -308,16 +308,45 @@ extension View {
     }
 }
 
-/// Icons looked up once per key (file extension, bundle id) for the app's lifetime, not on every redraw of a long list.
-// shortcut: never evicted, so an app installed/removed later keeps its old answer until relaunch.
+/// Icons looked up once per key (file extension, bundle id), not on every redraw of a long list.
+/// Dropped when a scan starts and when an app launches or quits or a disk mounts, so an app installed again
+/// shows its new icon; an icon of a file is also keyed by its modification date.
 @MainActor enum IconCache {
     private static var images: [String: NSImage?] = [:]
+    private static var observing = false
 
     static func image(_ key: String, _ make: () -> NSImage?) -> NSImage? {
+        observeWorkspace()
         if let cached = images[key] { return cached }
         let image = make()
         images[key] = image
         return image
+    }
+
+    /// The icon of `file` (an app bundle, a folder): a file replaced since (an app installed again) is looked up anew.
+    static func image(_ key: String, file: URL, _ make: () -> NSImage?) -> NSImage? {
+        var file = file
+        file.removeAllCachedResourceValues() // a URL kept from before would answer the old date
+        let date = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        return image("\(key)@\(date?.timeIntervalSinceReferenceDate ?? 0)", make)
+    }
+
+    static func clear() {
+        images = [:]
+    }
+
+    static var count: Int { images.count }
+
+    private static func observeWorkspace() {
+        guard !observing else { return }
+        observing = true
+        let center = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification,
+                     NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification] {
+            center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { clear() }
+            }
+        }
     }
 }
 
