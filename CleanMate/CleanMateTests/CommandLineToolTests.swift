@@ -229,7 +229,7 @@ struct CommandLineToolTests {
         let fixture = try Fixture()
         var sources = fixture.sources()
         sources.scanItem = { item, policy, openPaths in
-            if item.id == "cli-upto" { try? await Task.sleep(for: .milliseconds(300)) }
+            if item.id == "cli-upto" { try? await Task.sleep(for: .milliseconds(300)) } // kept: the duration under test
             return await Scanner.scan(item, policy: policy, openPaths: openPaths)
         }
         let report = try await Self.scanReport([], sources)

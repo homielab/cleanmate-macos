@@ -16,14 +16,6 @@ struct MeasureFailureTests {
         try Data(repeating: 1, count: bytes).write(to: url)
     }
 
-    /// Runs until cancelled (at most a minute), checking for cancellation like `SpaceLens.measure`.
-    @Sendable static func untilCancelled() async throws {
-        for _ in 0..<60_000 {
-            try Task.checkCancellation()
-            try? await Task.sleep(for: .milliseconds(1))
-        }
-    }
-
     @Test func failuresAreClassifiedFromTheErrorAndTheFolder() throws {
         defer { try? FileManager.default.removeItem(at: root) }
         try file("open/x.bin")
@@ -97,7 +89,7 @@ struct MeasureFailureTests {
         try file("Slow/x.bin")
         let slow = Locked(true)
         let model = overview { url in
-            if url.lastPathComponent == "Slow", slow.withLock({ $0 }) { try await Self.untilCancelled() }
+            if url.lastPathComponent == "Slow", slow.withLock({ $0 }) { try await untilCancelled() }
             return url.lastPathComponent == "Slow" ? 7_000 : 3_000
         }
         model.startIfNeeded()
@@ -122,7 +114,7 @@ struct MeasureFailureTests {
         let entered = SignalCount()
         let model = overview { _ in
             entered.add()
-            try await Self.untilCancelled()
+            try await untilCancelled()
             return 1
         }
         model.startIfNeeded()
@@ -145,7 +137,7 @@ struct MeasureFailureTests {
         model.hasFullDiskAccess = { true }
         model.measure = { url, _, _ in
             calls.withLock { $0.append(url.lastPathComponent) }
-            if url.lastPathComponent == "Slow", slow.withLock({ $0 }) { try await Self.untilCancelled() }
+            if url.lastPathComponent == "Slow", slow.withLock({ $0 }) { try await untilCancelled() }
             return (url.lastPathComponent == "Slow" ? 7_000 : 3_000, [:])
         }
         model.start(at: home.appending(path: "A"))

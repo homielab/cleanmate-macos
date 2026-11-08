@@ -229,7 +229,7 @@ final class OldDownloadsTests {
             guard case .done(let report) = model.phase else { return false }
             return report.undo != nil && !model.undoing
         }
-        for _ in 0..<5000 where !restored() { try? await Task.sleep(for: .milliseconds(2)) } // the Task ⌘Z starts
+        try await eventually("⌘Z puts the files back", timeout: .seconds(60)) { restored() } // the Task ⌘Z starts
         guard case .done(let after) = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(after.undo == TrashUndo.Result(restored: expected.count, skipped: 0))
         #expect(try Set(fm.contentsOfDirectory(atPath: downloads.path)) == before)

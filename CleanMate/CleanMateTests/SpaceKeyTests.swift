@@ -30,11 +30,14 @@ struct SpaceKeyTests {
         window.contentView = host
         defer { window.close() }
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(300))
 
         func byX<T: NSView>(_ views: [T]) -> [T] { views.sorted { $0.convert($0.bounds, to: nil).minX < $1.convert($1.bounds, to: nil).minX } }
-        let monitors = byX(all(ListKeyMonitorView.self, in: host))
-        let tables = byX(all(NSTableView.self, in: host))
+        var monitors: [ListKeyMonitorView] = [], tables: [NSTableView] = []
+        try await eventually("the two lists and their key monitors are attached", timeout: .seconds(30)) {
+            monitors = byX(all(ListKeyMonitorView.self, in: host))
+            tables = byX(all(NSTableView.self, in: host))
+            return monitors.count == 2 && tables.count == 2
+        }
         try #require(monitors.count == 2 && tables.count == 2)
 
         #expect(!monitors[0].handles(try space(window))) // nothing focused
@@ -63,9 +66,12 @@ struct SpaceKeyTests {
         window.contentView = host
         defer { window.close() }
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(300))
+        var monitors: [ListKeyMonitorView] = []
+        try await eventually("the list key monitors are attached", timeout: .seconds(30)) {
+            monitors = all(ListKeyMonitorView.self, in: host)
+            return monitors.first { $0.keys == .selectAll } != nil && monitors.first { $0.keys == .find } != nil
+        }
 
-        let monitors = all(ListKeyMonitorView.self, in: host)
         let selectAll = try #require(monitors.first { $0.keys == .selectAll })
         let find = try #require(monitors.first { $0.keys == .find })
         let table = try #require(all(NSTableView.self, in: host).first)

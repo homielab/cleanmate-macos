@@ -26,6 +26,28 @@ struct WaitTimedOut: Error {}
     }
 }
 
+/// The same wait for a condition that itself awaits (a cache file read, a process poll): checked now, then
+/// every `interval`, with the same timeout and issue as the synchronous `eventually`.
+nonisolated func eventually(_ what: String, timeout: Duration = .seconds(5), every interval: Duration = .milliseconds(20),
+                            sourceLocation: SourceLocation = #_sourceLocation,
+                            _ condition: () async -> Bool) async throws {
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while !(await condition()) {
+        guard ContinuousClock.now < deadline else {
+            Issue.record("Still waiting after \(timeout): \(what)", sourceLocation: sourceLocation)
+            throw WaitTimedOut()
+        }
+        try await Task.sleep(for: interval)
+    }
+}
+
+/// Suspends until the current task is cancelled and throws `CancellationError`: a fake scan or walk that runs until
+/// the code under test stops it. `Task.sleep` ends the moment its task is cancelled; after `limit` it returns, so a stop
+/// that never comes fails the test's checks instead of hanging the run.
+nonisolated func untilCancelled(limit: Duration = .seconds(60)) async throws {
+    try await Task.sleep(for: limit)
+}
+
 /// Waits `interval` on the main queue's own timer. `Task.sleep` wakes on the shared thread pool before it comes back
 /// to the main actor: with the whole suite running, every pool thread is busy and a 5 ms sleep took seconds.
 @MainActor private func pause(_ interval: Duration) async throws {

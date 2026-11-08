@@ -214,10 +214,7 @@ struct OverviewTests {
             entered.add()
             defer { left.add() }
             // A walk that checks for cancellation as `SpaceLens.measure` does, and would otherwise run for minutes.
-            for _ in 0..<60_000 {
-                try Task.checkCancellation()
-                try? await Task.sleep(for: .milliseconds(1))
-            }
+            try await untilCancelled()
             return (1, [:])
         }
         model.startIfNeeded()
@@ -560,7 +557,10 @@ struct OverviewTests {
 
         model.reveal(group: "g2")
         #expect(model.revealedGroup == nil && model.search.isEmpty && model.collapsedGroups.isEmpty) // after the scan
-        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(model.revealedGroup == "g2")
         #expect(model.foundByGroup(leavingOut: ["s390.live"]) == ["g1": 100, "g2": 30])
@@ -597,11 +597,16 @@ struct OverviewTests {
         let scans = Counter()
         model.scanItem = { _, _ in scans.add(); return ItemScan(measuredSize: 10) }
         let waitForReveal = {
-            for _ in 0..<3000 where model.revealedGroup == nil { try await Task.sleep(for: .milliseconds(5)) }
+            try await eventually("the revealed group shows up", timeout: .seconds(15)) {
+                model.revealedGroup != nil
+            }
         }
 
         model.startScan()
-        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         #expect(scans.value == 1)
         let first = try #require(model.resultsDate)
 

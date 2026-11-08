@@ -955,7 +955,9 @@ final class UninstallerTests {
         guard case .removed(let report) = model.outcome else { Issue.record("outcome"); return }
         #expect(Set(report.trashed.map(\.original)) == [cache, prefs] && undo.canUndo && undo.undoActionName == "Reset")
         undo.undo()
-        for _ in 0..<5000 where restored.isEmpty { try? await Task.sleep(for: .milliseconds(2)) } // ≥ 10 s: busy machines
+        try? await eventually("the undo puts the folders back", timeout: .seconds(60)) {
+            !restored.isEmpty
+        }
         #expect(Set(restored) == [cache, prefs])
     }
 

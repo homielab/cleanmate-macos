@@ -182,7 +182,9 @@ struct GeneralSettingsLayoutTests {
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
-        for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200)) }
+        try await settledLayout(host, timeout: .seconds(30)) {
+            Self.scrollView(in: host)?.documentView?.frame.height ?? 0
+        }
         let scroll = try #require(Self.scrollView(in: host))
         let content = try #require(scroll.documentView).frame.height
         let visible = scroll.contentView.bounds.height
@@ -214,7 +216,9 @@ struct GeneralSettingsLayoutTests {
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
-        for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(100)) }
+        try await settledLayout(host, timeout: .seconds(30)) {
+            Self.scrollView(in: host)?.documentView?.frame.height ?? 0
+        }
         let natural = try #require(Self.scrollView(in: host)).documentView?.frame.height ?? 0
         let capped = SettingsView.windowSize(visibleFrameHeight: 400).height
         #expect(natural > capped, "content \(natural) vs a window capped to \(capped): the tab scrolls, nothing cut")

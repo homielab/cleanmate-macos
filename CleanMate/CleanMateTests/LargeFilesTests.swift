@@ -360,7 +360,10 @@ struct LargeFilesTests {
         let roots = Roots()
         model.scanFiles = { root, _, _, _ in await roots.add(root); return [] }
         func scanned() async throws {
-            for _ in 0..<3000 { if case .results = model.phase { return }; try await Task.sleep(for: .milliseconds(10)) }
+            try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+                if case .results = model.phase { return true }
+                return false
+            }
         }
         let projects = home.appending(path: "Projects")
         #expect(!model.setScope(root)) // outside home: refused, nothing scanned
@@ -451,11 +454,14 @@ struct LargeFilesTests {
         model.hasFullDiskAccess = { true }
         model.scanFiles = { _, _, _, progress in
             progress(700)
-            try await Task.sleep(for: .milliseconds(100)) // the count reaches the model on the main actor
+            try await eventually("the count reaches the model") { await MainActor.run { model.scannedCount } == 700 }
             return []
         }
         model.scan()
-        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(10)) }
+        try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         #expect(model.lastCounts == ["\(home.path)|full": 700])
         #expect(UserDefaults.standard.dictionary(forKey: Preferences.largeFilesLastCount) as? [String: Int] == before)
     }
@@ -467,16 +473,20 @@ struct LargeFilesTests {
         model.hasFullDiskAccess = { true }
         model.scanFiles = { _, _, _, progress in
             for count in stride(from: 500, through: 500_000, by: 500) { progress(count) } // well under 100 ms
+            // Kept: the throttler measures time, so the next report has to come one interval later.
             try await Task.sleep(for: LargeFilesModel.progressInterval * 2)
             progress(500_500) // the next interval: shown again
-            try await Task.sleep(for: .milliseconds(100)) // the count reaches the model on the main actor
+            try await eventually("the count reaches the model") { await MainActor.run { model.scannedCount } == 500_500 }
             return []
         }
         var shown: [Int] = []
         let subscription = model.$scannedCount.dropFirst().sink { shown.append($0) }
         defer { subscription.cancel() }
         model.scan()
-        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(10)) }
+        try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         #expect(shown.filter { $0 > 0 } == [500, 500_500]) // `scan()` resets it to 0 first
         #expect(model.lastCounts == ["\(home.path)|full": 500_500])
     }
@@ -496,7 +506,10 @@ struct LargeFilesTests {
             return try await LargeFileScanner.scan(root: root, minSize: minSize, policy: policy, spotlightLastUsed: { _ in nil })
         }
         func scanned() async throws {
-            for _ in 0..<3000 { if case .results = model.phase { return }; try await Task.sleep(for: .milliseconds(10)) }
+            try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+                if case .results = model.phase { return true }
+                return false
+            }
         }
         #expect(model.sizeChoices == LargeFilesModel.sizeOptions)
         model.setScope(home.appending(path: "Projects"))
@@ -521,11 +534,14 @@ struct LargeFilesTests {
         model.hasFullDiskAccess = { true }
         let projects = LargeFilesModel.folder(home.appending(path: "Projects").path)
         model.scanFiles = { root, _, _, _ in
-            if root.lastPathComponent != "Projects" { try await Task.sleep(for: .seconds(60)) } // until stopped
+            if root.lastPathComponent != "Projects" { try await untilCancelled() } // until stopped
             return []
         }
         func settled() async throws {
-            for _ in 0..<3000 { if case .results = model.phase { return }; try await Task.sleep(for: .milliseconds(10)) }
+            try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+                if case .results = model.phase { return true }
+                return false
+            }
         }
         model.setScope(projects)
         try await settled()
@@ -534,7 +550,7 @@ struct LargeFilesTests {
         model.cancel()
         try await settled()
         #expect(model.scope == projects && model.scopeName == "~/Projects")
-        model.scanFiles = { _, _, _, _ in try await Task.sleep(for: .seconds(60)); return [] }
+        model.scanFiles = { _, _, _, _ in try await untilCancelled(); return [] }
         model.minSize = 1_000_000 // below the 50 MB scanned: scans again, then stopped
         guard case .scanning = model.phase else { Issue.record("phase \(model.phase)"); return }
         model.cancel()
@@ -957,10 +973,9 @@ private func hashKey(_ url: URL) -> DuplicateFinder.Key {
     #expect(model.stopped && model.groups.isEmpty)
     // The stopped task saves on its own; wait for the file to change, bounded so a regression fails instead of hanging.
     var saved: [DuplicateFinder.Key: Data] = [:]
-    for _ in 0..<1_000 {
+    try await eventually("the stopped task saves its cache", timeout: .seconds(60)) {
         saved = await DuplicateFinder.HashCache.load(from: cacheURL)
-        if saved[hashKey(a)] != nil { break }
-        try await Task.sleep(for: .milliseconds(10))
+        return saved[hashKey(a)] != nil
     }
     #expect(Set(saved.keys) == [hashKey(old), hashKey(a)])
 }

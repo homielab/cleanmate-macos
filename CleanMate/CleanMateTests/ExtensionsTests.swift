@@ -116,7 +116,7 @@ struct ExtensionsTests {
     }
 
     /// Nothing is ticked for the user; only ticked, selectable items reach the trash hook; ⌘Z undoes it.
-    @MainActor @Test func modelTrashesTickedExtensionsAndUndoes() async {
+    @MainActor @Test func modelTrashesTickedExtensionsAndUndoes() async throws {
         let model = UninstallerModel(), undo = UndoManager()
         undo.groupsByEvent = false
         model.undoManager = undo
@@ -149,7 +149,9 @@ struct ExtensionsTests {
         guard case .removed(let report) = model.outcome else { Issue.record("outcome"); return }
         #expect(report.freed == 9 && undo.canUndo)
         undo.undo()
-        for _ in 0..<5000 where restored == 0 { try? await Task.sleep(for: .milliseconds(2)) } // ≥ 10 s: busy machines
+        try await eventually("the undo puts the extension folder back", timeout: .seconds(60)) {
+            restored != 0
+        }
         #expect(restored == 1 && !undo.canUndo)
     }
 

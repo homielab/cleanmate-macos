@@ -37,7 +37,10 @@ struct MenuBarTests {
         model.scanFinished = { LastScan(date: Self.date, size: $0.selectedSize, found: $0.foundSize).save(defaults: defaults) }
         model.selectionChanged = { LastScan.recordSelection($0.selectedSize, defaults: defaults) }
         model.startScan()
-        for _ in 0..<3000 { if case .results = model.phase { break }; try await Task.sleep(for: .milliseconds(5)) }
+        try await eventually("the scan reaches its results", timeout: .seconds(60)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
 
         model.selected = ["m409.a"]

@@ -151,7 +151,7 @@ struct TrashUndoTests {
 
     /// Waits for the Task the undo handler starts.
     @MainActor func settle(_ done: () -> Bool) async {
-        for _ in 0..<5000 where !done() { try? await Task.sleep(for: .milliseconds(2)) } // ≥ 10 s: busy machines
+        try? await eventually("the Task the undo handler starts to finish", timeout: .seconds(60)) { done() }
     }
 
     @MainActor @Test func largeFilesRegistersUndoAndCmdZRestores() async {

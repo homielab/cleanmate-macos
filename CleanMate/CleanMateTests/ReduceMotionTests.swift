@@ -16,13 +16,18 @@ struct ReduceMotionTests {
         @Published var capturedGrown: Bool?
         @Published var capturedCounting: Bool?
         @Published var capturedRevealed: Bool?
+        /// How often each view reported: a new `.id` remounts it, and the test waits for the remount's report
+        /// instead of a fixed delay.
+        @Published var grownReports = 0
+        @Published var countingReports = 0
+        @Published var revealedReports = 0
     }
 
     struct GrowsInTestView: View {
         @ObservedObject var state: MotionHostState
 
         var body: some View {
-            GrowsIn(animates: true, onGrownChange: { state.capturedGrown = $0 }) { _ in
+            GrowsIn(animates: true, onGrownChange: { state.capturedGrown = $0; state.grownReports += 1 }) { _ in
                 Color.clear
             }
             .id(state.displayID)
@@ -35,7 +40,7 @@ struct ReduceMotionTests {
         let value: Int64
 
         var body: some View {
-            CountingBytes(value, countsUp: true, onCountingChange: { state.capturedCounting = $0 })
+            CountingBytes(value, countsUp: true, onCountingChange: { state.capturedCounting = $0; state.countingReports += 1 })
                 .id(state.displayID)
                 .environment(\._accessibilityReduceMotion, state.reduceMotion)
         }
@@ -48,7 +53,7 @@ struct ReduceMotionTests {
         let report: CleanReport
 
         var body: some View {
-            DoneScreen(model: model, module: module, report: report, onRevealedChange: { state.capturedRevealed = $0 }) {
+            DoneScreen(model: model, module: module, report: report, onRevealedChange: { state.capturedRevealed = $0; state.revealedReports += 1 }) {
                 EmptyView()
             }
             .id(state.displayID)
@@ -88,13 +93,13 @@ struct ReduceMotionTests {
 
         state.reduceMotion = true
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually("the view reports the grown state again") { state.grownReports > 1 }
         #expect(state.capturedGrown == true)
 
         // Subsequent display
         state.displayID = UUID()
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually("the new display reports its grown state") { state.grownReports > 1 }
         #expect(state.capturedGrown == true)
     }
 
@@ -120,13 +125,13 @@ struct ReduceMotionTests {
         // Turn on Reduce Motion while open / counting
         state.reduceMotion = true
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually("the view reports its counting state again") { state.countingReports > 1 }
         #expect(state.capturedCounting == false)
 
         // Next display: no animation
         state.displayID = UUID()
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually("the new display reports its counting state") { state.countingReports > 1 }
         #expect(state.capturedCounting == false)
     }
 
@@ -158,14 +163,14 @@ struct ReduceMotionTests {
         // Turn on Reduce Motion while open
         state.reduceMotion = true
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually("the view reports its revealed state again") { state.revealedReports > 1 }
         #expect(state.capturedRevealed == true)
 
         // Next clean / display with Reduce Motion
         model.revealsDone = true
         state.displayID = UUID()
         host.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually("the new display reports its revealed state") { state.revealedReports > 1 }
         #expect(state.capturedRevealed == true)
     }
 

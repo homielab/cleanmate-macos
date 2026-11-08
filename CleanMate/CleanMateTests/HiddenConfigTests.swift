@@ -107,7 +107,9 @@ struct HiddenConfigTests {
         model.refresh()
         #expect(model.appDataSizes.isEmpty)
         // Wait for the results, not the calls: they land after the hooks return (≥ 30 s on a busy machine).
-        for _ in 0..<3000 where apps == 0 || model.hiddenItems == nil || model.extensionItems == nil { try await Task.sleep(for: .milliseconds(10)) }
+        try await eventually("the apps, hidden and extension results", timeout: .seconds(60)) {
+            apps > 0 && model.hiddenItems != nil && model.extensionItems != nil
+        }
         #expect(apps == 1 && hidden == 1 && extensions == 1)
         #expect(model.hiddenItems != nil && model.extensionItems != nil)
     }

@@ -31,8 +31,7 @@ struct OpenFilesTests {
     @Test func readAgainOnceOlderThanMaxAge() async {
         let (calls, read) = counting(["/a/b"])
         let files = OpenFiles(maxAge: .zero, read: read)
-        _ = await files.paths(under: "/a")
-        try? await Task.sleep(for: .milliseconds(5))
+        _ = await files.paths(under: "/a") // with maxAge zero any later call finds it older
         #expect(await files.paths(under: "/a") == ["/a/b"])
         #expect(calls.withLock { $0.count } == 2)
     }

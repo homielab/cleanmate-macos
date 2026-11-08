@@ -183,7 +183,7 @@ struct OldInstallersTests {
             guard case .done(let report) = model.phase else { return false }
             return report.undo != nil && !model.undoing
         }
-        for _ in 0..<5000 where !restored() { try? await Task.sleep(for: .milliseconds(2)) } // the Task ⌘Z starts
+        try await eventually("⌘Z puts the files back", timeout: .seconds(60)) { restored() } // the Task ⌘Z starts
         guard case .done(let after) = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(after.undo == TrashUndo.Result(restored: 2, skipped: 0) && after.trashed.isEmpty && !undo.canUndo)
         #expect(try Set(fm.contentsOfDirectory(atPath: downloads.path)) == ["a.dmg", "b.iso"])

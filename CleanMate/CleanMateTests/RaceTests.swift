@@ -28,7 +28,7 @@ struct RaceTests {
     }
 
     func until(_ condition: () -> Bool) async throws {
-        for _ in 0..<3000 where !condition() { try await Task.sleep(for: .milliseconds(10)) } // ≥ 30 s: busy machines
+        try await eventually("the race reaches the expected state", timeout: .seconds(60)) { condition() }
     }
 
     func smartScan(_ gates: Gates, gated: @escaping @Sendable (Int) -> Bool) -> SmartScanModel {
@@ -48,7 +48,10 @@ struct RaceTests {
         try await until { model.scans["x"]?.size == 200 }
         gates.open(1) // the first scan finishes after the second
         try await until { gates.left == 2 }
-        try await Task.sleep(for: .milliseconds(200))
+        try await eventually("the finishing scan writes its results", timeout: .seconds(30)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(model.scans["x"]?.size == 200 && model.selected == ["x"])
     }
@@ -117,7 +120,10 @@ struct RaceTests {
         try await until { if case .results = model.phase { true } else { false } }
         gates.open(1) // the first scan finishes after the second
         try await until { gates.left == 2 }
-        try await Task.sleep(for: .milliseconds(200))
+        try await eventually("the finishing scan writes its results", timeout: .seconds(30)) {
+            if case .results = model.phase { return true }
+            return false
+        }
         guard case .results = model.phase else { Issue.record("phase \(model.phase)"); return }
         #expect(model.files.map(\.size) == [200_000_000] && model.scannedCount == 2000)
     }
@@ -499,7 +505,7 @@ struct AttentionTests {
                 if cancel { model.cancelScan() }
                 gates.open(1)
                 try await race.until { if case .scanning = model.phase { false } else { true } }
-                try await Task.sleep(for: .milliseconds(50))
+                try await Task.sleep(for: .milliseconds(50)) // kept: no signal says a bounce will not come
             }
         }
         return bounces.count

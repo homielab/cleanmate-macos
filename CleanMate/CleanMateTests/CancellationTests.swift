@@ -43,7 +43,7 @@ struct CancellationTests {
             task.withLock { $0 = handle }
             ready.withLock { $0 = true }
             if let delay {
-                if delay > 0 { try? await Task.sleep(for: .microseconds(delay)) }
+                if delay > 0 { try? await Task.sleep(for: .microseconds(delay)) } // kept: cancels at varied points of the work
                 handle.cancel()
             }
             await handle.value

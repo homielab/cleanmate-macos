@@ -23,9 +23,14 @@ struct LoginItemsLayoutTests {
         window.isReleasedWhenClosed = false
         window.contentView = host
         // Lay out until the sample agents are shown (≥ 30 s on a busy machine), then let the list settle.
-        for _ in 0..<150 where model.agents.count < agents.count { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200)) }
+        try await eventually("the sample agents are all shown", timeout: .seconds(60)) {
+            host.layoutSubtreeIfNeeded()
+            return model.agents.count >= agents.count
+        }
         #expect(model.agents.count == agents.count)
-        for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(200)) }
+        try await settledLayout(host, timeout: .seconds(5)) {
+            model.agents.count
+        }
         // Broken: the window grew to ~2170 pt to fit a ~2115 pt minimum height.
         #expect(host.fittingSize.height < 700, "Login Items needs \(host.fittingSize.height) pt of height")
         window.close()
