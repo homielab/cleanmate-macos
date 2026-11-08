@@ -122,6 +122,12 @@ nonisolated struct LargeFile: Identifiable, Hashable, Sendable {
 nonisolated enum LargeFileScanner {
     /// Folders never walked: regenerable dev trees whose files the user does not manage by hand.
     static let skippedFolderNames: Set = ["node_modules", "Pods", "DerivedData"]
+    /// A desktop virtual machine's bundle (Parallels `.pvm`, VMware Fusion `.vmwarevm`, UTM `.utm`): listed as one
+    /// row with the size of everything inside it, never opened. One of 20–100 GB that the walk would otherwise
+    /// either explode into its disk files or hide completely (when the hypervisor's app registered the extension).
+    static let vmBundleExtensions: Set<String> = ["pvm", "vmwarevm", "utm"]
+
+    static func isVMBundle(_ url: URL) -> Bool { vmBundleExtensions.contains(url.pathExtension.lowercased()) }
 
     /// A scan root that is not the home folder, an external volume or a folder inside one.
     struct OutsideHomeError: Error {}
@@ -248,7 +254,10 @@ nonisolated enum LargeFileScanner {
                     guard values.isHidden != true else { continue }
                     tick()
                     if values.isDirectory == true {
-                        if !skips(url, values), values.isPackage != true {
+                        if skips(url, values) { continue }
+                        if LargeFileScanner.isVMBundle(url) {
+                            if let row = bundleRow(url, values) { parts.append((index, [row])) }
+                        } else if values.isPackage != true {
                             let folder = folder.appending(path: name, directoryHint: .isDirectory)
                             group.addTask { (index, try await self.tree(folder, depth: depth - 1)) }
                         }
@@ -273,11 +282,29 @@ nonisolated enum LargeFileScanner {
                 guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
                 if values.isDirectory == true {
                     if skips(url, values) { enumerator.skipDescendants() }
+                    else if LargeFileScanner.isVMBundle(url) {
+                        if let row = bundleRow(url, values) { found.append(row) }
+                        enumerator.skipDescendants() // the hypervisor's app may register the extension as a package
+                    }
                     continue
                 }
                 if let file = file(url, values, inDrive: inDrive) { found.append(file) }
             }
             return found
+        }
+
+        /// One row for a virtual machine bundle: the bytes on disk of everything inside it (`FreeableBytes`, so a
+        /// hard-linked or cloned disk counts only what removing the bundle frees), dated like a file, movable when
+        /// the Space Lens rule takes the folder (a bundle under ~/Library is listed, never movable).
+        func bundleRow(_ url: URL, _ values: URLResourceValues) -> LargeFile? {
+            var info = stat()
+            guard lstat(url.path, &info) == 0, let (bytes, _, _) = FreeableBytes(clones: false).walk(url.path, device: info.st_dev),
+                  bytes >= minSize else { return nil }
+            return LargeFile(url: url, size: bytes,
+                             lastUsed: lastUsed(spotlight: nil, accessed: values.contentAccessDate,
+                                                modified: values.contentModificationDate),
+                             kind: .other, modified: values.contentModificationDate,
+                             trashable: policy.allowsSpaceLensItem(url, deep: false), home: policy.homeURL)
         }
 
         /// A folder not walked. Another volume mounted in the home (OrbStack's NFS share, CoreDevice's DeviceFS) is
@@ -325,10 +352,14 @@ nonisolated enum LargeFileScanner {
         [spotlight ?? accessed, modified].compactMap { $0 }.max() ?? .distantPast
     }
 
-    /// Moves files to the Trash (never deletes), re-checking the user-file policy right before each one.
+    /// Moves files to the Trash (never deletes), re-checking the user-file policy right before each one. A virtual
+    /// machine bundle is a folder: the Space Lens rule takes it (in the home folder, not under ~/Library).
     @concurrent static func trash(_ files: [LargeFile], policy: SafetyPolicy = .current) async -> CleanReport {
         CleanReport.trashing(files.filter(\.trashable).map { ($0.url, $0.size) }, module: "Large & Old Files", home: policy.homeURL,
-                             allows: policy.allowsUserFile)
+                             allows: { url in
+                                 policy.allowsUserFile(url) || (LargeFileScanner.isVMBundle(url)
+                                     && policy.allowsSpaceLensItem(url, deep: false))
+                             })
     }
 }
 

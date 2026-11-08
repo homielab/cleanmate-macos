@@ -260,6 +260,10 @@ extension CleanerGroup {
         // Unticked, to the Trash: disks of Colima, Lima, Rancher Desktop, Podman and minikube VMs, one row each
         // (`ContainerVMs`). A running VM is a locked row; no tool is run and no VM stopped.
         ContainerVMs.item(),
+        // Unticked, to the Trash: the desktop virtual machines Parallels Desktop, VMware Fusion, UTM and VirtualBox
+        // keep, one row each (`DesktopVMs`), listed only after 90 days unused. A running VM is a locked row; no
+        // hypervisor is run and no machine stopped.
+        DesktopVMs.item(),
         // Unticked, to the Trash: each JetBrains IDE / Android Studio version keeps its own settings, plugins,
         // caches and logs folder (`GoLand2025.3`, `AndroidStudio2026.1.1`), left behind by upgrades. Only versions older
         // than the newest of the same product found in these folders are listed (their settings were migrated);

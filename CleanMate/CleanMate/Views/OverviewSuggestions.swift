@@ -9,6 +9,8 @@ nonisolated struct Suggestion: Identifiable, Equatable, Sendable {
         case trash, externalTrash, unusedApps, downloads, docker, snapshots
         /// Container VMs not run for at least `days` days (the most recently run of them).
         case containerVMs(days: Int)
+        /// Desktop virtual machines not used for at least `days` days (the most recently used of them).
+        case desktopVMs(days: Int)
         /// Models of local AI apps not used for at least `days` days (the most recently used of them).
         case unusedModels(days: Int)
     }
@@ -58,7 +60,8 @@ nonisolated enum OverviewSuggestions {
     /// An older Smart Scan no longer says what is on the disk: its groups are not suggested.
     static let scanMaxAge: TimeInterval = 30 * 86_400
     /// Smart Scan items measured live here, so the last scan's groups leave them out (`LastScan.groups`).
-    static let liveItems = Set(["empty-trash", "external-trash", "old-installers", "old-downloads", ContainerVMs.id])
+    static let liveItems = Set(["empty-trash", "external-trash", "old-installers", "old-downloads",
+                                ContainerVMs.id, DesktopVMs.id])
         .union(dockerItems).union(LocalModels.ids)
     /// A container VM not run for longer than this is suggested.
     static let vmIdleAge: TimeInterval = 90 * 86_400
@@ -84,6 +87,8 @@ nonisolated enum OverviewSuggestions {
         var appSize: @Sendable (URL) async -> Int64
         /// Size and last run of each container VM that is not running (`ContainerVMs`).
         var containerVMs: @Sendable () async -> [(size: Int64, lastRun: Date?)] = { [] }
+        /// Size and last use of each desktop virtual machine that is not running (`DesktopVMs`).
+        var desktopVMs: @Sendable () async -> [(size: Int64, lastRun: Date?)] = { [] }
         /// Item id, size and last use of each model of a local AI app (`LocalModels`).
         var aiModels: @Sendable () async -> [(item: String, size: Int64, lastUsed: Date?)] = { [] }
 
@@ -104,6 +109,15 @@ nonisolated enum OverviewSuggestions {
             appSize: { await Uninstaller.size(of: $0) },
             containerVMs: {
                 let items = CleanerGroup.smartScan(hasFullDiskAccess: false).flatMap(\.items).filter { $0.id == ContainerVMs.id }
+                var found: [(size: Int64, lastRun: Date?)] = []
+                for item in items {
+                    let scan = await Scanner.scan(item, openPaths: { _ in [] })
+                    found += scan.entries.filter { $0.lockReason == nil }.map { ($0.size, $0.date) }
+                }
+                return found
+            },
+            desktopVMs: {
+                let items = CleanerGroup.smartScan(hasFullDiskAccess: false).flatMap(\.items).filter { $0.id == DesktopVMs.id }
                 var found: [(size: Int64, lastRun: Date?)] = []
                 for item in items {
                     let scan = await Scanner.scan(item, openPaths: { _ in [] })
@@ -166,6 +180,15 @@ nonisolated enum OverviewSuggestions {
             found.append(Suggestion(id: "container-vms", kind: .containerVMs(days: Int(latest / 86_400)),
                                     systemImage: "server.rack", size: idle.reduce(0) { $0 + $1.size }, count: idle.count,
                                     target: .smartScanItem(group: "developer", item: ContainerVMs.id)))
+        }
+        let desktopIdle = await sources.desktopVMs().compactMap { vm in
+            vm.lastRun.map { (size: vm.size, idle: now.timeIntervalSince($0)) }
+        }.filter { $0.idle > vmIdleAge }
+        if let latest = desktopIdle.map(\.idle).min() {
+            found.append(Suggestion(id: "desktop-vms", kind: .desktopVMs(days: Int(latest / 86_400)),
+                                    systemImage: "desktopcomputer", size: desktopIdle.reduce(0) { $0 + $1.size },
+                                    count: desktopIdle.count,
+                                    target: .smartScanItem(group: "developer", item: DesktopVMs.id)))
         }
         let models = await sources.aiModels().compactMap { model in
             model.lastUsed.map { (item: model.item, size: model.size, idle: now.timeIntervalSince($0)) }

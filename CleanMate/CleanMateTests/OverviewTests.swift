@@ -409,6 +409,26 @@ struct OverviewTests {
         #expect(!none.contains { $0.id == "container-vms" })
     }
 
+    /// Desktop virtual machines unused for more than 90 days: one suggestion with their total, dated by the most
+    /// recently used of them, opening Smart Scan at the item. A recent machine doesn't count; none idle, none.
+    @Test func idleDesktopVMsMakeASuggestion() async throws {
+        var sources = OverviewSuggestions.Sources.none
+        let ago = { (days: Double) in Self.now.addingTimeInterval(-days * 86_400) }
+        sources.desktopVMs = { [(30 * Self.gb, ago(150)), (20 * Self.gb, ago(400)), (40 * Self.gb, ago(5)),
+                                (Self.gb, ago(89))] }
+        let found = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: false, apps: [],
+                                                   appSizes: [:], now: Self.now, sources: sources)
+        let vms = try #require(found.first { $0.id == "desktop-vms" })
+        #expect(vms.kind == .desktopVMs(days: 150) && vms.size == 50 * Self.gb && vms.count == 2)
+        #expect(vms.target == .smartScanItem(group: "developer", item: DesktopVMs.id))
+        #expect(OverviewSuggestions.liveItems.contains(DesktopVMs.id)) // not counted again in the Developer group
+
+        sources.desktopVMs = { [(40 * Self.gb, ago(5))] }
+        let none = await OverviewSuggestions.read(lastScan: nil, snapshots: nil, hasFullDiskAccess: false, apps: [],
+                                                  appSizes: [:], now: Self.now, sources: sources)
+        #expect(!none.contains { $0.id == "desktop-vms" })
+    }
+
     /// Local AI models unused for over 90 days: one suggestion with their total, dated by the most recently used of
     /// them, opening Smart Scan at the AI Tools item holding the most of those bytes; none when all were used lately.
     @Test func unusedAIModelsMakeASuggestion() async throws {

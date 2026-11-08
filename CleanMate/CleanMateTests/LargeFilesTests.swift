@@ -30,6 +30,28 @@ struct LargeFilesTests {
         #expect(found.first { $0.url.lastPathComponent == "single.mov" }?.hardLinked == false)
     }
 
+    /// A virtual machine bundle is one row with the size of everything inside it, never opened, movable when the
+    /// Space Lens rule takes the folder; the files inside are not listed.
+    @Test func virtualMachineBundleIsOneRow() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bundle = home.appending(path: "Parallels/Windows 11.pvm")
+        try file("Parallels/Windows 11.pvm/disk.img", bytes: 60_000)
+        try file("Parallels/Windows 11.pvm/config", bytes: 100)
+        try file("Parallels/keep.txt", bytes: 20_000)
+        let found = try await LargeFileScanner.scan(root: home, minSize: 10_000, policy: policy)
+        let rows = found.filter { $0.url.lastPathComponent.hasPrefix("Windows 11") }
+        #expect(rows.count == 1)
+        #expect(rows.first?.url.standardizedFileURL.path == bundle.standardizedFileURL.path,
+                "was: \(rows.first?.url.path ?? "nil")")
+        #expect((rows.first?.size ?? 0) >= 60_000)
+        #expect(rows.first?.trashable == true) // in the home folder, not under ~/Library
+        #expect(found.contains { $0.url.lastPathComponent == "keep.txt" })
+        #expect(!found.contains { $0.url.lastPathComponent == "disk.img" })
+        #expect(LargeFileScanner.isVMBundle(bundle))
+        // A bundle under ~/Library is never reached by the home walk; outside the home it is not a root.
+        #expect(!LargeFileScanner.isVMBundle(home.appending(path: "Parallels/Windows 11")))
+    }
+
     @Test func userFilePolicyAllowsDocumentsButNotLibraryHiddenPackagesOrOutsideHome() throws {
         defer { try? FileManager.default.removeItem(at: root) }
         for path in ["Documents/a.mov", "Desktop/b.zip", "Movies/c.mp4", "Downloads/d.dmg", "Music/e.iso", "f.pkg"] {

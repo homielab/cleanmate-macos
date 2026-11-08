@@ -271,6 +271,24 @@ struct EndToEndCleanTests {
                     try write(folder.appending(path: "junk/1.0.0/virtualbox/box.vmdk"), Data(repeating: 1, count: 4096))
                     continue
                 }
+                if item.id == DesktopVMs.id { // a machine of each app, the bundle dated like an unused machine
+                    let disk = Data(repeating: 1, count: 4096)
+                    let bundle: URL
+                    switch folder.lastPathComponent {
+                    case "VirtualBox VMs":
+                        bundle = folder.appending(path: "junk")
+                        try write(bundle.appending(path: "junk.vbox"), Data("<VirtualBox/>".utf8))
+                        try write(bundle.appending(path: "disk.vdi"), disk)
+                    case "Virtual Machines.localized":
+                        bundle = folder.appending(path: "junk.vmwarevm")
+                        try write(bundle.appending(path: "disk.vmdk"), disk)
+                    default: // Parallels
+                        bundle = folder.appending(path: "junk.pvm")
+                        try write(bundle.appending(path: "disk.img"), disk)
+                    }
+                    try fm.setAttributes([.modificationDate: old], ofItemAtPath: bundle.path)
+                    continue
+                }
                 if item.id == ContainerVMs.id { // a VM of each tool (a Lima-based one, Podman's disk, minikube's machine)
                     let disk = Data(repeating: 1, count: 4096)
                     switch folder.lastPathComponent {

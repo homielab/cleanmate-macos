@@ -13611,6 +13611,100 @@
           }
         }
       }
+    },
+    "Desktop virtual machines not in use" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo để bàn không dùng"
+          }
+        }
+      }
+    },
+    "Machines Parallels Desktop, VMware Fusion, UTM and VirtualBox keep, often 20–100 GB each. A machine is listed after 90 days unused. Moved to the Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các máy ảo Parallels Desktop, VMware Fusion, UTM và VirtualBox giữ, thường 20–100 GB mỗi cái. Máy được liệt kê sau 90 ngày không dùng. Chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "A virtual machine that is running, or one used in the last 90 days" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo đang chạy, hoặc mới dùng trong 90 ngày qua"
+          }
+        }
+      }
+    },
+    "The virtual machine a desktop hypervisor keeps: its disks, its snapshots and the apps installed inside it. Removing one is final — the app can only make an empty new machine, so a machine is offered after 90 days unused." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo mà hypervisor để bàn giữ: đĩa, snapshot và các ứng dụng cài bên trong. Xoá là không thể hoàn tác — ứng dụng chỉ tạo được máy ảo mới rỗng, nên máy ảo chỉ được đề xuất sau 90 ngày không dùng."
+          }
+        }
+      }
+    },
+    "Moved to the Trash. The app makes an empty new machine; everything the machine held — disks, snapshots, installed apps — is gone." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển vào Thùng rác. Ứng dụng sẽ tạo máy ảo mới rỗng; mọi thứ máy ảo từng giữ — đĩa, snapshot, ứng dụng đã cài — biến mất."
+          }
+        }
+      }
+    },
+    "Machines Parallels Desktop, VMware Fusion, UTM or VirtualBox keep. Removing one loses the machine with everything inside it; it cannot be made again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các máy ảo Parallels Desktop, VMware Fusion, UTM hoặc VirtualBox giữ. Xoá một cái mất luôn máy ảo và mọi thứ bên trong; không thể tạo lại."
+          }
+        }
+      }
+    },
+    "Desktop VMs not used for %lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Desktop VMs not used for %lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Desktop VMs not used for %lld days"
+                }
+              }
+            }
+          }
+        },
+        "vi" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Máy ảo để bàn không dùng %lld ngày"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
