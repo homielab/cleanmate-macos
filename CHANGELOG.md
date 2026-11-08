@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Smart Scan › Applications** finds the regenerable caches of the creative apps — Adobe Camera Raw, Capture One, DaVinci Resolve's render cache, Blender, Sketch and Affinity — unticked, cleaned only when the app is closed, and never touching a catalog, library or document. The Settings window now fits short screens: it caps itself and the General tab scrolls instead of being cut.
 - **Smart Scan › Developer Junk** finds idle desktop virtual machines: one row each for what Parallels Desktop, VMware Fusion, UTM and VirtualBox keep, listed after 90 days unused and moved to the Trash; Large & Old Files shows a machine's bundle as one line instead of opening it.
 - **Smart Scan** lists items with thousands of entries quickly with **Show More**, and after a clean **Rescan Skipped Items** scans again only what was left because it was in use.
 - **Smart Scan › Developer Junk** shows what else hides in `~/.cache`, one folder per row, nothing ticked, plus RubyGems, Bundler, Carthage and Hugging Face download caches.

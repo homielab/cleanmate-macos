@@ -492,6 +492,11 @@ struct EndToEndCleanTests {
             let scan = scans[item.id]!
             let report = await Cleaner.clean(item, scan: scan, policy: policy, trash: moveToFakeTrash, openPaths: Self.ownOpenPaths)
             movedToTrash += report.trashed.count
+            if item.id == "user-caches" {
+                let owned = CleanerGroup.ownedCachePaths
+                print("E2E-DEBUG owned capture:", owned.contains("com.captureone.captureone"),
+                      "| excluded:", item.excluded.contains("com.captureone.captureone"))
+            }
             #expect(report.skipped == 0, "\(item.id) skipped \(report.skipped)")
             // Freed = the scanned size of what went (a database erase: how much the file shrank), never negative.
             #expect(report.freed >= 0 && report.upTo == (item.sizeIsUpperBound ? report.freed : 0), "\(item.id)")

@@ -22,8 +22,20 @@ extension ScanReminder {
 
 struct SettingsView: View {
     static let exclusionsTab = "exclusions"
-    /// The tallest tab (General) fits without scrolling in EN/VI (`GeneralSettingsLayoutTests`).
-    static let size = CGSize(width: 520, height: 800)
+    /// The tallest tab (General) fits without scrolling in EN/VI (`GeneralSettingsLayoutTests`); a screen too short
+    /// for it caps the window below the screen's visible frame (the tab scrolls), a taller screen changes nothing.
+    static let width: CGFloat = 520
+    static let maxHeight: CGFloat = 800
+    /// Room between the window and the screen's visible frame: the title bar and air around it.
+    static let screenMargin: CGFloat = 60
+    /// The fixed size snapshots and layout tests use; the live window follows the screen (`windowSize`).
+    static let size = CGSize(width: width, height: maxHeight)
+
+    /// The window's size on a screen whose visible frame is `visibleFrameHeight` tall (nil: the reference size).
+    static func windowSize(visibleFrameHeight: CGFloat?) -> CGSize {
+        CGSize(width: width,
+               height: visibleFrameHeight.map { min(maxHeight, max(320, $0 - screenMargin)) } ?? maxHeight)
+    }
     /// Remembered, and set by a blocked Smart Scan row to open on Exclusions.
     @AppStorage(Preferences.settingsTab) private var tab = "general"
 
@@ -35,7 +47,8 @@ struct SettingsView: View {
             ActivitySettings().tabItem { Label("Activity", systemImage: "list.bullet.rectangle") }.tag("activity")
             IntegrationSettings().tabItem { Label("Integrations", systemImage: "square.2.layers.3d") }.tag("integrations")
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(width: Self.size.width,
+               height: Self.windowSize(visibleFrameHeight: NSScreen.main?.visibleFrame.height).height)
     }
 }
 

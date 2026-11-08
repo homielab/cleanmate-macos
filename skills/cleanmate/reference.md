@@ -156,6 +156,13 @@ Desktop)`, listed only after 90 days unused; a machine that runs has a `reason` 
 one loses the machine with its disks, snapshots and installed apps, and it cannot be made again — say so before
 cleaning it; `restore` puts it back while it is in the Trash.
 
+The Applications group also has the creative apps' regenerable caches (`camera-raw-cache`, `capture-one-cache`,
+`resolve-cache`, `blender-cache`, `sketch-cache`, `affinity-cache`; unticked, deleted, skipped while the app runs):
+only the cache is cleaned — never a catalog, library, document or preset. Resolve's render cache is the one folder
+in `~/Movies` CleanMate touches, and it and Affinity's container cache need Full Disk Access; `resolve-cache` and
+`affinity-cache` are not in the catalog without it. "User caches" and "Sandboxed app caches" leave these folders
+to their own items.
+
 `llamacpp-models`, `jan-models`, `gpt4all-models`, `drawthings-models` and `comfyui-models` (unticked, moved to the
 Trash) have one entry per downloaded model, `name` its model (`Qwen3-4B-Q4_K_M`, `ae.safetensors (vae)` for ComfyUI).
 While the app runs the item is `locked` with a `reason` and is never cleaned. Name the models before cleaning; the

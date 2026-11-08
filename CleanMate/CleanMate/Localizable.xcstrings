@@ -13705,6 +13705,186 @@
           }
         }
       }
+    },
+    "Adobe Camera Raw cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Adobe Camera Raw"
+          }
+        }
+      }
+    },
+    "Preview renders of raw files Photoshop and Lightroom Classic share; made again when a photo is opened again. Photos are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản xem trước của file raw Photoshop và Lightroom Classic dùng chung; tạo lại khi mở lại ảnh. Ảnh được giữ"
+          }
+        }
+      }
+    },
+    "The previews Camera Raw makes of your raw photos so they open quickly, in one cache Photoshop and Lightroom Classic share. It is rebuilt from the photos when they are opened again; the photos themselves are never touched." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các bản xem trước Camera Raw tạo cho ảnh raw của bạn để mở nhanh, trong một bộ nhớ đệm Photoshop và Lightroom Classic dùng chung. Chúng được dựng lại từ ảnh khi mở lại; bản thân ảnh không bao giờ bị đụng tới."
+          }
+        }
+      }
+    },
+    "Capture One cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Capture One"
+          }
+        }
+      }
+    },
+    "Cached thumbnails and processed data, made again when a catalog opens; your catalogs and their previews are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hình thu nhỏ và dữ liệu đã xử lý được tạo lại khi mở catalog; catalog và bản xem trước của chúng được giữ"
+          }
+        }
+      }
+    },
+    "The thumbnails and processed data Capture One keeps in its cache folder to open catalogs quickly. It is rebuilt when a catalog is opened again; the catalogs themselves — with the previews inside them — are never touched." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hình thu nhỏ và dữ liệu đã xử lý Capture One giữ trong bộ nhớ đệm để mở catalog nhanh. Chúng được tạo lại khi mở lại catalog; bản thân các catalog — với bản xem trước bên trong — không bao giờ bị đụng tới."
+          }
+        }
+      }
+    },
+    "DaVinci Resolve render cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm render DaVinci Resolve"
+          }
+        }
+      }
+    },
+    "Cache clips of the timeline, made again when playback needs them; your projects, media and Gallery stills are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clip cache của timeline, tạo lại khi phát lại cần; dự án, media và ảnh chụp Gallery của bạn được giữ"
+          }
+        }
+      }
+    },
+    "The cache clips Resolve writes while you play the timeline so it plays smoothly, in the default cache folder. They are made again when playback needs them; your projects, the media they use and the stills in the Gallery are never touched. A project set to keep its cache elsewhere is not scanned." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các clip cache Resolve ghi khi bạn phát timeline để nó phát mượt, trong thư mục cache mặc định. Chúng được tạo lại khi phát lại cần; dự án, media chúng dùng và ảnh trong Gallery không bao giờ bị đụng tới. Dự án đặt cache chỗ khác không được quét."
+          }
+        }
+      }
+    },
+    "Blender cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Blender"
+          }
+        }
+      }
+    },
+    "Baked and physics cache files, made again by Blender when a scene needs them; your blend files and settings are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp cache bake và vật lý, Blender tạo lại khi cảnh cần; file blend và cài đặt của bạn được giữ"
+          }
+        }
+      }
+    },
+    "The baked and physics cache files Blender keeps with each version's settings. Blender makes them again when a scene needs them; your blend files and the settings beside the cache are never touched." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các tệp cache bake và vật lý Blender giữ cùng cài đặt của từng phiên bản. Blender tạo lại chúng khi một cảnh cần; file blend và cài đặt cạnh cache không bao giờ bị đụng tới."
+          }
+        }
+      }
+    },
+    "Sketch cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Sketch"
+          }
+        }
+      }
+    },
+    "Cached previews and support files, made again from your documents; your .sketch files are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản xem trước và tệp hỗ trợ được cache, tạo lại từ tài liệu của bạn; file .sketch được giữ"
+          }
+        }
+      }
+    },
+    "The previews and support files Sketch keeps in its cache folder. They are made again from your documents when Sketch needs them; the documents themselves are never touched." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các bản xem trước và tệp hỗ trợ Sketch giữ trong bộ nhớ đệm. Chúng được tạo lại từ tài liệu khi Sketch cần; bản thân tài liệu không bao giờ bị đụng tới."
+          }
+        }
+      }
+    },
+    "Affinity cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bộ nhớ đệm Affinity"
+          }
+        }
+      }
+    },
+    "Cached previews and renders of Affinity Designer, Photo and Publisher, made again from your documents; your files are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản xem trước và bản render được cache của Affinity Designer, Photo và Publisher, tạo lại từ tài liệu của bạn; file của bạn được giữ"
+          }
+        }
+      }
+    },
+    "The previews and renders Affinity Designer, Photo and Publisher keep in their caches. They are made again from your documents when the app needs them; the documents themselves are never touched." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các bản xem trước và bản render Affinity Designer, Photo và Publisher giữ trong bộ nhớ đệm. Chúng được tạo lại từ tài liệu của bạn khi ứng dụng cần; bản thân tài liệu không bao giờ bị đụng tới."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

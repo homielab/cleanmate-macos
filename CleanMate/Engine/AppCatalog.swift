@@ -320,6 +320,13 @@ extension CleanerGroup {
                     runningProcessNames: adobeMediaProcessNames, skipsOpenFiles: true),
         // Final Cut Pro and iMovie render files (`VideoRenderFiles`): one entry per library, unticked, deleted.
         VideoRenderFiles.item(hasFullDiskAccess: { hasFullDiskAccess }),
+        // Creative apps' regenerable caches (`CreativeAppCaches`): unticked, deleted, skipped while the app runs.
+        CreativeAppCaches.cameraRaw,
+        CreativeAppCaches.captureOne,
+        CreativeAppCaches.sketch,
+        CreativeAppCaches.blender,
+        // Resolve's cache sits in ~/Movies: like the Final Cut libraries, listed only once macOS lets CleanMate read it.
+        CreativeAppCaches.resolve(hasFullDiskAccess: { hasFullDiskAccess }),
         // Cloud sync apps' caches (`CloudSyncCaches`): unticked, deleted, skipped while the app runs.
         CloudSyncCaches.googleDrive,
         CloudSyncCaches.dropbox(hasFullDiskAccess: { hasFullDiskAccess }),
@@ -329,8 +336,9 @@ extension CleanerGroup {
     // Chat and design apps (`ChatAppCaches`): ticked, deleted, skipped while the app runs.
     + ChatAppCaches.all
     + GameLauncherCaches.all // Steam, Epic, Battle.net, GOG Galaxy, Minecraft, Prism: ticked, emptied, skipped while the launcher runs.
-    + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive, MediaAppCaches.telegram] + MediaAppCaches.podcasts
-        + ChatAppCaches.fullDiskAccess : []))
+    // Affinity's cache in a sandbox container: only with Full Disk Access, like every folder macOS protects there.
+    + (hasFullDiskAccess ? [CloudSyncCaches.oneDrive, MediaAppCaches.telegram, CreativeAppCaches.affinity]
+        + MediaAppCaches.podcasts + ChatAppCaches.fullDiskAccess : []))
     }
 
     /// Adobe apps that read and write the media cache. Bundle ids and executables carry the version

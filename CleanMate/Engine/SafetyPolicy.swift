@@ -164,6 +164,17 @@ nonisolated struct SafetyPolicy: Sendable {
         return allows(normalized: path, skipping: [cloud])
     }
 
+    /// `allows`, or the exception to the never-touch tree Movies: DaVinci Resolve's render cache, the one folder in
+    /// `~/Movies` that holds no user media — the cache and proxy clips Resolve makes again when playback needs them.
+    func allowsResolveCache(_ url: URL) -> Bool {
+        let path = Self.normalize(url)
+        if allows(normalized: path) { return true }
+        guard let home = allowedRoots.first else { return false }
+        let key = path.lowercased()
+        guard key.hasPrefix((home + "/Movies/DaVinci Resolve/CacheClip").lowercased() + "/") else { return false }
+        return allows(normalized: path, skipping: [(home + "/Movies").lowercased()])
+    }
+
     /// `allows`, also inside Documents and Desktop (never the other never-touch trees): for a model file whose app keeps
     /// its install there (ComfyUI Desktop's default is `~/Documents/ComfyUI`), after the item checked its exact place
     /// (`LocalModels`).

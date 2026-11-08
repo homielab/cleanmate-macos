@@ -190,6 +190,37 @@ struct GeneralSettingsLayoutTests {
         window.close()
     }
 
+    /// The window's height follows the screen: a tall screen keeps the reference size, a short one caps it (the
+    /// General tab scrolls), and no screen collapses it entirely.
+    @Test func windowHeightFollowsTheScreen() {
+        #expect(SettingsView.windowSize(visibleFrameHeight: nil) == CGSize(width: 520, height: 800))
+        #expect(SettingsView.windowSize(visibleFrameHeight: 2_000) == SettingsView.size)
+        #expect(SettingsView.windowSize(visibleFrameHeight: 860) == SettingsView.size) // 860 − 60 = the maximum
+        #expect(SettingsView.windowSize(visibleFrameHeight: 700) == CGSize(width: 520, height: 640))
+        #expect(SettingsView.windowSize(visibleFrameHeight: 100) == CGSize(width: 520, height: 320))
+    }
+
+    /// On a short screen nothing is cut: the General tab's natural height still exceeds the window a short screen
+    /// gets (the Form scrolls to everything) and fits the reference window.
+    @Test func shortScreenScrollsInsteadOfClipping() async throws {
+        let setup = ScanReminderTests.Setup(.weekly, center: FakeReminderCenter(status: .denied), now: .now)
+        let lowDisk = LowDiskWarningChecker(center: setup.center, defaults: setup.defaults)
+        let login = OpenAtLogin(service: FakeLoginItem(.requiresApproval))
+        let host = NSHostingView(rootView: GeneralSettings(reminders: setup.scheduler, lowDiskWarning: lowDisk,
+                                                           openAtLogin: login, notificationsDenied: true)
+            .environment(\.locale, Locale(identifier: "vi"))
+            .frame(width: SettingsView.size.width))
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: SettingsView.size), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        for _ in 0..<5 { host.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(100)) }
+        let natural = try #require(Self.scrollView(in: host)).documentView?.frame.height ?? 0
+        let capped = SettingsView.windowSize(visibleFrameHeight: 400).height
+        #expect(natural > capped, "content \(natural) vs a window capped to \(capped): the tab scrolls, nothing cut")
+        window.close()
+    }
+
     static func scrollView(in view: NSView) -> NSScrollView? {
         if let scroll = view as? NSScrollView { return scroll }
         for subview in view.subviews { if let found = scrollView(in: subview) { return found } }

@@ -41,7 +41,10 @@ extension CleanerGroup {
                         skipsOpenFiles: true, skipsEntry: {
                             let apps = runningApps()
                             let names = Set(runningAppNames().filter(AppMatcher.isDistinctive).map { $0.lowercased() })
-                            return { skipsUserCache($0, runningApps: apps, runningAppNames: names) }
+                            return { url in
+                                skipsUserCache(url, runningApps: apps, runningAppNames: names)
+                                    || ownedCacheChildPatterns.contains { fnmatch($0, url.lastPathComponent, 0) == 0 }
+                            }
                         },
                         skipNote: "The cache of an app that is open, and caches that hold iCloud or sync state",
                         about: "Files apps keep in ~/Library/Caches to open faster; each app makes them again when it needs them"),
@@ -51,7 +54,12 @@ extension CleanerGroup {
             CleanerItem(id: "sandbox-caches", title: "Sandboxed app caches", paths: ["~/Library/Containers/*/Data/Library/Caches"],
                         excluded: keptCaches, showsWhenEmpty: false, skipsEntry: {
                             let apps = runningApps()
-                            return { skipsSandboxCache($0, runningApps: apps) }
+                            return { url in
+                                skipsSandboxCache(url, runningApps: apps)
+                                    || ownedContainerPatterns.contains { pattern in
+                                        containerName(of: url).map { fnmatch(pattern, $0, 0) == 0 } ?? false
+                                    }
+                            }
                         },
                         skipNote: "Apple's apps and apps that are open",
                         about: "Caches of App Store and other sandboxed apps, inside each app's container; the app makes them again"),
@@ -232,6 +240,34 @@ extension CleanerGroup {
 
     /// Caches holding iCloud/sync state or in-flight downloads: wiping them forces a re-sync or breaks transfers.
     /// rclone: its VFS cache holds files written to a mount but not uploaded yet. TemporaryItems: saves in progress.
+    /// `~/Library/Caches` children and `~/Library/Containers` containers another item owns by a glob
+    /// (`com.captureone.captureone*`): `excluded` holds plain names and cannot carry a pattern, so the generic
+    /// cache items leave these to their own item here, by fnmatch.
+    nonisolated static let ownedCacheChildPatterns: [String] = Set(
+        [developer, aiTools(), applications(hasFullDiskAccess: true)].flatMap(\.items).flatMap(\.paths)
+        .compactMap { path -> String? in
+            guard path.hasPrefix("~/Library/Caches/"), path.contains("*") else { return nil }
+            let name = String(path.dropFirst("~/Library/Caches/".count).split(separator: "/").first ?? "")
+            return name.contains("*") ? name : nil
+        }).sorted()
+
+    nonisolated static let ownedContainerPatterns: [String] = Set(
+        [developer, aiTools(), applications(hasFullDiskAccess: true)].flatMap(\.items).flatMap(\.paths)
+        .compactMap { path -> String? in
+            let parts = path.split(separator: "/")
+            guard let i = parts.firstIndex(of: "Containers"), i + 1 < parts.count, parts[i + 1].contains("*")
+            else { return nil }
+            return String(parts[i + 1])
+        }).sorted()
+
+    /// The container name of a path under `~/Library/Containers/<container>/…`.
+    nonisolated static func containerName(of url: URL) -> String? {
+        let parts = url.pathComponents
+        guard let i = parts.indices.last(where: { $0 > 0 && parts[$0] == "Containers" && parts[$0 - 1] == "Library" }),
+              i + 1 < parts.count else { return nil }
+        return parts[i + 1]
+    }
+
     nonisolated static let keptCaches: Set<String> = [
         "rclone", "TemporaryItems",
         "com.apple.bird", "CloudKit", "com.apple.akd", "com.apple.nsurlsessiond", "com.apple.homed",
