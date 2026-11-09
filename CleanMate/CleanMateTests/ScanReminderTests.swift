@@ -182,7 +182,7 @@ struct GeneralSettingsLayoutTests {
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
-        try await settledLayout(host, timeout: .seconds(30)) {
+        try await settledLayout(host) {
             Self.scrollView(in: host)?.documentView?.frame.height ?? 0
         }
         let scroll = try #require(Self.scrollView(in: host))
@@ -216,7 +216,7 @@ struct GeneralSettingsLayoutTests {
                               backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
-        try await settledLayout(host, timeout: .seconds(30)) {
+        try await settledLayout(host) {
             Self.scrollView(in: host)?.documentView?.frame.height ?? 0
         }
         let natural = try #require(Self.scrollView(in: host)).documentView?.frame.height ?? 0

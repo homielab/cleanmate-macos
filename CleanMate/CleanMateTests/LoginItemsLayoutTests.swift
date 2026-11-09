@@ -28,7 +28,7 @@ struct LoginItemsLayoutTests {
             return model.agents.count >= agents.count
         }
         #expect(model.agents.count == agents.count)
-        try await settledLayout(host, timeout: .seconds(5)) {
+        try await settledLayout(host) {
             model.agents.count
         }
         // Broken: the window grew to ~2170 pt to fit a ~2115 pt minimum height.

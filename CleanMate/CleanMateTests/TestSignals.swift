@@ -12,8 +12,9 @@ struct WaitTimedOut: Error {}
 
 /// Returns once `condition` holds, checked every 5 ms (for state no publisher announces, or a fake's counter). After
 /// `timeout` it records an issue naming `what` at the caller's line and throws, so a state that never comes fails the
-/// test instead of hanging the whole suite.
-@MainActor func eventually(_ what: String, timeout: Duration = .seconds(5), every interval: Duration = .milliseconds(5),
+/// test instead of hanging the whole suite. 30 s, not less: a passing wait returns at once, and with another
+/// project's build loading the Mac a model took over 5 s to load and failed the run.
+@MainActor func eventually(_ what: String, timeout: Duration = .seconds(30), every interval: Duration = .milliseconds(5),
                            sourceLocation: SourceLocation = #_sourceLocation,
                            _ condition: @MainActor () -> Bool) async throws {
     let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -28,7 +29,7 @@ struct WaitTimedOut: Error {}
 
 /// The same wait for a condition that itself awaits (a cache file read, a process poll): checked now, then
 /// every `interval`, with the same timeout and issue as the synchronous `eventually`.
-nonisolated func eventually(_ what: String, timeout: Duration = .seconds(5), every interval: Duration = .milliseconds(20),
+nonisolated func eventually(_ what: String, timeout: Duration = .seconds(30), every interval: Duration = .milliseconds(20),
                             sourceLocation: SourceLocation = #_sourceLocation,
                             _ condition: () async -> Bool) async throws {
     let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -61,7 +62,7 @@ nonisolated func untilCancelled(limit: Duration = .seconds(60)) async throws {
 /// Lays out `host` until `value` (a size the test checks) reads the same for 0.1 s and at least 3 polls in a row, at
 /// most `timeout`: the view settled, without a fixed delay. Time, not a number of polls: with the whole suite running
 /// a poll can wait half a second for the main thread, and 20 polls outlasted the timeout.
-@MainActor func settledLayout<Value: Equatable>(_ host: NSView, timeout: Duration = .seconds(10),
+@MainActor func settledLayout<Value: Equatable>(_ host: NSView, timeout: Duration = .seconds(30),
                                                 sourceLocation: SourceLocation = #_sourceLocation,
                                                 _ value: @MainActor () -> Value) async throws {
     var last: Value?, same = 0, since = ContinuousClock.now
