@@ -7,17 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9] - 2026-11-11
+
 ### Added
-- **Smart Scan › Applications** finds the regenerable caches of the creative apps — Adobe Camera Raw, Capture One, DaVinci Resolve's render cache, Blender, Sketch and Affinity — unticked, cleaned only when the app is closed, and never touching a catalog, library or document. The Settings window now fits short screens: it caps itself and the General tab scrolls instead of being cut.
-- **Smart Scan › Developer Junk** finds idle desktop virtual machines: one row each for what Parallels Desktop, VMware Fusion, UTM and VirtualBox keep, listed after 90 days unused and moved to the Trash; Large & Old Files shows a machine's bundle as one line instead of opening it.
-- **Smart Scan** lists items with thousands of entries quickly with **Show More**, and after a clean **Rescan Skipped Items** scans again only what was left because it was in use.
-- **Smart Scan › Developer Junk** shows what else hides in `~/.cache`, one folder per row, nothing ticked, plus RubyGems, Bundler, Carthage and Hugging Face download caches.
-- **Smart Scan** cleans caches and old chats of Amp, Qwen Code, Kiro, Trae, Jan, GPT4All, llama.cpp and ComfyUI, and caches of Warp, Ghostty and Raycast. Models and sign-ins stay put.
+- **Smart Scan › Developer Junk** lists idle virtual machines of Parallels, VMware Fusion, UTM and VirtualBox, one row each, moved to the Trash. Large & Old Files shows a machine as one line.
 - **Smart Scan › AI Tools** lists each model you downloaded in llama.cpp, Jan, GPT4All, Draw Things and ComfyUI, with when you last used it. Nothing is ticked, and **Undo** brings a model back.
 - **Overview** suggests AI models you haven't touched in over 90 days.
+- **Smart Scan › Applications** finds the regenerable caches of Adobe Camera Raw, Capture One, DaVinci Resolve, Blender, Sketch and Affinity, never touching a catalog or project.
+- **Smart Scan › Developer Junk** shows what else hides in `~/.cache`, one folder per row and nothing ticked, plus RubyGems, Bundler, Carthage and Hugging Face caches.
+- **Smart Scan** cleans caches and old chats of Amp, Qwen Code, Kiro, Trae, Jan, GPT4All, llama.cpp and ComfyUI, and caches of Warp, Ghostty and Raycast. Models and sign-ins stay put.
+- Long lists in **Smart Scan** open fast with **Show More**, and **Rescan Skipped Items** checks again only what was in use.
+
+### Changed
+- The Settings window fits short screens: the General tab scrolls instead of being cut.
 
 ### Fixed
-- Counts read correctly in English and Vietnamese ("1 file", "1 copy"), and an app installed again shows its new icon without reopening CleanMate.
+- Counts read correctly in English and Vietnamese ("1 file", "1 copy"), and a reinstalled app shows its new icon without reopening CleanMate.
 
 ## [1.8] - 2026-11-06
 
