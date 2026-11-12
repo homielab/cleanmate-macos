@@ -68,6 +68,19 @@ struct FolderSizeCacheTests {
         #expect(FolderSizeCache.Fingerprint(root.appending(path: "missing")) == nil)
     }
 
+    /// Between saves memory stays bounded: past twice `limit`, only the `limit` most recently used are kept.
+    @Test func memoryStaysBoundedBetweenSaves() throws {
+        let sizes = FolderSizeCache(file: nil, limit: 3)
+        let fingerprint = try #require(FolderSizeCache.Fingerprint(FileManager.default.temporaryDirectory))
+        for index in 0..<7 {
+            sizes.remember(URL(filePath: "/tmp/cm-bounded/\(index)"), fingerprint, size: Int64(index), partlyUnreadable: false,
+                           now: Date(timeIntervalSince1970: Double(index)))
+        }
+        #expect(sizes.count == 3)
+        #expect(sizes.size(of: URL(filePath: "/tmp/cm-bounded/6"), fingerprint)?.size == 6)
+        #expect(sizes.size(of: URL(filePath: "/tmp/cm-bounded/3"), fingerprint) == nil)
+    }
+
     /// Without a file nothing is written; an unreadable file is no cache.
     @Test func memoryOnlyAndBrokenFile() throws {
         defer { try? fm.removeItem(at: root) }

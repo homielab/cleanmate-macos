@@ -156,6 +156,24 @@ struct MeasureFailureTests {
         #expect(calls.withLock { $0 }.sorted() == ["Fast", "Slow", "Slow"])
     }
 
+    /// Space Lens keeps at most `sizeLimit` folder sizes: past it, only those inside the folder shown stay.
+    @MainActor @Test func spaceLensCacheStaysWithinItsLimit() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        for name in ["One", "Two", "Three"] { try file("A/\(name)/x.bin") }
+        let model = SpaceLensModel(center: NotificationCenter())
+        model.disk = home.appending(path: "A")
+        model.hasFullDiskAccess = { true }
+        model.sizeLimit = 10
+        model.measure = { url, _, _ in
+            (1_000, Dictionary(uniqueKeysWithValues: (0..<4).map { ("/elsewhere/\(url.lastPathComponent)/\($0)", Int64($0)) }))
+        }
+        model.start(at: home.appending(path: "A"))
+        try await eventually("the measure to end") { !model.measuring }
+        #expect(model.cachedCounts.sizes <= 10)
+        #expect(model.items.count == 3 && model.items.allSatisfy { $0.size == 1_000 })
+        #expect(model.cachedCounts.listings == 1)
+    }
+
     /// Space Lens: a permission error is "Not Readable", any other error "Couldn’t Measure"; neither is "Cancelled".
     @MainActor @Test func spaceLensTellsPermissionErrorsFromOthers() async throws {
         defer { try? FileManager.default.removeItem(at: root) }

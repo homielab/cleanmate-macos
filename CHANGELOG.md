@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Review Before Cleaning** and the done screen count how many items go to the Trash, where Undo brings them back, and how many are deleted for good.
 - **Uninstaller** says when it couldn't read some folders and offers **Open Settings…** for Full Disk Access, instead of reporting that nothing was left.
+- Updates reach you when CleanMate runs only in the menu bar: started at login, it checks for updates once you've answered whether to check automatically, and shows nothing until a new version is out.
+- **Space Lens** keeps memory in check after measuring a whole disk: it remembers at most 200,000 folder sizes.
 
 ## [1.9] - 2026-11-11
 

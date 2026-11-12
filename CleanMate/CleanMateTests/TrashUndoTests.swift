@@ -119,6 +119,46 @@ struct TrashUndoTests {
         #expect(!fm.fileExists(atPath: a.path) && fm.fileExists(atPath: report.trashed[0].inTrash.path))
     }
 
+    /// Stop while Smart Scan cleans: what reached the Trash is exactly `report.trashed` and the records on disk, so
+    /// after quitting `cleanmate restore` (`TrashRecords.restore`) still puts every item back.
+    @MainActor @Test func smartScanStoppedCleanKeepsReportAndRecordsInStep() async throws {
+        defer { unlockAll(); try? fm.removeItem(at: root) }
+        let gates = RaceTests.Gates()
+        let items = (1...3).map { CleanerItem(id: "rec.\($0)", title: "Item \($0)", paths: [], mode: .trash) }
+        let files = try items.map { try file("Junk/\($0.id).bin") }
+        let model = SmartScanModel.isolated(module: .smartScan) { [CleanerGroup(id: "g", title: "G", systemImage: "x", items: items)] }
+        model.processNames = { [] }
+        model.appBundleIDs = { [] }
+        model.freeSpace = { nil }
+        model.logHome = root
+        model.cleanItem = { item, _, _ in
+            let call = await gates.enter { $0 == 2 } // the second item takes long
+            let url = files[call - 1]
+            return await MainActor.run {
+                CleanReport.trashing([(url, 10)], module: "Smart Scan", home: root, allows: { _ in true }, trash: fakeTrash)
+            }
+        }
+        model.scans = Dictionary(uniqueKeysWithValues: items.map { ($0.id, ItemScan(measuredSize: 10)) })
+        model.selected = Set(items.map(\.id))
+        model.phase = .results
+        let clean = Task { await model.clean() }
+        try await eventually("the second item to start") { gates.calls == 2 }
+        model.stopClean()
+        gates.open(2)
+        await clean.value
+        guard case .done(let report) = model.phase else { Issue.record("phase \(model.phase)"); return }
+        #expect(report.stopped == 1 && report.trashed.map(\.original) == Array(files.prefix(2)))
+        #expect(fm.fileExists(atPath: files[2].path)) // never handed to the cleaner
+
+        // what a later run (the command line, after quitting) reads
+        let records = TrashRecords.inTrash(home: root)
+        #expect(Set(records.map(\.trashed)) == Set(report.trashed.map(\.inTrash.path)))
+        let outcomes = TrashRecords.restore(report.trashed.map(\.inTrash.path), home: root)
+        #expect(outcomes.values.allSatisfy { $0 == .restored })
+        #expect(files.allSatisfy { fm.fileExists(atPath: $0.path) })
+        #expect(TrashRecords.inTrash(home: root).isEmpty)
+    }
+
     @MainActor @Test func largeFilesUndoRunsOnce() async {
         let model = LargeFilesModel()
         var calls = 0

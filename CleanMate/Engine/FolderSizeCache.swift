@@ -144,17 +144,25 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
                                                             links: fingerprint.links, size: size,
                                                             partlyUnreadable: partlyUnreadable, used: now.timeIntervalSince1970,
                                                             version: Self.version)
+            // a long scan between saves (or the command line tool, which never saves) stays bounded too
+            if let all = records, all.count > limit * 2 { records = trimmed(all) }
         }
     }
 
-    /// Drops all but the `limit` most recently used folders and writes the rest to `file`, atomically.
+    /// The `limit` most recently used records.
+    private func trimmed(_ all: [String: Record]) -> [String: Record] {
+        Dictionary(uniqueKeysWithValues: all.sorted { ($0.value.used, $0.key) > ($1.value.used, $1.key) }.prefix(limit)
+            .map { ($0.key, $0.value) })
+    }
+
+    /// Drops all but the `limit` most recently used folders and writes the rest to `file`, atomically. Called by
+    /// `Scanner.scan`, off the main thread.
     func save() {
         records.withLock { records in
             load(&records)
             guard var all = records else { return }
             if all.count > limit {
-                all = Dictionary(uniqueKeysWithValues: all.sorted { ($0.value.used, $0.key) > ($1.value.used, $1.key) }.prefix(limit)
-                    .map { ($0.key, $0.value) })
+                all = trimmed(all)
                 records = all
             }
             guard let file, !readOnly else { return }

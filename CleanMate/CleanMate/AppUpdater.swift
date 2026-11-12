@@ -15,12 +15,16 @@ final class AppUpdater: ObservableObject {
     private let environment: [String: String]
     /// Starts Sparkle; tests count calls instead.
     private var startUpdater: () -> Void = {}
+    /// Whether the user already answered Sparkle's "check automatically?" (or set it in Settings): its key is stored.
+    private let hasAnswered: () -> Bool
     /// Stays false under tests: they must never reach the network, nor show Sparkle's permission prompt.
     private(set) var isStarted = false
     @Published private(set) var canCheckForUpdates = false
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment, startUpdater: (() -> Void)? = nil) {
+    init(environment: [String: String] = ProcessInfo.processInfo.environment, startUpdater: (() -> Void)? = nil,
+         hasAnswered: @escaping () -> Bool = { UserDefaults.standard.object(forKey: "SUEnableAutomaticChecks") != nil }) {
         self.environment = environment
+        self.hasAnswered = hasAnswered
         controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: delegate, userDriverDelegate: nil)
         self.startUpdater = startUpdater ?? { [controller] in controller.startUpdater() }
         let updater = controller.updater
@@ -42,10 +46,11 @@ final class AppUpdater: ObservableObject {
         isStarted = true
     }
 
-    /// The main window appeared. A login launch's window is hidden at once: Sparkle waits until the user opens one,
-    /// so its permission prompt or an update alert never pops up alone at login.
+    /// The main window appeared. A login launch's window is hidden at once: Sparkle starts there only once the user
+    /// answered its permission prompt, so a menu-bar-only user still gets updates (its UI shows only when one is found),
+    /// while the prompt itself never pops up alone at login: it waits until the user opens the window.
     func windowShown(launchingHidden: Bool) {
-        guard !launchingHidden else { return }
+        guard !launchingHidden || hasAnswered() else { return }
         start()
     }
 

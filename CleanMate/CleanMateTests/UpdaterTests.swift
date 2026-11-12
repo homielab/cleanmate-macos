@@ -16,17 +16,32 @@ struct UpdaterTests {
         #expect(!AppUpdater.shared.isStarted)
     }
 
-    /// Opened at login with the window hidden: Sparkle doesn't start (no prompt or update alert alone at login);
-    /// the user opening the window starts it, once.
+    /// Opened at login with the window hidden before the user answered Sparkle's prompt: Sparkle doesn't start (no
+    /// prompt alone at login); the user opening the window starts it, once.
     @Test func hiddenLoginLaunchStartsTheUpdaterOnlyWhenTheWindowOpens() {
         var starts = 0
-        let updater = AppUpdater(environment: [:]) { starts += 1 }
+        let updater = AppUpdater(environment: [:], startUpdater: { starts += 1 }, hasAnswered: { false })
         updater.windowShown(launchingHidden: true)
         #expect(!updater.isStarted && starts == 0)
         updater.windowShown(launchingHidden: false)
         #expect(updater.isStarted && starts == 1)
         updater.windowShown(launchingHidden: false) // the window opened again
         #expect(starts == 1)
+    }
+
+    /// Once the user answered the prompt, a hidden login launch starts Sparkle: menu-bar-only users get updates too.
+    @Test func hiddenLoginLaunchStartsTheUpdaterOnceAnswered() {
+        var starts = 0
+        let updater = AppUpdater(environment: [:], startUpdater: { starts += 1 }, hasAnswered: { true })
+        updater.windowShown(launchingHidden: true)
+        #expect(updater.isStarted && starts == 1)
+        updater.windowShown(launchingHidden: false)
+        #expect(starts == 1)
+        // never under tests
+        let underTests = AppUpdater(environment: ["XCTestConfigurationFilePath": "/tmp/x"], startUpdater: { starts += 1 },
+                                    hasAnswered: { true })
+        underTests.windowShown(launchingHidden: true)
+        #expect(!underTests.isStarted && starts == 1)
     }
 
     @Test func feedIsTheLatestGitHubRelease() {

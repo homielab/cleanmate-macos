@@ -65,6 +65,13 @@ final class SpaceLensModel: ObservableObject {
     /// Session cache per finished listing: folder path → its child folders' sizes, hard-linked ones included.
     /// Only valid as a whole: those sizes depend on which sibling counted a shared hard link first.
     private var listings: [String: [String: Int64]] = [:]
+    /// Most folder sizes kept for the session: measuring the whole disk remembers every folder inside it, millions
+    /// on a large disk. Over it, only those inside the folder shown are kept (none when they fill half of it). Tests lower it.
+    var sizeLimit = 200_000
+    /// Most finished listings kept; over it, only those of the folder shown and the folders above it.
+    var listingLimit = 2_000
+    /// Folder sizes and listings remembered now (tests).
+    var cachedCounts: (sizes: Int, listings: Int) { (sizes.count, listings.count) }
     private var task: Task<Void, Never>?
     private var started = false
     /// Another module removed files: remembered sizes may be wrong, measure again next time Space Lens is shown.
@@ -314,6 +321,20 @@ final class SpaceLensModel: ObservableObject {
         if skipping != self.skipping { sizes = [:]; listings = [:]; self.skipping = skipping }
         sizes.merge(folders) { $1 }
         listings[folder.standardizedFileURL.path] = listing
+        trimCaches()
+    }
+
+    /// Keeps the caches within `sizeLimit` and `listingLimit`, favouring the folder shown: going back up stays instant.
+    private func trimCaches() {
+        let shown = current.standardizedFileURL.path
+        let prefix = shown.hasSuffix("/") ? shown : shown + "/"
+        if sizes.count > sizeLimit {
+            sizes = sizes.filter { $0.key.hasPrefix(prefix) }
+            if sizes.count > sizeLimit / 2 { sizes = [:] } // room to grow again before the next trim
+        }
+        if listings.count > listingLimit {
+            listings = listings.filter { shown == $0.key || shown.hasPrefix($0.key.hasSuffix("/") ? $0.key : $0.key + "/") }
+        }
     }
 
     private func loadVolume() { volume = Volume.read(root) }
@@ -371,7 +392,7 @@ final class SpaceLensModel: ObservableObject {
                     guard !Task.isCancelled, let index = indexByURL[url], items.indices.contains(index) else { continue }
                     switch result {
                     case .success(let measured):
-                        if epoch == cacheEpoch { sizes.merge(measured.folders) { $1 } }
+                        if epoch == cacheEpoch { sizes.merge(measured.folders) { $1 }; trimCaches() }
                         items[index].size = measured.size
                     case .failure(let failure):
                         items[index].failure = failure
@@ -380,7 +401,10 @@ final class SpaceLensModel: ObservableObject {
             }
             guard !Task.isCancelled else { return } // a cancelled listing is not remembered: its sizes are partial
             items.removeAll { $0.failure == .notFound } // gone since it was listed
-            if epoch == cacheEpoch { listings[folder.path] = Dictionary(items.filter(\.isFolder).compactMap { item in item.size.map { (item.url.path, $0) } }) { $1 } }
+            if epoch == cacheEpoch {
+                listings[folder.path] = Dictionary(items.filter(\.isFolder).compactMap { item in item.size.map { (item.url.path, $0) } }) { $1 }
+                trimCaches()
+            }
             measuring = false
             Attention.finished()
         }
