@@ -52,6 +52,7 @@ struct CleanReviewTests {
         let downloadsRow = review.groups[1].rows[1]
         #expect(downloadsRow.total.size == 6000 && downloadsRow.lockedCount == 1) // the locked entry is not counted
         #expect(review.trash == .init(size: 6000))
+        #expect(review.counts == .init(trash: 1, delete: 2)) // Old Downloads; Caches and pnpm
         #expect(review.delete == .init(size: 1000, upTo: 9000))
         #expect(review.trash.size + review.delete.size == model.selectedSize)
         #expect(review.trash.upTo + review.delete.upTo == model.selectedUpToSize)

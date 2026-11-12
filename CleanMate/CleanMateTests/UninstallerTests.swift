@@ -157,6 +157,20 @@ final class UninstallerTests {
     }
 
     /// A config folder named after a command in a PATH folder or an installed Homebrew package is that tool's, not an orphan.
+    /// A Library folder macOS won't list (no Full Disk Access) is reported, so an empty list there doesn't read as
+    /// "nothing left"; a protected folder skipped without Full Disk Access counts too, without being opened.
+    @Test func unreadableDataFoldersAreReported() throws {
+        let caches = try make("Library/Caches", folder: true)
+        try make("Library/Logs/x")
+        let containers = try make("Library/Containers", folder: true)
+        #expect(chmod(caches.path, 0) == 0)
+        defer { chmod(caches.path, 0o755); try? FileManager.default.removeItem(at: root) }
+        #expect(Uninstaller.unreadableDataFolders(policy: policy).map(\.lastPathComponent) == ["Caches"])
+        let skipped = ProtectedFolders.skipped(home: home, hasFullDiskAccess: false)
+        #expect(Uninstaller.unreadableDataFolders(policy: policy, skipped: skipped).map(\.path).sorted()
+                    == [caches.path, containers.path].sorted())
+    }
+
     @Test func orphanConfigSkipsToolsOnPathAndBrewPackages() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         for path in [".config/mycli/x", ".config/helix/x", ".local/share/fishcask/x", ".config/gone/x", "bin/mycli",

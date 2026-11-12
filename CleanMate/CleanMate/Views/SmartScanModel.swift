@@ -441,6 +441,8 @@ final class SmartScanModel: ObservableObject {
         var skipped: [CleanerItem] = []
         /// What the ticked rows move to the Trash and what they delete for good; together the "Selected" total.
         var trash = Total(), delete = Total()
+        /// How many ticked items go to the Trash and how many are deleted for good.
+        var counts = RemovalCounts()
 
         var hasSelection: Bool { groups.contains { $0.rows.contains(where: \.isOn) } }
     }
@@ -468,6 +470,7 @@ final class SmartScanModel: ObservableObject {
                     review[keyPath: kind].size += total.size
                     review[keyPath: kind].upTo += total.upTo
                     review[keyPath: kind].records += total.records
+                    review.counts.add(item.mode)
                 }
                 rows.append(.init(item: item, isOn: isOn, total: total, entries: scan.entries,
                                   lockedCount: lockedEntries(item).count,
@@ -495,6 +498,14 @@ final class SmartScanModel: ObservableObject {
     struct CleanedGroup: Identifiable { let id: String; let title: LocalizedStringResource; let systemImage: String
         var freed: Int64 = 0; var trashed: Int64 = 0 }
     @Published var cleanedGroups: [CleanedGroup] = []
+    /// Items the last clean moved to the Trash (can be undone) and deleted for good, for the done screen.
+    @Published var cleanedCounts = RemovalCounts()
+
+    /// Items by where they go: the Trash (can be undone) or deleted for good.
+    struct RemovalCounts: Equatable {
+        var trash = 0, delete = 0
+        mutating func add(_ mode: RemovalMode) { if mode == .trash { trash += 1 } else { delete += 1 } }
+    }
     /// Items the last clean left as they were (in use, locked, failed): "Rescan Skipped Items" scans just these.
     @Published private(set) var skippedItemIDs: Set<String> = []
 
@@ -811,6 +822,7 @@ final class SmartScanModel: ObservableObject {
         scannedItems = 0
         totalItems = todo.count
         var byGroup = groups.map { CleanedGroup(id: $0.id, title: $0.title, systemImage: $0.systemImage) }
+        var counts = RemovalCounts()
         let freeBefore = freeSpace()
         // Read again for the clean, never the scan's table: files opened since the scan are kept.
         let openFiles = OpenFiles(maxAge: OpenFiles.cleanMaxAge, read: readOpenFiles)
@@ -845,6 +857,7 @@ final class SmartScanModel: ObservableObject {
             for moved in result.trashed { trashedItemNames[moved.original] = ActivityLog.english(item.title) }
             let removed = Cleaner.removedCount(item, scan, result)
             if result.freed > 0 || removed > 0 {
+                counts.add(item.mode)
                 ActivityLog.record(module: module.title, item: ActivityLog.english(item.title), count: removed,
                                    size: result.freed, mode: item.mode, paths: Self.removedPaths(item, scan), home: logHome)
             }
@@ -855,6 +868,7 @@ final class SmartScanModel: ObservableObject {
         selected = []
         excludedEntries = [:]
         cleanedGroups = byGroup.filter { $0.freed > 0 }
+        cleanedCounts = counts
         skippedItemIDs = skipped
         freeSpaceChange = freeBefore.flatMap { before in
             freeSpace().map { FreeSpaceChange(before: before, after: $0, total: volumeSize() ?? 0) }

@@ -140,6 +140,10 @@ final class UninstallerModel: ObservableObject {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) != nil
         }
     }
+    /// Folders the app's files or the leftovers could not be read from (no Full Disk Access): the list may miss items.
+    @Published var unreadableFolders: [URL] = []
+    /// Injected by tests. The folders `loadEntries` could not read (`Uninstaller.unreadableDataFolders`).
+    var findUnreadableFolders: () -> [URL] = { Uninstaller.unreadableDataFolders() }
     /// The window's, set by the view: ⌘Z after Uninstall or Reset.
     weak var undoManager: UndoManager?
     /// "Undo"; tests pass their own so the real Trash is never touched.
@@ -450,6 +454,7 @@ final class UninstallerModel: ObservableObject {
         let current = entriesGeneration
         entries = []
         checked = []
+        unreadableFolders = []
         loadingEntries = selection != nil
         guard let selection else { return }
         defer { if current == entriesGeneration { loadingEntries = false } }
@@ -461,12 +466,14 @@ final class UninstallerModel: ObservableObject {
             let found = await data(of: app)
             guard !Task.isCancelled, current == entriesGeneration else { return }
             entries = found
+            unreadableFolders = findUnreadableFolders()
             checked = Set(found.filter { $0.kind == .data }.map(\.url)) // suggestions and config: never ticked for the user
         case .leftovers:
             let installed = Uninstaller.allBundleIDs().union(runningApps)
             let found = await leftovers(installed)
             guard !Task.isCancelled, current == entriesGeneration else { return }
             entries = found
+            unreadableFolders = findUnreadableFolders()
         }
     }
 

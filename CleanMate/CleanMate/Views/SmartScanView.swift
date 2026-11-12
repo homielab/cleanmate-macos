@@ -748,6 +748,7 @@ struct DoneScreen<Actions: View>: View {
             if module == .privacy {
                 Text("The selected traces were erased.")
             }
+            RemovalCountsLine(counts: model.cleanedCounts, module: module, done: true)
             let trashed = model.cleanedGroups.reduce(Int64(0)) { $0 + $1.trashed }
             if let result = report.undo {
                 UndoTrashResult(result: result)

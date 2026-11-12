@@ -992,6 +992,26 @@
         }
       }
     },
+    "Deleted for good: %lld, caches are made again as needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá hẳn: %lld mục, cache sẽ được tạo lại khi cần"
+          }
+        }
+      }
+    },
+    "Deleted for good: %lld, can’t be undone" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoá hẳn: %lld mục, không hoàn tác được"
+          }
+        }
+      }
+    },
     "Deleted permanently" : {
       "localizations" : {
         "vi" : {
@@ -2820,6 +2840,16 @@
         }
       }
     },
+    "Items to the Trash: %lld, can be undone" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vào Thùng rác: %lld mục, hoàn tác được"
+          }
+        }
+      }
+    },
     "Its file is no longer in the Trash." : {
       "localizations" : {
         "vi" : {
@@ -3176,6 +3206,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã chuyển vào Thùng rác"
+          }
+        }
+      }
+    },
+    "Moved to the Trash: %lld, can be undone" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã vào Thùng rác: %lld mục, hoàn tác được"
           }
         }
       }
@@ -5014,6 +5054,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã bỏ chọn một số mục con"
+          }
+        }
+      }
+    },
+    "Some folders couldn’t be read, so files there aren’t listed. Grant Full Disk Access, then look again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một số thư mục không đọc được nên file trong đó không được liệt kê. Cấp Full Disk Access rồi xem lại."
+          }
+        }
+      }
+    },
+    "Some Folders Not Readable" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Một số thư mục không đọc được"
           }
         }
       }

@@ -347,7 +347,8 @@ struct UninstallerView: View {
                     Text("Library items named after apps that are no longer installed. Nothing is selected for you: check each item before removing it.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
-                entryList(empty: Text("No Leftovers Found"))
+                unreadableNotice
+                entryList(empty: model.unreadableFolders.isEmpty ? Text("No Leftovers Found") : Text("Some Folders Not Readable"))
                 footer(button: Text("Move to Trash…"))
             }
         case .hiddenConfig:
@@ -410,11 +411,29 @@ struct UninstallerView: View {
                                 .font(.callout).foregroundStyle(.secondary)
                         }
                     }
+                    unreadableNotice
                     entryList(app: app, empty: Text("No Related Files Found"))
                     footer(button: !model.trashApp ? (model.isRunning(app) ? Text("Quit and Reset…") : Text("Reset…"))
                            : model.isRunning(app) ? Text("Quit and Uninstall…") : Text("Uninstall…"), app: app)
                 }
             }
+        }
+    }
+
+    /// Without Full Disk Access some Library folders can't be listed: files there are missing from the list, never
+    /// "nothing left".
+    @ViewBuilder private var unreadableNotice: some View {
+        if !model.unreadableFolders.isEmpty && !model.loadingEntries {
+            HStack {
+                Label("Some folders couldn’t be read, so files there aren’t listed. Grant Full Disk Access, then look again.",
+                      systemImage: "lock.shield")
+                    .foregroundStyle(.orange)
+                Button("Open Settings…") { FullDiskAccess.openSettings() }.buttonStyle(.link)
+            }
+            .font(.callout)
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+            .help(model.unreadableFolders.map(\.path).joined(separator: "\n"))
         }
     }
 

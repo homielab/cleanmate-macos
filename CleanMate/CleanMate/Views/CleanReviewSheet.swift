@@ -189,6 +189,7 @@ struct CleanReviewSheet: View {
     /// What goes to the Trash and what is deleted for good, each with what that means.
     private func summary(_ review: SmartScanModel.Review) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            RemovalCountsLine(counts: review.counts, module: module, done: false).font(.callout.bold())
             if review.trash != .init() {
                 Label {
                     Text("\(SmartScanView.totalText(review.trash).bold()) to the Trash: you can put it back with Undo or from the Trash.")
@@ -208,6 +209,28 @@ struct CleanReviewSheet: View {
         }
         .monospacedDigit()
         .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// "Items to the Trash: 3, can be undone · Deleted for good: 5, caches are made again" — before a clean (review) and
+/// after it (done screen). Parts with no item are left out; nothing when both are 0.
+struct RemovalCountsLine: View {
+    let counts: SmartScanModel.RemovalCounts
+    let module: Module
+    /// After the clean: "Moved to the Trash" / "Deleted for good" instead of "To the Trash" / "Deleted for good".
+    let done: Bool
+
+    var body: some View {
+        let trash = counts.trash > 0 ? (done ? Text("Moved to the Trash: \(counts.trash), can be undone")
+                                              : Text("Items to the Trash: \(counts.trash), can be undone")) : nil
+        let delete = counts.delete > 0 ? (module == .privacy ? Text("Deleted for good: \(counts.delete), can’t be undone")
+                                                              : Text("Deleted for good: \(counts.delete), caches are made again as needed")) : nil
+        switch (trash, delete) {
+        case let (trash?, delete?): trash + Text(verbatim: " · ") + delete
+        case let (trash?, nil): trash
+        case let (nil, delete?): delete
+        case (nil, nil): EmptyView()
+        }
     }
 }
 

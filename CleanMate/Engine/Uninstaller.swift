@@ -369,6 +369,20 @@ nonisolated enum Uninstaller {
         }
     }
 
+    /// The folders the app's files and leftovers are looked for in (`appDataFolders` in ~/Library, ~/.config,
+    /// ~/.local/share, ~/.local/state) that exist but macOS doesn't let CleanMate list (`SpaceLens.isUnreadable`): what
+    /// is in them can't be shown, so an empty list there means "not readable", not "nothing left". Folders in `skipped`
+    /// (`ProtectedFolders` without Full Disk Access) are counted without being opened: opening them would prompt.
+    static func unreadableDataFolders(policy: SafetyPolicy = .current, skipped: Set<String> = []) -> [URL] {
+        let home = policy.homeURL
+        let folders = SafetyPolicy.appDataFolders.map { home.appending(path: "Library/\($0)") }
+            + SafetyPolicy.appConfigFolders.map { home.appending(path: $0) }
+        return folders.filter { folder in
+            if ProtectedFolders.contains(skipped, folder) { return FileManager.default.fileExists(atPath: folder.path) }
+            return SpaceLens.isUnreadable(folder)
+        }
+    }
+
     private static func dataEntries(policy: SafetyPolicy, where keep: (String, String) -> Bool) async -> [AppDataEntry] {
         var entries: [AppDataEntry] = []
         for item in dataFolderItems(policy: policy) where keep(item.name, item.folder) {

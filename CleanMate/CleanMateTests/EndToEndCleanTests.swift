@@ -580,6 +580,7 @@ struct EndToEndCleanTests {
         #expect(report.freed == 139_264 && report.upTo == 0 && report.skipped == 0)
         #expect(model.cleanedGroups.map(\.freed) == [122_880, 16_384])
         #expect(model.cleanedGroups.map(\.trashed) == [0, 16_384])
+        #expect(model.cleanedCounts == .init(trash: 1, delete: 1))
         #expect(model.freeSpaceChange == .init(before: 5_000_000_000, after: 4_999_000_000, total: 10_000_000_000))
         #expect(model.revealsDone) // the done screen animates in the first time it shows this report
         #expect(files.keys.allSatisfy { !fm.fileExists(atPath: home.appending(path: $0).path) })

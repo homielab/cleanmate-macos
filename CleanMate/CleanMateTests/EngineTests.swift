@@ -2696,6 +2696,21 @@ struct AppCatalogTests {
         }
     }
 
+    /// Erasing a browser's databases while it runs corrupts its profile: every browser item (history, downloads,
+    /// cookies, autofill) is skipped while that browser is open, with the same bundle ids across its group.
+    @Test func privacyBrowserItemsWaitForTheirBrowserToQuit() {
+        let browsers = CleanerGroup.privacy.filter { $0.id != "privacy-system" }
+        #expect(browsers.count >= 8)
+        for group in browsers {
+            let ids = group.items.first?.runningAppBundleIDs ?? []
+            #expect(!ids.isEmpty, "\(group.id)")
+            for item in group.items {
+                #expect(item.runningAppBundleIDs == ids, "\(item.id)")
+                #expect(item.runningBlocker(apps: ids.map { String($0.trimmingCharacters(in: ["*"])) }, processes: []) != nil, "\(item.id)")
+            }
+        }
+    }
+
     /// One Privacy group per Beta/Dev/Canary/Nightly channel, its own folder and bundle id, nothing ticked.
     @Test func privacyBrowserChannelsHaveTheirOwnGroup() throws {
         #expect(CleanerGroup.browserChannels.count == 8)
