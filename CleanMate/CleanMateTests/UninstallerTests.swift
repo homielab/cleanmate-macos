@@ -156,6 +156,33 @@ final class UninstallerTests {
         #expect(leftovers.allSatisfy { policy.allowsAppConfig($0.url) })
     }
 
+    /// The app's Open Recent list (`ApplicationRecentDocuments/<bundle id>.sfl4`) is its data, matched by bundle id only;
+    /// other apps' lists, the Apple menu's lists, Apple apps' lists and a folder named like a list are never listed.
+    @Test func listsTheAppsOpenRecentList() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let lists = "Library/Application Support/com.apple.sharedfilelist"
+        let own = try make("\(lists)/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.foo.hopper.sfl4")
+        for path in ["com.foo.hopper.helper.sfl3", "com.foo.hopperpro.sfl4", "com.apple.textedit.sfl4", "com.foo.hopper.plist",
+                     "Hopper.sfl4"] {
+            try make("\(lists)/com.apple.LSSharedFileList.ApplicationRecentDocuments/\(path)")
+        }
+        try make("\(lists)/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.foo.hopper.x.sfl2", folder: true)
+        try make("\(lists)/com.apple.LSSharedFileList.RecentDocuments.sfl4")
+        let app = InstalledApp(url: URL(filePath: "/nonexistent/Hopper.app"), name: "Hopper", bundleID: "com.foo.Hopper",
+                               version: nil, lastUsed: nil)
+        let entries = await Uninstaller.data(of: app, otherBundleIDs: [], tools: [:], policy: policy)
+        let recent = entries.filter { $0.url.path.contains("sharedfilelist") }
+        #expect(Set(recent.map(\.url.lastPathComponent)) == ["com.foo.hopper.sfl4", "com.foo.hopper.helper.sfl3"])
+        #expect(recent.allSatisfy { $0.kind == .data && $0.location == "Recent Documents" })
+        #expect(policy.allowsAppRecentList(own) && !policy.allowsAppData(own))
+        #expect(!policy.allowsAppRecentList(home.appending(path: "\(lists)/com.apple.LSSharedFileList.RecentDocuments.sfl4")))
+        // Once the app is gone, its list is a leftover.
+        let leftovers = await Uninstaller.leftovers(installedBundleIDs: [], tools: [], appNames: [], toolFolders: [],
+                                                    brewPrefixes: [], isRegistered: { _ in false }, policy: policy)
+        #expect(Set(leftovers.map(\.url.lastPathComponent)).isSuperset(of: ["com.foo.hopper.sfl4", "com.foo.hopperpro.sfl4"]))
+        #expect(!leftovers.contains { $0.url.lastPathComponent.hasPrefix("com.apple.") })
+    }
+
     /// A config folder named after a command in a PATH folder or an installed Homebrew package is that tool's, not an orphan.
     /// A Library folder macOS won't list (no Full Disk Access) is reported, so an empty list there doesn't read as
     /// "nothing left"; a protected folder skipped without Full Disk Access counts too, without being opened.

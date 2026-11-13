@@ -38,7 +38,8 @@ nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     var names: [String] { [name] + [bundleName, executableName].compactMap { $0 } }
 }
 
-/// One item directly inside a ~/Library data folder (`SafetyPolicy.appDataFolders`), or an app's config item directly in
+/// One item directly inside a ~/Library data folder (`SafetyPolicy.appDataFolders`), the app's Open Recent list
+/// (`SafetyPolicy.allowsAppRecentList`), or an app's config item directly in
 /// ~, ~/.config, ~/.local/share or ~/.local/state (`SafetyPolicy.allowsAppConfig`).
 nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
     /// `data`: surely the app's (ticked when listed). `suggested`: a folder that only starts like the app's name.
@@ -53,8 +54,10 @@ nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
 
     var id: URL { url }
     var folder: String { url.deletingLastPathComponent().lastPathComponent }
-    /// Where the item is, as shown: its ~/Library folder, `~/.config`, `~/.local/share`, `~/.local/state` or `~`.
+    /// Where the item is, as shown: its ~/Library folder (`Recent Documents` for the app's Open Recent list),
+    /// `~/.config`, `~/.local/share`, `~/.local/state` or `~`.
     var location: String {
+        if folder == RecentItems.appFolderName { return "Recent Documents" }
         guard kind == .config else { return folder }
         let parent = url.deletingLastPathComponent()
         return SafetyPolicy.appConfigFolders.first { parent.path.hasSuffix("/" + $0) }.map { "~/" + $0 } ?? "~"
@@ -82,6 +85,9 @@ nonisolated enum AppMatcher {
         var id = name
         for ext in [".plist", ".savedState", ".binarycookies"] where id.lowercased().hasSuffix(ext.lowercased()) {
             id = String(id.dropLast(ext.count))
+        }
+        if folder == RecentItems.appFolderName, let dot = id.lastIndex(of: "."), id[dot...].hasPrefix(".sfl") {
+            id = String(id[..<dot])
         }
         if folder == "Group Containers" {
             let parts = id.split(separator: ".", maxSplits: 1).map(String.init)
@@ -360,13 +366,19 @@ nonisolated enum Uninstaller {
     /// Allowed items directly in each `appDataFolders` folder: (folder, name, url). Folders in `skipped`
     /// (`ProtectedFolders` without Full Disk Access) are not listed.
     private static func dataFolderItems(policy: SafetyPolicy, skipped: Set<String> = []) -> [(folder: String, name: String, url: URL)] {
-        SafetyPolicy.appDataFolders.flatMap { folder in
+        let items = SafetyPolicy.appDataFolders.flatMap { folder in
             let dir = policy.homeURL.appending(path: "Library/\(folder)")
             guard !ProtectedFolders.contains(skipped, dir) else { return [(folder: String, name: String, url: URL)]() }
             return ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
                 .map { (folder: folder, name: $0, url: dir.appending(path: $0)) }
                 .filter { policy.allowsAppData($0.url) }
         }
+        // Each app's Open Recent list (`<bundle id>.sfl4`), matched by bundle id only.
+        let recent = policy.homeURL.appending(path: "Library/" + SafetyPolicy.appRecentListFolder)
+        guard !ProtectedFolders.contains(skipped, recent) else { return items }
+        return items + ((try? FileManager.default.contentsOfDirectory(atPath: recent.path)) ?? [])
+            .map { (folder: RecentItems.appFolderName, name: $0, url: recent.appending(path: $0)) }
+            .filter { policy.allowsAppRecentList($0.url) }
     }
 
     /// The folders the app's files and leftovers are looked for in (`appDataFolders` in ~/Library, ~/.config,
@@ -707,7 +719,7 @@ nonisolated enum Uninstaller {
         }
         await bootOutAgents(in: data, policy: policy, run: launchctl)
         report += CleanReport.trashing(data.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
-                                       allows: { policy.allowsAppData($0) || policy.allowsAppConfig($0) }, trash: moveToTrash,
+                                       allows: { policy.allowsAppData($0) || policy.allowsAppRecentList($0) || policy.allowsAppConfig($0) }, trash: moveToTrash,
                                        run: run)
         return report
     }

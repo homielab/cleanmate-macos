@@ -640,6 +640,21 @@ nonisolated struct SafetyPolicy: Sendable {
         return allows(URL(fileURLWithPath: path))
     }
 
+    /// Uninstaller rule for an app's own Open Recent list, only ever moved to the Trash: a regular `<bundle id>.sfl<N>`
+    /// file directly in ~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments
+    /// (`RecentItems.isRecentList`), not hidden, not an Apple app's, and allowed by `allows`.
+    func allowsAppRecentList(_ url: URL) -> Bool {
+        let path = Self.normalize(url)
+        let name = (path as NSString).lastPathComponent
+        guard (path as NSString).deletingLastPathComponent == allowedRoots[0] + "/Library/" + Self.appRecentListFolder,
+              !name.hasPrefix("."), !Self.isApple(name), RecentItems.isRecentList(URL(fileURLWithPath: path))
+        else { return false }
+        return allows(URL(fileURLWithPath: path))
+    }
+
+    /// The folder in ~/Library that holds each app's Open Recent list, named `<bundle id>.sfl<N>`.
+    static let appRecentListFolder = "Application Support/\(RecentItems.folderName)/\(RecentItems.appFolderName)"
+
     /// Hidden items of the home folder that are never one app's config, whatever app is named like them: shell and login
     /// files, keys, stores shared by developer tools, and the folders `allows` already refuses. Lowercased.
     static let sharedHomeItems: Set = [
