@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **More browsers**: Dia, Zen, Orion, DuckDuckGo, Comet, Chromium and Opera GX. Smart Scan › Applications clears their caches; Privacy erases history, downloads, cookies and form data for Dia, Comet, Chromium, Opera GX and Zen, and cookies for Orion. Each is skipped while that browser is open, and bookmarks, passwords and settings are kept.
+
 ### Fixed
 - **Uninstaller** also removes the app's Open Recent list in `~/Library/Application Support/com.apple.sharedfilelist`, and lists the ones of apps already removed among the leftovers.
 

@@ -245,6 +245,20 @@ extension CleanerGroup {
         browser("opera", "Opera", bundle: "com.operasoftware.Opera", caches: "com.operasoftware.Opera",
                 support: "com.operasoftware.Opera"),
         browser("vivaldi", "Vivaldi", bundle: "com.vivaldi.Vivaldi", caches: "Vivaldi", support: "Vivaldi"),
+        browser("opera-gx", "Opera GX", bundle: "com.operasoftware.OperaGX", caches: "com.operasoftware.OperaGX",
+                support: "com.operasoftware.OperaGX"),
+        browser("chromium", "Chromium", bundle: "org.chromium.Chromium", caches: "Chromium", support: "Chromium"),
+        browser("dia", "Dia", bundle: "company.thebrowser.dia", caches: "company.thebrowser.dia", support: "Dia/User Data"),
+        // Comet keeps its cache under its name or its bundle id, depending on the version.
+        app("comet", "Comet", bundle: ["ai.perplexity.comet"],
+            ["~/Library/Caches/Comet", "~/Library/Caches/ai.perplexity.comet"] + chromium("~/Library/Application Support/Comet")),
+        // Zen (Firefox-based): profiles in Application Support/zen are never touched; its cache2 folders live here.
+        app("zen", "Zen", bundle: CleanerGroup.zenBundleIDs, ["~/Library/Caches/zen"]),
+        // Orion (WebKit) and DuckDuckGo (the build from duckduckgo.com; the App Store one is sandboxed): the
+        // cache folder only, never ~/Library/WebKit (website data) or Application Support.
+        app("orion", "Orion", bundle: CleanerGroup.orionBundleIDs, ["~/Library/Caches/com.kagi.kagimacOS"]),
+        app("duckduckgo", "DuckDuckGo", bundle: ["com.duckduckgo.macos.browser"],
+            ["~/Library/Caches/com.duckduckgo.macos.browser"]),
     ] + browserChannels.map { browser($0.id, $0.name, bundle: $0.bundle, caches: $0.folder, support: $0.folder) }
     // On-device AI model, GBs per channel: unticked, deleted (Chrome downloads it again when an AI feature
     // is used, so the Trash would free nothing); skipped while that channel runs.

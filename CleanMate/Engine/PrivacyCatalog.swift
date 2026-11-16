@@ -30,6 +30,16 @@ extension CleanerGroup {
         firefox,
         chromium("opera", "Opera", support: "com.operasoftware.Opera", bundle: "com.operasoftware.Opera"),
         chromium("vivaldi", "Vivaldi", support: "Vivaldi", bundle: "com.vivaldi.Vivaldi"),
+        chromium("opera-gx", "Opera GX", support: "com.operasoftware.OperaGX", bundle: "com.operasoftware.OperaGX"),
+        chromium("chromium", "Chromium", support: "Chromium", bundle: "org.chromium.Chromium"),
+        chromium("dia", "Dia", support: "Dia/User Data", bundle: "company.thebrowser.dia"),
+        chromium("comet", "Comet", support: "Comet", bundle: "ai.perplexity.comet"),
+        zen,
+        // Orion (WebKit): only its cookie file is a known format; its history database is left alone.
+        CleanerGroup(id: "privacy-orion", title: "Orion", systemImage: "globe", items: [
+            trace("orion-cookies", "Cookies", note: cookiesNote, ["~/Library/HTTPStorages"],
+                  orionBundleIDs.map { $0 + ".binarycookies" }, bundles: orionBundleIDs),
+        ]),
     ] + browserChannels.map { chromium($0.id, $0.name, support: $0.folder, bundle: $0.bundle) } + [
         CleanerGroup(id: "privacy-system", title: "System", systemImage: "desktopcomputer", items: [
             RecentItems.item(runningApps: runningApps),
@@ -136,13 +146,23 @@ extension CleanerGroup {
     /// Release/Beta/ESR (org.mozilla.firefox), Developer Edition and Nightly all share Firefox/Profiles.
     nonisolated static let firefoxBundleIDs = ["org.mozilla.firefox", "org.mozilla.firefoxdeveloperedition", "org.mozilla.nightly"]
 
-    nonisolated private static let firefox: CleanerGroup = {
-        let profiles = ["~/Library/Application Support/Firefox/Profiles/*"]
+    /// Zen is Firefox with its own profiles (Application Support/zen/Profiles) and bundle id; Twilight is its nightly.
+    nonisolated static let zenBundleIDs = ["app.zen-browser.zen", "app.zen-browser.twilight"]
+    /// Orion and its release candidate share their data.
+    nonisolated static let orionBundleIDs = ["com.kagi.kagimacOS", "com.kagi.kagimacOS.RC"]
+
+    nonisolated private static let firefox = gecko("firefox", "Firefox", folder: "Firefox", bundles: firefoxBundleIDs)
+    nonisolated private static let zen = gecko("zen", "Zen", folder: "zen", bundles: zenBundleIDs)
+
+    /// A Firefox-based browser: `folder`/Profiles/* under Application Support.
+    nonisolated private static func gecko(_ id: String, _ name: String, folder: String, bundles: [String]) -> CleanerGroup {
+        let profiles = ["~/Library/Application Support/\(folder)/Profiles/*"]
         let downloads = "SELECT id FROM moz_anno_attributes WHERE name LIKE 'downloads/%'"
-        return CleanerGroup(id: "privacy-firefox", title: "Firefox", systemImage: "globe", items: [
-            trace("firefox-history", "Browsing history and downloads",
+        return CleanerGroup(id: "privacy-" + id, title: LocalizedStringResource(String.LocalizationValue(name)),
+                            systemImage: "globe", items: [
+            trace(id + "-history", "Browsing history and downloads",
                   note: "Visited pages and the download list; bookmarks and downloaded files are kept",
-                  profiles, ["places.sqlite"], bundles: firefoxBundleIDs,
+                  profiles, ["places.sqlite"], bundles: bundles,
                   database: DatabaseErase(
                       count: "SELECT (SELECT count(*) FROM moz_historyvisits) + (SELECT count(*) FROM moz_annos WHERE anno_attribute_id IN (\(downloads)));",
                       erase: """
@@ -157,12 +177,12 @@ extension CleanerGroup {
                           DELETE FROM moz_origins WHERE id NOT IN (SELECT origin_id FROM moz_places WHERE origin_id NOT NULL);
                           COMMIT;
                           """)),
-            trace("firefox-cookies", "Cookies", note: cookiesNote, profiles, ["cookies.sqlite", "cookies.sqlite-*"],
-                  bundles: firefoxBundleIDs),
-            trace("firefox-autofill", "Form autofill data", note: autofillNote, profiles,
-                  ["formhistory.sqlite", "formhistory.sqlite-*"], bundles: firefoxBundleIDs),
+            trace(id + "-cookies", "Cookies", note: cookiesNote, profiles, ["cookies.sqlite", "cookies.sqlite-*"],
+                  bundles: bundles),
+            trace(id + "-autofill", "Form autofill data", note: autofillNote, profiles,
+                  ["formhistory.sqlite", "formhistory.sqlite-*"], bundles: bundles),
         ])
-    }()
+    }
 
     nonisolated private static func trace(_ id: String, _ title: LocalizedStringResource, note: LocalizedStringResource,
                                           _ paths: [String], _ included: [String], bundle: String? = nil, bundles: [String] = [],

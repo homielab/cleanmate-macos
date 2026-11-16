@@ -1726,7 +1726,9 @@ struct CatalogTests {
             #expect(userCaches.excluded.contains(name), "\(name)")
         }
         #expect(!userCaches.excluded.contains("Google")) // the rest of Google/ is still listed
-        for name in ["Google/Chrome Beta", "Microsoft Edge Canary", "BraveSoftware/Brave-Browser-Nightly"] {
+        for name in ["Google/Chrome Beta", "Microsoft Edge Canary", "BraveSoftware/Brave-Browser-Nightly", "com.operasoftware.OperaGX",
+                     "Chromium", "company.thebrowser.dia", "Comet", "ai.perplexity.comet", "zen", "com.kagi.kagimacOS",
+                     "com.duckduckgo.macos.browser"] {
             #expect(userCaches.excluded.contains(name), "\(name)")
         }
     }
@@ -2708,6 +2710,77 @@ struct AppCatalogTests {
                 #expect(item.runningAppBundleIDs == ids, "\(item.id)")
                 #expect(item.runningBlocker(apps: ids.map { String($0.trimmingCharacters(in: ["*"])) }, processes: []) != nil, "\(item.id)")
             }
+        }
+    }
+
+    /// Opera GX, Chromium, Dia, Comet, Zen, Orion and DuckDuckGo: the cache item removes cache folders only, the
+    /// Privacy items only their trace files; both are skipped while the browser runs. DuckDuckGo has no Privacy group.
+    @Test func addedBrowsersCleanCachesAndTraces() async throws {
+        let box = try Sandbox()
+        defer { box.remove() }
+        let support = "Library/Application Support/", caches = "Library/Caches/"
+        let browsers: [(id: String, bundles: [String], cache: [String], traces: [(item: String, file: String)], kept: [String])] = [
+            ("opera-gx", ["com.operasoftware.OperaGX"],
+             [caches + "com.operasoftware.OperaGX/Default/Cache/a", support + "com.operasoftware.OperaGX/Code Cache/js/a"],
+             [("cookies", support + "com.operasoftware.OperaGX/Cookies"), ("history", support + "com.operasoftware.OperaGX/Visited Links")],
+             [support + "com.operasoftware.OperaGX/Bookmarks", support + "com.operasoftware.OperaGX/Login Data"]),
+            ("chromium", ["org.chromium.Chromium"],
+             [caches + "Chromium/Default/Cache/a", support + "Chromium/Profile 1/GPUCache/a"],
+             [("cookies", support + "Chromium/Default/Network/Cookies"), ("history", support + "Chromium/Profile 1/Top Sites")],
+             [support + "Chromium/Default/Bookmarks", support + "Chromium/Local State"]),
+            ("dia", ["company.thebrowser.dia"],
+             [caches + "company.thebrowser.dia/a", support + "Dia/User Data/Default/Code Cache/js/a"],
+             [("cookies", support + "Dia/User Data/Default/Cookies"), ("history", support + "Dia/User Data/Profile 1/Visited Links")],
+             [support + "Dia/User Data/Default/Login Data", support + "Dia/StorableSidebar.json"]),
+            ("comet", ["ai.perplexity.comet"],
+             [caches + "Comet/Default/Cache/a", caches + "ai.perplexity.comet/a", support + "Comet/Default/Service Worker/CacheStorage/a"],
+             [("cookies", support + "Comet/Profile 1/Network/Cookies"), ("history", support + "Comet/Default/Visited Links")],
+             [support + "Comet/Default/Preferences", support + "Comet/Default/Extensions/abc/manifest.json"]),
+            ("zen", ["app.zen-browser.zen", "app.zen-browser.twilight"],
+             [caches + "zen/Profiles/ab.Default (release)/cache2/entries/a"],
+             [("cookies", support + "zen/Profiles/ab.Default (release)/cookies.sqlite"),
+              ("autofill", support + "zen/Profiles/ab.Default (release)/formhistory.sqlite")],
+             [support + "zen/Profiles/ab.Default (release)/logins.json", support + "zen/Profiles/ab.Default (release)/prefs.js",
+              support + "zen/profiles.ini"]),
+            ("orion", ["com.kagi.kagimacOS", "com.kagi.kagimacOS.RC"],
+             [caches + "com.kagi.kagimacOS/Cache.db"],
+             [("cookies", "Library/HTTPStorages/com.kagi.kagimacOS.binarycookies")],
+             [support + "Orion/Defaults/history", "Library/WebKit/com.kagi.kagimacOS/WebsiteData/a",
+              "Library/HTTPStorages/com.apple.other.binarycookies"]),
+            ("duckduckgo", ["com.duckduckgo.macos.browser"],
+             [caches + "com.duckduckgo.macos.browser/Cache.db"], [],
+             [support + "com.duckduckgo.macos.browser/Database.sqlite", "Library/WebKit/com.duckduckgo.macos.browser/a"]),
+        ]
+        let apps = CleanerGroup.applications().items
+        func exists(_ path: String) -> Bool { FileManager.default.fileExists(atPath: box.home.appending(path: path).path) }
+        for browser in browsers {
+            for path in browser.cache + browser.traces.map(\.file) + browser.kept { try box.file(path) }
+            let privacy = CleanerGroup.privacy.first { $0.id == "privacy-" + browser.id }?.items ?? []
+            #expect(privacy.isEmpty == browser.traces.isEmpty, "\(browser.id)")
+            let cache = try #require(apps.first { $0.id == browser.id }, "\(browser.id)")
+            let traces = try browser.traces.map { trace in
+                try #require(privacy.first { $0.id == browser.id + "-" + trace.item }, "\(browser.id)-\(trace.item)")
+            }
+            for item in [cache] + privacy {
+                #expect(item.runningAppBundleIDs == browser.bundles && !item.showsWhenEmpty, "\(item.id)")
+                for bundle in browser.bundles { #expect(item.runningBlocker(apps: [bundle], processes: []) != nil, "\(item.id)") }
+                #expect(item.runningBlocker(apps: ["com.apple.Safari"], processes: []) == nil, "\(item.id)")
+            }
+            #expect(cache.selectedByDefault && privacy.allSatisfy { !$0.selectedByDefault }, "\(browser.id)")
+
+            let scan = await Scanner.scan(cache, policy: box.policy)
+            #expect(scan.entries.count >= 1, "\(browser.id)")
+            #expect(await Cleaner.clean(cache, scan: scan, policy: box.policy).skipped == 0, "\(browser.id)")
+            for path in browser.cache { #expect(!exists(path), "\(path)") }
+            for path in browser.traces.map(\.file) + browser.kept { #expect(exists(path), "\(path)") }
+
+            for (item, trace) in zip(traces, browser.traces) {
+                let scan = await Scanner.scan(item, policy: box.policy)
+                #expect(scan.entries.count == 1, "\(item.id)")
+                #expect(await Cleaner.clean(item, scan: scan, policy: box.policy).skipped == 0, "\(item.id)")
+                #expect(!exists(trace.file), "\(item.id)")
+            }
+            for path in browser.kept { #expect(exists(path), "\(path)") }
         }
     }
 
