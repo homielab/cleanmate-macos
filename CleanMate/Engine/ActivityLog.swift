@@ -132,7 +132,7 @@ nonisolated enum ActivityLog {
     }
 
     /// One row of Settings › Activity.
-    struct Entry: Identifiable, Equatable {
+    struct Entry: Identifiable, Equatable, Sendable {
         var id = 0
         var date: Date?
         /// The date column as written, shown when it doesn't parse.
@@ -170,6 +170,41 @@ nonisolated enum ActivityLog {
         return Entry(id: id, date: try? Date(fields[0], strategy: .iso8601), dateText: fields[0], module: fields[1],
                      moduleKey: moduleKey, item: fields[2], size: fields[4], bytes: fields.count > 6 ? Int64(fields[6]) : nil, kind: fields[5],
                      reason: fields.count > 7 && !fields[7].isEmpty ? fields[7] : nil)
+    }
+
+    /// Bytes removed in a window, as `freed` returns them.
+    struct Freed: Equatable, Sendable {
+        var deleted: Int64 = 0
+        var trashed: Int64 = 0
+        var since: Date?
+    }
+
+    /// What Settings › Activity shows, built off the main thread.
+    struct Snapshot: Equatable, Sendable {
+        var entries: [Entry] = []
+        /// Last 30 days.
+        var recent = Freed()
+        var total = Freed()
+    }
+
+    /// Size and modification date of activity.log, activity.1.log and activity.archived: unchanged = nothing new to read.
+    static func stamp(home: URL = SafetyPolicy.current.homeURL) -> [String] {
+        let current = url(home: home)
+        return [current, current.deletingPathExtension().appendingPathExtension("1.log"), archiveURL(current)].map { file in
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path) else { return "" }
+            let size = (attributes[.size] as? NSNumber)?.int64Value ?? -1
+            return "\(size)-\((attributes[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0)"
+        }
+    }
+
+    /// The rows (newest first) and the Freed totals of Settings › Activity.
+    static func snapshot(home: URL = SafetyPolicy.current.homeURL, locale: Locale = .current, now: Date = .now) -> Snapshot {
+        let entries = readAll(home: home).split(separator: "\n").reversed().enumerated()
+            .map { entry($1, id: $0, locale: locale) }
+        let recent = freed(after: now.addingTimeInterval(-30 * 86_400), home: home)
+        let total = freed(home: home)
+        return Snapshot(entries: entries, recent: Freed(deleted: recent.deleted, trashed: recent.trashed, since: recent.since),
+                        total: Freed(deleted: total.deleted, trashed: total.trashed, since: total.since))
     }
 
     /// The log's text, oldest line first; empty when nothing was removed yet.

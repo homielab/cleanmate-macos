@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Settings › Integrations** installs the `cleanmate` command with one button: a link in `~/.local/bin`, no administrator password, repaired when the app was moved.
 - **More browsers**: Dia, Zen, Orion, DuckDuckGo, Comet, Chromium and Opera GX. Smart Scan › Applications clears their caches; Privacy erases history, downloads, cookies and form data for Dia, Comet, Chromium, Opera GX and Zen, and cookies for Orion. Each is skipped while that browser is open, and bookmarks, passwords and settings are kept.
 - **Developer Junk** finds more: Julia's compiled cache and artifacts, Conan 2's package cache, Expo's caches, Hex packages, PlatformIO's cache, Arduino downloads, old Godot export templates and the Python versions uv installed. What does not come back on its own is unticked.
 
@@ -15,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Uninstaller** also removes the app's Open Recent list in `~/Library/Application Support/com.apple.sharedfilelist`, and lists the ones of apps already removed among the leftovers.
 
 ### Changed
+- **Settings › Activity** reads the log in the background, and only when it changed.
 - **Review Before Cleaning** and the done screen count how many items go to the Trash, where Undo brings them back, and how many are deleted for good.
 - **Uninstaller** says when it couldn't read some folders and offers **Open Settings…** for Full Disk Access, instead of reporting that nothing was left.
 - Updates reach you when CleanMate runs only in the menu bar: started at login, it checks for updates once you've answered whether to check automatically, and shows nothing until a new version is out.

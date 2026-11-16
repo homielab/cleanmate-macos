@@ -363,8 +363,17 @@ struct SmartScanSettings: View {
 
 /// Where CleanMate's actions show up outside the app: the Shortcuts app, Spotlight and Siri (`CleanMateShortcuts`).
 struct IntegrationSettings: View {
+    @State private var status = CommandLineInstall.status()
+    @State private var onPath = true
+    @State private var failure: String?
+
+    private static func shown(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
+
+    private static let foreignText: LocalizedStringKey = "~/.local/bin/cleanmate is another file. CleanMate won't replace it; move or rename it first."
+
     var body: some View {
         Form {
+            commandLineSection
             Section {
                 Text("Use CleanMate in the Shortcuts app, in Spotlight and with Siri:")
                 VStack(alignment: .leading, spacing: 6) {
@@ -387,6 +396,118 @@ struct IntegrationSettings: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear(perform: refresh)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
+    }
+
+    private var commandLineSection: some View {
+        Section {
+            statusRow
+            HStack {
+                Spacer()
+                switch status {
+                case .notInstalled:
+                    Button("Install") { run { try CommandLineInstall.install() } }
+                case .installed:
+                    Button("Copy Path") { Pasteboard.copy(CommandLineInstall.link().path) }
+                    Button("Remove") { run { try CommandLineInstall.remove() } }
+                case .otherCopy, .broken:
+                    Button("Repair") { run { try CommandLineInstall.install() } }
+                    Button("Remove") { run { try CommandLineInstall.remove() } }
+                case .foreign:
+                    EmptyView()
+                }
+            }
+            if let failure {
+                Text(failure)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if status == .installed, !onPath {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("~/.local/bin is not on your shell's PATH. Add this line to ~/.zshrc, then open a new Terminal window:")
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    copyableLine(CommandLineInstall.pathLine)
+                }
+            }
+        } header: {
+            Text("Command Line Tool")
+        } footer: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No administrator password needed. For AI agents (Claude Code, Codex, Cursor…), install the Agent Skill:")
+                    .fixedSize(horizontal: false, vertical: true)
+                copyableLine(CommandLineInstall.skillCommand)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func copyableLine(_ text: String) -> some View {
+        HStack {
+            Text(verbatim: text)
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+            Spacer()
+            Button("Copy") { Pasteboard.copy(text) }
+        }
+    }
+
+    @ViewBuilder private var statusRow: some View {
+        switch status {
+        case .installed:
+            Label("Installed: cleanmate runs this copy of CleanMate.", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .fixedSize(horizontal: false, vertical: true)
+        case .notInstalled:
+            Label("Not installed. The cleanmate command is inside the app; installing links it into ~/.local/bin.",
+                  systemImage: "terminal")
+                .fixedSize(horizontal: false, vertical: true)
+        case .otherCopy(let path):
+            Label("Installed, but it runs another copy of CleanMate: \(Self.shown(path))", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        case .broken(let path):
+            Label("The link is broken: CleanMate was moved or removed from \(Self.shown(path))", systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        case .foreign:
+            Label(Self.foreignText, systemImage: "exclamationmark.triangle")
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Runs an install or removal and shows why it failed.
+    private func run(_ change: () throws -> Void) {
+        do {
+            try change()
+            failure = nil
+        } catch let error as CommandLineInstall.Failure {
+            switch error {
+            case .translocated: failure = String(localized: "Move CleanMate to the Applications folder first, then open it from there.")
+            case .helperMissing: failure = String(localized: "The cleanmate command is missing from this copy of CleanMate. Install CleanMate again.")
+            case .foreignFile: failure = String(localized: "~/.local/bin/cleanmate is another file. CleanMate won't replace it; move or rename it first.")
+            case .failed(let text): failure = String(localized: "Couldn't change ~/.local/bin/cleanmate: \(text)")
+            }
+        } catch {
+            failure = String(localized: "Couldn't change ~/.local/bin/cleanmate: \(error.localizedDescription)")
+        }
+        refresh()
+    }
+
+    /// The PATH check reads shell profiles, so it runs off the main thread.
+    private func refresh() {
+        status = CommandLineInstall.status()
+        Task.detached(priority: .userInitiated) {
+            let found = CommandLineInstall.onPath()
+            await MainActor.run { onPath = found }
+        }
     }
 }
 
@@ -521,13 +642,23 @@ struct ActivitySettings: View {
     /// "Last 30 days" ends here; nil = the time of each reload. UISnapshots pins it so the picture never moves.
     var now: Date?
     @Environment(\.locale) private var locale
-    @State private var entries: [ActivityLog.Entry] = []
-    @State private var recent: (deleted: Int64, trashed: Int64, since: Date?) = (0, 0, nil)
-    @State private var total: (deleted: Int64, trashed: Int64, since: Date?) = (0, 0, nil)
+    @State private var shownLog: ActivityLog.Snapshot
+    /// Stamp of the files `shownLog` was built from, plus the language; nil until the first load.
+    @State private var loaded: [String]?
+    /// Bumped by every `load`: a slower, older load never replaces a newer one.
+    @State private var generation = 0
     @State private var module = ""
     @State private var search = ""
 
+    /// `initial`: the log shown before the first load finishes (UISnapshots renders once, so it seeds the picture).
+    init(home: URL = SafetyPolicy.current.homeURL, now: Date? = nil, initial: ActivityLog.Snapshot? = nil) {
+        self.home = home
+        self.now = now
+        _shownLog = State(initialValue: initial ?? ActivityLog.Snapshot())
+    }
+
     var body: some View {
+        let entries = shownLog.entries, recent = shownLog.recent, total = shownLog.total
         VStack(alignment: .leading) {
             if let since = total.since {
                 let date = since.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
@@ -623,12 +754,23 @@ struct ActivitySettings: View {
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)) { _ in load() }
     }
 
+    /// Reads and parses the log off the main thread, and only when its files or the language changed.
     private func load() {
-        entries = ActivityLog.readAll(home: home).split(separator: "\n").reversed().enumerated()
-            .map { ActivityLog.entry($1, id: $0, locale: locale) }
-        // A module gone from the log (rotated or edited) would leave the picker blank and the table empty.
-        if !entries.contains(where: { $0.moduleKey == module }) { module = "" }
-        recent = ActivityLog.freed(after: (now ?? .now).addingTimeInterval(-30 * 86_400), home: home)
-        total = ActivityLog.freed(home: home)
+        let home = home, locale = locale, now = now ?? .now
+        generation += 1
+        let mine = generation
+        let seen = loaded
+        Task.detached(priority: .userInitiated) {
+            let stamp = ActivityLog.stamp(home: home) + [locale.identifier]
+            guard stamp != seen else { return }
+            let log = ActivityLog.snapshot(home: home, locale: locale, now: now)
+            await MainActor.run {
+                guard mine == generation else { return }
+                shownLog = log
+                loaded = stamp
+                // A module gone from the log (rotated or edited) would leave the picker blank and the table empty.
+                if !log.entries.contains(where: { $0.moduleKey == module }) { module = "" }
+            }
+        }
     }
 }

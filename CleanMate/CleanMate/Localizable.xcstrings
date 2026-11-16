@@ -872,6 +872,16 @@
         }
       }
     },
+    "Command Line Tool" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Công cụ dòng lệnh"
+          }
+        }
+      }
+    },
     "Comparing files…" : {
       "localizations" : {
         "vi" : {
@@ -898,6 +908,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tiếp"
+          }
+        }
+      }
+    },
+    "Copy Path" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chép đường dẫn"
+          }
+        }
+      }
+    },
+    "Couldn't change ~/.local/bin/cleanmate: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể thay đổi ~/.local/bin/cleanmate: %@"
           }
         }
       }
@@ -2686,6 +2716,16 @@
         }
       }
     },
+    "Install" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cài đặt"
+          }
+        }
+      }
+    },
     "Install it again, or scan again." : {
       "localizations" : {
         "vi" : {
@@ -2722,6 +2762,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cài bằng Setapp"
+          }
+        }
+      }
+    },
+    "Installed, but it runs another copy of CleanMate: %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã cài, nhưng lệnh chạy một bản CleanMate khác: %@"
+          }
+        }
+      }
+    },
+    "Installed: cleanmate runs this copy of CleanMate." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã cài: lệnh cleanmate chạy bản CleanMate này."
           }
         }
       }
@@ -3200,6 +3260,16 @@
         }
       }
     },
+    "Move CleanMate to the Applications folder first, then open it from there." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy chuyển CleanMate vào thư mục Ứng dụng trước, rồi mở nó từ đó."
+          }
+        }
+      }
+    },
     "Moved to the Trash" : {
       "localizations" : {
         "vi" : {
@@ -3226,6 +3296,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đã chuyển “%@” vào Thùng rác."
+          }
+        }
+      }
+    },
+    "No administrator password needed. For AI agents (Claude Code, Codex, Cursor…), install the Agent Skill:" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không cần mật khẩu quản trị. Với tác nhân AI (Claude Code, Codex, Cursor…), hãy cài Agent Skill:"
           }
         }
       }
@@ -3296,6 +3376,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Không từ App Store, Homebrew hay Setapp"
+          }
+        }
+      }
+    },
+    "Not installed. The cleanmate command is inside the app; installing links it into ~/.local/bin." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chưa cài. Lệnh cleanmate nằm sẵn trong ứng dụng; cài đặt sẽ liên kết nó vào ~/.local/bin."
           }
         }
       }
@@ -3694,6 +3784,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Thoát ứng dụng đang dùng nó, rồi thử lại."
+          }
+        }
+      }
+    },
+    "Repair" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa"
           }
         }
       }
@@ -5410,6 +5510,16 @@
         }
       }
     },
+    "The cleanmate command is missing from this copy of CleanMate. Install CleanMate again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bản CleanMate này thiếu lệnh cleanmate. Hãy cài lại CleanMate."
+          }
+        }
+      }
+    },
     "The details are too long for the link. Paste them into “System details” on the GitHub page." : {
       "localizations" : {
         "vi" : {
@@ -5436,6 +5546,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tệp vẫn ở trong iCloud Drive và sẽ tải về lại khi bạn mở."
+          }
+        }
+      }
+    },
+    "The link is broken: CleanMate was moved or removed from %@" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liên kết bị hỏng: CleanMate đã được chuyển đi hoặc xoá khỏi %@"
           }
         }
       }
@@ -6256,6 +6376,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bộ nhớ đệm sccache"
+          }
+        }
+      }
+    },
+    "~/.local/bin is not on your shell's PATH. Add this line to ~/.zshrc, then open a new Terminal window:" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~/.local/bin chưa nằm trong PATH của shell. Thêm dòng này vào ~/.zshrc, rồi mở cửa sổ Terminal mới:"
+          }
+        }
+      }
+    },
+    "~/.local/bin/cleanmate is another file. CleanMate won't replace it; move or rename it first." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~/.local/bin/cleanmate là một tệp khác. CleanMate sẽ không ghi đè; hãy chuyển hoặc đổi tên nó trước."
           }
         }
       }

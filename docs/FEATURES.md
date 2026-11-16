@@ -458,6 +458,15 @@ CleanMate adds four actions to the Shortcuts app; Spotlight and Siri offer them 
 ("Scan junk with CleanMate", "Free space in CleanMate"…; in Vietnamese "Quét rác bằng CleanMate"…).
 Settings › Integrations describes them and has **Open Shortcuts**.
 
+Above them, **Command Line Tool** installs the `cleanmate` command: one status line and the buttons that fit it.
+Not installed → **Install** links `~/.local/bin/cleanmate` to the helper inside this app (the folder is created when
+missing; no administrator password). Installed → **Copy Path** and **Remove** (only the link goes). The link points
+to another CleanMate.app, or to one that was moved or deleted → **Repair** and **Remove**. Any other file or link
+at that path is never replaced: the row says so and offers no button. A CleanMate opened from a disk image or a
+download folder (macOS runs it from a temporary read-only path) asks to be moved to Applications first. When
+`~/.local/bin` is not on the shell's PATH, the row shows the line to add to `~/.zshrc` with a **Copy** button;
+CleanMate never edits shell files. The footer has the command that installs the Agent Skill, also with **Copy**.
+
 - **Scan for Junk** scans like Smart Scan, with the Scan Groups and Exclusions set in CleanMate, and reports the junk
   that would be cleaned (items ticked by default, not in use or excluded): the total, the item count and a line per
   group. **Group** limits it to one group (System Junk, Trash, Developer Junk, AI Tools, Applications), even one turned
@@ -486,8 +495,9 @@ cleaning code, and writes the app's activity log. `trash` moves the files and fo
 with the same rules. The command changes no setting, reads stdin only to ask before a change on a terminal, never asks
 for a password, and never connects to the network.
 
-The command is in the app bundle. Link it into a folder on your PATH (no administrator password needed); once the
-Homebrew cask is published, it will do this for you (`brew uninstall` removes the link):
+The command is in the app bundle. **Settings › Integrations › Command Line Tool › Install** links it into
+`~/.local/bin` (no administrator password needed); once the Homebrew cask is published, it will do this for you
+(`brew uninstall` removes the link). Or by hand:
 
 ```sh
 mkdir -p ~/.local/bin   # add it to PATH in your shell profile if it isn't there

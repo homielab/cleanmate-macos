@@ -22,12 +22,11 @@ check, which you can turn off.
    signed with a Developer ID and notarized by Apple. Open the disk image and drag **CleanMate** to **Applications**.
    Requires **macOS 13** or later. Later versions install from the app: **CleanMate › Check for Updates…**
    (offered at the second launch; off until then — Settings › General › Updates).
-2. The `cleanmate` command line for scripts and AI agents (Claude Code, Codex…) is inside the app
-   (`/Applications/CleanMate.app/Contents/Helpers/cleanmate`). Put it on your `PATH`:
+2. The `cleanmate` command line for scripts and AI agents (Claude Code, Codex…) is inside the app. Open
+   **Settings › Integrations › Command Line Tool › Install**: it links `~/.local/bin/cleanmate` (no administrator
+   password). Then:
 
 ```sh
-mkdir -p ~/.local/bin
-ln -s /Applications/CleanMate.app/Contents/Helpers/cleanmate ~/.local/bin/cleanmate
 cleanmate --help
 ```
 

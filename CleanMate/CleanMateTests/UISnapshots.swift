@@ -718,7 +718,10 @@ struct UISnapshots {
         let url = ActivityLog.url(home: home)
         let text = ActivityLog.read(home: home)
         try (old + text).write(to: url, atomically: true, encoding: .utf8)
-        try await snapshot("settings-activity", size: SettingsView.size) { ActivitySettings(home: home, now: Self.today) }
+        try await snapshot("settings-activity", size: SettingsView.size) {
+            ActivitySettings(home: home, now: Self.today,
+                             initial: ActivityLog.snapshot(home: home, locale: Locale(identifier: Self.language), now: Self.today))
+        }
     }
 
     /// Moved to the Trash, from sample records in a temporary home and Trash (never this Mac's); one item can't go back
