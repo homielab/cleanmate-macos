@@ -13945,6 +13945,186 @@
           }
         }
       }
+    },
+    "Julia compiled cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache biên dịch của Julia"
+          }
+        }
+      }
+    },
+    "Precompiled packages, compiled again the next time they are loaded" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các gói đã biên dịch sẵn, được biên dịch lại ở lần nạp kế tiếp"
+          }
+        }
+      }
+    },
+    "Julia artifacts" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Artifact của Julia"
+          }
+        }
+      }
+    },
+    "Binary dependencies of packages, downloaded again with Pkg.instantiate()" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thư viện nhị phân mà các gói cần, tải lại bằng Pkg.instantiate()"
+          }
+        }
+      }
+    },
+    "Conan package cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache gói của Conan"
+          }
+        }
+      }
+    },
+    "Downloaded again by conan install; packages you built with conan create have to be built again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được tải lại bằng conan install; các gói bạn tự build bằng conan create phải build lại"
+          }
+        }
+      }
+    },
+    "Expo cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache của Expo"
+          }
+        }
+      }
+    },
+    "Downloaded Expo Go apps, templates and version lists, downloaded again when needed; your sign-in is kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng Expo Go, mẫu dự án và danh sách phiên bản đã tải, được tải lại khi cần; phiên đăng nhập của bạn được giữ lại"
+          }
+        }
+      }
+    },
+    "Hex packages" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gói Hex"
+          }
+        }
+      }
+    },
+    "Downloaded Elixir and Erlang packages, downloaded again by mix deps.get" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các gói Elixir và Erlang đã tải, được tải lại bằng mix deps.get"
+          }
+        }
+      }
+    },
+    "PlatformIO cache" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache của PlatformIO"
+          }
+        }
+      }
+    },
+    "Downloaded archives and registry answers, downloaded again when needed; installed platforms and toolchains are kept" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp nén đã tải và dữ liệu tra cứu registry, được tải lại khi cần; nền tảng và toolchain đã cài được giữ lại"
+          }
+        }
+      }
+    },
+    "Arduino downloads" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp tải về của Arduino"
+          }
+        }
+      }
+    },
+    "Archives of boards and libraries already installed, downloaded again when needed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp nén của các bo mạch và thư viện đã cài xong, được tải lại khi cần"
+          }
+        }
+      }
+    },
+    "Old Godot export templates" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mẫu xuất Godot cũ"
+          }
+        }
+      }
+    },
+    "Export templates of Godot versions other than the newest, installed again from the editor (Manage Export Templates)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mẫu xuất của các phiên bản Godot không phải bản mới nhất, cài lại từ trình biên tập (Manage Export Templates)"
+          }
+        }
+      }
+    },
+    "Python versions installed by uv" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các bản Python do uv cài"
+          }
+        }
+      }
+    },
+    "Removed with uv python uninstall; virtual environments made from a version stop working until uv python install brings it back" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Được gỡ bằng uv python uninstall; các môi trường ảo tạo từ một bản sẽ ngừng chạy cho đến khi cài lại bản đó bằng uv python install"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

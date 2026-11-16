@@ -20,6 +20,7 @@ nonisolated enum ShellEnvironment {
         "DENO_DIR", "ZIG_GLOBAL_CACHE_DIR", "CCACHE_DIR", "SCCACHE_DIR", "POETRY_CACHE_DIR", "PRE_COMMIT_HOME", "PIPX_HOME",
         "TF_PLUGIN_CACHE_DIR", "HELM_CACHE_HOME", "CABAL_DIR", "STACK_ROOT", "GHCUP_INSTALL_BASE_PREFIX", "COURSIER_CACHE",
         "OPAMROOT", "VAGRANT_HOME", "GEM_HOME", "BUNDLE_USER_HOME",
+        "JULIA_DEPOT_PATH", "CONAN_HOME", "HEX_HOME", "PLATFORMIO_CORE_DIR", "ARDUINO_DIRECTORIES_DATA",
         // llama.cpp's model cache (`LocalModels`) and the Hugging Face Xet cache.
         "LLAMA_CACHE", "HF_XET_CACHE",
     ]

@@ -312,6 +312,34 @@ nonisolated enum OldRuntimes {
                     allows: { policy, url in allowsGo(url, policy: policy) }, running: running)
     }
 
+    static let uvPythonID = "uv-python-versions"
+    static let uvPythonPath = "~/.local/share/uv/python"
+
+    /// `cpython-3.12.4-macos-aarch64-none`, `pypy-3.10.14-macos-x86_64-none`, `cpython-3.13.0+freethreaded-macos-aarch64-none`:
+    /// the folders uv installs Pythons in.
+    static func isUVPython(_ name: String) -> Bool {
+        name.wholeMatch(of: /[a-z]+-\d+\.\d+[A-Za-z0-9.+]*-macos-[a-z0-9_]+-[a-z0-9_]+/) != nil
+    }
+
+    /// Every Python uv installed in its default folder, each removed by uv itself (`uv python uninstall <name>`: it
+    /// also removes the links and `python3.x` commands it made for that version). Not only old ones: uv has no
+    /// default version, so all are listed, unticked. Links (`cpython-3.12-…` → the patch version), hidden files and
+    /// other names are never listed. A folder moved with `UV_PYTHON_INSTALL_DIR` is not listed: uv started by
+    /// CleanMate would not see that variable.
+    static func uvPythonItem(running: @escaping @Sendable () -> [String] = RunningProcesses.usedPaths) -> CleanerItem {
+        var item = versionItem(id: uvPythonID, title: "Python versions installed by uv",
+                               note: "Removed with uv python uninstall; virtual environments made from a version stop working until uv python install brings it back",
+                               paths: [uvPythonPath], shell: [:], label: label("Python"),
+                               allows: { policy, url in isUVPython(url.lastPathComponent) && isVersionFolder(url, policy: policy) },
+                               running: running)
+        item.runningProcessNames = ["uv"]
+        item.entryCommand = { url in
+            guard isUVPython(url.lastPathComponent) else { return nil }
+            return ShellCommand(executable: "uv", arguments: ["python", "uninstall", url.lastPathComponent], timeout: .seconds(120))
+        }
+        return item
+    }
+
     private static func versionItem(id: String, title: LocalizedStringResource, note: LocalizedStringResource,
                                     paths: [String], shell: [String: [String]], label: @escaping CleanerItem.EntryLabel,
                                     allows: @escaping @Sendable (SafetyPolicy, URL) -> Bool,

@@ -332,6 +332,41 @@ extension CleanerGroup {
             ["~/.sbt/boot"], processes: scalaTools),
         dev("opam-download-cache", "opam download cache", note: "Downloaded package archives; switches are kept",
             ["~/.opam/download-cache"], shell: ["OPAMROOT": ["download-cache"]], processes: ["opam"]),
+        // Julia: only the precompiled package images and the downloaded binary artifacts of one depot (`~/.julia`, or a
+        // JULIA_DEPOT_PATH naming a single folder). Unticked: big packages take minutes to precompile, and a missing
+        // artifact needs `Pkg.instantiate()`. Never `packages`, `environments`, `registries`, `dev`, `config`, `logs`
+        // nor `scratchspaces` (data packages keep).
+        dev("julia-compiled", "Julia compiled cache", note: "Precompiled packages, compiled again the next time they are loaded",
+            ["~/.julia/compiled"], shell: ["JULIA_DEPOT_PATH": ["compiled"]], selected: false, processes: ["julia"]),
+        dev("julia-artifacts", "Julia artifacts", note: "Binary dependencies of packages, downloaded again with Pkg.instantiate()",
+            ["~/.julia/artifacts"], shell: ["JULIA_DEPOT_PATH": ["artifacts"]], selected: false, processes: ["julia"]),
+        // Conan 2's package cache (recipes, sources, binaries and its index, all in `p`). Unticked: it also holds
+        // packages built locally with `conan create`. Never profiles, remotes or settings next to it.
+        dev("conan-packages", "Conan package cache",
+            note: "Downloaded again by conan install; packages you built with conan create have to be built again",
+            ["~/.conan2/p"], shell: ["CONAN_HOME": ["p"]], selected: false, processes: ["conan"], openFiles: true),
+        // Expo CLI: only its `*-cache` folders (Expo Go builds for simulators, templates, version lists). Never
+        // `state.json` (the sign-in) nor anything else in `~/.expo`.
+        dev("expo-cache", "Expo cache",
+            note: "Downloaded Expo Go apps, templates and version lists, downloaded again when needed; your sign-in is kept",
+            ["~/.expo"], included: ["*-cache"], processes: ["expo", "eas"], openFiles: true),
+        // Hex (Elixir, Erlang): downloaded package tarballs. `mix` runs inside the Erlang VM (`beam.smp`).
+        // Never `~/.mix` (installed archives, rebar, Hex itself) nor Hex's config and keys.
+        dev("hex-packages", "Hex packages", note: "Downloaded Elixir and Erlang packages, downloaded again by mix deps.get",
+            ["~/.hex/packages"], shell: ["HEX_HOME": ["packages"]], processes: ["mix", "beam.smp"]),
+        // PlatformIO: downloads and registry answers. Never `packages`, `platforms` (installed toolchains) nor `penv`.
+        dev("platformio-cache", "PlatformIO cache",
+            note: "Downloaded archives and registry answers, downloaded again when needed; installed platforms and toolchains are kept",
+            ["~/.platformio/.cache"], shell: ["PLATFORMIO_CORE_DIR": [".cache"]], processes: ["pio", "platformio"], openFiles: true),
+        // Arduino IDE and arduino-cli: archives of cores, tools and libraries already unpacked into `packages`.
+        dev("arduino-downloads", "Arduino downloads",
+            note: "Archives of boards and libraries already installed, downloaded again when needed",
+            ["~/Library/Arduino15/staging", "~/.arduino15/staging"], shell: ["ARDUINO_DIRECTORIES_DATA": ["staging"]],
+            apps: ["cc.arduino.IDE2", "cc.arduino.Arduino"], processes: ["arduino-cli"], openFiles: true),
+        // Unticked, deleted: export templates of Godot versions other than the newest, one entry per version (`GodotTemplates`).
+        GodotTemplates.item(),
+        // Unticked: every Python uv installed, one entry per version, removed with `uv python uninstall` (`OldRuntimes`).
+        OldRuntimes.uvPythonItem(),
         // Unticked like Playwright: since Puppeteer 19 this is where its browsers are installed; an existing
         // node_modules does not download them again, so launch() fails until `npx puppeteer browsers install`.
         dev("puppeteer-browsers", "Puppeteer browsers", note: "Downloaded again with npx puppeteer browsers install",

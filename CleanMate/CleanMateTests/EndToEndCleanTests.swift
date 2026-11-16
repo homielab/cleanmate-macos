@@ -28,6 +28,11 @@ struct EndToEndCleanTests {
         ".local/share/mise/installs/junk/9.0.0/bin/junk", "Developer/tools/MISE_DATA_DIR/installs/junk/9.0.0/bin/junk",
         // The newest version of a Vagrant box, kept next to the old one
         ".vagrant.d/boxes/junk/9.0.0/virtualbox/box.vmdk", "Developer/tools/VAGRANT_HOME/boxes/junk/9.0.0/virtualbox/box.vmdk",
+        // The newest Godot export templates, kept next to old ones; Julia, Conan, Expo, Hex, PlatformIO and Arduino files next to their caches
+        "Library/Application Support/Godot/export_templates/9.0.stable/macos.zip",
+        ".julia/packages/P/src/P.jl", ".julia/environments/v1.11/Manifest.toml", ".julia/scratchspaces/u/data.bin",
+        ".conan2/profiles/default", ".expo/state.json", ".hex/hex.config", ".mix/archives/hex/hex.app",
+        ".platformio/packages/toolchain/bin/gcc", "Library/Arduino15/packages/arduino/boards.txt",
         // Next to container VMs: Colima's settings, Lima's own settings and named disk, minikube's profile, and a file
         // in Podman's settings folder that names no disk
         ".colima/default/colima.yaml", ".lima/_config/user", ".lima/_disks/shared/datadisk",
@@ -305,6 +310,14 @@ struct EndToEndCleanTests {
                         try write(folder.appending(path: "colima/diffdisk"), disk)
                         try write(folder.appending(path: "_disks/colima/datadisk"), disk)
                     }
+                    continue
+                }
+                if item.id == GodotTemplates.id { // older than the bait 9.0.stable
+                    try write(folder.appending(path: "3.0.stable/macos.zip"), Data(repeating: 1, count: 4096))
+                    continue
+                }
+                if item.id == OldRuntimes.uvPythonID { // a folder named like the ones uv installs
+                    try write(folder.appending(path: "cpython-3.9.0-macos-aarch64-none/bin/python3"), Data(repeating: 1, count: 4096))
                     continue
                 }
                 if [ToolVersionManagers.asdfID, ToolVersionManagers.miseID].contains(item.id) { // older than the bait 9.0.0
