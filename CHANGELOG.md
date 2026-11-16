@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10] - 2026-11-16
+
 ### Added
 - **Settings › Integrations** installs the `cleanmate` command with one button: a link in `~/.local/bin`, no administrator password, repaired when the app was moved.
 - **More browsers**: Dia, Zen, Orion, DuckDuckGo, Comet, Chromium and Opera GX. Smart Scan › Applications clears their caches; Privacy erases history, downloads, cookies and form data for Dia, Comet, Chromium, Opera GX and Zen, and cookies for Orion. Each is skipped while that browser is open, and bookmarks, passwords and settings are kept.
