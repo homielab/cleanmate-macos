@@ -6420,6 +6420,26 @@
         }
       }
     },
+    "%@ · Asks for your admin password" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · Cần mật khẩu quản trị"
+          }
+        }
+      }
+    },
+    "the admin password was not given" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chưa nhập mật khẩu quản trị"
+          }
+        }
+      }
+    },
     "%@ · Possibly related" : {
       "localizations" : {
         "vi" : {

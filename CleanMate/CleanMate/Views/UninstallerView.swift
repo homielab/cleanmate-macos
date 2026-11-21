@@ -701,9 +701,11 @@ struct UninstallerView: View {
         }
     }
 
-    /// The entry's folder (`~/.config`, `~/.local/share`, `~` for config), and whether it is only a suggestion.
+    /// The entry's folder (`~/.config`, `~/.local/share`, `~` for config, `/Library/…` for a system one), and whether
+    /// it is only a suggestion or needs the admin password.
     private func location(_ entry: AppDataEntry) -> Text {
         entry.orphan ? Text("\(entry.location) · No app with this name is installed")
+            : entry.system ? Text("\(entry.location) · Asks for your admin password")
             : entry.kind == .suggested ? Text("\(entry.location) · Possibly related") : Text(verbatim: entry.location)
     }
 

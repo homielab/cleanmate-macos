@@ -549,7 +549,7 @@ final class UninstallerModel: ObservableObject {
     var resetEntries: [AppDataEntry] { selectedApp == nil ? [] : Self.resetItems(entries) }
 
     nonisolated static func resetItems(_ entries: [AppDataEntry]) -> [AppDataEntry] {
-        entries.filter { $0.kind == .data && $0.folder != "LaunchAgents" }
+        entries.filter { $0.kind == .data && $0.folder != "LaunchAgents" && !$0.system }
     }
 
     /// The Reset sheet opens with every row ticked.

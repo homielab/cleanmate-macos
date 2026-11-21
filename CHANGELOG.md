@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Uninstaller** finds an app's files in the system Library too: launch agents and daemons, privileged helper tools, and its items in /Library/Application Support, Caches, Logs and Preferences, matched by bundle id. They go to the Trash after one admin password prompt.
+
 ## [1.10] - 2026-11-16
 
 ### Added

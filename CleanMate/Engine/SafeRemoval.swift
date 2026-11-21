@@ -74,6 +74,41 @@ nonisolated enum SafeRemoval {
         return try await held.landed(move(held.path))
     }
 
+    /// What a move of several items at once did: where each moved one is now (keyed by the path it was given), and
+    /// its error (a cancelled password prompt, an item it couldn't move), if any.
+    typealias BatchMove = @Sendable ([URL]) async -> (moved: [URL: URL], error: Error?)
+
+    /// `trash` for several items in ONE move (`NSWorkspace.recycle`: one admin password prompt for all): each is
+    /// checked and held like `trash` and looked at again right before the move; all still unchanged are moved together,
+    /// and each is checked after. Per item: where it is in the Trash (nil: not told), or why it stayed (`Failure`;
+    /// not moved by `move` → `failed(EPERM)`). `moveError`: the error `move` gave, for the caller to tell a cancelled
+    /// prompt.
+    static func trashAll(_ urls: [URL], allows: (URL) -> Bool, move: BatchMove) async
+        -> (results: [URL: Result<URL?, Failure>], moveError: Error?) {
+        var results: [URL: Result<URL?, Failure>] = [:]
+        var held: [(url: URL, item: Held)] = []
+        for url in urls {
+            do throws(Failure) {
+                let item = try Held(url, expected: nil, regularFileOnly: false, allows: allows)
+                try item.unchanged()
+                held.append((url, item))
+            } catch {
+                results[url] = .failure(error)
+            }
+        }
+        guard !held.isEmpty else { return (results, nil) }
+        let (moved, error) = await move(held.map(\.item.path))
+        let byPath = Dictionary(moved.map { ($0.key.standardizedFileURL.path, $0.value) }, uniquingKeysWith: { first, _ in first })
+        for (url, item) in held {
+            guard let inTrash = byPath[item.path.standardizedFileURL.path] else {
+                results[url] = .failure(.failed(EPERM))
+                continue
+            }
+            do throws(Failure) { results[url] = .success(try item.landed(inTrash)) } catch { results[url] = .failure(error) }
+        }
+        return (results, error)
+    }
+
     /// An item checked for a move to the Trash, held open with its folder until it is moved.
     private final class Held {
         let folder: Int32

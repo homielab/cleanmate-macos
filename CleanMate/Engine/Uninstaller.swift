@@ -1,8 +1,8 @@
 import AppKit
 
 // Uninstaller: apps in /Applications and ~/Applications (and up to three subfolders down) plus their data in ~/Library and
-// their config in ~, ~/.config and ~/.local/share, and data left behind by apps already removed. Everything goes to the Trash; Apple's apps
-// and data are never listed.
+// their config in ~, ~/.config and ~/.local/share, their system-wide files in /Library (by bundle id, moved with the admin
+// password), and data left behind by apps already removed. Everything goes to the Trash; Apple's apps and data are never listed.
 
 nonisolated struct InstalledApp: Identifiable, Hashable, Sendable {
     let url: URL
@@ -51,12 +51,15 @@ nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
     var kind: Kind = .data
     /// A `config` item in a leftovers list that no installed app or command-line tool is named after.
     var orphan = false
+    /// In the system Library (`SafetyPolicy.allowsSystemAppData`): root's, moved with the admin password, no Undo.
+    var system = false
 
     var id: URL { url }
     var folder: String { url.deletingLastPathComponent().lastPathComponent }
     /// Where the item is, as shown: its ~/Library folder (`Recent Documents` for the app's Open Recent list),
     /// `~/.config`, `~/.local/share`, `~/.local/state` or `~`.
     var location: String {
+        if system { return "/Library/" + url.deletingLastPathComponent().lastPathComponent }
         if folder == RecentItems.appFolderName { return "Recent Documents" }
         guard kind == .config else { return folder }
         let parent = url.deletingLastPathComponent()
@@ -447,7 +450,7 @@ nonisolated enum Uninstaller {
     private static func classify(_ app: InstalledApp, library: [LibraryItem], config: [(name: String, inConfig: Bool, url: URL)],
                                  otherBundleIDs: Set<String>, otherAppNames: Set<String>,
                                  tools: [String: [String]], teamID: String? = nil,
-                                 teamShared: Bool = false) -> [(url: URL, kind: AppDataEntry.Kind)] {
+                                 teamShared: Bool = false, system: [LibraryItem] = []) -> [(url: URL, kind: AppDataEntry.Kind)] {
         let names = AppMatcher.Names(app)
         let others = Set(otherBundleIDs.map { $0.lowercased() })
         let data = library.compactMap { item in
@@ -464,12 +467,32 @@ nonisolated enum Uninstaller {
             else { return nil }
             return (url: item.url, kind: .config)
         }
-        return data + configs
+        // System Library entries count by bundle id only (`AppMatcher.kind` outside `nameFolders`), and only for an app
+        // with a real bundle id (`com.vendor.app`): a vendor-wide name could be another app's.
+        let systemData = AppMatcher.isBundleIDShaped(app.bundleID.lowercased()) ? system.compactMap { item in
+            AppMatcher.kind(id: item.id, lowerName: item.lowerName, folder: "", app: names, otherBundleIDs: otherBundleIDs,
+                            otherAppNames: []) == .data ? (url: item.url, kind: AppDataEntry.Kind.data) : nil
+        } : []
+        return data + systemData + configs
     }
 
     /// A non-Apple Library entry with the per-entry work of `AppMatcher.kind` done once.
     /// `team`: the `<TEAMID>` of a group container named `<TEAMID>.<group>`.
     private struct LibraryItem { let id: String; let lowerName: String; let folder: String; let url: URL; var team: String? }
+
+    /// Entries of `SafetyPolicy.systemAppDataFolders` in the system Library that `allowsSystemAppData`; none
+    /// without the policy's `systemLibrary`.
+    private static func systemItems(policy: SafetyPolicy) -> [LibraryItem] {
+        guard let library = policy.systemLibrary else { return [] }
+        return SafetyPolicy.systemAppDataFolders.flatMap { folder -> [LibraryItem] in
+            let dir = URL(fileURLWithPath: library).appending(path: folder)
+            return ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).compactMap { name -> LibraryItem? in
+                let url = dir.appending(path: name)
+                guard policy.allowsSystemAppData(url) else { return nil }
+                return LibraryItem(id: AppMatcher.identifier(name, in: folder), lowerName: name.lowercased(), folder: folder, url: url)
+            }
+        }
+    }
 
     private static func libraryItems(policy: SafetyPolicy, skipped: Set<String> = []) -> [LibraryItem] {
         dataFolderItems(policy: policy, skipped: skipped).filter { !SafetyPolicy.isApple($0.name) }.map {
@@ -497,9 +520,13 @@ nonisolated enum Uninstaller {
         }
         let found = classify(app, library: library, config: configItems(policy: policy),
                              otherBundleIDs: otherBundleIDs, otherAppNames: otherAppNames,
-                             tools: tools ?? toolPaths(home: policy.homeURL), teamID: team, teamShared: teamShared)
+                             tools: tools ?? toolPaths(home: policy.homeURL), teamID: team, teamShared: teamShared,
+                             system: systemItems(policy: policy))
         var entries: [AppDataEntry] = []
-        for item in found { entries.append(AppDataEntry(url: item.url, size: await size(of: item.url), kind: item.kind)) }
+        for item in found {
+            entries.append(AppDataEntry(url: item.url, size: await size(of: item.url), kind: item.kind,
+                                        system: policy.isSystemLibraryItem(item.url)))
+        }
         return entries.sorted { $0.size > $1.size }
     }
 
@@ -512,12 +539,13 @@ nonisolated enum Uninstaller {
                                               policy: SafetyPolicy = .current) async -> [URL: [(url: URL, kind: AppDataEntry.Kind)]] {
         let library = libraryItems(policy: policy, skipped: skipped)
         let config = configItems(policy: policy)
+        let system = systemItems(policy: policy)
         let tools = tools ?? toolPaths(home: policy.homeURL)
         var result: [URL: [(url: URL, kind: AppDataEntry.Kind)]] = [:]
         for app in apps {
             let names = Set(apps.lazy.filter { $0.url != app.url }.flatMap(\.names)).union(otherAppNames(than: app.url, in: allApps))
             result[app.url] = classify(app, library: library, config: config, otherBundleIDs: otherBundleIDs,
-                                       otherAppNames: names, tools: tools)
+                                       otherAppNames: names, tools: tools, system: system)
         }
         return result
     }
@@ -646,6 +674,14 @@ nonisolated enum Uninstaller {
     ///. Returns where the app now is inside the Trash; throws `CocoaError.userCancelled` if the prompt is cancelled.
     static let recycle: @Sendable (URL) async throws -> URL? = { url in try await NSWorkspace.shared.recycle([url])[url] }
 
+    /// `NSWorkspace.recycle` of several items at once: one admin password prompt for all of them (system Library
+    /// entries), with what moved even when some didn't.
+    static let recycleAll: SafeRemoval.BatchMove = { urls in
+        await withCheckedContinuation { done in
+            NSWorkspace.shared.recycle(urls) { moved, error in done.resume(returning: (moved, error)) }
+        }
+    }
+
     /// The app at `url` is open: a running app with its bundle id, or launched from that bundle.
     static let isRunning: @Sendable (URL) -> Bool = { url in
         let id = Bundle(url: url)?.bundleIdentifier
@@ -673,6 +709,7 @@ nonisolated enum Uninstaller {
                                   launchctl: LaunchAgents.Runner = LaunchAgents.launchctlRunner,
                                   moveToTrash: @Sendable (URL) throws -> URL? = CleanReport.moveToTrash,
                                   recycle: @Sendable (URL) async throws -> URL? = recycle,
+                                  recycleAll: SafeRemoval.BatchMove = recycleAll,
                                   isRunning: @Sendable (URL) -> Bool = isRunning,
                                   brewRunning: @Sendable () -> Bool = HomebrewCasks.isBrewRunning,
                                   uninstallCask: @Sendable (HomebrewCask) async -> Bool = HomebrewCasks.uninstall)
@@ -717,10 +754,44 @@ nonisolated enum Uninstaller {
                                        home: policy.homeURL)
             }
         }
-        await bootOutAgents(in: data, policy: policy, run: launchctl)
-        report += CleanReport.trashing(data.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
+        let own = data.filter { !$0.system }
+        await bootOutAgents(in: own, policy: policy, run: launchctl)
+        report += CleanReport.trashing(own.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
                                        allows: { policy.allowsAppData($0) || policy.allowsAppRecentList($0) || policy.allowsAppConfig($0) }, trash: moveToTrash,
                                        run: run)
+        report += await trashSystem(data.filter(\.system), policy: policy, move: recycleAll)
+        return report
+    }
+
+    /// The app's system Library entries in ONE `recycleAll` (one admin password prompt), each checked by
+    /// `allowsSystemAppData` right before. Not kept for Undo or `cleanmate restore`: moving them back needs the password
+    /// too (Finder's Put Back asks for it). A cancelled prompt leaves them all, saying so; Stop before leaves them all.
+    /// A launch daemon already running keeps running until the Mac restarts (stopping it needs root).
+    static func trashSystem(_ entries: [AppDataEntry], policy: SafetyPolicy, move: SafeRemoval.BatchMove) async -> CleanReport {
+        var report = CleanReport()
+        guard !entries.isEmpty else { return report }
+        if TrashRun.current?.isStopped == true {
+            report.stopped = entries.count
+            return report
+        }
+        let (results, moveError) = await SafeRemoval.trashAll(entries.map(\.url), allows: policy.allowsSystemAppData, move: move)
+        let cancelled = (moveError as? CocoaError)?.code == .userCancelled
+        for entry in entries {
+            switch results[entry.url] {
+            case .success?:
+                report.freed += entry.size
+                ActivityLog.record(module: "Uninstaller", item: entry.url.path, size: entry.size, mode: .trash, home: policy.homeURL)
+            case .failure(let failure)?:
+                if case .changed = failure { report.changed.append(entry.url) }
+                if case .movedOther = failure { report.failed.append(entry.url) }
+                let notMoved = if case .failed = failure { true } else { false }
+                report.skip(entry.url, cancelled && notMoved ? .kept(String(localized: "the admin password was not given"))
+                                                             : .from(failure, at: entry.url))
+            case nil:
+                break
+            }
+        }
+        report.logFailures(module: "Uninstaller", home: policy.homeURL)
         return report
     }
 

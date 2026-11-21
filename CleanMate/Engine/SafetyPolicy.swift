@@ -54,17 +54,21 @@ nonisolated struct SafetyPolicy: Sendable {
     let flags: VolumeFlags
     /// `device` of each of `allowedRoots`.
     private let rootDevices: [dev_t?]
+    /// The system Library (symlinks resolved) where the Uninstaller may find an app's system-wide files
+    /// (`allowsSystemAppData`); nil: none. Only `current` passes `/Library`, so a test never reaches the real one.
+    let systemLibrary: String?
 
     /// Read on every use so exclusions added in Settings apply to the next scan and removal.
     static var current: SafetyPolicy {
         SafetyPolicy(home: URL(fileURLWithPath: NSHomeDirectory()), temp: FileManager.default.temporaryDirectory,
-                     excluded: Preferences.excluded)
+                     excluded: Preferences.excluded, systemLibrary: URL(fileURLWithPath: "/Library"))
     }
 
     /// `device`, `mounts` and `flags` are injected by tests (they can't mount a volume).
     init(home: URL, temp: URL, excluded: [String] = [], device: @escaping DeviceID = SafetyPolicy.deviceID,
          mounts: @escaping MountPoints = SafetyPolicy.mountPoints, volumesFolder: String = "/Volumes",
-         flags: @escaping VolumeFlags = SafetyPolicy.volumeFlags) {
+         flags: @escaping VolumeFlags = SafetyPolicy.volumeFlags, systemLibrary: URL? = nil) {
+        self.systemLibrary = systemLibrary.map { ($0.path as NSString).resolvingSymlinksInPath }
         self.volumesFolder = Self.normalize(URL(fileURLWithPath: volumesFolder))
         self.flags = flags
         homeURL = home
@@ -702,6 +706,36 @@ nonisolated struct SafetyPolicy: Sendable {
         guard (try? real.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == false,
               !(Extensions.bundleID(of: real).map(Self.isApple) ?? false) else { return false }
         return allows(real)
+    }
+
+    /// Folders of the system Library whose direct children named by an app's bundle id the Uninstaller may remove
+    /// (`allowsSystemAppData`): root owns them, so they go to the Trash through macOS's admin password prompt.
+    static let systemAppDataFolders = [
+        "Application Support", "Caches", "Logs", "Preferences", "LaunchAgents", "LaunchDaemons", "PrivilegedHelperTools",
+    ]
+
+    /// Uninstaller rule for an app's system-wide file, only ever moved to the Trash (with the admin password): one
+    /// entry directly inside one of `systemAppDataFolders` of `systemLibrary`, named like a bundle id
+    /// (`com.vendor.app…`, never a vendor folder such as `Microsoft`), not hidden, not Apple's, a real file or folder
+    /// (not a symlink) on its folder's volume, holding no mount point, not excluded. None without `systemLibrary`.
+    func allowsSystemAppData(_ url: URL) -> Bool {
+        guard let library = systemLibrary else { return false }
+        let path = Self.normalize(url)
+        let parent = (path as NSString).deletingLastPathComponent
+        let name = (path as NSString).lastPathComponent
+        guard Self.systemAppDataFolders.contains(where: { parent == library + "/" + $0 }), !name.hasPrefix("."),
+              !Self.isApple(name), AppMatcher.isBundleIDShaped(AppMatcher.identifier(name, in: parent)),
+              !isExcluded(path), !holdsMount(path) else { return false }
+        var info = stat(), folder = stat()
+        guard lstat(path, &info) == 0, lstat(parent, &folder) == 0, folder.st_mode & S_IFMT == S_IFDIR,
+              info.st_dev == folder.st_dev else { return false }
+        let type = info.st_mode & S_IFMT
+        return type == S_IFREG || type == S_IFDIR
+    }
+
+    /// `url` is in `systemLibrary` (what `allowsSystemAppData` may allow), as the Uninstaller marks its entries.
+    func isSystemLibraryItem(_ url: URL) -> Bool {
+        systemLibrary.map { Self.normalize(url).hasPrefix($0 + "/") } ?? false
     }
 
     /// Login Items rule for a user launch agent, which is only ever disabled through `launchctl` or moved to the Trash:
