@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11] - 2026-11-22
+
 ### Fixed
 - **Uninstaller** finds an app's files in the system Library too: launch agents and daemons, privileged helper tools, and its items in /Library/Application Support, Caches, Logs and Preferences, matched by bundle id. Finder moves them to the Trash after one administrator password prompt (the first time, macOS asks to let CleanMate control Finder).
 - **Uninstaller** moves an app owned by root to the Trash through Finder, which asks for the password; before, macOS refused it without asking.

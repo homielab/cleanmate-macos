@@ -1,6 +1,6 @@
 cask "cleanmate" do
-  version "1.10"
-  sha256 "239faa0efbbf3ad81238298bfa80a9cc31fcb500bfb092c60702fe0aa1b987ba"
+  version "1.11"
+  sha256 "edbdd700fcdf023a8cb3ff804ceab9b985bc709bc384d1cfe6df3af111511ee3"
 
   url "https://github.com/homielab/cleanmate-macos/releases/download/v#{version}/CleanMate-#{version}.dmg"
   name "CleanMate"
