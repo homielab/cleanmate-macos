@@ -74,9 +74,9 @@ nonisolated enum SafeRemoval {
         return try await held.landed(move(held.path))
     }
 
-    /// What a move of several items at once did: where each moved one is now (keyed by the path it was given), and
-    /// its error (a cancelled password prompt, an item it couldn't move), if any.
-    typealias BatchMove = @Sendable ([URL]) async -> (moved: [URL: URL], error: Error?)
+    /// What a move of several items at once did: where each moved one is now (keyed by the path it was given; nil:
+    /// moved, place unknown), and its error (a cancelled password prompt, an item it couldn't move), if any.
+    typealias BatchMove = @Sendable ([URL]) async -> (moved: [URL: URL?], error: Error?)
 
     /// `trash` for several items in ONE move (`NSWorkspace.recycle`: one admin password prompt for all): each is
     /// checked and held like `trash` and looked at again right before the move; all still unchanged are moved together,

@@ -32,10 +32,10 @@ final class UninstallerSystemTests {
         private(set) var calls: [[URL]] = []
         init(trash: URL) { self.trash = trash }
 
-        func move(_ urls: [URL]) -> (moved: [URL: URL], error: Error?) {
+        func move(_ urls: [URL]) -> (moved: [URL: URL?], error: Error?) {
             lock.withLock { calls.append(urls) }
             try? FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
-            var moved: [URL: URL] = [:]
+            var moved: [URL: URL?] = [:]
             for url in urls {
                 let target = trash.appending(path: url.lastPathComponent)
                 if (try? FileManager.default.moveItem(at: url, to: target)) != nil { moved[url] = target }
@@ -163,7 +163,26 @@ final class FinderTrashTests {
             return NSAppleEventDescriptor.null()
         }
         #expect(events == 1 && result.error == nil)
-        #expect(result.moved[a]?.lastPathComponent == "moved 0" && result.moved[b]?.lastPathComponent == "moved 1")
+        #expect(result.moved[a]??.lastPathComponent == "moved 0" && result.moved[b]??.lastPathComponent == "moved 1")
+    }
+
+    @Test func goneButNotInThisTrashCountsAsMovedPlaceUnknown() async throws {
+        let a = try file("com.foo.bar.plist"), b = try file("com.foo.bar.helper.plist")
+        let result = FinderTrash.move([a, b], trash: trash) { _ in
+            try FileManager.default.removeItem(at: a) // put in another Trash
+            return NSAppleEventDescriptor.null()
+        }
+        #expect(result.moved.count == 1 && result.moved[a] == .some(nil) && result.error == nil)
+        // Through the Uninstaller it counts as moved, never "failed", and has no Undo record.
+        let policy = SafetyPolicy(home: root.appending(path: "home"), temp: root.appending(path: "tmp"),
+                                  systemLibrary: root.appending(path: "Library"))
+        try Data([1]).write(to: a)
+        let report = await Uninstaller.trashSystem([AppDataEntry(url: a, size: 7, system: true)], policy: policy) { urls in
+            urls.forEach { try? FileManager.default.removeItem(at: $0) }
+            return (Dictionary(uniqueKeysWithValues: urls.map { ($0, URL?.none) }), nil)
+        }
+        #expect(report.freed == 7 && report.skipped == 0 && report.trashed.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: b.path))
     }
 
     @Test func cancelledOrRefusedMovesNothing() throws {

@@ -23,11 +23,13 @@ nonisolated enum FinderTrash {
     static let timeout: TimeInterval = 600
 
     /// Sends one Finder `delete` of every item in `urls` (one password prompt for all), then finds each moved item in
-    /// `trash` by its volume and inode (the name may change there: `x 2.plist`). A cancelled prompt is
+    /// `trash` by its volume and inode (the name may change there: `x 2.plist`). An item gone from its place but not
+    /// found there after Finder reported no error counts as moved, place unknown (nil): Finder may put root's items in
+    /// another Trash. A cancelled prompt is
     /// `CocoaError.userCancelled`; refused Finder control `Failure.notAllowed`.
     static func move(_ urls: [URL], trash: URL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".Trash"),
                      send: (NSAppleEventDescriptor) throws -> NSAppleEventDescriptor = sendToFinder)
-        -> (moved: [URL: URL], error: Error?) {
+        -> (moved: [URL: URL?], error: Error?) {
         let ids = urls.compactMap { url in SafeRemoval.FileID(url).map { (url, $0) } }
         guard !ids.isEmpty else { return ([:], nil) }
         var failure: Error?
@@ -42,9 +44,13 @@ nonisolated enum FinderTrash {
             let url = trash.appending(path: name)
             return SafeRemoval.FileID(url).map { ($0, url) }
         }, uniquingKeysWith: { first, _ in first })
-        var moved: [URL: URL] = [:]
-        for (url, id) in ids where SafeRemoval.FileID(url) != id {
-            if let found = inTrash[id] { moved[url] = found }
+        var moved: [URL: URL?] = [:]
+        for (url, id) in ids {
+            if let found = inTrash[id] {
+                moved[url] = .some(found)
+            } else if failure == nil, SafeRemoval.FileID(url) == nil {
+                moved[url] = .some(nil)
+            }
         }
         return (moved, failure)
     }
