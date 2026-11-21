@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSAppleEventsUsageDescription": {
+      "extractionState": "extracted_with_value",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "CleanMate asks Finder to move an app’s files in /Library to the Trash. Finder asks for your administrator password first."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CleanMate nhờ Finder chuyển tệp của ứng dụng trong /Library vào Thùng rác. Finder sẽ hỏi mật khẩu quản trị trước."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

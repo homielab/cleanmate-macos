@@ -702,6 +702,9 @@
         }
       }
     },
+    "Canva" : {
+      "shouldTranslate" : false
+    },
     "Capacity in Bytes" : {
       "localizations" : {
         "vi" : {
@@ -808,6 +811,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CleanMate để nguyên các mục này. Mỗi lý do nói cách xử lý; sau đó dọn lại."
+          }
+        }
+      }
+    },
+    "CleanMate may not control Finder (System Settings › Privacy & Security › Automation)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CleanMate chưa được phép điều khiển Finder (Cài đặt hệ thống › Quyền riêng tư & Bảo mật › Tự động hoá)"
           }
         }
       }
@@ -1052,6 +1065,9 @@
         }
       }
     },
+    "Discord" : {
+      "shouldTranslate" : false
+    },
     "Document" : {
       "localizations" : {
         "vi" : {
@@ -1272,6 +1288,9 @@
         }
       }
     },
+    "Figma" : {
+      "shouldTranslate" : false
+    },
     "Files and hidden names directly in ~/.cache" : {
       "localizations" : {
         "vi" : {
@@ -1378,6 +1397,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm ảnh tương tự"
+          }
+        }
+      }
+    },
+    "Finder couldn’t move it to the Trash (error %lld)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder không chuyển được vào Thùng rác (lỗi %lld)"
           }
         }
       }
@@ -3260,6 +3289,9 @@
         }
       }
     },
+    "Microsoft Teams" : {
+      "shouldTranslate" : false
+    },
     "Move CleanMate to the Applications folder first, then open it from there." : {
       "localizations" : {
         "vi" : {
@@ -3460,6 +3492,9 @@
         }
       }
     },
+    "Notion" : {
+      "shouldTranslate" : false
+    },
     "Number of Photos" : {
       "localizations" : {
         "vi" : {
@@ -3469,6 +3504,9 @@
           }
         }
       }
+    },
+    "Obsidian" : {
+      "shouldTranslate" : false
     },
     "Old installers and downloads" : {
       "localizations" : {
@@ -3580,6 +3618,9 @@
         }
       }
     },
+    "Orion" : {
+      "shouldTranslate" : false
+    },
     "Other caches in ~/.cache" : {
       "localizations" : {
         "vi" : {
@@ -3653,6 +3694,9 @@
           }
         }
       }
+    },
+    "Postman" : {
+      "shouldTranslate" : false
     },
     "Put Back" : {
       "localizations" : {
@@ -5098,6 +5142,9 @@
         }
       }
     },
+    "Signal" : {
+      "shouldTranslate" : false
+    },
     "Similar Photos" : {
       "localizations" : {
         "vi" : {
@@ -5137,6 +5184,9 @@
           }
         }
       }
+    },
+    "Slack" : {
+      "shouldTranslate" : false
     },
     "Smart Scan has not run yet." : {
       "localizations" : {
@@ -5496,6 +5546,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bản sao thiết bị test"
+          }
+        }
+      }
+    },
+    "the admin password was not given" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chưa nhập mật khẩu quản trị"
           }
         }
       }
@@ -5910,6 +5970,9 @@
         }
       }
     },
+    "WhatsApp" : {
+      "shouldTranslate" : false
+    },
     "You can also manage it in System Settings › General › Login Items & Extensions." : {
       "localizations" : {
         "vi" : {
@@ -5959,6 +6022,9 @@
           }
         }
       }
+    },
+    "Zalo" : {
+      "shouldTranslate" : false
     },
     "Zig cache" : {
       "localizations" : {
@@ -6426,16 +6492,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ · Cần mật khẩu quản trị"
-          }
-        }
-      }
-    },
-    "the admin password was not given" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "chưa nhập mật khẩu quản trị"
           }
         }
       }

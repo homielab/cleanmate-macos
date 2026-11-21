@@ -670,17 +670,18 @@ nonisolated enum Uninstaller {
     /// let us move (the user removes it in Launchpad or Finder instead of meeting a password prompt).
     enum AppTrashError: Error, Equatable { case notTrashed, cancelled, locked, brewBusy, appStore }
 
-    /// `NSWorkspace.recycle`: like Finder, asks for an admin password when the app is owned by root or the App Store
-    ///. Returns where the app now is inside the Trash; throws `CocoaError.userCancelled` if the prompt is cancelled.
-    static let recycle: @Sendable (URL) async throws -> URL? = { url in try await NSWorkspace.shared.recycle([url])[url] }
-
-    /// `NSWorkspace.recycle` of several items at once: one admin password prompt for all of them (system Library
-    /// entries), with what moved even when some didn't.
-    static let recycleAll: SafeRemoval.BatchMove = { urls in
-        await withCheckedContinuation { done in
-            NSWorkspace.shared.recycle(urls) { moved, error in done.resume(returning: (moved, error)) }
-        }
+    /// Through Finder (`FinderTrash`), which asks for an admin password when the app is owned by root
+    /// (`NSWorkspace.recycle` only fails). Returns where the app now is inside the Trash; throws
+    /// `CocoaError.userCancelled` if the prompt is cancelled.
+    static let recycle: @Sendable (URL) async throws -> URL? = { url in
+        let result = FinderTrash.move([url])
+        if let moved = result.moved[url] { return moved }
+        throw result.error ?? CocoaError(.fileWriteNoPermission)
     }
+
+    /// `FinderTrash` of several items at once: one admin password prompt for all of them (system Library entries),
+    /// with what moved even when some didn't.
+    static let recycleAll: SafeRemoval.BatchMove = { urls in FinderTrash.move(urls) }
 
     /// The app at `url` is open: a running app with its bundle id, or launched from that bundle.
     static let isRunning: @Sendable (URL) -> Bool = { url in
@@ -785,8 +786,14 @@ nonisolated enum Uninstaller {
                 if case .changed = failure { report.changed.append(entry.url) }
                 if case .movedOther = failure { report.failed.append(entry.url) }
                 let notMoved = if case .failed = failure { true } else { false }
-                report.skip(entry.url, cancelled && notMoved ? .kept(String(localized: "the admin password was not given"))
-                                                             : .from(failure, at: entry.url))
+                let reason: CleanFailure.Reason = if notMoved, cancelled {
+                    .kept(String(localized: "the admin password was not given"))
+                } else if notMoved, let finder = moveError as? FinderTrash.Failure {
+                    .other(finder.localizedDescription)
+                } else {
+                    .from(failure, at: entry.url)
+                }
+                report.skip(entry.url, reason)
             case nil:
                 break
             }

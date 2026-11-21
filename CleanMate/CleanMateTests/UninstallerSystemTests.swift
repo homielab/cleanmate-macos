@@ -127,3 +127,55 @@ final class UninstallerSystemTests {
         #expect(report.failures.contains { $0.reason == .refused })
     }
 }
+
+/// `FinderTrash` with a fake Finder: no Apple Event is sent and the real Trash is never touched.
+final class FinderTrashTests {
+    let root = TestTemp.url("CleanMateFinderTrash")
+    deinit { try? FileManager.default.removeItem(at: root) }
+    var trash: URL { root.appending(path: "Trash") }
+
+    func file(_ name: String) throws -> URL {
+        let url = root.appending(path: "Library/LaunchDaemons/\(name)")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([1]).write(to: url)
+        return url
+    }
+
+    /// The file URLs a Finder `delete` event carries.
+    static func targets(_ event: NSAppleEventDescriptor) -> [URL] {
+        guard let list = event.paramDescriptor(forKeyword: keyDirectObject) else { return [] }
+        return (0..<list.numberOfItems).compactMap { list.atIndex($0 + 1)?.fileURLValue }
+    }
+
+    @Test func oneDeleteFindsEachItemInTheTrashByInode() throws {
+        let a = try file("com.foo.bar.plist"), b = try file("com.foo.bar.helper.plist")
+        try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+        try Data([2]).write(to: trash.appending(path: "com.foo.bar.plist")) // same name already in the Trash
+        var events = 0
+        let result = FinderTrash.move([a, b], trash: trash) { event in
+            events += 1
+            #expect(event.eventClass == AEEventClass(kAECoreSuite) && event.eventID == AEEventID(kAEDelete))
+            let urls = Self.targets(event)
+            #expect(urls.map(\.lastPathComponent) == [a.lastPathComponent, b.lastPathComponent])
+            for (index, url) in urls.enumerated() {
+                try FileManager.default.moveItem(at: url, to: self.trash.appending(path: "moved \(index)"))
+            }
+            return NSAppleEventDescriptor.null()
+        }
+        #expect(events == 1 && result.error == nil)
+        #expect(result.moved[a]?.lastPathComponent == "moved 0" && result.moved[b]?.lastPathComponent == "moved 1")
+    }
+
+    @Test func cancelledOrRefusedMovesNothing() throws {
+        let a = try file("com.foo.bar.plist")
+        let cancelled = FinderTrash.move([a], trash: trash) { _ in throw NSError(domain: NSOSStatusErrorDomain, code: -128) }
+        #expect(cancelled.moved.isEmpty && (cancelled.error as? CocoaError)?.code == .userCancelled)
+        let refused = FinderTrash.move([a], trash: trash) { _ in
+            let reply = NSAppleEventDescriptor.record()
+            reply.setParam(NSAppleEventDescriptor(int32: -1743), forKeyword: keyErrorNumber)
+            return reply
+        }
+        #expect(refused.moved.isEmpty && refused.error as? FinderTrash.Failure == .notAllowed)
+        #expect(FileManager.default.fileExists(atPath: a.path))
+    }
+}
