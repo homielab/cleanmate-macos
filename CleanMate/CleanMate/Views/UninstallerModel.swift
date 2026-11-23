@@ -636,8 +636,8 @@ final class UninstallerModel: ObservableObject {
             if quitCancelled { return false }
             runningApps = appBundleIDs()
             if !isRunning(app) { return true }
-            if clock.now >= deadline || Task.isCancelled { return false }
-            try? await Task.sleep(for: .milliseconds(200))
+            if clock.now >= deadline { return false }
+            do { try await Task.sleep(for: .milliseconds(200)) } catch { return false } // cancelled
         }
     }
 

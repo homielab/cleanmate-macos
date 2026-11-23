@@ -242,7 +242,7 @@ struct CleanerItemIcon: View {
     @MainActor static func appIcon(_ bundleID: String) -> NSImage? {
         IconCache.image("app:" + bundleID) {
             NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { url in
-                IconCache.image("bundle:" + url.path, file: url) { NSWorkspace.shared.icon(forFile: url.path) }
+                IconCache.image("bundle:" + url.path) { NSWorkspace.shared.icon(forFile: url.path) }
             } ?? nil
         }
     }

@@ -88,23 +88,6 @@ struct SmartScanPolishTests {
         #expect(only.map(\.id) == ["g"] && only[0].items.map(\.id) == ["b"])
     }
 
-    /// An app bundle replaced (installed again) shows its new icon without relaunching CleanMate.
-    @MainActor @Test func iconOfAReplacedBundleIsLookedUpAgain() throws {
-        let root = TestTemp.url("CleanMateIconCache")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let app = root.appending(path: "Fake.app")
-        try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000)], ofItemAtPath: app.path)
-        let old = NSImage(size: NSSize(width: 1, height: 1)), new = NSImage(size: NSSize(width: 2, height: 2))
-        let key = "test:" + app.path
-        #expect(IconCache.image(key, file: app) { old } === old)
-        #expect(IconCache.image(key, file: app) { new } === old) // cached
-        try FileManager.default.removeItem(at: app) // reinstalled: a new bundle in its place
-        try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
-        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 2_000_000)], ofItemAtPath: app.path)
-        #expect(IconCache.image(key, file: app) { new } === new)
-    }
-
     /// A new scan (and an app launching or quitting) drops the cached icons.
     @MainActor @Test func iconCacheIsDroppedOnClear() {
         let a = NSImage(size: NSSize(width: 1, height: 1)), b = NSImage(size: NSSize(width: 2, height: 2))

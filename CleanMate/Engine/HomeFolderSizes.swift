@@ -40,13 +40,12 @@ nonisolated struct HomeFolderSizes: Codable, Equatable, Sendable {
         return sizes
     }
 
-    /// Saves atomically; a write error only means the next launch measures without numbers to show first.
+    /// Saves atomically (`AtomicFile.save`, a failure is logged); a lost file only means the next launch measures
+    /// without numbers to show first.
     func write(to file: URL) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
         encoder.outputFormatting = [.sortedKeys]
-        guard let data = try? encoder.encode(self) else { return }
-        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: file, options: .atomic)
+        AtomicFile.save(try? encoder.encode(self), to: file)
     }
 }

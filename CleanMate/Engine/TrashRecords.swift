@@ -103,9 +103,13 @@ nonisolated enum TrashRecords {
     /// path, or Smart Scan's item name). Items whose place in the Trash macOS did not say are left out. Never under a
     /// test host for the real home (like `ActivityLog`).
     /// `run`: the move they belong to (`TrashRun`); one clean or uninstall adding records in several calls passes one.
+    /// A file that can't be saved (full disk, I/O error) keeps its old records and logs a "failed" line under `module`,
+    /// so the user can see why Undo and Put Back don't list these items (they are still in the Trash). False then.
+    @discardableResult
     static func add(_ items: [TrashedItem], module: LocalizedStringResource, home: URL, date: Date = .now,
-                    run: String = TrashRun.currentID, logName: (URL) -> String = { $0.path }) {
-        guard !items.isEmpty, !ActivityLog.writesRealLogInTests(home) else { return }
+                    run: String = TrashRun.currentID, logName: (URL) -> String = { $0.path },
+                    writer: AtomicFile.Writer = AtomicFile.plainWrite) -> Bool {
+        guard !items.isEmpty, !ActivityLog.writesRealLogInTests(home) else { return true }
         let english = ActivityLog.english(module)
         let records = items.compactMap { item in
             SafeRemoval.FileID(item.inTrash).map { id in
@@ -114,8 +118,14 @@ nonisolated enum TrashRecords {
                               run: run)
             }
         }
-        if !records.isEmpty { update(home: home) { $0 += records } }
+        guard !records.isEmpty, !update(home: home, writer: writer, { $0 += records }) else { return true }
+        ActivityLog.recordFailed(module: module, item: url(home: home).path, reason: saveFailedReason, home: home, date: date)
+        return false
     }
+
+    /// The activity log's reason when the records file couldn't be saved (English, like every reason).
+    static let saveFailedReason = "Could not save the list of items moved to the Trash: Undo and Put Back can't list "
+        + "them, but they are still in the Trash"
 
     /// The records of `home` whose item is still in the Trash, oldest first. Never creates or rewrites the file (a
     /// shared lock, so a write in progress is not read half-done); one that can't be read is set aside (`setAside`).
@@ -258,43 +268,52 @@ nonisolated enum TrashRecords {
 
     /// Reads, changes and writes the records under an exclusive lock, so two runs at once keep both changes. Records
     /// of items no longer in the Trash are dropped, then whole runs beyond the limits (`kept`). An unreadable file is
-    /// set aside (`setAside`) and a new one started, never overwritten; a write error loses nothing else.
+    /// set aside (`setAside`) and a new one started, never overwritten. The new list is written whole to a temporary
+    /// file and renamed over the old one (`AtomicFile`) while the lock is held: a failed write keeps the old list.
     /// `create` false: no file is made when there is none (`change` sees no records).
-    static func update(home: URL, create: Bool = true, _ change: (inout [Record]) -> Void) {
+    /// False when the change couldn't be saved; true when it was, or there was no file and `create` is false.
+    @discardableResult
+    static func update(home: URL, create: Bool = true, writer: AtomicFile.Writer = AtomicFile.plainWrite,
+                       _ change: (inout [Record]) -> Void) -> Bool {
         let url = url(home: home)
         if create {
             try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         }
-        // A file set aside or replaced while this waited for its lock is let go and the new one opened: at most twice
-        // (set aside, then a new one made by another run).
-        for _ in 0..<3 {
+        // A file set aside or replaced (each save renames a new one over it) while this waited for its lock is let go
+        // and the new one opened: once per run saving at the same time.
+        var saved = false
+        for _ in 0..<attempts {
             let fd = open(url.path, O_RDWR | O_CLOEXEC | O_NOFOLLOW | (create ? O_CREAT : 0), 0o600)
-            guard fd >= 0 else { break }
+            guard fd >= 0 else {
+                saved = !create && errno == ENOENT
+                break
+            }
             defer { close(fd) }
-            guard flock(fd, LOCK_EX) == 0 else { return }
+            guard flock(fd, LOCK_EX) == 0 else { return false }
             defer { flock(fd, LOCK_UN) }
             guard isFile(fd, at: url) else { continue }
-            let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
-            guard var records = decode((try? handle.readToEnd()) ?? Data()) else {
+            guard var records = decode((try? FileHandle(fileDescriptor: fd, closeOnDealloc: false).readToEnd()) ?? Data())
+            else {
                 setAside(url)
                 continue
             }
-            write(&records, change, to: fd, handle: handle)
-            return
+            change(&records)
+            records.removeAll { !$0.isInTrash }
+            records = kept(records)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+            do {
+                try AtomicFile.write(try encoder.encode(records), to: url, permissions: 0o600, writer: writer)
+                return true
+            } catch {
+                return false
+            }
         }
         var none: [Record] = []
         change(&none)
+        return saved
     }
 
-    private static func write(_ records: inout [Record], _ change: (inout [Record]) -> Void, to fd: Int32,
-                              handle: FileHandle) {
-        change(&records)
-        records.removeAll { !$0.isInTrash }
-        records = kept(records)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard let out = try? encoder.encode(records) else { return }
-        guard ftruncate(fd, 0) == 0, lseek(fd, 0, SEEK_SET) == 0 else { return }
-        try? handle.write(contentsOf: out)
-    }
+    /// How often `update` opens the file again after it was replaced while waiting for its lock.
+    static let attempts = 20
 }

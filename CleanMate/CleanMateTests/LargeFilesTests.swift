@@ -320,7 +320,7 @@ struct LargeFilesTests {
 
     /// A saved scope comes back; one that is gone, outside home, hidden, excluded or protected without Full
     /// Disk Access falls back to the home folder.
-    @MainActor @Test func savedScopeIsRestoredUnlessNoLongerValid() throws {
+    @MainActor @Test func savedScopeIsRestoredUnlessNoLongerValid() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         for name in ["Projects", "Projects/Old", ".hidden", "Downloads"] {
             try FileManager.default.createDirectory(at: home.appending(path: name), withIntermediateDirectories: true)
@@ -330,19 +330,19 @@ struct LargeFilesTests {
         var access = true
         model.hasFullDiskAccess = { access }
         let projects = home.appending(path: "Projects")
-        model.restoreScope(projects.path, excluded: [])
+        await model.restoreScope(projects.path, excluded: [])
         #expect(model.scope == LargeFilesModel.folder(projects.path) && model.scopeName == "~/Projects")
         for path in ["", home.path, home.appending(path: "Gone").path, home.appending(path: ".hidden").path, root.path] {
-            model.restoreScope(projects.path, excluded: [])
-            model.restoreScope(path, excluded: [])
+            await model.restoreScope(projects.path, excluded: [])
+            await model.restoreScope(path, excluded: [])
             #expect(model.scope == nil, "\(path)")
         }
-        model.restoreScope(home.appending(path: "Projects/Old").path, excluded: [projects.path.uppercased()])
+        await model.restoreScope(home.appending(path: "Projects/Old").path, excluded: [projects.path.uppercased()])
         #expect(model.scope == nil)
-        model.restoreScope(home.appending(path: "Downloads").path, excluded: [])
+        await model.restoreScope(home.appending(path: "Downloads").path, excluded: [])
         #expect(model.scope != nil)
         access = false
-        model.restoreScope(home.appending(path: "Downloads").path, excluded: [])
+        await model.restoreScope(home.appending(path: "Downloads").path, excluded: [])
         #expect(model.scope == nil)
     }
 
@@ -444,6 +444,17 @@ struct LargeFilesTests {
         #expect(model.lastTrash?.undo == TrashUndo.Result(restored: 2, skipped: 0))
         model.dismissTrashReport()
         #expect(model.lastTrash == nil)
+    }
+
+    /// Files put back by Undo go back to their place in the list (largest first), not to its end.
+    @MainActor @Test func filesPutBackKeepTheListOrder() {
+        func row(_ name: String, _ size: Int64) -> LargeFile {
+            LargeFile(url: URL(fileURLWithPath: "/x/" + name), size: size, lastUsed: .now, kind: .other)
+        }
+        let listed = [row("a", 900), row("b", 500), row("c", 100)]
+        let merged = LargeFilesModel.merged(listed, [row("small", 50), row("big", 1_000), row("same", 500)])
+        #expect(merged.map(\.url.lastPathComponent) == ["big", "a", "b", "same", "c", "small"])
+        #expect(LargeFilesModel.merged(listed, []) == listed && LargeFilesModel.merged([], listed) == listed)
     }
 
     /// Under a test host a finished scan keeps its count in memory only: the real preferences stay untouched.

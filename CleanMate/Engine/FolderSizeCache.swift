@@ -166,8 +166,7 @@ nonisolated final class FolderSizeCache: @unchecked Sendable {
                 records = all
             }
             guard let file, !readOnly else { return }
-            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try? JSONEncoder().encode(all).write(to: file, options: .atomic)
+            AtomicFile.save(try? JSONEncoder().encode(all), to: file)
         }
     }
 

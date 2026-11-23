@@ -341,23 +341,45 @@ nonisolated enum ActivityLog {
         return days
     }
 
+    /// Moves `url` (activity.log) to activity.1.log, dropping the old activity.1.log after adding its totals to
+    /// activity.archived. When the totals can't be saved nothing moves (the log grows until they can); when the move
+    /// fails the totals saved before are put back. So the lifetime total never drops and never counts a line twice.
+    /// The caller holds `lock`. `writer` and `move` stand in for the disk in tests. False when nothing moved.
+    @discardableResult
+    static func rotate(_ url: URL, writer: AtomicFile.Writer = AtomicFile.plainWrite,
+                       move: (String, String) -> Int32 = { rename($0, $1) }) -> Bool {
+        let old = url.deletingPathExtension().appendingPathExtension("1.log")
+        let archive = archiveURL(url)
+        var info = stat()
+        var before: Data?
+        if lstat(old.path, &info) == 0 {
+            // The lines dropped with activity.1.log still count in the lifetime totals.
+            guard let dropped = try? Data(contentsOf: old) else { return false }
+            before = (try? Data(contentsOf: archive)) ?? Data()
+            var kept = archived(url: url)
+            let freed = totals(of: String(decoding: dropped, as: UTF8.self), after: .distantPast)
+            kept.deleted += freed.deleted
+            kept.trashed += freed.trashed
+            do {
+                try AtomicFile.write(Data("\(kept.deleted)\t\(kept.trashed)\n".utf8), to: archive, writer: writer)
+            } catch {
+                return false
+            }
+        }
+        guard move(url.path, old.path) == 0 else {
+            if let before { try? AtomicFile.write(before, to: archive) }
+            return false
+        }
+        return true
+    }
+
     private static func append(_ line: String, to url: URL, rotateAt: Int) {
         lock.lock()
         defer { lock.unlock() }
         let manager = FileManager.default
         try? manager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         if let size = (try? manager.attributesOfItem(atPath: url.path))?[.size] as? Int, size > rotateAt {
-            let old = url.deletingPathExtension().appendingPathExtension("1.log")
-            // The lines dropped with activity.1.log still count in the lifetime totals.
-            if let dropped = try? String(contentsOf: old, encoding: .utf8) {
-                var kept = archived(url: url)
-                let freed = totals(of: dropped, after: .distantPast)
-                kept.deleted += freed.deleted
-                kept.trashed += freed.trashed
-                try? "\(kept.deleted)\t\(kept.trashed)\n".write(to: archiveURL(url), atomically: true, encoding: .utf8)
-            }
-            try? manager.removeItem(at: old)
-            try? manager.moveItem(at: url, to: old)
+            rotate(url)
         }
         // O_APPEND: lines from modules cleaning at the same time don't overwrite each other.
         let fd = open(url.path, O_WRONLY | O_APPEND | O_CREAT, 0o644)

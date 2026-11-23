@@ -713,9 +713,9 @@ final class SmartScanModel: ObservableObject {
         scanningSince = [:]
         scanningNow = ScanningLine()
         let sampler = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.scanningRefresh)
-                guard let self, current == self.generation, !Task.isCancelled else { return }
+            while true {
+                do { try await Task.sleep(for: Self.scanningRefresh) } catch { return } // cancelled
+                guard let self, current == self.generation else { return }
                 self.sampleScanning()
             }
         }

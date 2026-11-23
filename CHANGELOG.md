@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Moved Items** keeps its list when the disk is full or a save fails: the list is saved whole or not at all, and Settings › Activity says when items could not be added to it. The activity log's lifetime total no longer drops when its old log can't be rotated, and saved scan caches can't be left half-written.
+- **Large & Old Files**: files put back with Undo return to their place in the list, and the Scope menu no longer reads the disk each time it is drawn.
+
 ## [1.11] - 2026-11-22
 
 ### Fixed

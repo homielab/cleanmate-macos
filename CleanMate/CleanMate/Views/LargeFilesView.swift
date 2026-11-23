@@ -127,7 +127,14 @@ struct LargeFilesView: View {
         }
         .focusedSceneValue(\.moveToTrash, moveToTrash)
         .trashUndo(model)
-        .onAppear { model.restoreScope(savedScope) }
+        .task { await model.restoreScope(savedScope) }
+        .task { await model.refreshVolumes() }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didMountNotification)) { _ in
+            Task { await model.refreshVolumes() }
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in
+            Task { await model.refreshVolumes() }
+        }
         .onChange(of: model.scope) { scope in savedScope = scope?.path ?? "" }
     }
 
@@ -138,7 +145,7 @@ struct LargeFilesView: View {
     /// Scope: the whole home, a few home folders, external drives, recently chosen folders, or "Choose Folder…".
     private var scopeMenu: some View {
         let presets = LargeFilesModel.scopePresets.map { model.home.appending(path: $0).path }
-        let volumes = LargeFilesModel.externalVolumes()
+        let volumes = model.volumes
         let recent = Preferences.recentFolders(recentFolders).filter { path in
             !presets.contains(path) && path != model.home.path
                 && !volumes.contains { $0.path == LargeFilesModel.folder(path).path }

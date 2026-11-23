@@ -427,8 +427,7 @@ nonisolated enum SimilarPhotos {
                 let kept = live.sorted { $0.key.modified > $1.key.modified }.prefix(limit).map { Entry(key: $0.key, print: $0.value) }
                 let encoder = PropertyListEncoder()
                 encoder.outputFormat = .binary
-                try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try? encoder.encode(Array(kept)).write(to: url, options: .atomic)
+                AtomicFile.save(try? encoder.encode(Array(kept)), to: url)
             }
         }
     }

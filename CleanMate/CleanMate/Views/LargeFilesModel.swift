@@ -125,8 +125,17 @@ final class LargeFilesModel: ObservableObject {
         SafetyPolicy(home: home, temp: FileManager.default.temporaryDirectory, excluded: Preferences.excluded)
     }
 
+    /// External volumes the Scope menu offers, read off the main thread (`refreshVolumes`).
+    @Published private(set) var volumes: [URL] = []
+
+    /// Reads `externalVolumes` again in the background: when the view appears and when a disk mounts or unmounts.
+    func refreshVolumes() async {
+        volumes = await Task.detached { Self.externalVolumes() }.value
+    }
+
     /// External volumes the Scope menu offers (mounted in /Volumes, browsable, not the startup disk), by name.
-    static func externalVolumes() -> [URL] {
+    /// Reads the disk: call it off the main thread.
+    nonisolated static func externalVolumes() -> [URL] {
         let policy = SafetyPolicy.current
         let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: [.volumeIsBrowsableKey],
                                                          options: [.skipHiddenVolumes]) ?? []
@@ -147,7 +156,7 @@ final class LargeFilesModel: ObservableObject {
     static let scopePresets = ["Downloads", "Desktop", "Documents"]
 
     /// One URL form per folder path, so menu tags and `scope` compare equal.
-    static func folder(_ path: String) -> URL { URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL }
+    nonisolated static func folder(_ path: String) -> URL { URL(filePath: path, directoryHint: .isDirectory).standardizedFileURL }
 
     /// `~/Downloads`-style name of the scope, nil for the whole home folder.
     var scopeName: String? {
@@ -170,14 +179,15 @@ final class LargeFilesModel: ObservableObject {
 
     /// Restores the scope saved by the view before the first scan; a folder that is gone, outside home, in
     /// ~/Library or hidden, excluded, or protected without Full Disk Access silently falls back to the home folder.
-    func restoreScope(_ path: String, excluded: [String] = Preferences.excluded) {
+    /// The folder is looked up off the main thread; a scan started meanwhile keeps its scope.
+    func restoreScope(_ path: String, excluded: [String] = Preferences.excluded) async {
+        guard case .idle = phase else { return }
+        let url = Self.folder(path)
+        let exists = path.isEmpty ? false : await Self.isFolder(url)
         guard case .idle = phase else { return }
         scope = nil
-        guard !path.isEmpty else { return }
-        let url = Self.folder(path)
-        var isFolder: ObjCBool = false
         let lower = url.path.lowercased()
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder), isFolder.boolValue,
+        guard exists,
               LargeFileScanner.allowsRoot(url, policy: policy),
               !excluded.map({ Self.folder($0).path.lowercased() }).contains(where: { lower == $0 || lower.hasPrefix($0 + "/") }),
               !ProtectedFolders.contains(ProtectedFolders.skipped(home: home, hasFullDiskAccess: hasFullDiskAccess()), url),
@@ -185,6 +195,15 @@ final class LargeFilesModel: ObservableObject {
         else { return }
         scope = url
     }
+
+    /// A folder is at `url` now; read off the main thread.
+    nonisolated static func isFolder(_ url: URL) async -> Bool {
+        await Task.detached {
+            var isFolder: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isFolder) && isFolder.boolValue
+        }.value
+    }
+
     /// "Undo"; tests pass their own so the real Trash is never touched.
     var restore: ([TrashedItem]) async -> TrashUndo.Result = { await TrashUndo.restore($0, module: "Large & Old Files") }
     /// Injectable for tests.
@@ -529,7 +548,7 @@ final class LargeFilesModel: ObservableObject {
     }
 
     /// "Undo" in the note of the last move (or ⌘Z): puts the files just trashed back, once. Those back at their place
-    /// are listed again.
+    /// (checked off the main thread) are listed again, where the scan's order puts them (`merged`).
     func undoTrash() async {
         guard var report = lastTrash, report.undo == nil, !report.trashed.isEmpty, !undoing else { return }
         undoManager?.removeAllActions(withTarget: self) // the button ran it, or ⌘Z did
@@ -541,11 +560,32 @@ final class LargeFilesModel: ObservableObject {
         undoing = false
         report.undo = result
         lastTrash = report
-        let listed = Set(files.map(\.url))
-        let back = trashedRows.filter { !listed.contains($0.url) && FileManager.default.fileExists(atPath: $0.url.path) }
+        let rows = trashedRows
         trashedRows = []
+        let present = await Task.detached { rows.filter { FileManager.default.fileExists(atPath: $0.url.path) } }.value
+        let listed = Set(files.map(\.url))
+        let back = present.filter { !listed.contains($0.url) }
         guard !back.isEmpty else { return }
-        files += back
+        files = Self.merged(files, back)
+    }
+
+    /// `back` inserted into `files` (largest first, as a scan lists them) at their places by size; equal sizes keep
+    /// the listed file first. Linear: `files` may hold many thousands.
+    static func merged(_ files: [LargeFile], _ back: [LargeFile]) -> [LargeFile] {
+        let back = back.sorted { $0.size > $1.size }
+        var result: [LargeFile] = []
+        result.reserveCapacity(files.count + back.count)
+        var i = 0, j = 0
+        while i < files.count || j < back.count {
+            if j == back.count || (i < files.count && files[i].size >= back[j].size) {
+                result.append(files[i])
+                i += 1
+            } else {
+                result.append(back[j])
+                j += 1
+            }
+        }
+        return result
     }
 }
 

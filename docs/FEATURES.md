@@ -329,7 +329,7 @@ One list of everything CleanMate moved to the Trash, from any module, kept after
 - Each row shows the item, its source (Smart Scan, Large & Old Files, Similar Photos, Space Lens, Uninstaller, Login Items or Command Line) and when it was moved; the header shows how many items are still in the Trash and their size.
 - **Put Back** returns one item to where it was; **Put Back All Shown…** returns everything the source filter and search show, after a confirmation. Nothing already at that place is replaced.
 - An item is not put back when something with the same name is there now, or its folder was moved, renamed, removed, is on another disk or is now a link; it says so, and **Reveal in Finder** shows it in the Trash.
-- Items stay listed until the Trash is emptied; it works the same for thousands of items. If the list can't be read, a new one is started and the old items stay in the Trash, to put back from Finder.
+- Items stay listed until the Trash is emptied; it works the same for thousands of items. If the list can't be read, a new one is started and the old items stay in the Trash, to put back from Finder. The list is saved whole or not at all: when the disk is full or a write fails, the list stays as it was and Settings › Activity shows a "failed" line, so the items just moved are still in the Trash but not in this list.
 - `cleanmate restore --list` shows the same items and `cleanmate restore` puts them back.
 
 ## Menu bar and notifications

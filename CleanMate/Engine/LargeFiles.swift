@@ -552,8 +552,7 @@ nonisolated enum DuplicateFinder {
                 }
                 let kept = live.count <= limit ? live
                     : Dictionary(uniqueKeysWithValues: live.sorted { $0.key.modified > $1.key.modified }.prefix(limit).map { ($0.key, $0.value) })
-                try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try? JSONEncoder().encode(kept).write(to: url, options: .atomic)
+                AtomicFile.save(try? JSONEncoder().encode(kept), to: url)
             }
         }
     }
