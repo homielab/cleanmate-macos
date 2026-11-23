@@ -37,8 +37,8 @@ command -v cleanmate || ls /Applications/CleanMate.app/Contents/Helpers/cleanmat
 ```
 
 Use whichever exists; the second is the full path to run. Neither: the user downloads CleanMate from
-https://github.com/homielab/cleanmate-macos/releases/latest (drag it to Applications) or, once the Homebrew tap is
-published, runs `brew install --cask homielab/tap/cleanmate`. Then `cleanmate --help` shows everything.
+https://github.com/homielab/cleanmate-macos/releases/latest (drag it to Applications) or runs
+`brew install --cask homielab/tap/cleanmate`. Then `cleanmate --help` shows everything.
 
 ## Scan
 

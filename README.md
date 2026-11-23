@@ -30,8 +30,11 @@ check, which you can turn off.
 cleanmate --help
 ```
 
-Homebrew is not available yet: the cask (`packaging/Casks/cleanmate.rb`, which also links `cleanmate`) is ready, but
-its tap is not published.
+Or install both with Homebrew (the cask also links `cleanmate`):
+
+```sh
+brew install --cask homielab/tap/cleanmate
+```
 
 ```sh
 cleanmate scan                       # what Smart Scan would find, read-only
