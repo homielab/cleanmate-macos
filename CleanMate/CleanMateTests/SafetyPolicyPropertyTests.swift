@@ -182,8 +182,8 @@ struct SafetyPolicyPropertyTests {
             }
             if policy.allowsUserExtension(url) {
                 extensionsAllowed += 1
-                let kinds = ExtensionItem.Kind.allCases.filter { key(realHome + "/Library/" + $0.folder) == parentKey }
-                #expect(generalOK(t) && kinds.count == 1 && kinds[0].fileExtensions.contains((name as NSString).pathExtension.lowercased())
+                let kinds = ExtensionItem.Kind.allCases.filter { $0.folders.contains { key(realHome + "/Library/" + $0) == parentKey } }
+                #expect(generalOK(t) && kinds.count == 1 && kinds[0].fileExtensions(in: ((t as NSString).deletingLastPathComponent as NSString).lastPathComponent).contains((name as NSString).pathExtension.lowercased())
                         && !name.hasPrefix(".") && !isLink(t) && !key(t).contains("applepane"), "allowsUserExtension \(path) → \(t)")
             }
         }

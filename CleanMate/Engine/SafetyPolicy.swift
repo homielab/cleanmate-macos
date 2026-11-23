@@ -692,20 +692,39 @@ nonisolated struct SafetyPolicy: Sendable {
     }
 
     /// Uninstaller rule for a user extension, only ever moved to the Trash: one entry directly inside one of the
-    /// `ExtensionItem.Kind` folders of ~/Library, with that kind's name extension, not hidden, not a symlink, not Apple's
-    /// (name or `CFBundleIdentifier`), and allowed by `allows`.
+    /// `ExtensionItem.Kind` folders of ~/Library, with that kind's name extension, not hidden, not a symlink, neither
+    /// Apple's nor CleanMate's (name or `CFBundleIdentifier`), and allowed by `allows`.
     func allowsUserExtension(_ url: URL) -> Bool {
         let path = Self.normalize(url)
         let parent = (path as NSString).deletingLastPathComponent
         let name = (path as NSString).lastPathComponent
         let library = allowedRoots[0] + "/Library/"
-        guard let kind = ExtensionItem.Kind.allCases.first(where: { parent == library + $0.folder }),
-              kind.fileExtensions.contains((name as NSString).pathExtension.lowercased()),
-              !name.hasPrefix("."), !Self.isApple(name) else { return false }
+        guard let kind = ExtensionItem.Kind.allCases.first(where: { $0.folders.contains { parent == library + $0 } }),
+              kind.fileExtensions(in: (parent as NSString).lastPathComponent).contains((name as NSString).pathExtension.lowercased()),
+              !name.hasPrefix("."), !Self.isApple(name), !Self.isCleanMate(name) else { return false }
         let real = URL(fileURLWithPath: path)
         guard (try? real.resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == false,
-              !(Extensions.bundleID(of: real).map(Self.isApple) ?? false) else { return false }
+              !(Extensions.bundleID(of: real).map { Self.isApple($0) || Self.isCleanMate($0) } ?? false) else { return false }
         return allows(real)
+    }
+
+    /// Uninstaller rule for an extension of the system Library, only ever moved to the Trash through Finder (the admin
+    /// password): one entry directly inside one of the `ExtensionItem.Kind` folders of `systemLibrary`, with that kind's
+    /// name extension, not hidden, neither Apple's nor CleanMate's (name or `CFBundleIdentifier`), a real bundle or file
+    /// (not a symlink) on its folder's volume, holding no mount point, not excluded. None without `systemLibrary`.
+    func allowsSystemExtension(_ url: URL) -> Bool {
+        guard let library = systemLibrary else { return false }
+        let path = Self.normalize(url)
+        let parent = (path as NSString).deletingLastPathComponent
+        let name = (path as NSString).lastPathComponent
+        guard let kind = ExtensionItem.Kind.allCases.first(where: { $0.folders.contains { parent == library + "/" + $0 } }),
+              kind.fileExtensions(in: (parent as NSString).lastPathComponent).contains((name as NSString).pathExtension.lowercased()),
+              !name.hasPrefix("."), !Self.isApple(name), !Self.isCleanMate(name), !isExcluded(path), !holdsMount(path)
+        else { return false }
+        var info = stat(), folder = stat()
+        guard lstat(path, &info) == 0, lstat(parent, &folder) == 0, folder.st_mode & S_IFMT == S_IFDIR,
+              info.st_dev == folder.st_dev, [S_IFREG, S_IFDIR].contains(info.st_mode & S_IFMT) else { return false }
+        return !(Extensions.bundleID(of: URL(fileURLWithPath: path)).map { Self.isApple($0) || Self.isCleanMate($0) } ?? false)
     }
 
     /// Folders of the system Library whose direct children named by an app's bundle id the Uninstaller may remove

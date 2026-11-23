@@ -23,7 +23,7 @@ struct ExtensionsTests {
         try bundle("Services/Resize Images.workflow")                                   // no bundle id
         try bundle("Screen Savers/Exact.saver", id: "com.exact.saver")                  // exactly an installed app's id
         try bundle("Input Methods/Shared.app", id: "org.sparkle-project.thing")         // shared vendor: never "removed"
-        try bundle("Internet Plug-Ins/Plug.plugin", id: "com.apple.plug")               // Apple: never "removed"
+        try bundle("Internet Plug-Ins/Plug.plugin", id: "com.apple.plug")               // Apple's: not listed
         try bundle("Spotlight/Sketch.mdimporter", id: "com.gone2.sketch.importer")
         try bundle("PreferencePanes/SelfContained.prefPane", id: "fr.solo.pane")
         try bundle("PreferencePanes/SelfContained.prefPane/Contents/PlugIns/Solo Control.app", id: "fr.solo.app")  // ships its own app
@@ -34,8 +34,8 @@ struct ExtensionsTests {
         let apps = ["com.vendor.editor": "Editor", "com.vendor.zeta": "Zeta", "com.exact.saver": "Exact Saver"]
         let items = Extensions.list(library: library, apps: apps)
         let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0) })
-        #expect(Set(byName.keys) == ["Gone", "Markdown", "Resize Images", "Exact", "Shared", "Plug", "Sketch", "SelfContained"])
-        #expect(items.map(\.name) == ["Exact", "Gone", "Markdown", "Plug", "Resize Images", "SelfContained", "Shared", "Sketch"])
+        #expect(Set(byName.keys) == ["Gone", "Markdown", "Resize Images", "Exact", "Shared", "Sketch", "SelfContained"])
+        #expect(items.map(\.name) == ["Exact", "Gone", "Markdown", "Resize Images", "SelfContained", "Shared", "Sketch"])
 
         #expect(byName["Gone"]?.kind == .preferencePane)
         #expect(byName["Gone"]?.owner == nil && byName["Gone"]?.appRemoved == true)
@@ -45,7 +45,6 @@ struct ExtensionsTests {
         #expect(byName["Resize Images"]?.bundleID == nil && byName["Resize Images"]?.appRemoved == false)
         #expect(byName["Exact"]?.kind == .screenSaver && byName["Exact"]?.owner == "Exact Saver")
         #expect(byName["Shared"]?.kind == .inputMethod && byName["Shared"]?.appRemoved == false)
-        #expect(byName["Plug"]?.kind == .internetPlugin && byName["Plug"]?.appRemoved == false)
         #expect(byName["SelfContained"]?.owner == nil && byName["SelfContained"]?.appRemoved == false)
         #expect(byName["Sketch"]?.kind == .spotlight && byName["Sketch"]?.appRemoved == true)
     }

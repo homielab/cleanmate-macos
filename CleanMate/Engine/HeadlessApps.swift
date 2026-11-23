@@ -70,6 +70,50 @@ nonisolated enum HeadlessApps {
         var leftoversSize: Int64
     }
 
+    /// `cleanmate uninstall --extensions`: the Uninstaller's Extensions list (read-only).
+    struct ExtensionsReport: Codable, Equatable, Sendable {
+        var version: String
+        var durationMs: Int
+        var count: Int
+        /// Sorted by name.
+        var items: [Extension]
+    }
+
+    struct Extension: Codable, Equatable, Sendable {
+        var name: String
+        /// "preference-pane", "quick-look", "service", "screen-saver", "input-method", "internet-plugin", "spotlight"
+        /// or "audio".
+        var kind: String
+        /// `~/…` inside the home folder.
+        var path: String
+        /// Null for an item without one (an Automator service).
+        var bundleId: String?
+        /// The installed app it belongs to; null when unknown.
+        var owner: String?
+        /// Has a third-party bundle id but no app of its vendor is installed.
+        var appRemoved: Bool
+        /// In /Library: removing it in the app asks for the administrator password.
+        var system: Bool
+        var size: Int64
+        /// The app's Extensions list may move it to the Trash.
+        var removable: Bool
+
+        enum CodingKeys: String, CodingKey { case name, kind, path, bundleId, owner, appRemoved, system, size, removable }
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(path, forKey: .path)
+            try container.encode(bundleId, forKey: .bundleId)
+            try container.encode(owner, forKey: .owner)
+            try container.encode(appRemoved, forKey: .appRemoved)
+            try container.encode(system, forKey: .system)
+            try container.encode(size, forKey: .size)
+            try container.encode(removable, forKey: .removable)
+        }
+    }
+
     /// One thing `uninstall` moved (or would move) to the Trash.
     struct Moved: Codable, Equatable, Sendable {
         /// `~/…` inside the home folder.
@@ -170,6 +214,36 @@ nonisolated enum HeadlessApps {
         return ListReport(version: sources.version(), fullDiskAccess: hasAccess,
                           durationMs: HeadlessScan.milliseconds(ContinuousClock.now - started), apps: apps,
                           leftovers: leftovers, leftoversSize: leftovers.reduce(0) { $0 + $1.size })
+    }
+
+    static func kind(_ kind: ExtensionItem.Kind) -> String {
+        switch kind {
+        case .preferencePane: "preference-pane"
+        case .quickLook: "quick-look"
+        case .service: "service"
+        case .screenSaver: "screen-saver"
+        case .inputMethod: "input-method"
+        case .internetPlugin: "internet-plugin"
+        case .spotlight: "spotlight"
+        case .audio: "audio"
+        }
+    }
+
+    /// The extensions of ~/Library and /Library, as the app's Uninstaller › Extensions lists them, with their size.
+    static func extensions(sources: HeadlessScan.Sources) async -> ExtensionsReport {
+        let started = ContinuousClock.now
+        let policy = sources.policy()
+        let items = await Extensions.list(policy: policy, running: sources.runningApps())
+        let sizes = await measure(Set(items.map(\.url)))
+        let listed = items.map { item in
+            Extension(name: item.name, kind: kind(item.kind), path: HeadlessScan.displayPath(item.url, home: policy.homeURL),
+                      bundleId: item.bundleID, owner: item.owner, appRemoved: item.appRemoved, system: item.system,
+                      size: sizes[item.url] ?? 0,
+                      removable: item.trashable
+                        && (item.system ? policy.allowsSystemExtension(item.url) : policy.allowsUserExtension(item.url)))
+        }
+        return ExtensionsReport(version: sources.version(), durationMs: HeadlessScan.milliseconds(ContinuousClock.now - started),
+                                count: listed.count, items: listed)
     }
 
     /// Data of apps no longer installed, as the app's "Leftovers of Removed Apps" lists it.

@@ -54,6 +54,7 @@ nonisolated enum CommandLineTool {
         case restore(paths: [String], json: Bool)
         case restoreList(limit: Int, json: Bool)
         case uninstallList(leftoversOnly: Bool, json: Bool)
+        case extensionsList(json: Bool)
         case uninstall(HeadlessApps.Options, json: Bool)
         case removeLeftovers(paths: [String], dryRun: Bool, yes: Bool, json: Bool)
         case privacy(json: Bool)
@@ -77,7 +78,7 @@ nonisolated enum CommandLineTool {
           cleanmate trash [--yes] [--json] [--] PATH…
           cleanmate restore [--json] [--] TRASHED…
           cleanmate restore --list [--limit N] [--json]
-          cleanmate uninstall [--leftovers] [--json]
+          cleanmate uninstall [--leftovers | --extensions] [--json]
           cleanmate uninstall APP [--leftovers-only] [--quit] [--dry-run] [--yes] [--json]
           cleanmate uninstall --leftovers [--dry-run] [--yes] [--json] [--] PATH…
           cleanmate privacy [--json]
@@ -150,7 +151,10 @@ nonisolated enum CommandLineTool {
           uninstall       Without APP: the apps the Uninstaller lists (not Apple's), with bundle id, source
                           (App Store, Homebrew, Setapp or Downloaded), size of the app and of its data, last
                           used and whether it is open; then the leftovers of apps already removed.
-                          --leftovers lists only those. Read-only.
+                          --leftovers lists only those. --extensions lists the plug-ins in ~/Library and
+                          /Library instead (Quick Look, Spotlight, preference panes, services, screen savers,
+                          input methods, internet and audio plug-ins): kind, bundle id, owning app or "app
+                          removed", size; remove them in the app. Read-only.
                           With APP (name, bundle id or path of the .app): moves the app and its own data in
                           ~/Library to the Trash like the app's Uninstall, stops its launch agents and clears
                           a Homebrew cask's record. Folders that only look like its name and config folders
@@ -330,6 +334,11 @@ nonisolated enum CommandLineTool {
             output.out(text)
         case .uninstallList(let leftoversOnly, let json):
             return await uninstallList(leftoversOnly: leftoversOnly, json: json, sources: sources, output: output)
+        case .extensionsList(let json):
+            let report = await HeadlessApps.extensions(sources: sources)
+            return emit(report, json: json, output: output) {
+                extensionsText(report, color: output.color)
+            } ?? Exit.ok.rawValue
         case .uninstall(let options, let json):
             return await uninstall(options, json: json, sources: sources, output: output)
         case .removeLeftovers(let paths, let dryRun, let yes, let json):

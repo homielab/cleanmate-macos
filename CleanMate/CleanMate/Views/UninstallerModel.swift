@@ -117,7 +117,7 @@ final class UninstallerModel: ObservableObject {
     @Published var hiddenItems: [HiddenConfigItem]?
     /// Filled in the background after `hiddenItems`.
     @Published var hiddenSizes: [URL: Int64] = [:]
-    /// Extensions in ~/Library; nil until first loaded.
+    /// Extensions in ~/Library and /Library; nil until first loaded.
     @Published var extensionItems: [ExtensionItem]?
     /// Filled in the background after `extensionItems`.
     @Published var extensionSizes: [URL: Int64] = [:]
@@ -344,7 +344,7 @@ final class UninstallerModel: ObservableObject {
     var checkedEntries: [AppDataEntry] {
         guard selection == .extensions else { return entries.filter { checked.contains($0.url) } }
         return tickableExtensions.filter { checked.contains($0.url) }
-            .map { AppDataEntry(url: $0.url, size: extensionSizes[$0.url] ?? 0) }
+            .map { AppDataEntry(url: $0.url, size: extensionSizes[$0.url] ?? 0, system: $0.system) }
     }
     /// Ticked data plus the app itself when its row is ticked.
     var checkedSize: Int64 {
@@ -429,7 +429,7 @@ final class UninstallerModel: ObservableObject {
         await measure(items.map(\.url), into: \.hiddenSizes)
     }
 
-    /// Lists extensions in ~/Library, then measures them in the background (a cancelled walk is never recorded).
+    /// Lists extensions in ~/Library and /Library, then measures them in the background (a cancelled walk is never recorded).
     func loadExtensions() async {
         let items = await extensions()
         guard !Task.isCancelled else { return }
@@ -731,7 +731,8 @@ final class UninstallerModel: ObservableObject {
         }
     }
 
-    /// Moves the ticked extensions to the Trash, then lists them again.
+    /// Moves the ticked extensions to the Trash (the /Library ones after one admin password prompt, without Undo), then
+    /// lists them again.
     private func removeExtensions() async {
         runningApps = appBundleIDs()
         let data = checkedEntries

@@ -8,7 +8,7 @@ nonisolated extension CommandLineTool {
 
     static func parseUninstall(_ arguments: ArraySlice<String>) throws -> Command {
         var rest = arguments
-        var json = false, leftovers = false, leftoversOnly = false, quit = false, dryRun = false, yes = false
+        var json = false, leftovers = false, leftoversOnly = false, quit = false, dryRun = false, yes = false, extensions = false
         var words: [String] = []
         while let argument = rest.popFirst() {
             switch argument {
@@ -18,6 +18,7 @@ nonisolated extension CommandLineTool {
             case "-h", "--help": return .help
             case "--json": json = true
             case "--leftovers": leftovers = true
+            case "--extensions": extensions = true
             case "--leftovers-only": leftoversOnly = true
             case "--quit": quit = true
             case "--dry-run": dryRun = true
@@ -25,6 +26,12 @@ nonisolated extension CommandLineTool {
             case _ where !argument.hasPrefix("-"): words.append(argument)
             default: throw UsageError(message: "unknown option `\(split(argument).0)` for uninstall")
             }
+        }
+        if extensions {
+            guard words.isEmpty, !leftovers, !leftoversOnly, !quit, !dryRun, !yes else {
+                throw UsageError(message: "uninstall --extensions only lists: remove extensions in the app (Uninstaller › Extensions)")
+            }
+            return .extensionsList(json: json)
         }
         if leftovers {
             guard !leftoversOnly, !quit else { throw UsageError(message: "--leftovers takes no app: it lists or removes the data of removed apps") }
@@ -487,6 +494,20 @@ nonisolated extension CommandLineTool {
             text += style.yellow("Note: no Full Disk Access, so Safari and other protected traces were skipped (see `cleanmate --help`).") + "\n"
         }
         return text
+    }
+
+    static func extensionsText(_ report: HeadlessApps.ExtensionsReport, color: Bool) -> String {
+        let style = Style(color: color)
+        let width = min(40, report.items.map(\.name.count).max() ?? 0)
+        var text = ""
+        for item in report.items {
+            text += "  \(padded(item.name, width))  \(padded(item.kind, 15))  \(padded(size(item.size), 9))  "
+            text += item.owner.map { style.dim($0) } ?? (item.appRemoved ? style.yellow("app removed") : style.dim("—"))
+            text += "\n    " + style.dim(item.path + (item.bundleId.map { "  \($0)" } ?? "")) + "\n"
+        }
+        if report.items.isEmpty { text += "No extensions found.\n" }
+        return text + "\n" + style.dim("Remove them in the app: Uninstaller › Extensions (/Library ones ask for the "
+                                       + "administrator password).") + "\n"
     }
 
     static func loginItemsText(_ report: HeadlessLoginItems.ListReport, color: Bool) -> String {

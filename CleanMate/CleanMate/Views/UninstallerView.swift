@@ -214,8 +214,11 @@ struct UninstallerView: View {
                 Label("Unknown Hidden Config", systemImage: "exclamationmark.triangle")
                     .badge(model.hiddenItems?.count ?? 0)
                     .tag(UninstallerModel.Selection.hiddenConfig)
+                // The ticked size while some are ticked (what Move to Trash frees), else how many there are.
                 Label("Extensions", systemImage: "puzzlepiece.extension")
-                    .badge(model.extensionItems?.count ?? 0)
+                    .badge(model.selection == .extensions && model.checkedSize > 0
+                           ? Text(model.checkedSize.formatted(.fileSize.locale(locale)))
+                           : Text(model.extensionItems?.count ?? 0, format: .number))
                     .tag(UninstallerModel.Selection.extensions)
             }
             Section {
@@ -370,10 +373,15 @@ struct UninstallerView: View {
                     Image(systemName: "puzzlepiece.extension").font(.largeTitle).foregroundStyle(.secondary)
                 } text: {
                     Text("Extensions").font(.title2.bold())
-                    Text("Preference panes, Quick Look and Spotlight plug-ins, services, screen savers, input methods and internet plug-ins in your Library. They often stay behind after an app is removed.")
+                    Text("Preference panes, Quick Look and Spotlight plug-ins, services, screen savers, input methods, internet and audio plug-ins in your Library and in /Library. They often stay behind after an app is removed. Apple’s are not listed.")
                         .font(.callout).foregroundStyle(.secondary)
-                    Text("Nothing is selected for you: check each item before removing it. Apple’s items can’t be selected.")
+                    Text("Nothing is selected for you: check each item before removing it. Items in /Library need your administrator password once.")
                         .font(.callout)
+                    HStack(spacing: 4) {
+                        Text("Quick Look and Spotlight plug-ins stop being used after Reset Quick Look or after you log in again.")
+                        Button("Open Maintenance") { ModuleRouter.shared.requested = .maintenance }.buttonStyle(.link)
+                    }
+                    .font(.callout).foregroundStyle(.secondary)
                 }
                 extensionList
                 footer(button: Text("Move to Trash…"))
@@ -586,23 +594,32 @@ struct UninstallerView: View {
 
     /// Like `hiddenList`, plus a checkbox (never pre-ticked) on items that may go to the Trash.
     private var extensionList: some View {
-        List(model.extensionItems ?? [], selection: $model.highlighted) { item in
+        let largest = model.extensionSizes.values.max() ?? 0
+        return List(model.extensionItems ?? [], selection: $model.highlighted) { item in
             HStack {
                 Toggle(isOn: checked(item.url)) { EmptyView() }
                 .toggleStyle(SelectionCheckboxStyle())
-                .accessibilityLabel(Text(verbatim: "\(item.name), \(model.extensionSizes[item.url]?.formatted(.fileSize.locale(locale)) ?? "…")"))
+                .accessibilityLabel(extensionLabel(item))
                 .disabled(!item.trashable || model.isInUse(item) || model.working)
                 AppIcon(url: item.url, size: 20)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.name).lineLimit(1).truncationMode(.middle)
                     HStack(spacing: 6) {
-                        Text(kindName(item.kind)).foregroundStyle(.secondary).fixedSize()
+                        Text(kindResource(item.kind)).foregroundStyle(.secondary).fixedSize()
                         if let owner = item.owner {
                             Text(verbatim: "·").foregroundStyle(.secondary).fixedSize()
                             Text(verbatim: owner).foregroundStyle(.secondary).lineLimit(1)
                         } else if item.appRemoved {
                             Text(verbatim: "·").foregroundStyle(.secondary).fixedSize()
                             Text("App removed").foregroundStyle(.orange).fixedSize()
+                        }
+                        if item.system {
+                            Text(verbatim: "·").foregroundStyle(.secondary).fixedSize()
+                            Text("/Library · Asks for your admin password").foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        if let id = item.bundleID {
+                            Text(verbatim: "·").foregroundStyle(.secondary).fixedSize()
+                            Text(verbatim: id).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                         }
                     }
                     .font(.subheadline)
@@ -625,6 +642,8 @@ struct UninstallerView: View {
                     }
                 }
                 .fixedSize()
+                SizeBar(size: model.extensionSizes[item.url] ?? 0, largest: largest,
+                        tint: model.checked.contains(item.url) ? .accentColor : .secondary)
                 Button("Quick Look", systemImage: "eye") { previewURL = item.url }
                     .labelStyle(.iconOnly).buttonStyle(.borderless).help("Quick Look")
                 Button("Reveal in Finder", systemImage: "magnifyingglass") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
@@ -647,7 +666,16 @@ struct UninstallerView: View {
         }
     }
 
-    private func kindName(_ kind: ExtensionItem.Kind) -> LocalizedStringKey {
+    /// VoiceOver on the checkbox: name, kind, owner or "App removed", /Library, size.
+    private func extensionLabel(_ item: ExtensionItem) -> Text {
+        var parts = [item.name, String(localized: kindResource(item.kind))]
+        if let owner = item.owner { parts.append(owner) } else if item.appRemoved { parts.append(String(localized: "App removed")) }
+        if item.system { parts.append(String(localized: "/Library · Asks for your admin password")) }
+        parts.append(model.extensionSizes[item.url]?.formatted(.fileSize.locale(locale)) ?? "…")
+        return Text(verbatim: parts.joined(separator: ", "))
+    }
+
+    private func kindResource(_ kind: ExtensionItem.Kind) -> LocalizedStringResource {
         switch kind {
         case .preferencePane: "Preference Pane"
         case .quickLook: "Quick Look Plug-in"
@@ -656,6 +684,7 @@ struct UninstallerView: View {
         case .inputMethod: "Input Method"
         case .internetPlugin: "Internet Plug-in"
         case .spotlight: "Spotlight Importer"
+        case .audio: "Audio Plug-in"
         }
     }
 
@@ -796,6 +825,8 @@ struct UninstallerView: View {
         } message: {
             if open {
                 Text("CleanMate asks the app to quit and waits up to 10 seconds; if it doesn’t quit, nothing is moved. You can put the items back from the Trash until it is emptied.")
+            } else if app == nil && model.checkedEntries.contains(where: \.system) {
+                Text("Finder asks for your administrator password once for the items in /Library; put those back with Put Back in the Trash. The others you can put back from the Trash until it is emptied.")
             } else {
                 Text("You can put them back from the Trash until it is emptied.")
             }

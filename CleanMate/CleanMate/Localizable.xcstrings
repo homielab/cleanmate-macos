@@ -422,6 +422,16 @@
         }
       }
     },
+    "/Library · Asks for your admin password" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "/Library · Cần mật khẩu quản trị"
+          }
+        }
+      }
+    },
     "a Homebrew command is running" : {
       "localizations" : {
         "vi" : {
@@ -598,6 +608,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Âm thanh"
+          }
+        }
+      }
+    },
+    "Audio Plug-in" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plug-in âm thanh"
           }
         }
       }
@@ -1407,6 +1427,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm ảnh tương tự"
+          }
+        }
+      }
+    },
+    "Finder asks for your administrator password once for the items in /Library; put those back with Put Back in the Trash. The others you can put back from the Trash until it is emptied." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder hỏi mật khẩu quản trị một lần cho các mục trong /Library; khôi phục chúng bằng Đặt lại trong Thùng rác. Các mục khác bạn có thể khôi phục từ Thùng rác cho tới khi Thùng rác được dọn sạch."
           }
         }
       }
@@ -3532,6 +3562,16 @@
         }
       }
     },
+    "Nothing is selected for you: check each item before removing it. Items in /Library need your administrator password once." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không mục nào được chọn sẵn: xem kỹ từng mục trước khi xoá. Các mục trong /Library cần mật khẩu quản trị một lần."
+          }
+        }
+      }
+    },
     "Notion" : {
       "shouldTranslate" : false
     },
@@ -3604,6 +3644,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mở lúc đăng nhập"
+          }
+        }
+      }
+    },
+    "Open Maintenance" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở Bảo trì"
           }
         }
       }
@@ -3738,6 +3788,16 @@
     "Postman" : {
       "shouldTranslate" : false
     },
+    "Preference panes, Quick Look and Spotlight plug-ins, services, screen savers, input methods, internet and audio plug-ins in your Library and in /Library. They often stay behind after an app is removed. Apple’s are not listed." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bảng tuỳ chọn, plug-in Quick Look và Spotlight, dịch vụ, trình bảo vệ màn hình, phương thức nhập, plug-in internet và âm thanh trong Library của bạn và trong /Library. Chúng thường còn sót lại sau khi gỡ ứng dụng. Mục của Apple không được liệt kê."
+          }
+        }
+      }
+    },
     "Put Back" : {
       "localizations" : {
         "vi" : {
@@ -3804,6 +3864,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Đặt tệp của agent về chỗ cũ và nạp lại nó."
+          }
+        }
+      }
+    },
+    "Quick Look and Spotlight plug-ins stop being used after Reset Quick Look or after you log in again." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plug-in Quick Look và Spotlight chỉ thôi được dùng sau khi Đặt lại Quick Look hoặc đăng nhập lại."
           }
         }
       }
@@ -8723,16 +8793,6 @@
         }
       }
     },
-    "Nothing is selected for you: check each item before removing it. Apple’s items can’t be selected." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Không mục nào được chọn sẵn: xem kỹ từng mục trước khi xoá. Không chọn được mục của Apple."
-          }
-        }
-      }
-    },
     "Nothing has been removed yet" : {
       "localizations" : {
         "vi" : {
@@ -10300,16 +10360,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Phần mở rộng"
-          }
-        }
-      }
-    },
-    "Preference panes, Quick Look and Spotlight plug-ins, services, screen savers, input methods and internet plug-ins in your Library. They often stay behind after an app is removed." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bảng tuỳ chọn, plug-in Quick Look và Spotlight, dịch vụ, trình bảo vệ màn hình, phương thức nhập và plug-in internet trong Library của bạn. Chúng thường còn sót lại sau khi gỡ ứng dụng."
           }
         }
       }

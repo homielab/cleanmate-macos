@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Login Items** removes third-party launch agents and daemons in /Library, such as updaters and helpers left by removed apps: Finder moves the file to the Trash after one administrator password prompt, and it stops starting after a restart. Each shows its app, whether it is running, and **App Removed** when its app is gone.
+- **Uninstaller › Extensions** also lists plug-ins in /Library and audio plug-ins (Audio Units, HAL drivers, VST, VST3), with their bundle id and a size bar. Ones in /Library go to the Trash through Finder after one administrator password prompt. Uninstalling an app also takes its own plug-ins, and `cleanmate uninstall --extensions` lists them.
 
 ### Fixed
 - **Moved Items** keeps its list when the disk is full or a save fails: the list is saved whole or not at all, and Settings › Activity says when items could not be added to it. The activity log's lifetime total no longer drops when its old log can't be rotated, and saved scan caches can't be left half-written.

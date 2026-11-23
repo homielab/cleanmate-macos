@@ -18,6 +18,7 @@
 | `cleanmate uninstall --json` | apps like the Uninstaller (source, sizes, last used, open or not), then leftovers of removed apps; read-only |
 | `cleanmate uninstall --yes --json APP` | moves the app and its data to the Trash (`--leftovers-only`: only its data; `--quit`: ask an open app to quit first; `--dry-run`: nothing) |
 | `cleanmate uninstall --leftovers --yes --json PATH…` | moves leftovers that `uninstall --leftovers` listed to the Trash |
+| `cleanmate uninstall --extensions --json` | plug-ins in `~/Library` and `/Library` (Quick Look, Spotlight, preference panes, audio…): `name`, `kind`, `path`, `bundleId`, `owner`, `appRemoved`, `system` (in `/Library`), `size`, `removable`; read-only, remove them in the app |
 | `cleanmate privacy --json` | Privacy items per browser with size; items of a running browser are `skipped`; read-only |
 | `cleanmate privacy --erase --yes --json ID…` | erases those Privacy items (default: the ones ticked in the app); can't be undone |
 | `cleanmate login-items --json` | login items and launch agents: label, scope, state, program, `removable` |

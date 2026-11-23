@@ -59,7 +59,12 @@ nonisolated struct AppDataEntry: Identifiable, Hashable, Sendable {
     /// Where the item is, as shown: its ~/Library folder (`Recent Documents` for the app's Open Recent list),
     /// `~/.config`, `~/.local/share`, `~/.local/state` or `~`.
     var location: String {
-        if system { return "/Library/" + url.deletingLastPathComponent().lastPathComponent }
+        if system {
+            // `/Library/Audio/Plug-Ins/HAL`, not only `HAL`.
+            let parent = url.deletingLastPathComponent().path
+            return parent.range(of: "/Library/", options: .backwards).map { "/Library/" + parent[$0.upperBound...] }
+                ?? "/Library/" + folder
+        }
         if folder == RecentItems.appFolderName { return "Recent Documents" }
         guard kind == .config else { return folder }
         let parent = url.deletingLastPathComponent()
@@ -527,6 +532,10 @@ nonisolated enum Uninstaller {
             entries.append(AppDataEntry(url: item.url, size: await size(of: item.url), kind: item.kind,
                                         system: policy.isSystemLibraryItem(item.url)))
         }
+        // Its plug-ins (Quick Look, Spotlight, panes, audio…) named by its bundle id, in ~/Library and /Library.
+        for plugin in Extensions.owned(by: app.bundleID, policy: policy) {
+            entries.append(AppDataEntry(url: plugin.url, size: await size(of: plugin.url), system: plugin.system))
+        }
         return entries.sorted { $0.size > $1.size }
     }
 
@@ -758,24 +767,28 @@ nonisolated enum Uninstaller {
         let own = data.filter { !$0.system }
         await bootOutAgents(in: own, policy: policy, run: launchctl)
         report += CleanReport.trashing(own.map { ($0.url, $0.size) }, module: "Uninstaller", home: policy.homeURL,
-                                       allows: { policy.allowsAppData($0) || policy.allowsAppRecentList($0) || policy.allowsAppConfig($0) }, trash: moveToTrash,
+                                       allows: { policy.allowsAppData($0) || policy.allowsAppRecentList($0) || policy.allowsAppConfig($0)
+                                           || policy.allowsUserExtension($0) }, trash: moveToTrash,
                                        run: run)
-        report += await trashSystem(data.filter(\.system), policy: policy, move: recycleAll)
+        report += await trashSystem(data.filter(\.system), policy: policy, move: recycleAll) {
+            policy.allowsSystemAppData($0) || policy.allowsSystemExtension($0)
+        }
         return report
     }
 
     /// The app's system Library entries in ONE `recycleAll` (one admin password prompt), each checked by
-    /// `allowsSystemAppData` right before. Not kept for Undo or `cleanmate restore`: moving them back needs the password
+    /// `allows` (default `allowsSystemAppData`) right before. Not kept for Undo or `cleanmate restore`: moving them back needs the password
     /// too (Finder's Put Back asks for it). A cancelled prompt leaves them all, saying so; Stop before leaves them all.
     /// A launch daemon already running keeps running until the Mac restarts (stopping it needs root).
-    static func trashSystem(_ entries: [AppDataEntry], policy: SafetyPolicy, move: SafeRemoval.BatchMove) async -> CleanReport {
+    static func trashSystem(_ entries: [AppDataEntry], policy: SafetyPolicy, move: SafeRemoval.BatchMove,
+                            allows: (@Sendable (URL) -> Bool)? = nil) async -> CleanReport {
         var report = CleanReport()
         guard !entries.isEmpty else { return report }
         if TrashRun.current?.isStopped == true {
             report.stopped = entries.count
             return report
         }
-        let (results, moveError) = await SafeRemoval.trashAll(entries.map(\.url), allows: policy.allowsSystemAppData, move: move)
+        let (results, moveError) = await SafeRemoval.trashAll(entries.map(\.url), allows: allows ?? policy.allowsSystemAppData, move: move)
         let cancelled = (moveError as? CocoaError)?.code == .userCancelled
         for entry in entries {
             switch results[entry.url] {
