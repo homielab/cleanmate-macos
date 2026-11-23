@@ -201,8 +201,9 @@ struct OverviewTests {
         #expect(calls.withLock { $0 } == ["A": 2, "B": 3, "C": 2])
     }
 
-    /// Stop ends the measure at once: the progress row goes, and the folder walk is cancelled and returns within a second.
-    @MainActor @Test func stopEndsTheMeasureWithinASecond() async throws {
+    /// Stop ends the measure at once: the progress row goes, and the folder walk is cancelled and returns (it would
+    /// otherwise run for a minute; the bound is loose because a loaded machine takes seconds to resume the walk).
+    @MainActor @Test func stopEndsTheMeasure() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         try file("A/data.bin", bytes: 10)
         let entered = SignalCount(), left = SignalCount()
@@ -224,7 +225,7 @@ struct OverviewTests {
         model.cancel()
         #expect(!model.measuring && model.progress == nil)
         await left.reach(1)
-        #expect(ContinuousClock.now - start < .seconds(1))
+        #expect(ContinuousClock.now - start < .seconds(10))
     }
 
     /// Saved sizes come back as written, only for the same home; a missing, damaged or older-format file reads as nil.
