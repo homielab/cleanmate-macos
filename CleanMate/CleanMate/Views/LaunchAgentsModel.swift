@@ -1,14 +1,15 @@
 import AppKit
 import Combine
 
-/// Login Items: launch agents with their state; the user's own can be disabled, enabled or removed.
+/// Login Items: launch agents with their state; the user's own can be disabled, enabled or removed, a third-party one
+/// of /Library removed (Finder asks for the admin password).
 final class LaunchAgentsModel: ObservableObject {
     @Published private(set) var agents: [LaunchAgent] = []
     @Published private(set) var loading = false
     @Published private(set) var working = false
     /// Set when an action or its Undo failed, shown as an alert with the reason.
     @Published var problem: Problem?
-    /// The agent last moved to the Trash, until its Undo or another action: the bar offers "Undo".
+    /// The agent last moved to the Trash, until its Undo or another action: the bar offers "Undo" (not for /Library).
     @Published private(set) var removed: Removed?
     /// Edit › Undo / ⌘Z of the last removal.
     var undoManager: UndoManager?
@@ -35,10 +36,12 @@ final class LaunchAgentsModel: ObservableObject {
         enum Kind { case action(CleanFailure.Reason), undo(TrashUndo.Outcome) }
     }
 
-    /// An agent moved to the Trash by "Remove…".
+    /// An agent moved to the Trash by "Remove…". `system`: from /Library, put back only with Finder's Put Back
+    /// (it asks for the password); `trashed` nil when Finder put it somewhere it couldn't be found.
     struct Removed: Equatable {
         var label: String
-        var trashed: TrashedItem
+        var trashed: TrashedItem?
+        var system = false
     }
 
     /// Toolbar search: label, app or program; "" = no search.
@@ -73,7 +76,13 @@ final class LaunchAgentsModel: ObservableObject {
 
     func disable(_ agent: LaunchAgent) async { await perform(agent) { await LaunchAgents.disable($0, policy: $1) } }
     func enable(_ agent: LaunchAgent) async { await perform(agent) { await LaunchAgents.enable($0, policy: $1) } }
-    func remove(_ agent: LaunchAgent) async { await perform(agent) { await LaunchAgents.remove($0, policy: $1) } }
+    func remove(_ agent: LaunchAgent) async {
+        if agent.isUser {
+            await perform(agent) { await LaunchAgents.remove($0, policy: $1) }
+        } else {
+            await perform(agent) { await LaunchAgents.removeSystem($0, policy: $1) }
+        }
+    }
 
     private func perform(_ agent: LaunchAgent, _ action: (LaunchAgent, SafetyPolicy) async -> LaunchAgents.Outcome) async {
         guard !working else { return } // one launchctl action at a time (e.g. Disable + Move to Trash on the same agent)
@@ -81,7 +90,10 @@ final class LaunchAgentsModel: ObservableObject {
         let outcome = await run(action, agent)
         working = false
         if let reason = outcome.failure { problem = Problem(label: agent.label, kind: .action(reason)) }
-        if let trashed = outcome.trashed {
+        if !agent.isUser, outcome.succeeded {
+            dropUndo()
+            removed = Removed(label: agent.label, trashed: outcome.trashed, system: true)
+        } else if let trashed = outcome.trashed {
             removed = Removed(label: agent.label, trashed: trashed)
             undoManager?.registerTrashUndo(self, name: String(localized: "Remove")) { await $0.undoRemove() }
         } else if outcome.succeeded {
@@ -93,10 +105,10 @@ final class LaunchAgentsModel: ObservableObject {
 
     /// "Undo" of the last removal: the plist back from the Trash, loaded again. Why not, as an alert.
     func undoRemove() async {
-        guard let removed, !working else { return }
+        guard let removed, !removed.system, let trashed = removed.trashed, !working else { return }
         dropUndo()
         working = true
-        let outcome = await restore(removed.trashed, removed.label)
+        let outcome = await restore(trashed, removed.label)
         working = false
         if outcome != .restored { problem = Problem(label: removed.label, kind: .undo(outcome)) }
         await load()

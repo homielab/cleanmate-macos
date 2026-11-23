@@ -749,6 +749,29 @@ nonisolated struct SafetyPolicy: Sendable {
         return (try? URL(fileURLWithPath: path).resourceValues(forKeys: [.isSymbolicLinkKey]))?.isSymbolicLink == false
     }
 
+    /// Login Items rule for a third-party agent or daemon of the system Library, only ever moved to the Trash through
+    /// Finder (`FinderTrash`, the admin password): a `.plist` directly in LaunchAgents or LaunchDaemons of
+    /// `systemLibrary`, not hidden, its name and label neither Apple's nor CleanMate's own, a label that can't name
+    /// another service (no `/`), a regular file (not a symlink) on its folder's volume, not excluded. None without
+    /// `systemLibrary`.
+    func allowsSystemLaunchAgent(_ url: URL, label: String) -> Bool {
+        guard let library = systemLibrary else { return false }
+        let path = Self.normalize(url)
+        let parent = (path as NSString).deletingLastPathComponent
+        let name = (path as NSString).lastPathComponent
+        guard [library + "/LaunchAgents", library + "/LaunchDaemons"].contains(parent), name.hasSuffix(".plist"),
+              !name.hasPrefix("."), !label.isEmpty, !label.contains("/"),
+              ![name, label].contains(where: { Self.isApple($0) || Self.isCleanMate($0) }), !isExcluded(path)
+        else { return false }
+        var info = stat(), folder = stat()
+        guard lstat(path, &info) == 0, lstat(parent, &folder) == 0, folder.st_mode & S_IFMT == S_IFDIR,
+              info.st_dev == folder.st_dev else { return false }
+        return info.st_mode & S_IFMT == S_IFREG
+    }
+
+    /// CleanMate's own bundle id or one under it (`com.homielab.CleanMate…`).
+    static func isCleanMate(_ name: String) -> Bool { name.lowercased().hasPrefix("com.homielab.cleanmate") }
+
     /// Resolves `..` and symlinks in the parent folders, but not the last component:
     /// removing a symlink only removes the link, while a symlinked parent could point anywhere.
     static func normalize(_ url: URL) -> String {

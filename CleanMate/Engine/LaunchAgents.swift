@@ -1,8 +1,9 @@
 import Foundation
 
 // Login items & launch agents: the user's agents in ~/Library/LaunchAgents can be disabled, enabled or removed
-// (plist to the Trash) through `launchctl` in the user's own `gui/<uid>` domain. Agents and daemons in /Library
-// are listed read-only (they need an administrator). Anything of Apple's is never listed nor touched.
+// (plist to the Trash) through `launchctl` in the user's own `gui/<uid>` domain. Third-party agents and daemons in
+// /Library can only be removed: Finder moves the plist to the Trash with the admin password (`removeSystem`), and
+// they stop starting after a restart. Anything of Apple's is never listed nor touched.
 
 nonisolated struct LaunchAgent: Identifiable, Hashable, Sendable {
     enum Scope: Sendable, CaseIterable { case user, systemAgent, systemDaemon }
@@ -18,6 +19,10 @@ nonisolated struct LaunchAgent: Identifiable, Hashable, Sendable {
     /// The app the program lives in, or whose bundle id prefixes the label.
     let owner: URL?
     var state: State
+    /// A system agent or daemon `removeSystem` may move (`SafetyPolicy.allowsSystemLaunchAgent`); false for the user's.
+    var removable = false
+    /// The program is gone and so is its app (or it has none): left behind by an app that was removed (`scan`).
+    var appRemoved = false
 
     var id: URL { url }
     var isUser: Bool { scope == .user }
@@ -29,8 +34,8 @@ nonisolated enum LaunchAgents {
     static func folder(_ scope: LaunchAgent.Scope, policy: SafetyPolicy = .current) -> URL {
         switch scope {
         case .user: policy.homeURL.appending(path: "Library/LaunchAgents")
-        case .systemAgent: URL(fileURLWithPath: "/Library/LaunchAgents")
-        case .systemDaemon: URL(fileURLWithPath: "/Library/LaunchDaemons")
+        case .systemAgent: URL(fileURLWithPath: (policy.systemLibrary ?? "/Library") + "/LaunchAgents")
+        case .systemDaemon: URL(fileURLWithPath: (policy.systemLibrary ?? "/Library") + "/LaunchDaemons")
         }
     }
 
@@ -110,12 +115,29 @@ nonisolated enum LaunchAgents {
         await ShellCommand(executable: launchctl, arguments: $0, timeout: .seconds(10)).output()
     }
 
-    /// Every non-Apple plist of the folders of `scopes`; state only for agents in the user's GUI domain.
+    /// Path → pid of every running process whose path can be read (also root's, without root). Tests pass a fake.
+    static let runningPrograms: @Sendable () -> [String: Int] = {
+        let count = proc_listallpids(nil, 0)
+        guard count > 0 else { return [:] }
+        var pids = [pid_t](repeating: 0, count: Int(count) + 64)
+        let found = Int(proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size)))
+        var programs: [String: Int] = [:]
+        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        for pid in pids.prefix(max(found, 0)) where pid > 0 && proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 {
+            programs[String(cString: buffer)] = Int(pid)
+        }
+        return programs
+    }
+
+    /// Every non-Apple plist of the folders of `scopes`. State from the user's GUI domain; a system agent or daemon
+    /// whose program runs (`processes`) is running, a daemon's state is otherwise unknown (reading it needs root).
     @concurrent static func scan(appForID: @Sendable (String) -> URL?, policy: SafetyPolicy = .current,
                                  scopes: [LaunchAgent.Scope] = LaunchAgent.Scope.allCases,
-                                 read: Reader = launchctlReader) async -> [LaunchAgent] {
+                                 read: Reader = launchctlReader,
+                                 processes: @Sendable () -> [String: Int] = runningPrograms) async -> [LaunchAgent] {
         let list = parseList(await read(["list"]) ?? "")
         let disabled = parseDisabled(await read(["print-disabled", "gui/\(getuid())"]) ?? "")
+        let programs = scopes.contains(where: { $0 != .user }) ? processes() : [:]
         var agents: [LaunchAgent] = []
         for scope in scopes {
             let folder = folder(scope, policy: policy)
@@ -125,12 +147,15 @@ nonisolated enum LaunchAgents {
                 let dict = Self.read(url) ?? [:]
                 let (label, program) = info(dict, fileName: name)
                 guard !SafetyPolicy.isApple(label) else { continue }
-                let state = scope == .systemDaemon
+                var state = scope == .systemDaemon
                     ? .unknown : state(of: label, loaded: list.loaded, pids: list.pids, disabled: disabled)
+                if scope != .user, let program, let pid = programs[program] { state = .running(pid: pid) }
+                let programMissing = !Uninstaller.agentIsActive(url)
+                let owner = owner(program: program, label: label, associated: associatedIDs(dict), appForID: appForID)
                 agents.append(LaunchAgent(
-                    url: url, label: label, scope: scope, program: program,
-                    programMissing: !Uninstaller.agentIsActive(url),
-                    owner: owner(program: program, label: label, associated: associatedIDs(dict), appForID: appForID), state: state))
+                    url: url, label: label, scope: scope, program: program, programMissing: programMissing, owner: owner,
+                    state: state, removable: scope != .user && policy.allowsSystemLaunchAgent(url, label: label),
+                    appRemoved: programMissing && !(owner.map { FileManager.default.fileExists(atPath: $0.path) } ?? false)))
             }
         }
         return agents
@@ -239,5 +264,38 @@ nonisolated enum LaunchAgents {
         if let trashed { TrashRecords.add([trashed], module: "Login Items", home: policy.homeURL) }
         if let label { _ = await run(["bootout", service(label)]) } // by label, so it works once the plist is gone
         return Outcome(trashed: trashed)
+    }
+
+    /// Moves a system agent's or daemon's plist to the Trash through Finder (`move`, one admin password prompt), after
+    /// checking it against `allowsSystemLaunchAgent` and that its `Label` is still the one shown. Not stopped (that needs
+    /// root): it no longer starts after a restart. Not kept for Undo or `cleanmate restore`: moving it back needs the
+    /// password too, so Finder's Put Back does it. A cancelled prompt leaves it, saying so.
+    @concurrent static func removeSystem(_ agent: LaunchAgent, policy: SafetyPolicy = .current,
+                                         move: SafeRemoval.BatchMove = Uninstaller.recycleAll) async -> Outcome {
+        let allows: (URL) -> Bool = { policy.allowsSystemLaunchAgent($0, label: agent.label) }
+        guard !agent.isUser, allows(agent.url) else { return .failed(.refused) }
+        guard let dict = read(agent.url), info(dict, fileName: agent.url.lastPathComponent).label == agent.label
+        else { return .failed(.changed) }
+        let size = Int64((try? agent.url.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?.totalFileAllocatedSize ?? 0)
+        let (results, moveError) = await SafeRemoval.trashAll([agent.url], allows: allows, move: move)
+        let reason: CleanFailure.Reason
+        switch results[agent.url] {
+        case .success(let inTrash)?:
+            ActivityLog.record(module: "Login Items", item: agent.url.path, size: size, mode: .trash, home: policy.homeURL)
+            return Outcome(trashed: inTrash.map { TrashedItem(original: agent.url, inTrash: $0, size: size) })
+        case .failure(let failure)?:
+            let notMoved = if case .failed = failure { true } else { false }
+            if notMoved, (moveError as? CocoaError)?.code == .userCancelled {
+                reason = .kept(String(localized: "the admin password was not given"))
+            } else if notMoved, let finder = moveError as? FinderTrash.Failure {
+                reason = .other(finder.localizedDescription)
+            } else {
+                reason = .from(failure, at: agent.url)
+            }
+        case nil:
+            reason = .refused
+        }
+        ActivityLog.recordFailed(module: "Login Items", item: agent.url.path, reason: reason.logText, home: policy.homeURL)
+        return .failed(reason)
     }
 }

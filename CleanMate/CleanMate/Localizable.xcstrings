@@ -532,6 +532,16 @@
         }
       }
     },
+    "App Removed" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng đã gỡ"
+          }
+        }
+      }
+    },
     "App Store" : {
       "localizations" : {
         "vi" : {
@@ -1397,6 +1407,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tìm ảnh tương tự"
+          }
+        }
+      }
+    },
+    "Finder asks for your administrator password, then moves its file to the Trash. It is running now and keeps running until you restart the Mac; after that it no longer starts. To put it back, use Put Back in the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder sẽ hỏi mật khẩu quản trị rồi chuyển tệp của mục này vào Thùng rác. Mục đang chạy và vẫn chạy tới khi bạn khởi động lại máy Mac; sau đó không khởi chạy nữa. Để khôi phục, dùng Đặt lại trong Thùng rác."
+          }
+        }
+      }
+    },
+    "Finder asks for your administrator password, then moves its file to the Trash. It no longer starts after you restart the Mac. To put it back, use Put Back in the Trash." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder sẽ hỏi mật khẩu quản trị rồi chuyển tệp của mục này vào Thùng rác. Mục không khởi chạy nữa sau khi bạn khởi động lại máy Mac. Để khôi phục, dùng Đặt lại trong Thùng rác."
           }
         }
       }
@@ -3332,6 +3362,16 @@
         }
       }
     },
+    "Moved “%@” to the Trash. It stops after you restart the Mac." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chuyển “%@” vào Thùng rác. Mục này dừng sau khi bạn khởi động lại máy Mac."
+          }
+        }
+      }
+    },
     "No administrator password needed. For AI agents (Claude Code, Codex, Cursor…), install the Agent Skill:" : {
       "localizations" : {
         "vi" : {
@@ -5082,6 +5122,16 @@
         }
       }
     },
+    "Show in Trash" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện trong Thùng rác"
+          }
+        }
+      }
+    },
     "Show it in the Trash in Finder." : {
       "localizations" : {
         "vi" : {
@@ -5466,6 +5516,16 @@
         }
       }
     },
+    "System Agents & Daemons — removing one asks for your administrator password" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent & daemon hệ thống — gỡ một mục sẽ hỏi mật khẩu quản trị"
+          }
+        }
+      }
+    },
     "System Integrity Protection" : {
       "localizations" : {
         "vi" : {
@@ -5666,6 +5726,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Simulator này đang chạy. Hãy tắt rồi quét lại"
+          }
+        }
+      }
+    },
+    "To put it back, select it in the Trash and choose File › Put Back. Finder asks for your administrator password." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Để khôi phục, chọn mục trong Thùng rác rồi chọn Tệp › Đặt lại. Finder sẽ hỏi mật khẩu quản trị."
           }
         }
       }
@@ -9797,16 +9867,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hệ thống"
-          }
-        }
-      }
-    },
-    "System Agents & Daemons — require administrator, manage in System Settings" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Agent & daemon hệ thống — cần quyền quản trị, quản lý trong Cài đặt hệ thống"
           }
         }
       }

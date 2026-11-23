@@ -12,7 +12,8 @@ extension LaunchAgent.State {
     }
 }
 
-/// Login Items: the user's launch agents (disable, enable, remove) plus read-only agents and daemons in /Library.
+/// Login Items: the user's launch agents (disable, enable, remove) plus agents and daemons in /Library (third-party
+/// ones can be removed with the admin password).
 struct LaunchAgentsView: View {
     @ObservedObject var model: LaunchAgentsModel
     @State private var selection: URL?
@@ -46,7 +47,7 @@ struct LaunchAgentsView: View {
                     HStack(spacing: 4) {
                         Text(agent.state.title)
                         if agent.programMissing {
-                            Text("Program Missing")
+                            Text(agent.appRemoved ? "App Removed" : "Program Missing")
                                 .font(.subheadline)
                                 .padding(.horizontal, 4)
                                 .background(.orange.opacity(0.2), in: .capsule)
@@ -72,7 +73,7 @@ struct LaunchAgentsView: View {
                     Section {
                         ForEach(system) { TableRow($0) }
                     } header: {
-                        Text("System Agents & Daemons — require administrator, manage in System Settings")
+                        Text("System Agents & Daemons — removing one asks for your administrator password")
                     }
                 }
             }
@@ -102,7 +103,14 @@ struct LaunchAgentsView: View {
         }
         .safeAreaInset(edge: .bottom) {
             HStack {
-                if let removed = model.removed {
+                if let removed = model.removed, removed.system {
+                    Text("Moved “\(removed.label)” to the Trash. It stops after you restart the Mac.")
+                        .lineLimit(1).truncationMode(.middle)
+                    if let inTrash = removed.trashed?.inTrash {
+                        Button("Show in Trash") { NSWorkspace.shared.activateFileViewerSelecting([inTrash]) }
+                            .help("To put it back, select it in the Trash and choose File › Put Back. Finder asks for your administrator password.")
+                    }
+                } else if let removed = model.removed {
                     Text("Moved “\(removed.label)” to the Trash.").lineLimit(1).truncationMode(.middle)
                     Button("Undo") { Task { await model.undoRemove() } }
                         .help("Put the agent’s file back where it was and load it again.")
@@ -112,7 +120,7 @@ struct LaunchAgentsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if let agent = selected, agent.isUser { actions(agent) }
+                if let agent = selected, agent.isUser || agent.removable { actions(agent) }
                 Button("Refresh") { Task { await model.load() } }
             }
             .disabled(model.working)
@@ -129,8 +137,14 @@ struct LaunchAgentsView: View {
             presenting: removing
         ) { agent in
             Button("Move to Trash", role: .destructive) { Task { await model.remove(agent) } }
-        } message: { _ in
-            Text("The agent is stopped and its file is moved to the Trash. Undo puts it back and loads it again.")
+        } message: { agent in
+            if agent.isUser {
+                Text("The agent is stopped and its file is moved to the Trash. Undo puts it back and loads it again.")
+            } else if case .running = agent.state {
+                Text("Finder asks for your administrator password, then moves its file to the Trash. It is running now and keeps running until you restart the Mac; after that it no longer starts. To put it back, use Put Back in the Trash.")
+            } else {
+                Text("Finder asks for your administrator password, then moves its file to the Trash. It no longer starts after you restart the Mac. To put it back, use Put Back in the Trash.")
+            }
         }
         .alert(
             problemTitle,
@@ -182,6 +196,8 @@ struct LaunchAgentsView: View {
             } else {
                 Button("Disable") { Task { await model.disable(agent) } }
             }
+            Button("Remove…") { removing = agent }
+        } else if agent.removable {
             Button("Remove…") { removing = agent }
         }
     }

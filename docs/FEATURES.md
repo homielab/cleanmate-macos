@@ -290,13 +290,15 @@ Remove apps with their data, reset apps, and find leftovers (⌘6). Everything g
 
 ## Login Items
 
-Your launch agents (⌘7): disable, enable or remove. Removed agents go to the Trash and can be put back.
+Your launch agents (⌘7): disable, enable or remove; third-party agents and daemons in /Library: remove. Removed items go to the Trash and can be put back.
 
 - Your launch agents with owner app and state: disable, enable or remove (plist to the Trash).
 - After a removal the bar offers **Undo** (also ⌘Z), which puts the plist back and loads the agent again, and **View Moved Items…**; later, `cleanmate restore --list` lists it and `cleanmate restore` puts it back (then log in again).
 - When an action fails, the alert gives the real reason: what `launchctl` printed with its exit code, or the file system's (not permitted, locked, in use), plus **Open Settings…** when Full Disk Access would help.
 - The plist's Label is read again right before; if it changed, can't be read or another plist in the folder uses the same Label, CleanMate refuses instead of touching another service.
-- System agents are read-only.
+- Third-party agents and daemons in /Library/LaunchAgents and /Library/LaunchDaemons are listed with their app and **Running** when their program runs; **App Removed** marks one whose program and app are gone. Apple's are never listed; CleanMate's own are listed but never removed.
+- **Remove…** on one of them: Finder moves its plist to the Trash after one administrator password prompt (the first time, macOS asks to let CleanMate control Finder). It stops starting after a restart; one running now keeps running until then (stopping it needs root). There is no Disable and no Undo: put it back with **Put Back** in the Trash, which asks for the password. Cancelling the prompt leaves it, and the alert says so.
+- `cleanmate login-items` lists them too, but only removes your own agents.
 
 ## Maintenance
 
